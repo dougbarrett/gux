@@ -5,6 +5,7 @@ package main
 import (
 	"context"
 	"syscall/js"
+	"time"
 
 	"goquery/components"
 	"goquery/example/api"
@@ -140,6 +141,7 @@ func showComponents() {
 			{Label: "Forms", Content: formsDemo()},
 			{Label: "Feedback", Content: feedbackDemo()},
 			{Label: "Data", Content: dataDemo()},
+			{Label: "New", Content: newComponentsDemo()},
 		},
 	})
 
@@ -328,6 +330,137 @@ func dataDemo() js.Value {
 	return components.Div("space-y-4",
 		components.H3("Table"),
 		table.Element(),
+	)
+}
+
+func newComponentsDemo() js.Value {
+	// Progress bars
+	progress := components.NewProgress(components.ProgressProps{
+		Value:   65,
+		Variant: components.ProgressPrimary,
+		Label:   "Upload Progress",
+	})
+
+	progressStriped := components.NewProgress(components.ProgressProps{
+		Value:    45,
+		Variant:  components.ProgressSuccess,
+		Striped:  true,
+		Animated: true,
+	})
+
+	// Avatars
+	avatarGroup := components.AvatarGroup([]components.AvatarProps{
+		{Name: "John Doe", Status: "online"},
+		{Name: "Jane Smith", Status: "away"},
+		{Name: "Bob Wilson", Status: "offline"},
+		{Name: "Alice Brown", Status: "busy"},
+		{Name: "Charlie Davis"},
+	}, 4)
+
+	// Accordion
+	accordion := components.NewAccordion(components.AccordionProps{
+		Items: []components.AccordionItem{
+			{
+				Title:   "What is GoQuery?",
+				Content: components.Text("GoQuery is a Go WebAssembly framework for building web applications entirely in Go."),
+			},
+			{
+				Title:   "How does it work?",
+				Content: components.Text("It compiles Go code to WebAssembly and provides component APIs for DOM manipulation."),
+			},
+			{
+				Title:   "Is it production ready?",
+				Content: components.Text("It's a proof of concept demonstrating the capabilities of Go WASM for web development."),
+			},
+		},
+		AllowMultiple: true,
+	})
+
+	// Date picker
+	datePicker := components.NewDatePicker(components.DatePickerProps{
+		Label:       "Select Date",
+		Placeholder: "Choose a date",
+		OnChange: func(t time.Time) {
+			components.Toast("Date selected: "+t.Format("Jan 2, 2006"), components.ToastInfo)
+		},
+	})
+
+	// Stepper
+	stepper := components.NewStepper(components.StepperProps{
+		Steps: []components.Step{
+			{Title: "Account", Description: "Create account"},
+			{Title: "Profile", Description: "Set up profile"},
+			{Title: "Complete", Description: "All done!"},
+		},
+		CurrentStep: 1,
+	})
+
+	// Breadcrumbs
+	breadcrumbs := components.Breadcrumbs(components.BreadcrumbsProps{
+		Items: []components.BreadcrumbItem{
+			{Label: "Home", Path: "/"},
+			{Label: "Components", Path: "/components"},
+			{Label: "New"},
+		},
+	})
+
+	// Tooltip demo button
+	tooltipBtn := components.WithTooltip(
+		components.Button(components.ButtonProps{
+			Text: "Hover me for tooltip",
+		}),
+		components.TooltipProps{
+			Text:     "This is a helpful tooltip!",
+			Position: components.TooltipTop,
+		},
+	)
+
+	return components.Div("space-y-6",
+		// Breadcrumbs section
+		components.H3("Breadcrumbs"),
+		breadcrumbs,
+
+		// Progress section
+		components.H3("Progress Bars"),
+		components.Div("space-y-3",
+			progress.Element(),
+			progressStriped.Element(),
+		),
+
+		// Skeleton section
+		components.H3("Skeleton Loaders"),
+		components.Div("flex gap-4",
+			components.SkeletonAvatar("w-12 h-12"),
+			components.Div("flex-1", components.SkeletonText(2)),
+		),
+
+		// Avatar section
+		components.H3("Avatars"),
+		components.Div("flex items-center gap-4",
+			components.Avatar(components.AvatarProps{Name: "John Doe", Size: components.AvatarLG, Status: "online"}),
+			components.Avatar(components.AvatarProps{Name: "Jane Smith", Size: components.AvatarMD, Status: "away"}),
+			avatarGroup,
+		),
+
+		// Tooltip section
+		components.H3("Tooltip"),
+		tooltipBtn,
+
+		// Clipboard section
+		components.H3("Clipboard"),
+		components.CopyableText("npm install goquery"),
+
+		// Date Picker section
+		components.H3("Date Picker"),
+		datePicker.Element(),
+
+		// Accordion section
+		components.H3("Accordion"),
+		accordion.Element(),
+
+		// Stepper section
+		components.H3("Stepper"),
+		stepper.Element(),
 	)
 }
 
