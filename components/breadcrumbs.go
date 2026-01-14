@@ -37,7 +37,7 @@ func Breadcrumbs(props BreadcrumbsProps) js.Value {
 		// Separator (except before first item)
 		if i > 0 {
 			sep := document.Call("createElement", "span")
-			sep.Set("className", "text-gray-400")
+			sep.Set("className", "text-gray-400 dark:text-gray-500")
 			sep.Set("textContent", separator)
 			nav.Call("appendChild", sep)
 		}
@@ -59,7 +59,7 @@ func Breadcrumbs(props BreadcrumbsProps) js.Value {
 		if item.Path != "" && !isLast {
 			link := document.Call("createElement", "a")
 			link.Set("href", item.Path)
-			link.Set("className", "text-blue-600 hover:text-blue-800 hover:underline")
+			link.Set("className", "text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:underline")
 			link.Set("textContent", item.Label)
 
 			// Handle click for SPA routing
@@ -75,10 +75,10 @@ func Breadcrumbs(props BreadcrumbsProps) js.Value {
 		} else {
 			text := document.Call("createElement", "span")
 			if isLast {
-				text.Set("className", "text-gray-500 font-medium")
+				text.Set("className", "text-gray-500 dark:text-gray-400 font-medium")
 				text.Set("aria-current", "page")
 			} else {
-				text.Set("className", "text-gray-600")
+				text.Set("className", "text-gray-600 dark:text-gray-400")
 			}
 			text.Set("textContent", item.Label)
 			itemEl.Call("appendChild", text)

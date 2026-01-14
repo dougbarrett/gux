@@ -49,7 +49,7 @@ func NewTabs(props TabsProps) *Tabs {
 
 	// Tab list
 	tabList := document.Call("createElement", "div")
-	tabList.Set("className", "border-b border-gray-200")
+	tabList.Set("className", "border-b border-gray-200 dark:border-gray-700")
 
 	tabNav := document.Call("createElement", "nav")
 	tabNav.Set("className", "flex space-x-8")
@@ -123,8 +123,8 @@ func (t *Tabs) ActiveIndex() int {
 }
 
 func (t *Tabs) updateStyles() {
-	activeClass := "border-b-2 border-blue-500 text-blue-600 py-2 px-1 font-medium text-sm cursor-pointer"
-	inactiveClass := "border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 py-2 px-1 font-medium text-sm cursor-pointer"
+	activeClass := "border-b-2 border-blue-500 text-blue-600 dark:text-blue-400 py-2 px-1 font-medium text-sm cursor-pointer"
+	inactiveClass := "border-b-2 border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600 py-2 px-1 font-medium text-sm cursor-pointer"
 
 	for i := range t.tabButtons {
 		if i == t.activeIndex {

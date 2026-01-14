@@ -109,14 +109,14 @@ func NewToggle(props ToggleProps) *Toggle {
 
 		if props.Label != "" {
 			label := document.Call("createElement", "div")
-			label.Set("className", "text-sm font-medium text-gray-900")
+			label.Set("className", "text-sm font-medium text-gray-900 dark:text-gray-100")
 			label.Set("textContent", props.Label)
 			textContainer.Call("appendChild", label)
 		}
 
 		if props.Description != "" {
 			desc := document.Call("createElement", "div")
-			desc.Set("className", "text-xs text-gray-500")
+			desc.Set("className", "text-xs text-gray-500 dark:text-gray-400")
 			desc.Set("textContent", props.Description)
 			textContainer.Call("appendChild", desc)
 		}
@@ -151,7 +151,13 @@ func (t *Toggle) updateTrackColor(toggle js.Value) {
 	if t.checked {
 		toggle.Get("style").Set("backgroundColor", "#3b82f6") // blue-500
 	} else {
-		toggle.Get("style").Set("backgroundColor", "#d1d5db") // gray-300
+		// Check if dark mode is active
+		isDark := js.Global().Get("document").Get("documentElement").Get("classList").Call("contains", "dark").Bool()
+		if isDark {
+			toggle.Get("style").Set("backgroundColor", "#4b5563") // gray-600
+		} else {
+			toggle.Get("style").Set("backgroundColor", "#d1d5db") // gray-300
+		}
 	}
 }
 

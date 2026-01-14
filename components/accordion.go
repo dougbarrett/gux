@@ -28,7 +28,7 @@ func NewAccordion(props AccordionProps) *Accordion {
 	document := js.Global().Get("document")
 
 	container := document.Call("createElement", "div")
-	container.Set("className", "border border-gray-200 rounded-lg divide-y divide-gray-200")
+	container.Set("className", "border border-gray-200 dark:border-gray-700 rounded-lg divide-y divide-gray-200 dark:divide-gray-700")
 
 	acc := &Accordion{
 		element: container,
@@ -52,18 +52,18 @@ func (a *Accordion) createPanel(item AccordionItem, index int, allowMultiple boo
 
 	// Header button
 	header := document.Call("createElement", "button")
-	header.Set("className", "w-full px-4 py-3 flex items-center justify-between text-left hover:bg-gray-50 focus:outline-none focus:bg-gray-50 transition-colors cursor-pointer")
+	header.Set("className", "w-full px-4 py-3 flex items-center justify-between text-left hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:bg-gray-50 dark:focus:bg-gray-700 transition-colors cursor-pointer")
 	header.Set("type", "button")
 
 	title := document.Call("createElement", "span")
-	title.Set("className", "font-medium text-gray-900")
+	title.Set("className", "font-medium text-gray-900 dark:text-gray-100")
 	title.Set("textContent", item.Title)
 	header.Call("appendChild", title)
 
 	// Chevron icon
 	chevron := document.Call("createElement", "span")
 	chevron.Set("className", "transform transition-transform duration-200")
-	chevron.Set("innerHTML", `<svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>`)
+	chevron.Set("innerHTML", `<svg class="w-5 h-5 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>`)
 	header.Call("appendChild", chevron)
 
 	panel.Call("appendChild", header)
@@ -73,7 +73,7 @@ func (a *Accordion) createPanel(item AccordionItem, index int, allowMultiple boo
 	content.Set("className", "overflow-hidden transition-all duration-200")
 
 	contentInner := document.Call("createElement", "div")
-	contentInner.Set("className", "px-4 py-3 text-gray-600")
+	contentInner.Set("className", "px-4 py-3 text-gray-600 dark:text-gray-300")
 	contentInner.Call("appendChild", item.Content)
 	content.Call("appendChild", contentInner)
 

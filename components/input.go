@@ -54,7 +54,7 @@ func NewInput(props InputProps) *Input {
 	// Label
 	if props.Label != "" {
 		label := document.Call("createElement", "label")
-		label.Set("className", "block text-sm font-medium text-gray-700 mb-1")
+		label.Set("className", "block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1")
 		label.Set("textContent", props.Label)
 		container.Call("appendChild", label)
 		inp.label = label
@@ -62,9 +62,9 @@ func NewInput(props InputProps) *Input {
 
 	// Input field
 	input := document.Call("createElement", "input")
-	className := "w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+	className := "w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 placeholder-gray-400 dark:placeholder-gray-500"
 	if props.Disabled {
-		className += " bg-gray-100 cursor-not-allowed"
+		className += " bg-gray-100 dark:bg-gray-800 cursor-not-allowed"
 	}
 	if props.ClassName != "" {
 		className = props.ClassName
@@ -133,12 +133,12 @@ func (i *Input) Focus() {
 
 // SetError adds error styling to the input
 func (i *Input) SetError(message string) {
-	i.input.Set("className", "w-full px-3 py-2 border border-red-500 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500")
+	i.input.Set("className", "w-full px-3 py-2 border border-red-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500")
 }
 
 // ClearError removes error styling
 func (i *Input) ClearError() {
-	i.input.Set("className", "w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500")
+	i.input.Set("className", "w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500")
 }
 
 // Quick input constructors

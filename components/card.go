@@ -18,7 +18,7 @@ func Card(children ...js.Value) js.Value {
 
 // CardWithClass creates a card with additional custom classes.
 func CardWithClass(extraClass string, children ...js.Value) js.Value {
-	className := "bg-white rounded-lg shadow p-6"
+	className := "bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-900 p-6"
 	if extraClass != "" {
 		className += " " + extraClass
 	}

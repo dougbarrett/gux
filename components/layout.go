@@ -35,7 +35,7 @@ func NewLayout(props LayoutProps) *Layout {
 	mainArea.Call("appendChild", header.Element())
 
 	content := document.Call("createElement", "main")
-	content.Set("className", "flex-1 p-6 bg-gray-100 overflow-auto")
+	content.Set("className", "flex-1 p-6 bg-gray-100 dark:bg-gray-900 overflow-auto")
 	mainArea.Call("appendChild", content)
 
 	container.Call("appendChild", mainArea)

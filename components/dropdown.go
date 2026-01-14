@@ -61,7 +61,7 @@ func NewDropdown(props DropdownProps) *Dropdown {
 		alignClass = "right-0"
 	}
 
-	className := "absolute " + alignClass + " mt-2 bg-white rounded-md shadow-lg border border-gray-200 py-1 z-50 hidden"
+	className := "absolute " + alignClass + " mt-2 bg-white dark:bg-gray-800 rounded-md shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-50 hidden"
 	if props.ClassName != "" {
 		className += " " + props.ClassName
 	}
@@ -75,7 +75,7 @@ func NewDropdown(props DropdownProps) *Dropdown {
 	for _, item := range props.Items {
 		if item.Divider {
 			divider := document.Call("createElement", "div")
-			divider.Set("className", "border-t border-gray-200 my-1")
+			divider.Set("className", "border-t border-gray-200 dark:border-gray-700 my-1")
 			menu.Call("appendChild", divider)
 			continue
 		}
@@ -83,9 +83,9 @@ func NewDropdown(props DropdownProps) *Dropdown {
 		menuItem := document.Call("createElement", "button")
 		itemClass := "w-full text-left px-4 py-2 text-sm flex items-center gap-2"
 		if item.Disabled {
-			itemClass += " text-gray-400 cursor-not-allowed"
+			itemClass += " text-gray-400 dark:text-gray-500 cursor-not-allowed"
 		} else {
-			itemClass += " text-gray-700 hover:bg-gray-100 cursor-pointer"
+			itemClass += " text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer"
 		}
 		menuItem.Set("className", itemClass)
 		menuItem.Set("disabled", item.Disabled)
@@ -190,7 +190,7 @@ func ActionDropdown(buttonText string, items []DropdownItem) *Dropdown {
 func IconDropdown(icon string, items []DropdownItem) *Dropdown {
 	document := js.Global().Get("document")
 	trigger := document.Call("createElement", "button")
-	trigger.Set("className", "p-2 hover:bg-gray-100 rounded-full text-gray-600")
+	trigger.Set("className", "p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full text-gray-600 dark:text-gray-300")
 	trigger.Set("textContent", icon)
 
 	return NewDropdown(DropdownProps{

@@ -9,12 +9,12 @@ import (
 
 // Default heading classes by level
 var headingClasses = map[int]string{
-	1: "text-3xl font-bold mb-6",
-	2: "text-lg font-semibold mb-4",
-	3: "text-base font-semibold mb-3",
-	4: "text-sm font-semibold mb-2",
-	5: "text-xs font-semibold mb-2",
-	6: "text-xs font-medium mb-1",
+	1: "text-3xl font-bold mb-6 text-gray-900 dark:text-gray-100",
+	2: "text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100",
+	3: "text-base font-semibold mb-3 text-gray-900 dark:text-gray-100",
+	4: "text-sm font-semibold mb-2 text-gray-900 dark:text-gray-100",
+	5: "text-xs font-semibold mb-2 text-gray-900 dark:text-gray-100",
+	6: "text-xs font-medium mb-1 text-gray-900 dark:text-gray-100",
 }
 
 // Heading creates a heading element (h1-h6) with appropriate styling.

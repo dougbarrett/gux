@@ -40,25 +40,25 @@ func NewTable(props TableProps) *Table {
 	container.Set("className", "overflow-x-auto")
 
 	table := document.Call("createElement", "table")
-	tableClass := "min-w-full divide-y divide-gray-200"
+	tableClass := "min-w-full divide-y divide-gray-200 dark:divide-gray-700"
 	if props.Bordered {
-		tableClass += " border border-gray-200"
+		tableClass += " border border-gray-200 dark:border-gray-700"
 	}
 	table.Set("className", tableClass)
 
 	// Header
 	thead := document.Call("createElement", "thead")
-	thead.Set("className", "bg-gray-50")
+	thead.Set("className", "bg-gray-50 dark:bg-gray-800")
 
 	headerRow := document.Call("createElement", "tr")
 	for _, col := range props.Columns {
 		th := document.Call("createElement", "th")
-		thClass := "px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+		thClass := "px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
 		if props.Compact {
-			thClass = "px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+			thClass = "px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
 		}
 		if props.Bordered {
-			thClass += " border-b border-gray-200"
+			thClass += " border-b border-gray-200 dark:border-gray-700"
 		}
 		if col.Width != "" {
 			th.Get("style").Set("width", col.Width)
@@ -72,7 +72,7 @@ func NewTable(props TableProps) *Table {
 
 	// Body
 	tbody := document.Call("createElement", "tbody")
-	tbodyClass := "bg-white divide-y divide-gray-200"
+	tbodyClass := "bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700"
 	tbody.Set("className", tbodyClass)
 	table.Call("appendChild", tbody)
 
@@ -107,10 +107,10 @@ func (t *Table) SetData(data []map[string]any) {
 
 		rowClass := ""
 		if t.props.Striped && i%2 == 1 {
-			rowClass = "bg-gray-50"
+			rowClass = "bg-gray-50 dark:bg-gray-800"
 		}
 		if t.props.Hoverable {
-			rowClass += " hover:bg-gray-100"
+			rowClass += " hover:bg-gray-100 dark:hover:bg-gray-800"
 		}
 		if t.props.OnRowClick != nil {
 			rowClass += " cursor-pointer"
@@ -125,12 +125,12 @@ func (t *Table) SetData(data []map[string]any) {
 
 		for _, col := range t.columns {
 			td := document.Call("createElement", "td")
-			tdClass := "px-6 py-4 whitespace-nowrap text-sm text-gray-900"
+			tdClass := "px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100"
 			if t.props.Compact {
-				tdClass = "px-4 py-2 whitespace-nowrap text-sm text-gray-900"
+				tdClass = "px-4 py-2 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100"
 			}
 			if t.props.Bordered {
-				tdClass += " border-b border-gray-200"
+				tdClass += " border-b border-gray-200 dark:border-gray-700"
 			}
 			if col.ClassName != "" {
 				tdClass = col.ClassName

@@ -49,7 +49,7 @@ func NewModal(props ModalProps) *Modal {
 	}
 
 	modal := document.Call("createElement", "div")
-	modal.Set("className", "bg-white rounded-lg shadow-xl "+widthClass+" w-full mx-4 max-h-[90vh] flex flex-col")
+	modal.Set("className", "bg-white dark:bg-gray-800 rounded-lg shadow-xl "+widthClass+" w-full mx-4 max-h-[90vh] flex flex-col")
 
 	m := &Modal{
 		overlay: overlay,
@@ -59,15 +59,15 @@ func NewModal(props ModalProps) *Modal {
 	// Header
 	if props.Title != "" {
 		header := document.Call("createElement", "div")
-		header.Set("className", "flex justify-between items-center px-6 py-4 border-b")
+		header.Set("className", "flex justify-between items-center px-6 py-4 border-b border-gray-200 dark:border-gray-700")
 
 		title := document.Call("createElement", "h3")
-		title.Set("className", "text-lg font-semibold text-gray-900")
+		title.Set("className", "text-lg font-semibold text-gray-900 dark:text-gray-100")
 		title.Set("textContent", props.Title)
 		header.Call("appendChild", title)
 
 		closeBtn := document.Call("createElement", "button")
-		closeBtn.Set("className", "text-gray-400 hover:text-gray-600 text-2xl leading-none cursor-pointer")
+		closeBtn.Set("className", "text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-2xl leading-none cursor-pointer")
 		closeBtn.Set("innerHTML", "&times;")
 		closeBtn.Call("addEventListener", "click", js.FuncOf(func(this js.Value, args []js.Value) any {
 			m.Close()
@@ -90,7 +90,7 @@ func NewModal(props ModalProps) *Modal {
 	// Footer
 	if !props.Footer.IsUndefined() && !props.Footer.IsNull() {
 		footer := document.Call("createElement", "div")
-		footer.Set("className", "px-6 py-4 border-t bg-gray-50 rounded-b-lg")
+		footer.Set("className", "px-6 py-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 rounded-b-lg")
 		footer.Call("appendChild", props.Footer)
 		modal.Call("appendChild", footer)
 	}

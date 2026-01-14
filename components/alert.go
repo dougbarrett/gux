@@ -20,10 +20,10 @@ var alertStyles = map[AlertVariant]struct {
 	text   string
 	icon   string
 }{
-	AlertInfo:    {bg: "bg-blue-50", border: "border-blue-200", text: "text-blue-800", icon: "ℹ️"},
-	AlertSuccess: {bg: "bg-green-50", border: "border-green-200", text: "text-green-800", icon: "✓"},
-	AlertWarning: {bg: "bg-yellow-50", border: "border-yellow-200", text: "text-yellow-800", icon: "⚠️"},
-	AlertError:   {bg: "bg-red-50", border: "border-red-200", text: "text-red-800", icon: "✕"},
+	AlertInfo:    {bg: "bg-blue-50 dark:bg-blue-900/30", border: "border-blue-200 dark:border-blue-700", text: "text-blue-800 dark:text-blue-300", icon: "ℹ️"},
+	AlertSuccess: {bg: "bg-green-50 dark:bg-green-900/30", border: "border-green-200 dark:border-green-700", text: "text-green-800 dark:text-green-300", icon: "✓"},
+	AlertWarning: {bg: "bg-yellow-50 dark:bg-yellow-900/30", border: "border-yellow-200 dark:border-yellow-700", text: "text-yellow-800 dark:text-yellow-300", icon: "⚠️"},
+	AlertError:   {bg: "bg-red-50 dark:bg-red-900/30", border: "border-red-200 dark:border-red-700", text: "text-red-800 dark:text-red-300", icon: "✕"},
 }
 
 // AlertProps configures an Alert component

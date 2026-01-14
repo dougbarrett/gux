@@ -30,10 +30,10 @@ func NewHeader(props HeaderProps) *Header {
 	document := js.Global().Get("document")
 
 	header := document.Call("createElement", "header")
-	header.Set("className", "bg-white shadow px-6 py-4 flex justify-between items-center")
+	header.Set("className", "bg-white dark:bg-gray-800 shadow dark:shadow-gray-900 px-6 py-4 flex justify-between items-center")
 
 	title := document.Call("createElement", "h1")
-	title.Set("className", "text-2xl font-semibold text-gray-800")
+	title.Set("className", "text-2xl font-semibold text-gray-800 dark:text-gray-100")
 	title.Set("textContent", props.Title)
 	header.Call("appendChild", title)
 
@@ -52,7 +52,7 @@ func NewHeader(props HeaderProps) *Header {
 	for _, action := range props.Actions {
 		btn := Button(ButtonProps{
 			Text:      action.Label,
-			ClassName: "px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded transition-colors cursor-pointer",
+			ClassName: "px-3 py-1 text-sm bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 rounded transition-colors cursor-pointer",
 			OnClick:   action.OnClick,
 		})
 		actionsDiv.Call("appendChild", btn)

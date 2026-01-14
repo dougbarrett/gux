@@ -15,10 +15,10 @@ const (
 )
 
 var textVariantClasses = map[TextVariant]string{
-	TextDefault: "text-gray-800",
-	TextMuted:   "text-gray-600",
-	TextError:   "text-red-500",
-	TextSuccess: "text-green-500",
+	TextDefault: "text-gray-800 dark:text-gray-200",
+	TextMuted:   "text-gray-600 dark:text-gray-400",
+	TextError:   "text-red-500 dark:text-red-400",
+	TextSuccess: "text-green-500 dark:text-green-400",
 }
 
 // Text creates a paragraph element with text content.
