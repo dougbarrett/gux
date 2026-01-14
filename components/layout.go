@@ -68,3 +68,14 @@ func (l *Layout) SetContent(content js.Value) {
 	l.contentEl.Set("innerHTML", "")
 	l.contentEl.Call("appendChild", content)
 }
+
+// SetPage is a convenience method that wraps content in a TitledCard
+func (l *Layout) SetPage(title, description string, content ...js.Value) {
+	l.SetContent(TitledCard(title, description, content...))
+}
+
+// SetPageWithHeader sets page content and updates the header title
+func (l *Layout) SetPageWithHeader(title, description string, content ...js.Value) {
+	l.header.SetTitle(title)
+	l.SetContent(TitledCard(title, description, content...))
+}

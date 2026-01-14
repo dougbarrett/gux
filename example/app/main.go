@@ -87,9 +87,8 @@ func main() {
 func showDashboard() {
 	layout.SetContent(
 		components.Div("space-y-4",
-			components.Card(
-				components.H2("Welcome to the Admin Dashboard"),
-				components.Text("This is a proof of concept admin dashboard built entirely with Go WASM. Select an option from the sidebar to explore."),
+			components.TitledCard("Welcome to the Admin Dashboard",
+				"This is a proof of concept admin dashboard built entirely with Go WASM. Select an option from the sidebar to explore.",
 			),
 			components.Div("grid grid-cols-1 md:grid-cols-3 gap-4",
 				statCard("Total Posts", "3", components.BadgePrimary),
@@ -111,31 +110,16 @@ func statCard(label, value string, variant components.BadgeVariant) js.Value {
 }
 
 func showAPITest() {
-	layout.SetContent(
-		components.Card(
-			components.H2("API Test"),
-			components.Div("flex gap-2 mb-4",
-				components.Button(components.ButtonProps{
-					Text: "Fetch Post #1",
-					OnClick: func() {
-						go fetchSinglePost()
-					},
-				}),
-				components.Button(components.ButtonProps{
-					Text:      "Fetch All Posts",
-					ClassName: "px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 cursor-pointer transition-colors",
-					OnClick: func() {
-						go fetchAllPosts()
-					},
-				}),
-			),
-			display.Element(),
+	layout.SetPage("API Test", "",
+		components.Div("flex gap-2 mb-4",
+			components.PrimaryButton("Fetch Post #1", func() { go fetchSinglePost() }),
+			components.SuccessButton("Fetch All Posts", func() { go fetchAllPosts() }),
 		),
+		display.Element(),
 	)
 }
 
 func showComponents() {
-	// Create tabs for component showcase
 	tabs := components.NewTabs(components.TabsProps{
 		Tabs: []components.Tab{
 			{Label: "Forms", Content: formsDemo()},
@@ -145,43 +129,20 @@ func showComponents() {
 		},
 	})
 
-	layout.SetContent(
-		components.Card(
-			components.H2("Component Showcase"),
-			components.Text("Explore the available UI components."),
-			components.Div("mt-4", tabs.Element()),
-		),
+	layout.SetPage("Component Showcase", "Explore the available UI components.",
+		components.Div("mt-4", tabs.Element()),
 	)
 }
 
 func formsDemo() js.Value {
-	nameInput := components.NewInput(components.InputProps{
-		Label:       "Name",
-		Placeholder: "Enter your name",
-	})
-
-	emailInput := components.NewInput(components.InputProps{
-		Type:        components.InputEmail,
-		Label:       "Email",
-		Placeholder: "you@example.com",
-	})
-
+	nameInput := components.TextInput("Name", "Enter your name")
+	emailInput := components.EmailInput("Email", "you@example.com")
 	bioTextArea := components.NewTextArea(components.TextAreaProps{
 		Label:       "Bio",
 		Placeholder: "Tell us about yourself...",
 		Rows:        3,
 	})
-
-	roleSelect := components.NewSelect(components.SelectProps{
-		Label:       "Role",
-		Placeholder: "Select a role",
-		Options: []components.SelectOption{
-			{Label: "Admin", Value: "admin"},
-			{Label: "Editor", Value: "editor"},
-			{Label: "Viewer", Value: "viewer"},
-		},
-	})
-
+	roleSelect := components.SimpleSelectWithPlaceholder("Role", "Select a role", "Admin", "Editor", "Viewer")
 	notifyCheckbox := components.NewCheckbox(components.CheckboxProps{
 		Label:   "Receive email notifications",
 		Checked: true,
@@ -193,11 +154,8 @@ func formsDemo() js.Value {
 		bioTextArea.Element(),
 		roleSelect.Element(),
 		notifyCheckbox.Element(),
-		components.Button(components.ButtonProps{
-			Text: "Submit Form",
-			OnClick: func() {
-				js.Global().Call("alert", "Name: "+nameInput.Value()+"\nEmail: "+emailInput.Value())
-			},
+		components.PrimaryButton("Submit Form", func() {
+			js.Global().Call("alert", "Name: "+nameInput.Value()+"\nEmail: "+emailInput.Value())
 		}),
 	)
 }
@@ -205,93 +163,66 @@ func formsDemo() js.Value {
 func feedbackDemo() js.Value {
 	// Create modal
 	modal = components.NewModal(components.ModalProps{
-		Title: "Confirm Action",
-		Content: components.Div("",
-			components.Text("Are you sure you want to proceed with this action?"),
-		),
+		Title:   "Confirm Action",
+		Content: components.Text("Are you sure you want to proceed with this action?"),
 		Footer: components.Div("flex justify-end gap-2",
-			components.Button(components.ButtonProps{
-				Text:      "Cancel",
-				ClassName: "px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 cursor-pointer transition-colors",
-				OnClick: func() {
-					modal.Close()
-				},
-			}),
-			components.Button(components.ButtonProps{
-				Text: "Confirm",
-				OnClick: func() {
-					modal.Close()
-					components.Toast("Action confirmed!", components.ToastSuccess)
-				},
+			components.SecondaryButton("Cancel", func() { modal.Close() }),
+			components.PrimaryButton("Confirm", func() {
+				modal.Close()
+				components.Toast("Action confirmed!", components.ToastSuccess)
 			}),
 		),
 		CloseOnEsc: true,
 	})
 
 	return components.Div("space-y-4",
-		components.H3("Toasts"),
-		components.Div("flex flex-wrap gap-2",
-			components.Button(components.ButtonProps{
-				Text:      "Info Toast",
-				ClassName: "px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 cursor-pointer",
-				OnClick: func() {
+		components.Section("Toasts",
+			components.Div("flex flex-wrap gap-2",
+				components.Button(components.ButtonProps{Text: "Info Toast", Variant: components.ButtonInfo, Size: components.ButtonSM, OnClick: func() {
 					components.Toast("This is an info message", components.ToastInfo)
-				},
-			}),
-			components.Button(components.ButtonProps{
-				Text:      "Success Toast",
-				ClassName: "px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600 cursor-pointer",
-				OnClick: func() {
+				}}),
+				components.Button(components.ButtonProps{Text: "Success Toast", Variant: components.ButtonSuccess, Size: components.ButtonSM, OnClick: func() {
 					components.Toast("Operation successful!", components.ToastSuccess)
-				},
-			}),
-			components.Button(components.ButtonProps{
-				Text:      "Warning Toast",
-				ClassName: "px-3 py-1 bg-yellow-500 text-white rounded hover:bg-yellow-600 cursor-pointer",
-				OnClick: func() {
+				}}),
+				components.Button(components.ButtonProps{Text: "Warning Toast", Variant: components.ButtonWarning, Size: components.ButtonSM, OnClick: func() {
 					components.Toast("Please be careful!", components.ToastWarning)
-				},
-			}),
-			components.Button(components.ButtonProps{
-				Text:      "Error Toast",
-				ClassName: "px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 cursor-pointer",
-				OnClick: func() {
+				}}),
+				components.Button(components.ButtonProps{Text: "Error Toast", Variant: components.ButtonDanger, Size: components.ButtonSM, OnClick: func() {
 					components.Toast("Something went wrong!", components.ToastError)
-				},
-			}),
+				}}),
+			),
 		),
 
-		components.H3("Alerts"),
-		components.AlertInfoMsg("This is an informational message."),
-		components.AlertSuccessMsg("Operation completed successfully!"),
-		components.AlertWarningMsg("Please review before continuing."),
-		components.AlertErrorMsg("An error occurred while processing."),
-
-		components.H3("Badges"),
-		components.Div("flex flex-wrap gap-2",
-			components.BadgeText("Default"),
-			components.BadgePrimaryText("Primary"),
-			components.BadgeSuccessText("Success"),
-			components.BadgeWarningText("Warning"),
-			components.BadgeErrorText("Error"),
-			components.BadgeInfoText("Info"),
+		components.Section("Alerts",
+			components.AlertInfoMsg("This is an informational message."),
+			components.AlertSuccessMsg("Operation completed successfully!"),
+			components.AlertWarningMsg("Please review before continuing."),
+			components.AlertErrorMsg("An error occurred while processing."),
 		),
 
-		components.H3("Spinner"),
-		components.Div("flex items-center gap-4",
-			components.Spinner(components.SpinnerProps{Size: components.SpinnerSM}),
-			components.Spinner(components.SpinnerProps{Size: components.SpinnerMD}),
-			components.Spinner(components.SpinnerProps{Size: components.SpinnerLG, Label: "Loading..."}),
+		components.Section("Badges",
+			components.Div("flex flex-wrap gap-2",
+				components.BadgeText("Default"),
+				components.BadgePrimaryText("Primary"),
+				components.BadgeSuccessText("Success"),
+				components.BadgeWarningText("Warning"),
+				components.BadgeErrorText("Error"),
+				components.BadgeInfoText("Info"),
+			),
 		),
 
-		components.H3("Modal"),
-		components.Button(components.ButtonProps{
-			Text: "Open Modal",
-			OnClick: func() {
-				modal.Open()
-			},
-		}),
-		modal.Element(),
+		components.Section("Spinner",
+			components.Div("flex items-center gap-4",
+				components.Spinner(components.SpinnerProps{Size: components.SpinnerSM}),
+				components.Spinner(components.SpinnerProps{Size: components.SpinnerMD}),
+				components.Spinner(components.SpinnerProps{Size: components.SpinnerLG, Label: "Loading..."}),
+			),
+		),
+
+		components.Section("Modal",
+			components.PrimaryButton("Open Modal", func() { modal.Open() }),
+			modal.Element(),
+		),
 	)
 }
 
@@ -334,21 +265,13 @@ func dataDemo() js.Value {
 }
 
 func newComponentsDemo() js.Value {
-	// Progress bars
 	progress := components.NewProgress(components.ProgressProps{
-		Value:   65,
-		Variant: components.ProgressPrimary,
-		Label:   "Upload Progress",
+		Value: 65, Variant: components.ProgressPrimary, Label: "Upload Progress",
 	})
-
 	progressStriped := components.NewProgress(components.ProgressProps{
-		Value:    45,
-		Variant:  components.ProgressSuccess,
-		Striped:  true,
-		Animated: true,
+		Value: 45, Variant: components.ProgressSuccess, Striped: true, Animated: true,
 	})
 
-	// Avatars
 	avatarGroup := components.AvatarGroup([]components.AvatarProps{
 		{Name: "John Doe", Status: "online"},
 		{Name: "Jane Smith", Status: "away"},
@@ -357,35 +280,22 @@ func newComponentsDemo() js.Value {
 		{Name: "Charlie Davis"},
 	}, 4)
 
-	// Accordion
 	accordion := components.NewAccordion(components.AccordionProps{
 		Items: []components.AccordionItem{
-			{
-				Title:   "What is GoQuery?",
-				Content: components.Text("GoQuery is a Go WebAssembly framework for building web applications entirely in Go."),
-			},
-			{
-				Title:   "How does it work?",
-				Content: components.Text("It compiles Go code to WebAssembly and provides component APIs for DOM manipulation."),
-			},
-			{
-				Title:   "Is it production ready?",
-				Content: components.Text("It's a proof of concept demonstrating the capabilities of Go WASM for web development."),
-			},
+			{Title: "What is GoQuery?", Content: components.Text("GoQuery is a Go WebAssembly framework for building web applications entirely in Go.")},
+			{Title: "How does it work?", Content: components.Text("It compiles Go code to WebAssembly and provides component APIs for DOM manipulation.")},
+			{Title: "Is it production ready?", Content: components.Text("It's a proof of concept demonstrating the capabilities of Go WASM for web development.")},
 		},
 		AllowMultiple: true,
 	})
 
-	// Date picker
 	datePicker := components.NewDatePicker(components.DatePickerProps{
-		Label:       "Select Date",
-		Placeholder: "Choose a date",
+		Label: "Select Date", Placeholder: "Choose a date",
 		OnChange: func(t time.Time) {
 			components.Toast("Date selected: "+t.Format("Jan 2, 2006"), components.ToastInfo)
 		},
 	})
 
-	// Stepper
 	stepper := components.NewStepper(components.StepperProps{
 		Steps: []components.Step{
 			{Title: "Account", Description: "Create account"},
@@ -395,7 +305,6 @@ func newComponentsDemo() js.Value {
 		CurrentStep: 1,
 	})
 
-	// Breadcrumbs
 	breadcrumbs := components.Breadcrumbs(components.BreadcrumbsProps{
 		Items: []components.BreadcrumbItem{
 			{Label: "Home", Path: "/"},
@@ -404,89 +313,49 @@ func newComponentsDemo() js.Value {
 		},
 	})
 
-	// Tooltip demo button
 	tooltipBtn := components.WithTooltip(
-		components.Button(components.ButtonProps{
-			Text: "Hover me for tooltip",
-		}),
-		components.TooltipProps{
-			Text:     "This is a helpful tooltip!",
-			Position: components.TooltipTop,
-		},
+		components.PrimaryButton("Hover me for tooltip", nil),
+		components.TooltipProps{Text: "This is a helpful tooltip!", Position: components.TooltipTop},
 	)
 
 	return components.Div("space-y-6",
-		// Breadcrumbs section
-		components.H3("Breadcrumbs"),
-		breadcrumbs,
-
-		// Progress section
-		components.H3("Progress Bars"),
-		components.Div("space-y-3",
-			progress.Element(),
-			progressStriped.Element(),
+		components.Section("Breadcrumbs", breadcrumbs),
+		components.Section("Progress Bars",
+			components.Div("space-y-3", progress.Element(), progressStriped.Element()),
 		),
-
-		// Skeleton section
-		components.H3("Skeleton Loaders"),
-		components.Div("flex gap-4",
-			components.SkeletonAvatar("w-12 h-12"),
-			components.Div("flex-1", components.SkeletonText(2)),
+		components.Section("Skeleton Loaders",
+			components.Div("flex gap-4",
+				components.SkeletonAvatar("w-12 h-12"),
+				components.Div("flex-1", components.SkeletonText(2)),
+			),
 		),
-
-		// Avatar section
-		components.H3("Avatars"),
-		components.Div("flex items-center gap-4",
-			components.Avatar(components.AvatarProps{Name: "John Doe", Size: components.AvatarLG, Status: "online"}),
-			components.Avatar(components.AvatarProps{Name: "Jane Smith", Size: components.AvatarMD, Status: "away"}),
-			avatarGroup,
+		components.Section("Avatars",
+			components.Div("flex items-center gap-4",
+				components.Avatar(components.AvatarProps{Name: "John Doe", Size: components.AvatarLG, Status: "online"}),
+				components.Avatar(components.AvatarProps{Name: "Jane Smith", Size: components.AvatarMD, Status: "away"}),
+				avatarGroup,
+			),
 		),
-
-		// Tooltip section
-		components.H3("Tooltip"),
-		tooltipBtn,
-
-		// Clipboard section
-		components.H3("Clipboard"),
-		components.CopyableText("npm install goquery"),
-
-		// Date Picker section
-		components.H3("Date Picker"),
-		datePicker.Element(),
-
-		// Accordion section
-		components.H3("Accordion"),
-		accordion.Element(),
-
-		// Stepper section
-		components.H3("Stepper"),
-		stepper.Element(),
+		components.Section("Tooltip", tooltipBtn),
+		components.Section("Clipboard", components.CopyableText("npm install goquery")),
+		components.Section("Date Picker", datePicker.Element()),
+		components.Section("Accordion", accordion.Element()),
+		components.Section("Stepper", stepper.Element()),
 	)
 }
 
 func showCreatePost() {
 	form := components.NewForm(components.FormProps{
 		Fields: []components.FormField{
-			{
-				Name:        "title",
-				Label:       "Title",
-				Placeholder: "Enter post title",
-				Rules:       []components.ValidationRule{components.Required, components.MinLength(3)},
-			},
-			{
-				Name:        "body",
-				Label:       "Body",
-				Placeholder: "Write your post content...",
-				Rules:       []components.ValidationRule{components.Required, components.MinLength(10)},
-			},
+			{Name: "title", Label: "Title", Placeholder: "Enter post title", Rules: []components.ValidationRule{components.Required, components.MinLength(3)}},
+			{Name: "body", Label: "Body", Placeholder: "Write your post content...", Rules: []components.ValidationRule{components.Required, components.MinLength(10)}},
 		},
 		SubmitLabel: "Create Post",
+		CancelLabel: "Cancel",
 		OnSubmit: func(values map[string]string) {
 			go func() {
 				_, err := posts.Create(context.Background(), api.CreatePostRequest{
-					UserID: 1,
-					Title:  values["title"],
-					Body:   values["body"],
+					UserID: 1, Title: values["title"], Body: values["body"],
 				})
 				if err != nil {
 					components.Toast("Failed to create post: "+err.Error(), components.ToastError)
@@ -496,57 +365,28 @@ func showCreatePost() {
 				router.Navigate("/api-test")
 			}()
 		},
-		OnCancel: func() {
-			router.Navigate("/")
-		},
-		CancelLabel: "Cancel",
+		OnCancel: func() { router.Navigate("/") },
 	})
 
-	layout.SetContent(
-		components.Card(
-			components.H2("Create New Post"),
-			components.Text("Fill out the form below to create a new post."),
-			components.Div("mt-4 max-w-lg", form.Element()),
-		),
+	layout.SetPage("Create New Post", "Fill out the form below to create a new post.",
+		components.Div("mt-4 max-w-lg", form.Element()),
 	)
 }
 
 func showSettings() {
-	nameInput := components.NewInput(components.InputProps{
-		Label: "Display Name",
-		Value: "Admin User",
-	})
+	nameInput := components.NewInput(components.InputProps{Label: "Display Name", Value: "Admin User"})
+	themeSelect := components.SimpleSelect("Theme", "Light", "Dark", "System")
+	notifyCheckbox := components.NewCheckbox(components.CheckboxProps{Label: "Enable notifications", Checked: true})
 
-	themeSelect := components.NewSelect(components.SelectProps{
-		Label: "Theme",
-		Value: "light",
-		Options: []components.SelectOption{
-			{Label: "Light", Value: "light"},
-			{Label: "Dark", Value: "dark"},
-			{Label: "System", Value: "system"},
-		},
-	})
-
-	notifyCheckbox := components.NewCheckbox(components.CheckboxProps{
-		Label:   "Enable notifications",
-		Checked: true,
-	})
-
-	layout.SetContent(
-		components.Card(
-			components.H2("Settings"),
-			components.Div("space-y-4 max-w-md",
-				nameInput.Element(),
-				themeSelect.Element(),
-				notifyCheckbox.Element(),
-				components.Div("pt-4",
-					components.Button(components.ButtonProps{
-						Text: "Save Settings",
-						OnClick: func() {
-							components.Toast("Settings saved successfully!", components.ToastSuccess)
-						},
-					}),
-				),
+	layout.SetPage("Settings", "",
+		components.Div("space-y-4 max-w-md",
+			nameInput.Element(),
+			themeSelect.Element(),
+			notifyCheckbox.Element(),
+			components.Div("pt-4",
+				components.PrimaryButton("Save Settings", func() {
+					components.Toast("Settings saved successfully!", components.ToastSuccess)
+				}),
 			),
 		),
 	)

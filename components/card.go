@@ -24,3 +24,20 @@ func CardWithClass(extraClass string, children ...js.Value) js.Value {
 	}
 	return Div(className, children...)
 }
+
+// TitledCard creates a card with a title and optional description
+func TitledCard(title, description string, children ...js.Value) js.Value {
+	content := []js.Value{H2(title)}
+	if description != "" {
+		content = append(content, Text(description))
+	}
+	content = append(content, children...)
+	return Card(content...)
+}
+
+// Section creates a titled section with content
+func Section(title string, children ...js.Value) js.Value {
+	content := []js.Value{H3(title)}
+	content = append(content, children...)
+	return Div("space-y-3", content...)
+}

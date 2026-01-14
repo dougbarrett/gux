@@ -140,3 +140,30 @@ func (i *Input) SetError(message string) {
 func (i *Input) ClearError() {
 	i.input.Set("className", "w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500")
 }
+
+// Quick input constructors
+
+// TextInput creates a simple text input with label and placeholder
+func TextInput(label, placeholder string) *Input {
+	return NewInput(InputProps{Label: label, Placeholder: placeholder})
+}
+
+// EmailInput creates an email input with label and placeholder
+func EmailInput(label, placeholder string) *Input {
+	return NewInput(InputProps{Type: InputEmail, Label: label, Placeholder: placeholder})
+}
+
+// PasswordInput creates a password input with label and placeholder
+func PasswordInput(label, placeholder string) *Input {
+	return NewInput(InputProps{Type: InputPassword, Label: label, Placeholder: placeholder})
+}
+
+// NumberInput creates a number input with label and placeholder
+func NumberInput(label, placeholder string) *Input {
+	return NewInput(InputProps{Type: InputNumber, Label: label, Placeholder: placeholder})
+}
+
+// SearchInput creates a search input with placeholder
+func SearchInput(placeholder string) *Input {
+	return NewInput(InputProps{Type: InputSearch, Placeholder: placeholder})
+}

@@ -119,3 +119,23 @@ func (s *Select) Value() string {
 func (s *Select) SetValue(value string) {
 	s.selectEl.Set("value", value)
 }
+
+// Quick select constructors
+
+// SimpleSelect creates a select with label and string options (value = label)
+func SimpleSelect(label string, options ...string) *Select {
+	opts := make([]SelectOption, len(options))
+	for i, opt := range options {
+		opts[i] = SelectOption{Label: opt, Value: opt}
+	}
+	return NewSelect(SelectProps{Label: label, Options: opts})
+}
+
+// SimpleSelectWithPlaceholder creates a select with placeholder and string options
+func SimpleSelectWithPlaceholder(label, placeholder string, options ...string) *Select {
+	opts := make([]SelectOption, len(options))
+	for i, opt := range options {
+		opts[i] = SelectOption{Label: opt, Value: opt}
+	}
+	return NewSelect(SelectProps{Label: label, Placeholder: placeholder, Options: opts})
+}
