@@ -1,0 +1,165 @@
+//go:build js && wasm
+
+package components
+
+import "syscall/js"
+
+// ModalProps configures a Modal component
+type ModalProps struct {
+	Title      string
+	Content    js.Value
+	Footer     js.Value
+	Width      string // sm, md, lg, xl, full
+	OnClose    func()
+	CloseOnEsc bool
+}
+
+// Modal creates a modal dialog overlay
+type Modal struct {
+	overlay js.Value
+	modal   js.Value
+	content js.Value
+	isOpen  bool
+}
+
+var modalWidths = map[string]string{
+	"sm":   "max-w-sm",
+	"md":   "max-w-md",
+	"lg":   "max-w-lg",
+	"xl":   "max-w-xl",
+	"full": "max-w-4xl",
+}
+
+// NewModal creates a new Modal component
+func NewModal(props ModalProps) *Modal {
+	document := js.Global().Get("document")
+
+	// Overlay
+	overlay := document.Call("createElement", "div")
+	overlay.Set("className", "fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden")
+
+	// Modal container
+	width := props.Width
+	if width == "" {
+		width = "md"
+	}
+	widthClass := modalWidths[width]
+	if widthClass == "" {
+		widthClass = modalWidths["md"]
+	}
+
+	modal := document.Call("createElement", "div")
+	modal.Set("className", "bg-white rounded-lg shadow-xl "+widthClass+" w-full mx-4 max-h-[90vh] flex flex-col")
+
+	m := &Modal{
+		overlay: overlay,
+		modal:   modal,
+	}
+
+	// Header
+	if props.Title != "" {
+		header := document.Call("createElement", "div")
+		header.Set("className", "flex justify-between items-center px-6 py-4 border-b")
+
+		title := document.Call("createElement", "h3")
+		title.Set("className", "text-lg font-semibold text-gray-900")
+		title.Set("textContent", props.Title)
+		header.Call("appendChild", title)
+
+		closeBtn := document.Call("createElement", "button")
+		closeBtn.Set("className", "text-gray-400 hover:text-gray-600 text-2xl leading-none cursor-pointer")
+		closeBtn.Set("innerHTML", "&times;")
+		closeBtn.Call("addEventListener", "click", js.FuncOf(func(this js.Value, args []js.Value) any {
+			m.Close()
+			return nil
+		}))
+		header.Call("appendChild", closeBtn)
+
+		modal.Call("appendChild", header)
+	}
+
+	// Content
+	content := document.Call("createElement", "div")
+	content.Set("className", "px-6 py-4 overflow-y-auto flex-1")
+	if !props.Content.IsUndefined() && !props.Content.IsNull() {
+		content.Call("appendChild", props.Content)
+	}
+	modal.Call("appendChild", content)
+	m.content = content
+
+	// Footer
+	if !props.Footer.IsUndefined() && !props.Footer.IsNull() {
+		footer := document.Call("createElement", "div")
+		footer.Set("className", "px-6 py-4 border-t bg-gray-50 rounded-b-lg")
+		footer.Call("appendChild", props.Footer)
+		modal.Call("appendChild", footer)
+	}
+
+	overlay.Call("appendChild", modal)
+
+	// Close on overlay click
+	overlay.Call("addEventListener", "click", js.FuncOf(func(this js.Value, args []js.Value) any {
+		if args[0].Get("target").Equal(overlay) {
+			m.Close()
+		}
+		return nil
+	}))
+
+	// Close on Escape key
+	if props.CloseOnEsc {
+		js.Global().Get("document").Call("addEventListener", "keydown", js.FuncOf(func(this js.Value, args []js.Value) any {
+			if m.isOpen && args[0].Get("key").String() == "Escape" {
+				m.Close()
+			}
+			return nil
+		}))
+	}
+
+	// Store onClose callback
+	if props.OnClose != nil {
+		m.overlay.Set("_onClose", js.FuncOf(func(this js.Value, args []js.Value) any {
+			props.OnClose()
+			return nil
+		}))
+	}
+
+	return m
+}
+
+// Element returns the overlay DOM element
+func (m *Modal) Element() js.Value {
+	return m.overlay
+}
+
+// Open shows the modal
+func (m *Modal) Open() {
+	m.overlay.Get("classList").Call("remove", "hidden")
+	m.isOpen = true
+	// Prevent body scroll
+	js.Global().Get("document").Get("body").Get("style").Set("overflow", "hidden")
+}
+
+// Close hides the modal
+func (m *Modal) Close() {
+	m.overlay.Get("classList").Call("add", "hidden")
+	m.isOpen = false
+	// Restore body scroll
+	js.Global().Get("document").Get("body").Get("style").Set("overflow", "")
+
+	// Call onClose callback
+	onClose := m.overlay.Get("_onClose")
+	if !onClose.IsUndefined() {
+		onClose.Invoke()
+	}
+}
+
+// IsOpen returns whether the modal is currently open
+func (m *Modal) IsOpen() bool {
+	return m.isOpen
+}
+
+// SetContent replaces the modal content
+func (m *Modal) SetContent(content js.Value) {
+	m.content.Set("innerHTML", "")
+	m.content.Call("appendChild", content)
+}

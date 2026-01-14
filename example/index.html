@@ -3,21 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Go WASM Demo</title>
+    <title>GoQuery Example</title>
 </head>
 <body>
-    <div id="app">Loading WASM...</div>
-
+    <div id="app">Loading...</div>
     <script src="wasm_exec.js"></script>
     <script>
         const go = new Go();
         WebAssembly.instantiateStreaming(fetch("main.wasm"), go.importObject)
-            .then((result) => {
-                go.run(result.instance);
-            })
-            .catch((err) => {
-                document.getElementById("app").textContent = "Failed to load WASM: " + err.message;
-            });
+            .then(result => go.run(result.instance));
     </script>
 </body>
 </html>

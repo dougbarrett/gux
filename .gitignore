@@ -1,10 +1,6 @@
 # Build artifacts
-main.wasm
+*.wasm
 bin/
-goquery-server
-
-# Distribution files
-cmd/prod/dist/
 
 # Go
 *.exe

@@ -4,46 +4,50 @@ package components
 
 import "syscall/js"
 
+const (
+	sidebarItemClass   = "flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-gray-700 hover:text-white rounded-lg transition-colors cursor-pointer"
+	sidebarActiveClass = "flex items-center gap-3 px-4 py-3 bg-gray-700 text-white rounded-lg cursor-pointer"
+)
+
+// NavItem represents a navigation menu item
 type NavItem struct {
 	Label string
 	Icon  string
-	Path  string // Use for routing
+	Path  string
 }
 
+// SidebarProps configures a Sidebar component
 type SidebarProps struct {
 	Title string
 	Items []NavItem
 }
 
+// Sidebar is a navigation sidebar component
 type Sidebar struct {
 	element  js.Value
 	items    []NavItem
 	navItems []js.Value
 }
 
-const (
-	sidebarClass       = "w-64 bg-gray-900 text-white min-h-screen flex flex-col"
-	sidebarTitleClass  = "p-4 text-xl font-bold border-b border-gray-700"
-	sidebarNavClass    = "flex-1 py-4"
-	sidebarItemClass   = "flex items-center px-4 py-3 text-gray-300 hover:bg-gray-800 hover:text-white cursor-pointer transition-colors no-underline"
-	sidebarActiveClass = "flex items-center px-4 py-3 bg-gray-800 text-white cursor-pointer border-l-4 border-blue-500 no-underline"
-)
-
+// NewSidebar creates a new Sidebar component
 func NewSidebar(props SidebarProps) *Sidebar {
 	document := js.Global().Get("document")
 
 	sidebar := document.Call("createElement", "aside")
-	sidebar.Set("className", sidebarClass)
+	sidebar.Set("className", "w-64 bg-gray-800 text-white flex flex-col h-screen")
 
-	// Title/Logo
-	title := document.Call("createElement", "div")
-	title.Set("className", sidebarTitleClass)
+	// Header
+	header := document.Call("createElement", "div")
+	header.Set("className", "p-4 border-b border-gray-700")
+	title := document.Call("createElement", "h1")
+	title.Set("className", "text-xl font-bold")
 	title.Set("textContent", props.Title)
-	sidebar.Call("appendChild", title)
+	header.Call("appendChild", title)
+	sidebar.Call("appendChild", header)
 
 	// Navigation
 	nav := document.Call("createElement", "nav")
-	nav.Set("className", sidebarNavClass)
+	nav.Set("className", "flex-1 p-4 space-y-2")
 
 	s := &Sidebar{
 		element:  sidebar,
@@ -62,10 +66,12 @@ func NewSidebar(props SidebarProps) *Sidebar {
 	return s
 }
 
+// Element returns the underlying DOM element
 func (s *Sidebar) Element() js.Value {
 	return s.element
 }
 
+// SetActive updates the active state of nav items
 func (s *Sidebar) SetActive(path string) {
 	for i, item := range s.items {
 		if item.Path == path {
@@ -77,21 +83,17 @@ func (s *Sidebar) SetActive(path string) {
 }
 
 func (s *Sidebar) createNavItem(document js.Value, item NavItem) js.Value {
-	// Create link element
 	link := Link(LinkProps{
 		To:        item.Path,
 		ClassName: sidebarItemClass,
 	})
 
-	// Icon
 	if item.Icon != "" {
 		icon := document.Call("createElement", "span")
-		icon.Set("className", "mr-3")
 		icon.Set("textContent", item.Icon)
 		link.Call("appendChild", icon)
 	}
 
-	// Label
 	label := document.Call("createElement", "span")
 	label.Set("textContent", item.Label)
 	link.Call("appendChild", label)
