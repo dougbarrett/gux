@@ -16,6 +16,8 @@ func LoadTailwind() {
 	// Block until loaded
 	done := make(chan struct{})
 	script.Set("onload", js.FuncOf(func(this js.Value, args []js.Value) any {
+		// Configure Tailwind for class-based dark mode after it loads
+		js.Global().Get("tailwind").Get("config").Set("darkMode", "class")
 		close(done)
 		return nil
 	}))

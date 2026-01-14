@@ -125,6 +125,9 @@ func showComponents() {
 			{Label: "Feedback", Content: feedbackDemo()},
 			{Label: "Data", Content: dataDemo()},
 			{Label: "New", Content: newComponentsDemo()},
+			{Label: "Advanced", Content: advancedDemo()},
+			{Label: "Charts", Content: chartsDemo()},
+			{Label: "Utilities", Content: utilitiesDemo()},
 		},
 	})
 
@@ -340,6 +343,361 @@ func newComponentsDemo() js.Value {
 		components.Section("Date Picker", datePicker.Element()),
 		components.Section("Accordion", accordion.Element()),
 		components.Section("Stepper", stepper.Element()),
+	)
+}
+
+func advancedDemo() js.Value {
+	// Toggle
+	toggle := components.SimpleToggle("Dark Mode", false, func(checked bool) {
+		if checked {
+			components.Toast("Dark mode enabled", components.ToastInfo)
+		} else {
+			components.Toast("Dark mode disabled", components.ToastInfo)
+		}
+	})
+
+	// Dropdown
+	dropdown := components.ActionDropdown("Actions", []components.DropdownItem{
+		{Label: "Edit", Icon: "✏️", OnClick: func() { components.Toast("Edit clicked", components.ToastInfo) }},
+		{Label: "Duplicate", Icon: "📋", OnClick: func() { components.Toast("Duplicate clicked", components.ToastInfo) }},
+		{Divider: true},
+		{Label: "Delete", Icon: "🗑️", OnClick: func() { components.Toast("Delete clicked", components.ToastError) }},
+	})
+
+	// Combobox
+	combobox := components.NewCombobox(components.ComboboxProps{
+		Label:       "Select Framework",
+		Placeholder: "Search frameworks...",
+		Options: []components.ComboboxOption{
+			{Label: "React", Value: "react", Description: "A JavaScript library for building user interfaces"},
+			{Label: "Vue", Value: "vue", Description: "The Progressive JavaScript Framework"},
+			{Label: "Angular", Value: "angular", Description: "Platform for building mobile and desktop web apps"},
+			{Label: "Svelte", Value: "svelte", Description: "Cybernetically enhanced web apps"},
+			{Label: "Go WASM", Value: "gowasm", Description: "Build web apps with Go and WebAssembly"},
+		},
+		OnChange: func(value string) {
+			components.Toast("Selected: "+value, components.ToastSuccess)
+		},
+	})
+
+	// Pagination
+	pagination := components.NewPagination(components.PaginationProps{
+		CurrentPage:  3,
+		TotalPages:   10,
+		TotalItems:   97,
+		ItemsPerPage: 10,
+		ShowInfo:     true,
+		OnPageChange: func(page int) {
+			components.Toast("Page "+string(rune('0'+page))+" clicked", components.ToastInfo)
+		},
+	})
+
+	// File Upload
+	fileUpload := components.ImageUpload("Upload Images", func(files []components.FileInfo) {
+		components.Toast("Uploaded "+string(rune('0'+len(files)))+" file(s)", components.ToastSuccess)
+	})
+
+	// Drawer button
+	var drawer *components.Drawer
+	drawerContent := components.Div("space-y-4",
+		components.Text("This is a slide-out drawer panel. Great for settings, filters, or secondary navigation."),
+		components.PrimaryButton("Close Drawer", func() {
+			if drawer != nil {
+				drawer.Close()
+			}
+		}),
+	)
+	drawer = components.RightDrawer("Settings Panel", drawerContent)
+
+	return components.Div("space-y-6",
+		components.Section("Toggle Switch",
+			toggle.Element(),
+		),
+		components.Section("Dropdown Menu",
+			dropdown.Element(),
+		),
+		components.Section("Combobox / Autocomplete",
+			components.Div("max-w-sm", combobox.Element()),
+		),
+		components.Section("Pagination",
+			pagination.Element(),
+		),
+		components.Section("File Upload",
+			fileUpload.Element(),
+		),
+		components.Section("Drawer Panel",
+			components.PrimaryButton("Open Drawer", func() { drawer.Open() }),
+		),
+	)
+}
+
+func utilitiesDemo() js.Value {
+	// Theme toggle
+	themeToggle := components.ThemeToggle(components.ThemeToggleProps{
+		ShowLabel: true,
+	})
+
+	// Animation demo elements
+	document := js.Global().Get("document")
+	animBox := document.Call("createElement", "div")
+	animBox.Set("className", "w-16 h-16 bg-blue-500 rounded-lg flex items-center justify-center text-white font-bold")
+	animBox.Set("textContent", "Go")
+
+	// WebSocket demo
+	wsStatusText := document.Call("createElement", "span")
+	wsStatusText.Set("className", "text-gray-500")
+	wsStatusText.Set("textContent", "Disconnected")
+
+	wsMessageLog := document.Call("createElement", "div")
+	wsMessageLog.Set("className", "h-32 overflow-y-auto bg-gray-100 dark:bg-gray-800 rounded p-2 text-sm font-mono text-gray-800 dark:text-gray-200 border border-gray-200 dark:border-gray-700")
+	wsMessageLog.Set("textContent", "No messages yet...")
+
+	wsInput := document.Call("createElement", "input")
+	wsInput.Set("type", "text")
+	wsInput.Set("placeholder", "Type a message to echo...")
+	wsInput.Set("className", "flex-1 px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500")
+
+	var wsStore *state.WebSocketStore
+
+	appendMessage := func(msg string) {
+		current := wsMessageLog.Get("innerHTML").String()
+		if current == "No messages yet..." {
+			wsMessageLog.Set("innerHTML", msg)
+		} else {
+			wsMessageLog.Set("innerHTML", current+"<br>"+msg)
+		}
+		// Auto-scroll to bottom
+		wsMessageLog.Set("scrollTop", wsMessageLog.Get("scrollHeight"))
+	}
+
+	connectWS := func() {
+		// Use a public WebSocket echo server
+		wsStore = state.NewWebSocketStore(state.WebSocketConfig{
+			URL: "wss://echo.websocket.org",
+			OnOpen: func() {
+				wsStatusText.Set("className", "text-green-500 font-medium")
+				wsStatusText.Set("textContent", "Connected")
+				appendMessage("[System] Connected to echo server")
+				components.Toast("WebSocket connected!", components.ToastSuccess)
+			},
+			OnClose: func(code int, reason string) {
+				wsStatusText.Set("className", "text-gray-500")
+				wsStatusText.Set("textContent", "Disconnected")
+				appendMessage("[System] Disconnected")
+			},
+			OnMessage: func(data []byte) {
+				appendMessage("[Received] " + string(data))
+			},
+			OnError: func(err string) {
+				wsStatusText.Set("className", "text-red-500")
+				wsStatusText.Set("textContent", "Error")
+				appendMessage("[Error] " + err)
+				components.Toast("WebSocket error", components.ToastError)
+			},
+		})
+		wsStore.Connect()
+	}
+
+	disconnectWS := func() {
+		if wsStore != nil {
+			wsStore.Close()
+			wsStore = nil
+		}
+	}
+
+	sendMessage := func() {
+		if wsStore != nil && wsStore.IsConnected() {
+			msg := wsInput.Get("value").String()
+			if msg != "" {
+				appendMessage("[Sent] " + msg)
+				wsStore.Send([]byte(msg))
+				wsInput.Set("value", "")
+			}
+		} else {
+			components.Toast("Not connected", components.ToastWarning)
+		}
+	}
+
+	// FormBuilder demo
+	formBuilder := components.NewFormBuilder(components.FormBuilderProps{
+		Fields: []components.BuilderField{
+			{Name: "username", Type: components.BuilderFieldText, Label: "Username", Placeholder: "Enter username", Rules: []components.ValidationRule{components.Required}},
+			{Name: "email", Type: components.BuilderFieldEmail, Label: "Email", Placeholder: "you@example.com", Rules: []components.ValidationRule{components.Required, components.Email}},
+			{Name: "password", Type: components.BuilderFieldPassword, Label: "Password", Placeholder: "Enter password", Rules: []components.ValidationRule{components.Required, components.MinLength(6)}},
+			{Name: "role", Type: components.BuilderFieldSelect, Label: "Role", Placeholder: "Select role", Options: []components.SelectOption{
+				{Label: "Admin", Value: "admin"},
+				{Label: "Editor", Value: "editor"},
+				{Label: "Viewer", Value: "viewer"},
+			}},
+			{Name: "bio", Type: components.BuilderFieldTextarea, Label: "Bio", Placeholder: "Tell us about yourself...", Rows: 3},
+			{Name: "newsletter", Type: components.BuilderFieldCheckbox, Label: "Subscribe to newsletter"},
+		},
+		SubmitText: "Register",
+		ShowCancel: true,
+		CancelText: "Reset",
+		OnSubmit: func(values map[string]any) error {
+			components.Toast("Form submitted!", components.ToastSuccess)
+			return nil
+		},
+		OnCancel: func() {
+			components.Toast("Form reset", components.ToastInfo)
+		},
+	})
+
+	return components.Div("space-y-6",
+		components.Section("Theme System",
+			components.Div("space-y-4",
+				components.Text("Toggle between light and dark mode:"),
+				components.Div("flex items-center gap-4",
+					themeToggle,
+					components.ThemeSelector(),
+				),
+			),
+		),
+		components.Section("Animations",
+			components.Div("space-y-4",
+				components.Div("flex flex-wrap gap-2",
+					components.Button(components.ButtonProps{Text: "Bounce", Size: components.ButtonSM, OnClick: func() {
+						components.Bounce(animBox)
+					}}),
+					components.Button(components.ButtonProps{Text: "Shake", Size: components.ButtonSM, OnClick: func() {
+						components.Shake(animBox)
+					}}),
+					components.Button(components.ButtonProps{Text: "Pulse", Size: components.ButtonSM, OnClick: func() {
+						components.Pulse(animBox, 3)
+					}}),
+					components.Button(components.ButtonProps{Text: "Spin", Size: components.ButtonSM, OnClick: func() {
+						components.Spin(animBox)
+					}}),
+					components.Button(components.ButtonProps{Text: "Wiggle", Size: components.ButtonSM, OnClick: func() {
+						components.Wiggle(animBox)
+					}}),
+					components.Button(components.ButtonProps{Text: "Flash", Size: components.ButtonSM, OnClick: func() {
+						components.Flash(animBox, 3)
+					}}),
+				),
+				components.Div("p-4 bg-gray-100 rounded-lg inline-block", animBox),
+			),
+		),
+		components.Section("Form Builder",
+			components.Div("max-w-md",
+				components.Text("Dynamic form generated from configuration:"),
+				components.Div("mt-4", formBuilder.Element()),
+			),
+		),
+		components.Section("WebSocket",
+			components.Div("space-y-4",
+				components.Text("Real-time WebSocket communication with echo server:"),
+				components.Div("flex items-center gap-4",
+					components.Text("Status:"),
+					wsStatusText,
+				),
+				components.Div("flex gap-2",
+					components.Button(components.ButtonProps{Text: "Connect", Variant: components.ButtonSuccess, Size: components.ButtonSM, OnClick: func() {
+						connectWS()
+					}}),
+					components.Button(components.ButtonProps{Text: "Disconnect", Variant: components.ButtonDanger, Size: components.ButtonSM, OnClick: func() {
+						disconnectWS()
+					}}),
+				),
+				wsMessageLog,
+				components.Div("flex gap-2",
+					wsInput,
+					components.Button(components.ButtonProps{Text: "Send", Size: components.ButtonSM, OnClick: func() {
+						sendMessage()
+					}}),
+				),
+			),
+		),
+		components.Section("Component Inspector",
+			components.Div("space-y-2",
+				components.Text("Debug tool for viewing component hierarchy:"),
+				components.PrimaryButton("Open Inspector", func() {
+					components.InitInspector()
+					inspector := components.GetInspector()
+					if inspector != nil {
+						inspector.Open()
+					}
+				}),
+			),
+		),
+	)
+}
+
+func chartsDemo() js.Value {
+	// Sample data
+	barData := []components.ChartData{
+		{Label: "Jan", Value: 65},
+		{Label: "Feb", Value: 59},
+		{Label: "Mar", Value: 80},
+		{Label: "Apr", Value: 81},
+		{Label: "May", Value: 56},
+		{Label: "Jun", Value: 55},
+	}
+
+	lineData := []components.ChartData{
+		{Label: "Mon", Value: 12},
+		{Label: "Tue", Value: 19},
+		{Label: "Wed", Value: 15},
+		{Label: "Thu", Value: 25},
+		{Label: "Fri", Value: 22},
+		{Label: "Sat", Value: 30},
+		{Label: "Sun", Value: 28},
+	}
+
+	pieData := []components.ChartData{
+		{Label: "Desktop", Value: 55},
+		{Label: "Mobile", Value: 35},
+		{Label: "Tablet", Value: 10},
+	}
+
+	sparklineData := []float64{5, 10, 5, 20, 8, 15, 12, 18, 14, 22, 16, 25}
+
+	return components.Div("space-y-6",
+		components.Section("Bar Chart",
+			components.BarChart(components.BarChartProps{
+				Data:       barData,
+				Height:     "200px",
+				ShowLabels: true,
+				ShowValues: true,
+				Horizontal: true,
+			}),
+		),
+		components.Section("Line Chart",
+			components.LineChart(components.LineChartProps{
+				Data:       lineData,
+				Height:     "200px",
+				ShowLabels: true,
+				ShowPoints: true,
+				ShowGrid:   true,
+				FillColor:  "#3b82f6",
+			}),
+		),
+		components.Section("Pie Chart",
+			components.PieChart(components.PieChartProps{
+				Data:       pieData,
+				ShowLegend: true,
+			}),
+		),
+		components.Section("Donut Chart",
+			components.DonutChart(pieData, 40),
+		),
+		components.Section("Sparklines",
+			components.Div("space-y-2",
+				components.Div("flex items-center gap-4",
+					components.Text("Revenue:"),
+					components.LineSparkline(sparklineData),
+				),
+				components.Div("flex items-center gap-4",
+					components.Text("Users:"),
+					components.BarSparkline(sparklineData),
+				),
+				components.Div("flex items-center gap-4",
+					components.Text("Trend:"),
+					components.TrendSparkline(sparklineData),
+				),
+			),
+		),
 	)
 }
 
