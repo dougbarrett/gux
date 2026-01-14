@@ -27,3 +27,4 @@ vendor/
 
 # Debug
 __debug_bin*
+.playwright-mcp/
