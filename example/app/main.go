@@ -3,7 +3,6 @@
 package main
 
 import (
-	"context"
 	"syscall/js"
 	"time"
 
@@ -354,7 +353,7 @@ func showCreatePost() {
 		CancelLabel: "Cancel",
 		OnSubmit: func(values map[string]string) {
 			go func() {
-				_, err := posts.Create(context.Background(), api.CreatePostRequest{
+				_, err := posts.Create(api.CreatePostRequest{
 					UserID: 1, Title: values["title"], Body: values["body"],
 				})
 				if err != nil {
@@ -395,7 +394,7 @@ func showSettings() {
 func fetchSinglePost() {
 	display.ShowLoading("Fetching post #1...")
 
-	post, err := posts.GetByID(context.Background(), 1)
+	post, err := posts.GetByID(1)
 	if err != nil {
 		display.ShowError("Error: " + err.Error())
 		components.Toast("Failed to fetch post", components.ToastError)
@@ -409,7 +408,7 @@ func fetchSinglePost() {
 func fetchAllPosts() {
 	display.ShowLoading("Fetching all posts...")
 
-	allPosts, err := posts.GetAll(context.Background())
+	allPosts, err := posts.GetAll()
 	if err != nil {
 		display.ShowError("Error: " + err.Error())
 		components.Toast("Failed to fetch posts", components.ToastError)
