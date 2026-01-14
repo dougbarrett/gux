@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	gqapi "goquery/api"
+	gqapi "gux/api"
 )
 
 

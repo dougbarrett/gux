@@ -6,8 +6,8 @@ import (
 	"log"
 	"net/http"
 
-	"goquery/example/api"
-	"goquery/server"
+	"gux/example/api"
+	"gux/server"
 )
 
 func main() {
@@ -30,6 +30,17 @@ func main() {
 
 	postsHandler.RegisterRoutes(mux)
 
+	// WebSocket handler for real-time posts
+	postsWSHandler := NewPostsWSHandler(postsService)
+	mux.HandleFunc("/ws/posts", postsWSHandler.ServeHTTP)
+
+	// Wire up event callbacks so HTTP API changes broadcast to WebSocket clients
+	postsService.SetEventCallbacks(
+		func(post api.Post) { postsWSHandler.broadcastEvent("post.created", post) },
+		func(post api.Post) { postsWSHandler.broadcastEvent("post.updated", post) },
+		func(id int) { postsWSHandler.broadcastEvent("post.deleted", struct{ ID int `json:"id"` }{id}) },
+	)
+
 	// SPA handler for static files
 	spaHandler := server.NewSPAHandler(*dir)
 	mux.HandleFunc("/", spaHandler.ServeHTTP)
@@ -43,6 +54,8 @@ func main() {
 	fmt.Println("  POST   /api/posts      - Create post")
 	fmt.Println("  PUT    /api/posts/:id  - Update post")
 	fmt.Println("  DELETE /api/posts/:id  - Delete post")
+	fmt.Println("\nWebSocket:")
+	fmt.Println("  WS     /ws/posts       - Real-time posts API")
 
 	if err := http.ListenAndServe(addr, mux); err != nil {
 		log.Fatal(err)

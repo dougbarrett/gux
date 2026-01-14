@@ -154,13 +154,13 @@ func InitThemeWithColors(lightColors, darkColors ThemeColors) *ThemeManager {
 
 	// Create style element for CSS variables
 	globalThemeManager.styleElement = document.Call("createElement", "style")
-	globalThemeManager.styleElement.Set("id", "goquery-theme")
+	globalThemeManager.styleElement.Set("id", "gux-theme")
 	document.Get("head").Call("appendChild", globalThemeManager.styleElement)
 
 	// Check for saved preference
 	localStorage := js.Global().Get("localStorage")
 	if !localStorage.IsUndefined() && !localStorage.IsNull() {
-		saved := localStorage.Call("getItem", "goquery-theme")
+		saved := localStorage.Call("getItem", "gux-theme")
 		if !saved.IsNull() && !saved.IsUndefined() {
 			switch saved.String() {
 			case "light":
@@ -213,7 +213,7 @@ func SetTheme(theme ThemeMode) {
 
 	localStorage := js.Global().Get("localStorage")
 	if !localStorage.IsUndefined() && !localStorage.IsNull() {
-		localStorage.Call("setItem", "goquery-theme", string(theme))
+		localStorage.Call("setItem", "gux-theme", string(theme))
 	}
 
 	globalThemeManager.apply()

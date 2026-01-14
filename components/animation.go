@@ -171,7 +171,7 @@ func InitAnimations() {
 	document := js.Global().Get("document")
 
 	style := document.Call("createElement", "style")
-	style.Set("id", "goquery-animations")
+	style.Set("id", "gux-animations")
 	style.Set("textContent", animationsCSS)
 
 	document.Get("head").Call("appendChild", style)

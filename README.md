@@ -1,46 +1,53 @@
-# GoQuery
+# Gux
 
-A Go framework for building web applications with WebAssembly.
+A full-stack Go framework for building modern web applications with WebAssembly. Write your entire application in Go — from type-safe API clients to reactive UI components.
 
-Write your frontend and backend in Go, with type-safe API clients generated from interface definitions.
+[![Go Version](https://img.shields.io/badge/Go-1.21+-00ADD8?logo=go)](https://golang.org)
+[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 ## Features
 
-- **UI Components** - Buttons, layouts, routing, sidebars, and more
-- **Type-Safe API Clients** - Generate HTTP clients from Go interfaces
-- **SPA Support** - Server utilities for single-page application routing
-- **Tailwind CSS** - Automatic Tailwind loading for styling
+- **Type-Safe API Generation** — Define Go interfaces, generate HTTP clients and server handlers automatically
+- **45+ UI Components** — Forms, layouts, data display, feedback, and charts with Tailwind CSS
+- **Reactive State Management** — Generic stores, persistence, async loading, and SWR-style query caching
+- **WebSocket Support** — Type-safe real-time communication with automatic reconnection
+- **Server Utilities** — Middleware composition, SPA handler, CORS, logging, and error handling
+- **Go-Powered Frontend** — Compile to WebAssembly, run natively in the browser
 
 ## Quick Start
 
+### Prerequisites
+
+- Go 1.21+
+- TinyGo 0.30+ (optional, for smaller WASM builds ~500KB vs ~5MB)
+
+### Installation
+
 ```bash
-# Clone and run the example
+go get github.com/yourusername/gux
+```
+
+### Run the Example
+
+```bash
 cd example
-make setup  # First time only: copies wasm_exec.js
-make dev    # Build WASM and start server
+make setup-tinygo   # First time: copy wasm_exec.js
+make dev-tinygo     # Build and start server
 
-# Open http://localhost:8080
+# Open http://localhost:8093
 ```
 
-## Project Structure
+## How It Works
 
-```
-goquery/
-├── components/     # UI components (WASM)
-├── server/         # Server utilities
-├── cmd/apigen/     # API client generator
-└── example/        # Complete working example
-```
-
-## Usage
-
-### 1. Define your API interface
+### 1. Define Your API Interface
 
 ```go
 // api/posts.go
 package api
 
-//go:generate go run goquery/cmd/apigen -source=posts.go -output=posts_client_gen.go
+import "context"
+
+//go:generate go run gux/cmd/apigen -source=posts.go -output=posts_client_gen.go
 
 // @client PostsClient
 // @basepath /api/posts
@@ -53,56 +60,106 @@ type PostsAPI interface {
 
     // @route POST /
     Create(ctx context.Context, req CreatePostRequest) (*Post, error)
+
+    // @route PUT /{id}
+    Update(ctx context.Context, id int, req CreatePostRequest) (*Post, error)
+
+    // @route DELETE /{id}
+    Delete(ctx context.Context, id int) error
 }
 ```
 
-### 2. Generate the client
+### 2. Generate Client & Server Code
 
 ```bash
 go generate ./api/...
 ```
 
-### 3. Use in your WASM app
+This generates:
+- `posts_client_gen.go` — Type-safe HTTP client for WASM
+- `posts_server_gen.go` — HTTP handler with automatic routing
+
+### 3. Build Your Frontend
 
 ```go
-// app/main.go
+//go:build js && wasm
 package main
 
 import (
-    "context"
-    "goquery/components"
     "yourapp/api"
+    "gux/components"
 )
 
 func main() {
     components.LoadTailwind()
+    components.InitToasts()
 
+    // Type-safe API client
     posts := api.NewPostsClient()
 
-    // Fetch data
-    allPosts, err := posts.GetAll(context.Background())
-    // ...
+    // Build reactive UI
+    app := components.NewApp("#app")
+    app.Mount(
+        components.Layout(components.LayoutProps{
+            Sidebar: components.SidebarProps{
+                Title: "My App",
+                Items: []components.NavItem{
+                    {Label: "Dashboard", Path: "/", Icon: "home"},
+                    {Label: "Posts", Path: "/posts", Icon: "file-text"},
+                },
+            },
+        }),
+    )
+
+    // Fetch and display
+    allPosts, err := posts.GetAll()
+    if err != nil {
+        components.Toast(err.Error(), components.ToastError)
+        return
+    }
+
+    // Use posts...
+    select {} // Keep WASM running
 }
 ```
 
-### 4. Implement the server
+### 4. Compile to WebAssembly
+
+```bash
+# Standard Go (larger output, ~5MB)
+GOOS=js GOARCH=wasm go build -o main.wasm ./app
+
+# TinyGo (smaller output, ~500KB)
+tinygo build -o main.wasm -target wasm -no-debug ./app
+```
+
+### 5. Create Your Server
 
 ```go
-// server/main.go
 package main
 
 import (
     "net/http"
-    "goquery/server"
+    "yourapp/api"
+    "gux/server"
 )
 
 func main() {
     mux := http.NewServeMux()
 
-    // Your API handlers
-    mux.HandleFunc("/api/posts", handlePosts)
+    // Wire up generated handler with your service
+    service := NewPostsService()
+    handler := api.NewPostsAPIHandler(service)
 
-    // SPA handler for static files
+    // Add middleware
+    handler.Use(
+        server.Logger(),
+        server.CORS(server.CORSOptions{}),
+        server.Recover(),
+    )
+    handler.RegisterRoutes(mux)
+
+    // Serve static files with SPA routing
     spa := server.NewSPAHandler("./static")
     mux.HandleFunc("/", spa.ServeHTTP)
 
@@ -110,56 +167,280 @@ func main() {
 }
 ```
 
-## Components
+## Documentation
 
-### Layout Components
+| Guide | Description |
+|-------|-------------|
+| [Getting Started](docs/getting-started.md) | Installation, setup, and first app |
+| [API Generation](docs/api-generation.md) | Code generation annotations and usage |
+| [Components](docs/components.md) | Complete UI component reference |
+| [State Management](docs/state-management.md) | Stores, persistence, and async data |
+| [WebSocket](docs/websocket.md) | Real-time communication patterns |
+| [Server Utilities](docs/server.md) | Middleware and backend helpers |
+| [Deployment](docs/deployment.md) | Docker and production setup |
 
+## Component Library
+
+Gux includes 45+ production-ready UI components:
+
+### Forms
 ```go
-layout := components.NewLayout(components.LayoutProps{
-    Sidebar: components.SidebarProps{
-        Title: "My App",
-        Items: []components.NavItem{
-            {Label: "Home", Icon: "🏠", Path: "/"},
-            {Label: "Settings", Icon: "⚙️", Path: "/settings"},
-        },
+// Text input with validation
+input := components.Input(components.InputProps{
+    Label:       "Email",
+    Type:        components.InputEmail,
+    Placeholder: "you@example.com",
+    OnChange:    func(value string) { /* validate */ },
+})
+
+// Dynamic form builder
+form := components.NewFormBuilder(components.FormBuilderProps{
+    Fields: []components.BuilderField{
+        {Name: "email", Type: components.BuilderFieldEmail, Label: "Email",
+         Rules: []components.ValidationRule{components.Required, components.Email}},
+        {Name: "password", Type: components.BuilderFieldPassword, Label: "Password",
+         Rules: []components.ValidationRule{components.Required, components.MinLength(8)}},
     },
-    Header: components.HeaderProps{
-        Title: "Dashboard",
-    },
+    OnSubmit: func(values map[string]string) { /* handle */ },
 })
 ```
 
-### Router
-
+### Data Display
 ```go
-router := components.NewRouter()
-components.SetGlobalRouter(router)
-
-router.Register("/", showHome)
-router.Register("/settings", showSettings)
-
-router.Start()
-```
-
-### Button
-
-```go
-btn := components.Button(components.ButtonProps{
-    Text: "Click Me",
-    OnClick: func() {
-        // Handle click
+// Interactive table
+table := components.Table(components.TableProps{
+    Columns: []components.TableColumn{
+        {Header: "Name", Key: "name"},
+        {Header: "Status", Key: "status", Render: func(row map[string]any) js.Value {
+            return components.Badge(components.BadgeProps{
+                Text: row["status"].(string),
+                Variant: components.BadgeSuccess,
+            })
+        }},
     },
+    Data:       tableData,
+    Striped:    true,
+    OnRowClick: func(row map[string]any) { /* handle */ },
+})
+
+// Charts
+chart := components.BarChart(components.ChartProps{
+    Data: []components.ChartData{
+        {Label: "Jan", Value: 100},
+        {Label: "Feb", Value: 150},
+        {Label: "Mar", Value: 120},
+    },
+    Height:     200,
+    ShowValues: true,
 })
 ```
 
-## API Generator Annotations
+### Feedback
+```go
+// Toast notifications
+components.Toast("Post created!", components.ToastSuccess)
 
-- `@client ClientName` - Name for the generated client struct
-- `@basepath /api/resource` - Base path for all endpoints
-- `@route METHOD /path` - HTTP method and path for each method
+// Modal dialogs
+modal := components.Modal(components.ModalProps{
+    Title: "Confirm Delete",
+    Content: components.Text("Are you sure?"),
+    Footer: components.Div("flex gap-2",
+        components.Button(components.ButtonProps{Text: "Cancel", OnClick: modal.Close}),
+        components.Button(components.ButtonProps{Text: "Delete", Variant: components.ButtonDanger}),
+    ),
+})
+modal.Open()
+```
 
-Path parameters use `{name}` syntax and must match function parameter names.
+### Full Component List
+
+| Category | Components |
+|----------|------------|
+| **Forms** | Button, Input, TextArea, Select, Checkbox, Toggle, DatePicker, Combobox, FileUpload, FormBuilder |
+| **Layout** | Layout, Sidebar, Header, Card, Tabs, Accordion, Drawer |
+| **Data** | Table, Badge, Avatar, Breadcrumbs, Pagination, VirtualList |
+| **Feedback** | Modal, Toast, Alert, Progress, Spinner, Skeleton, Tooltip |
+| **Navigation** | Router, Link, Stepper |
+| **Charts** | BarChart, LineChart, PieChart, DonutChart, Sparkline |
+| **Utilities** | Theme, Animation, Clipboard, FocusTrap, SkipLinks, Inspector |
+
+## State Management
+
+```go
+// Generic reactive store
+store := state.New(AppState{Count: 0, User: nil})
+
+// Subscribe to changes
+unsubscribe := store.Subscribe(func(s AppState) {
+    fmt.Println("Count:", s.Count)
+})
+defer unsubscribe()
+
+// Update state
+store.Update(func(s *AppState) {
+    s.Count++
+})
+
+// Persistent store (auto-saves to localStorage)
+userStore := state.NewPersistentStore("currentUser", User{})
+
+// Async data with loading states
+posts := state.NewAsync[[]Post]()
+posts.Load(func() ([]Post, error) {
+    return api.GetPosts()
+})
+
+if posts.IsLoading() {
+    // Show spinner
+}
+if posts.HasError() {
+    // Show error
+}
+data := posts.Data()
+
+// Query caching (SWR pattern)
+result := state.UseQuery("posts", fetchPosts, state.QueryOptions{
+    StaleTime:      5 * time.Minute,
+    RefetchOnFocus: true,
+})
+```
+
+## WebSocket Support
+
+### Type-Safe Subscriptions
+
+```go
+// Subscribe to real-time events (mirrors HTTP client pattern)
+sub, err := posts.Subscribe(func(event api.PostEvent) {
+    switch event.Type {
+    case "created":
+        fmt.Println("New post:", event.Post.Title)
+    case "updated":
+        fmt.Println("Updated:", event.Post.Title)
+    case "deleted":
+        fmt.Println("Deleted ID:", event.ID)
+    }
+})
+if err != nil {
+    log.Fatal(err)
+}
+defer sub.Close()
+```
+
+### Low-Level WebSocket Client
+
+```go
+client := ws.NewClient("ws://localhost:8080/ws",
+    ws.WithOnOpen(func() { fmt.Println("Connected") }),
+    ws.WithOnClose(func(code int, reason string) { fmt.Println("Closed") }),
+)
+client.Connect()
+
+// Typed message handlers
+ws.OnTyped(client, "chat.message", func(msg ChatMessage) {
+    fmt.Println(msg.Author, ":", msg.Text)
+})
+
+// Send typed messages
+client.Send("chat.join", JoinRequest{Room: "general"})
+
+// Request/response pattern
+resp, err := ws.RequestTyped[JoinReq, JoinResp](client, "room.join", req)
+```
+
+## Server Utilities
+
+### Middleware
+
+```go
+// Compose middleware
+handler := server.Chain(
+    server.Logger(),      // Request logging
+    server.CORS(opts),    // Cross-origin support
+    server.Recover(),     // Panic recovery
+    server.RequestID(),   // X-Request-ID header
+)(apiHandler)
+```
+
+### Error Handling
+
+```go
+// Structured errors with HTTP status codes
+if user == nil {
+    return nil, api.NotFoundf("user %d not found", id)
+}
+
+if !valid {
+    return nil, api.BadRequest("invalid email format")
+}
+
+// Automatic JSON error responses
+// {"error": {"code": "not_found", "message": "user 123 not found"}}
+```
+
+### Pagination
+
+```go
+func handleList(w http.ResponseWriter, r *http.Request) {
+    q := api.Query(r)
+    search := q.String("search", "")
+    page := q.Pagination() // Reads ?page=1&per_page=20
+
+    items := fetchItems(search, page.Offset, page.PerPage)
+    total := countItems(search)
+
+    result := api.NewPaginatedResult(items, page, total)
+    json.NewEncoder(w).Encode(result)
+}
+```
+
+## Project Structure
+
+```
+gux/
+├── api/           # Error handling, query utilities, pagination
+├── auth/          # Authentication helpers
+├── cmd/apigen/    # Code generator CLI tool
+├── components/    # 45+ UI components (WASM)
+├── example/       # Complete working application
+│   ├── app/       # WASM frontend
+│   ├── server/    # Go backend
+│   ├── api/       # API definitions
+│   └── Dockerfile # Production deployment
+├── fetch/         # Browser fetch API wrapper
+├── server/        # Middleware and SPA handler
+├── state/         # Reactive state management
+├── storage/       # Data persistence layer
+└── ws/            # WebSocket client
+```
+
+## Deployment
+
+### Docker
+
+```bash
+cd example
+make docker       # Build image
+make docker-run   # Run locally on :8080
+```
+
+The Dockerfile uses multi-stage builds:
+1. **TinyGo** — Compiles WASM frontend (~500KB)
+2. **Go** — Builds server binary
+3. **Alpine** — Minimal production image (~20MB)
+
+See [Deployment Guide](docs/deployment.md) for Kubernetes, fly.io, and other platforms.
+
+## Contributing
+
+Contributions are welcome! Please:
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing`)
+5. Open a Pull Request
 
 ## License
 
-MIT
+MIT License — see [LICENSE](LICENSE) for details.

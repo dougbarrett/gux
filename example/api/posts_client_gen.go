@@ -7,7 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"goquery/fetch"
+	"gux/fetch"
 )
 
 // ClientOption configures a client

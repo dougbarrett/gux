@@ -260,7 +260,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"goquery/fetch"
+	"gux/fetch"
 )
 
 // ClientOption configures a client
@@ -444,7 +444,7 @@ import (
 	"strconv"
 	"strings"
 
-	gqapi "goquery/api"
+	gqapi "gux/api"
 )
 
 {{range $iface := .}}

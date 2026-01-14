@@ -59,7 +59,7 @@ func NewInspector(props InspectorProps) *Inspector {
 
 	// Container
 	container := document.Call("createElement", "div")
-	container.Set("id", "goquery-inspector")
+	container.Set("id", "gux-inspector")
 	container.Set("className", "fixed z-[9999]")
 
 	// Position
@@ -106,7 +106,7 @@ func NewInspector(props InspectorProps) *Inspector {
 
 	title := document.Call("createElement", "span")
 	title.Set("className", "text-purple-400 font-bold")
-	title.Set("textContent", "GoQuery Inspector")
+	title.Set("textContent", "Gux Inspector")
 	header.Call("appendChild", title)
 
 	headerButtons := document.Call("createElement", "div")

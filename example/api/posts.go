@@ -2,7 +2,7 @@ package api
 
 import "context"
 
-//go:generate go run goquery/cmd/apigen -source=posts.go -output=posts_client_gen.go
+//go:generate go run gux/cmd/apigen -source=posts.go -output=posts_client_gen.go
 
 // PostsAPI defines the posts endpoints
 // @client PostsClient

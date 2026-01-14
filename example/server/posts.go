@@ -4,8 +4,8 @@ import (
 	"context"
 	"sync"
 
-	gqapi "goquery/api"
-	"goquery/example/api"
+	gqapi "gux/api"
+	"gux/example/api"
 )
 
 // PostsService implements api.PostsAPI
@@ -13,6 +13,18 @@ type PostsService struct {
 	mu     sync.RWMutex
 	posts  map[int]api.Post
 	nextID int
+
+	// Event callbacks for real-time notifications
+	onCreated func(api.Post)
+	onUpdated func(api.Post)
+	onDeleted func(id int)
+}
+
+// SetEventCallbacks sets the callbacks for post events
+func (s *PostsService) SetEventCallbacks(onCreated func(api.Post), onUpdated func(api.Post), onDeleted func(int)) {
+	s.onCreated = onCreated
+	s.onUpdated = onUpdated
+	s.onDeleted = onDeleted
 }
 
 // NewPostsService creates a new PostsService with sample data
@@ -64,8 +76,6 @@ func (s *PostsService) GetByID(ctx context.Context, id int) (*api.Post, error) {
 // Create creates a new post
 func (s *PostsService) Create(ctx context.Context, req api.CreatePostRequest) (*api.Post, error) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
-
 	post := api.Post{
 		ID:     s.nextID,
 		UserID: req.UserID,
@@ -74,6 +84,12 @@ func (s *PostsService) Create(ctx context.Context, req api.CreatePostRequest) (*
 	}
 	s.posts[post.ID] = post
 	s.nextID++
+	s.mu.Unlock()
+
+	// Notify listeners
+	if s.onCreated != nil {
+		s.onCreated(post)
+	}
 
 	return &post, nil
 }
@@ -81,9 +97,8 @@ func (s *PostsService) Create(ctx context.Context, req api.CreatePostRequest) (*
 // Update updates an existing post
 func (s *PostsService) Update(ctx context.Context, id int, req api.CreatePostRequest) (*api.Post, error) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
-
 	if _, ok := s.posts[id]; !ok {
+		s.mu.Unlock()
 		return nil, gqapi.NotFoundf("post %d not found", id)
 	}
 
@@ -94,6 +109,12 @@ func (s *PostsService) Update(ctx context.Context, id int, req api.CreatePostReq
 		Body:   req.Body,
 	}
 	s.posts[id] = post
+	s.mu.Unlock()
+
+	// Notify listeners
+	if s.onUpdated != nil {
+		s.onUpdated(post)
+	}
 
 	return &post, nil
 }
@@ -101,12 +122,18 @@ func (s *PostsService) Update(ctx context.Context, id int, req api.CreatePostReq
 // Delete removes a post
 func (s *PostsService) Delete(ctx context.Context, id int) error {
 	s.mu.Lock()
-	defer s.mu.Unlock()
-
 	if _, ok := s.posts[id]; !ok {
+		s.mu.Unlock()
 		return gqapi.NotFoundf("post %d not found", id)
 	}
 
 	delete(s.posts, id)
+	s.mu.Unlock()
+
+	// Notify listeners
+	if s.onDeleted != nil {
+		s.onDeleted(id)
+	}
+
 	return nil
 }

@@ -6,9 +6,9 @@ import (
 	"syscall/js"
 	"time"
 
-	"goquery/components"
-	"goquery/example/api"
-	"goquery/state"
+	"gux/components"
+	"gux/example/api"
+	"gux/state"
 )
 
 var (
@@ -284,7 +284,7 @@ func newComponentsDemo() js.Value {
 
 	accordion := components.NewAccordion(components.AccordionProps{
 		Items: []components.AccordionItem{
-			{Title: "What is GoQuery?", Content: components.Text("GoQuery is a Go WebAssembly framework for building web applications entirely in Go.")},
+			{Title: "What is Gux?", Content: components.Text("Gux is a Go WebAssembly framework for building web applications entirely in Go.")},
 			{Title: "How does it work?", Content: components.Text("It compiles Go code to WebAssembly and provides component APIs for DOM manipulation.")},
 			{Title: "Is it production ready?", Content: components.Text("It's a proof of concept demonstrating the capabilities of Go WASM for web development.")},
 		},
@@ -339,7 +339,7 @@ func newComponentsDemo() js.Value {
 			),
 		),
 		components.Section("Tooltip", tooltipBtn),
-		components.Section("Clipboard", components.CopyableText("npm install goquery")),
+		components.Section("Clipboard", components.CopyableText("npm install gux")),
 		components.Section("Date Picker", datePicker.Element()),
 		components.Section("Accordion", accordion.Element()),
 		components.Section("Stepper", stepper.Element()),
@@ -443,7 +443,7 @@ func utilitiesDemo() js.Value {
 	animBox.Set("className", "w-16 h-16 bg-blue-500 rounded-lg flex items-center justify-center text-white font-bold")
 	animBox.Set("textContent", "Go")
 
-	// WebSocket demo
+	// WebSocket Echo Demo (raw WebSocket)
 	wsStatusText := document.Call("createElement", "span")
 	wsStatusText.Set("className", "text-gray-500")
 	wsStatusText.Set("textContent", "Disconnected")
@@ -455,66 +455,119 @@ func utilitiesDemo() js.Value {
 	wsInput := document.Call("createElement", "input")
 	wsInput.Set("type", "text")
 	wsInput.Set("placeholder", "Type a message to echo...")
-	wsInput.Set("className", "flex-1 px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500")
+	wsInput.Set("className", "flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500")
 
 	var wsStore *state.WebSocketStore
 
-	appendMessage := func(msg string) {
+	appendEchoMessage := func(msg string) {
 		current := wsMessageLog.Get("innerHTML").String()
 		if current == "No messages yet..." {
 			wsMessageLog.Set("innerHTML", msg)
 		} else {
 			wsMessageLog.Set("innerHTML", current+"<br>"+msg)
 		}
-		// Auto-scroll to bottom
 		wsMessageLog.Set("scrollTop", wsMessageLog.Get("scrollHeight"))
 	}
 
-	connectWS := func() {
-		// Use a public WebSocket echo server
+	connectEchoWS := func() {
 		wsStore = state.NewWebSocketStore(state.WebSocketConfig{
 			URL: "wss://echo.websocket.org",
 			OnOpen: func() {
 				wsStatusText.Set("className", "text-green-500 font-medium")
 				wsStatusText.Set("textContent", "Connected")
-				appendMessage("[System] Connected to echo server")
-				components.Toast("WebSocket connected!", components.ToastSuccess)
+				appendEchoMessage("[System] Connected to echo server")
 			},
 			OnClose: func(code int, reason string) {
 				wsStatusText.Set("className", "text-gray-500")
 				wsStatusText.Set("textContent", "Disconnected")
-				appendMessage("[System] Disconnected")
+				appendEchoMessage("[System] Disconnected")
 			},
 			OnMessage: func(data []byte) {
-				appendMessage("[Received] " + string(data))
+				appendEchoMessage("[Echo] " + string(data))
 			},
 			OnError: func(err string) {
 				wsStatusText.Set("className", "text-red-500")
 				wsStatusText.Set("textContent", "Error")
-				appendMessage("[Error] " + err)
-				components.Toast("WebSocket error", components.ToastError)
+				appendEchoMessage("[Error] " + err)
 			},
 		})
 		wsStore.Connect()
 	}
 
-	disconnectWS := func() {
+	disconnectEchoWS := func() {
 		if wsStore != nil {
 			wsStore.Close()
 			wsStore = nil
 		}
 	}
 
-	sendMessage := func() {
+	sendEchoMessage := func() {
 		if wsStore != nil && wsStore.IsConnected() {
 			msg := wsInput.Get("value").String()
 			if msg != "" {
-				appendMessage("[Sent] " + msg)
+				appendEchoMessage("[Sent] " + msg)
 				wsStore.Send([]byte(msg))
 				wsInput.Set("value", "")
 			}
 		} else {
 			components.Toast("Not connected", components.ToastWarning)
+		}
+	}
+
+	// Posts Subscribe Demo - First-party API (mirrors HTTP client pattern)
+	subStatusText := document.Call("createElement", "span")
+	subStatusText.Set("className", "text-gray-500")
+	subStatusText.Set("textContent", "Not subscribed")
+
+	subLog := document.Call("createElement", "div")
+	subLog.Set("className", "h-32 overflow-y-auto bg-gray-100 dark:bg-gray-800 rounded p-2 text-sm font-mono text-gray-800 dark:text-gray-200 border border-gray-200 dark:border-gray-700")
+	subLog.Set("textContent", "No events yet...")
+
+	var postsSub *api.Subscription
+
+	appendSubEvent := func(msg string) {
+		current := subLog.Get("innerHTML").String()
+		if current == "No events yet..." {
+			subLog.Set("innerHTML", msg)
+		} else {
+			subLog.Set("innerHTML", current+"<br>"+msg)
+		}
+		subLog.Set("scrollTop", subLog.Get("scrollHeight"))
+	}
+
+	startSubscription := func() {
+		var err error
+		// Simple Subscribe API - just pass a handler function
+		postsSub, err = posts.Subscribe(func(event api.PostEvent) {
+			switch event.Type {
+			case "created":
+				appendSubEvent("[Created] " + event.Post.Title)
+			case "updated":
+				appendSubEvent("[Updated] " + event.Post.Title)
+			case "deleted":
+				appendSubEvent("[Deleted] Post #" + string(rune('0'+event.ID)))
+			}
+		})
+		if err != nil {
+			subStatusText.Set("className", "text-red-500")
+			subStatusText.Set("textContent", "Failed")
+			appendSubEvent("[Error] " + err.Error())
+			components.Toast("Subscribe failed", components.ToastError)
+			return
+		}
+		subStatusText.Set("className", "text-green-500 font-medium")
+		subStatusText.Set("textContent", "Subscribed")
+		appendSubEvent("[System] Listening for post events...")
+		components.Toast("Subscribed to posts!", components.ToastSuccess)
+	}
+
+	stopSubscription := func() {
+		if postsSub != nil {
+			postsSub.Close()
+			postsSub = nil
+			subStatusText.Set("className", "text-gray-500")
+			subStatusText.Set("textContent", "Not subscribed")
+			appendSubEvent("[System] Unsubscribed")
 		}
 	}
 
@@ -585,28 +638,47 @@ func utilitiesDemo() js.Value {
 				components.Div("mt-4", formBuilder.Element()),
 			),
 		),
-		components.Section("WebSocket",
-			components.Div("space-y-4",
-				components.Text("Real-time WebSocket communication with echo server:"),
+		components.Section("WebSocket (Raw)",
+			components.Div("space-y-3",
+				components.Text("Raw WebSocket with echo.websocket.org:"),
 				components.Div("flex items-center gap-4",
 					components.Text("Status:"),
 					wsStatusText,
 				),
 				components.Div("flex gap-2",
 					components.Button(components.ButtonProps{Text: "Connect", Variant: components.ButtonSuccess, Size: components.ButtonSM, OnClick: func() {
-						connectWS()
+						connectEchoWS()
 					}}),
 					components.Button(components.ButtonProps{Text: "Disconnect", Variant: components.ButtonDanger, Size: components.ButtonSM, OnClick: func() {
-						disconnectWS()
+						disconnectEchoWS()
 					}}),
 				),
 				wsMessageLog,
 				components.Div("flex gap-2",
 					wsInput,
 					components.Button(components.ButtonProps{Text: "Send", Size: components.ButtonSM, OnClick: func() {
-						sendMessage()
+						sendEchoMessage()
 					}}),
 				),
+			),
+		),
+		components.Section("Posts Subscribe (First-Party API)",
+			components.Div("space-y-3",
+				components.Text("Type-safe WebSocket API - mirrors HTTP client pattern:"),
+				components.Div("flex items-center gap-4",
+					components.Text("Status:"),
+					subStatusText,
+				),
+				components.Div("flex gap-2",
+					components.Button(components.ButtonProps{Text: "Subscribe", Variant: components.ButtonSuccess, Size: components.ButtonSM, OnClick: func() {
+						startSubscription()
+					}}),
+					components.Button(components.ButtonProps{Text: "Unsubscribe", Variant: components.ButtonDanger, Size: components.ButtonSM, OnClick: func() {
+						stopSubscription()
+					}}),
+				),
+				subLog,
+				components.Text("Create posts via HTTP API to see real-time events here."),
 			),
 		),
 		components.Section("Component Inspector",
