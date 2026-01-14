@@ -1,0 +1,33 @@
+# Build artifacts
+main.wasm
+bin/
+goquery-server
+
+# Distribution files
+cmd/prod/dist/
+
+# Go
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Dependency directories
+vendor/
+
+# Debug
+__debug_bin*
