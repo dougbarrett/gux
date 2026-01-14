@@ -13,8 +13,8 @@ RUN go mod download || true
 # Copy source code
 COPY . .
 
-# Build WASM module
-RUN tinygo build -o example/main.wasm -target wasm -no-debug ./example/app
+# Build WASM module (output to /app which is writable)
+RUN tinygo build -o main.wasm -target wasm -no-debug ./example/app
 
 # Stage 2: Build Go server
 FROM golang:1.24-alpine AS server-builder
@@ -50,7 +50,7 @@ COPY example/index.html .
 COPY example/wasm_exec.js .
 
 # Copy built WASM
-COPY --from=wasm-builder /app/example/main.wasm .
+COPY --from=wasm-builder /app/main.wasm .
 
 # Expose port
 EXPOSE 8080
