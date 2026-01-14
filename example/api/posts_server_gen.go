@@ -7,12 +7,15 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+
+	gqapi "goquery/api"
 )
 
 
 // PostsAPIHandler wraps a PostsAPI implementation with HTTP handlers
 type PostsAPIHandler struct {
-	service PostsAPI
+	service    PostsAPI
+	middleware []func(http.Handler) http.Handler
 }
 
 // NewPostsAPIHandler creates a new HTTP handler for PostsAPI
@@ -20,10 +23,24 @@ func NewPostsAPIHandler(service PostsAPI) *PostsAPIHandler {
 	return &PostsAPIHandler{service: service}
 }
 
+// Use adds middleware to the handler chain
+func (h *PostsAPIHandler) Use(mw ...func(http.Handler) http.Handler) {
+	h.middleware = append(h.middleware, mw...)
+}
+
+// wrap applies middleware chain to a handler
+func (h *PostsAPIHandler) wrap(handler http.HandlerFunc) http.Handler {
+	var result http.Handler = handler
+	for i := len(h.middleware) - 1; i >= 0; i-- {
+		result = h.middleware[i](result)
+	}
+	return result
+}
+
 // RegisterRoutes registers all routes for PostsAPI
 func (h *PostsAPIHandler) RegisterRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("/api/posts", h.handleRoot)
-	mux.HandleFunc("/api/posts/", h.handleWithID)
+	mux.Handle("/api/posts", h.wrap(h.handleRoot))
+	mux.Handle("/api/posts/", h.wrap(h.handleWithID))
 }
 
 func (h *PostsAPIHandler) handleRoot(w http.ResponseWriter, r *http.Request) {
@@ -48,7 +65,7 @@ func (h *PostsAPIHandler) handleWithID(w http.ResponseWriter, r *http.Request) {
 
 	id, err := strconv.Atoi(path)
 	if err != nil {
-		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		gqapi.WriteError(w, gqapi.BadRequest("invalid ID"))
 		return
 	}
 
@@ -69,7 +86,7 @@ func (h *PostsAPIHandler) handleGetAll(w http.ResponseWriter, r *http.Request) {
 
 	result, err := h.service.GetAll(r.Context())
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		gqapi.WriteError(w, err)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -80,7 +97,7 @@ func (h *PostsAPIHandler) handleGetByID(w http.ResponseWriter, r *http.Request, 
 
 	result, err := h.service.GetByID(r.Context(), id)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		gqapi.WriteError(w, err)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -90,13 +107,13 @@ func (h *PostsAPIHandler) handleGetByID(w http.ResponseWriter, r *http.Request, 
 func (h *PostsAPIHandler) handleCreate(w http.ResponseWriter, r *http.Request) {
 	var req CreatePostRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		gqapi.WriteError(w, gqapi.BadRequest("invalid request body"))
 		return
 	}
 
 	result, err := h.service.Create(r.Context(), req)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		gqapi.WriteError(w, err)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -106,13 +123,13 @@ func (h *PostsAPIHandler) handleCreate(w http.ResponseWriter, r *http.Request) {
 func (h *PostsAPIHandler) handleUpdate(w http.ResponseWriter, r *http.Request, id int) {
 	var req CreatePostRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		gqapi.WriteError(w, gqapi.BadRequest("invalid request body"))
 		return
 	}
 
 	result, err := h.service.Update(r.Context(), id, req)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		gqapi.WriteError(w, err)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -123,7 +140,7 @@ func (h *PostsAPIHandler) handleDelete(w http.ResponseWriter, r *http.Request, i
 
 	err := h.service.Delete(r.Context(), id)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		gqapi.WriteError(w, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)

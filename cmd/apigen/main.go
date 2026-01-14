@@ -443,12 +443,15 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+
+	gqapi "goquery/api"
 )
 
 {{range $iface := .}}
 // {{$iface.Name}}Handler wraps a {{$iface.Name}} implementation with HTTP handlers
 type {{$iface.Name}}Handler struct {
-	service {{$iface.Name}}
+	service    {{$iface.Name}}
+	middleware []func(http.Handler) http.Handler
 }
 
 // New{{$iface.Name}}Handler creates a new HTTP handler for {{$iface.Name}}
@@ -456,10 +459,24 @@ func New{{$iface.Name}}Handler(service {{$iface.Name}}) *{{$iface.Name}}Handler 
 	return &{{$iface.Name}}Handler{service: service}
 }
 
+// Use adds middleware to the handler chain
+func (h *{{$iface.Name}}Handler) Use(mw ...func(http.Handler) http.Handler) {
+	h.middleware = append(h.middleware, mw...)
+}
+
+// wrap applies middleware chain to a handler
+func (h *{{$iface.Name}}Handler) wrap(handler http.HandlerFunc) http.Handler {
+	var result http.Handler = handler
+	for i := len(h.middleware) - 1; i >= 0; i-- {
+		result = h.middleware[i](result)
+	}
+	return result
+}
+
 // RegisterRoutes registers all routes for {{$iface.Name}}
 func (h *{{$iface.Name}}Handler) RegisterRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("{{$iface.BasePath}}", h.handleRoot)
-	mux.HandleFunc("{{$iface.BasePath}}/", h.handleWithID)
+	mux.Handle("{{$iface.BasePath}}", h.wrap(h.handleRoot))
+	mux.Handle("{{$iface.BasePath}}/", h.wrap(h.handleWithID))
 }
 
 func (h *{{$iface.Name}}Handler) handleRoot(w http.ResponseWriter, r *http.Request) {
@@ -486,7 +503,7 @@ func (h *{{$iface.Name}}Handler) handleWithID(w http.ResponseWriter, r *http.Req
 
 	id, err := strconv.Atoi(path)
 	if err != nil {
-		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		gqapi.WriteError(w, gqapi.BadRequest("invalid ID"))
 		return
 	}
 
@@ -507,14 +524,14 @@ func (h *{{$iface.Name}}Handler) handle{{$method.Name}}(w http.ResponseWriter, r
 {{- if $method.HasBody}}
 	var req {{$method.BodyType}}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		gqapi.WriteError(w, gqapi.BadRequest("invalid request body"))
 		return
 	}
 {{- end}}
 
 	{{if $method.HasReturn}}result, {{end}}err := h.service.{{$method.Name}}(r.Context(){{range $method.PathParams}}, {{.}}{{end}}{{if $method.HasBody}}, req{{end}})
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		gqapi.WriteError(w, err)
 		return
 	}
 

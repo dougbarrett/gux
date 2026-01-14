@@ -8,20 +8,25 @@ import (
 
 	"goquery/components"
 	"goquery/example/api"
+	"goquery/state"
 )
 
 var (
-	app     *components.App
-	layout  *components.Layout
-	display *components.DataDisplay
-	router  *components.Router
-	posts   *api.PostsClient
-	modal   *components.Modal
+	app        *components.App
+	layout     *components.Layout
+	display    *components.DataDisplay
+	router     *components.Router
+	posts      *api.PostsClient
+	modal      *components.Modal
+	postsStore *state.AsyncStore[[]api.Post]
 )
 
 func main() {
 	// Initialize app (loads Tailwind, clears #app)
 	app = components.NewApp("app")
+
+	// Initialize toast notifications
+	components.InitToasts()
 
 	// Initialize API client
 	posts = api.NewPostsClient()
@@ -30,8 +35,12 @@ func main() {
 	router = components.NewRouter()
 	components.SetGlobalRouter(router)
 
+	// Initialize async posts store
+	postsStore = state.NewAsync[[]api.Post]()
+
 	router.Register("/", showDashboard)
 	router.Register("/api-test", showAPITest)
+	router.Register("/create-post", showCreatePost)
 	router.Register("/components", showComponents)
 	router.Register("/settings", showSettings)
 
@@ -52,6 +61,7 @@ func main() {
 			Items: []components.NavItem{
 				{Label: "Dashboard", Icon: "📊", Path: "/"},
 				{Label: "API Test", Icon: "🔌", Path: "/api-test"},
+				{Label: "Create Post", Icon: "✏️", Path: "/create-post"},
 				{Label: "Components", Icon: "🧩", Path: "/components"},
 				{Label: "Settings", Icon: "⚙️", Path: "/settings"},
 			},
@@ -209,6 +219,7 @@ func feedbackDemo() js.Value {
 				Text: "Confirm",
 				OnClick: func() {
 					modal.Close()
+					components.Toast("Action confirmed!", components.ToastSuccess)
 				},
 			}),
 		),
@@ -216,6 +227,38 @@ func feedbackDemo() js.Value {
 	})
 
 	return components.Div("space-y-4",
+		components.H3("Toasts"),
+		components.Div("flex flex-wrap gap-2",
+			components.Button(components.ButtonProps{
+				Text:      "Info Toast",
+				ClassName: "px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 cursor-pointer",
+				OnClick: func() {
+					components.Toast("This is an info message", components.ToastInfo)
+				},
+			}),
+			components.Button(components.ButtonProps{
+				Text:      "Success Toast",
+				ClassName: "px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600 cursor-pointer",
+				OnClick: func() {
+					components.Toast("Operation successful!", components.ToastSuccess)
+				},
+			}),
+			components.Button(components.ButtonProps{
+				Text:      "Warning Toast",
+				ClassName: "px-3 py-1 bg-yellow-500 text-white rounded hover:bg-yellow-600 cursor-pointer",
+				OnClick: func() {
+					components.Toast("Please be careful!", components.ToastWarning)
+				},
+			}),
+			components.Button(components.ButtonProps{
+				Text:      "Error Toast",
+				ClassName: "px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 cursor-pointer",
+				OnClick: func() {
+					components.Toast("Something went wrong!", components.ToastError)
+				},
+			}),
+		),
+
 		components.H3("Alerts"),
 		components.AlertInfoMsg("This is an informational message."),
 		components.AlertSuccessMsg("Operation completed successfully!"),
@@ -288,6 +331,53 @@ func dataDemo() js.Value {
 	)
 }
 
+func showCreatePost() {
+	form := components.NewForm(components.FormProps{
+		Fields: []components.FormField{
+			{
+				Name:        "title",
+				Label:       "Title",
+				Placeholder: "Enter post title",
+				Rules:       []components.ValidationRule{components.Required, components.MinLength(3)},
+			},
+			{
+				Name:        "body",
+				Label:       "Body",
+				Placeholder: "Write your post content...",
+				Rules:       []components.ValidationRule{components.Required, components.MinLength(10)},
+			},
+		},
+		SubmitLabel: "Create Post",
+		OnSubmit: func(values map[string]string) {
+			go func() {
+				_, err := posts.Create(context.Background(), api.CreatePostRequest{
+					UserID: 1,
+					Title:  values["title"],
+					Body:   values["body"],
+				})
+				if err != nil {
+					components.Toast("Failed to create post: "+err.Error(), components.ToastError)
+					return
+				}
+				components.Toast("Post created successfully!", components.ToastSuccess)
+				router.Navigate("/api-test")
+			}()
+		},
+		OnCancel: func() {
+			router.Navigate("/")
+		},
+		CancelLabel: "Cancel",
+	})
+
+	layout.SetContent(
+		components.Card(
+			components.H2("Create New Post"),
+			components.Text("Fill out the form below to create a new post."),
+			components.Div("mt-4 max-w-lg", form.Element()),
+		),
+	)
+}
+
 func showSettings() {
 	nameInput := components.NewInput(components.InputProps{
 		Label: "Display Name",
@@ -320,7 +410,7 @@ func showSettings() {
 					components.Button(components.ButtonProps{
 						Text: "Save Settings",
 						OnClick: func() {
-							js.Global().Call("alert", "Settings saved!")
+							components.Toast("Settings saved successfully!", components.ToastSuccess)
 						},
 					}),
 				),
@@ -335,10 +425,12 @@ func fetchSinglePost() {
 	post, err := posts.GetByID(context.Background(), 1)
 	if err != nil {
 		display.ShowError("Error: " + err.Error())
+		components.Toast("Failed to fetch post", components.ToastError)
 		return
 	}
 
 	display.ShowJSON(post)
+	components.Toast("Post loaded successfully", components.ToastSuccess)
 }
 
 func fetchAllPosts() {
@@ -347,6 +439,7 @@ func fetchAllPosts() {
 	allPosts, err := posts.GetAll(context.Background())
 	if err != nil {
 		display.ShowError("Error: " + err.Error())
+		components.Toast("Failed to fetch posts", components.ToastError)
 		return
 	}
 
@@ -355,4 +448,5 @@ func fetchAllPosts() {
 		allPosts = allPosts[:5]
 	}
 	display.ShowJSON(allPosts)
+	components.Toast("Posts loaded successfully", components.ToastSuccess)
 }

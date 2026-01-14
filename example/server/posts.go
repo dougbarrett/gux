@@ -2,9 +2,9 @@ package main
 
 import (
 	"context"
-	"errors"
 	"sync"
 
+	gqapi "goquery/api"
 	"goquery/example/api"
 )
 
@@ -56,7 +56,7 @@ func (s *PostsService) GetByID(ctx context.Context, id int) (*api.Post, error) {
 
 	post, ok := s.posts[id]
 	if !ok {
-		return nil, errors.New("post not found")
+		return nil, gqapi.NotFoundf("post %d not found", id)
 	}
 	return &post, nil
 }
@@ -84,7 +84,7 @@ func (s *PostsService) Update(ctx context.Context, id int, req api.CreatePostReq
 	defer s.mu.Unlock()
 
 	if _, ok := s.posts[id]; !ok {
-		return nil, errors.New("post not found")
+		return nil, gqapi.NotFoundf("post %d not found", id)
 	}
 
 	post := api.Post{
@@ -104,7 +104,7 @@ func (s *PostsService) Delete(ctx context.Context, id int) error {
 	defer s.mu.Unlock()
 
 	if _, ok := s.posts[id]; !ok {
-		return errors.New("post not found")
+		return gqapi.NotFoundf("post %d not found", id)
 	}
 
 	delete(s.posts, id)

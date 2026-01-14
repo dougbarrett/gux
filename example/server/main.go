@@ -20,6 +20,14 @@ func main() {
 	// Create service and wrap with generated HTTP handler
 	postsService := NewPostsService()
 	postsHandler := api.NewPostsAPIHandler(postsService)
+
+	// Add middleware (logging, CORS, panic recovery)
+	postsHandler.Use(
+		server.Logger(),
+		server.CORS(server.CORSOptions{}),
+		server.Recover(),
+	)
+
 	postsHandler.RegisterRoutes(mux)
 
 	// SPA handler for static files
