@@ -47,12 +47,12 @@ func NewTabs(props TabsProps) *Tabs {
 		props:       props,
 	}
 
-	// Tab list
+	// Tab list - scrollable on mobile
 	tabList := document.Call("createElement", "div")
-	tabList.Set("className", "border-b border-gray-200 dark:border-gray-700")
+	tabList.Set("className", "border-b border-gray-200 dark:border-gray-700 overflow-x-auto scrollbar-hide")
 
 	tabNav := document.Call("createElement", "nav")
-	tabNav.Set("className", "flex space-x-8")
+	tabNav.Set("className", "flex space-x-4 md:space-x-8 min-w-max px-1")
 
 	for i, tab := range props.Tabs {
 		btn := document.Call("createElement", "button")

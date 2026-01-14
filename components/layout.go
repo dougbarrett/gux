@@ -26,16 +26,25 @@ func NewLayout(props LayoutProps) *Layout {
 	container.Set("className", "flex h-screen")
 
 	sidebar := NewSidebar(props.Sidebar)
+
+	// Add overlay first (so it's behind sidebar but above content)
+	container.Call("appendChild", sidebar.Overlay())
 	container.Call("appendChild", sidebar.Element())
 
 	mainArea := document.Call("createElement", "div")
-	mainArea.Set("className", "flex-1 flex flex-col overflow-hidden")
+	mainArea.Set("className", "flex-1 flex flex-col overflow-hidden w-full")
 
-	header := NewHeader(props.Header)
+	// Add hamburger menu toggle to header props
+	headerPropsWithMenu := props.Header
+	headerPropsWithMenu.OnMenuToggle = func() {
+		sidebar.Toggle()
+	}
+
+	header := NewHeader(headerPropsWithMenu)
 	mainArea.Call("appendChild", header.Element())
 
 	content := document.Call("createElement", "main")
-	content.Set("className", "flex-1 p-6 bg-gray-100 dark:bg-gray-900 overflow-auto")
+	content.Set("className", "flex-1 p-4 md:p-6 bg-gray-100 dark:bg-gray-900 overflow-auto")
 	mainArea.Call("appendChild", content)
 
 	container.Call("appendChild", mainArea)

@@ -12,8 +12,9 @@ type HeaderAction struct {
 
 // HeaderProps configures a Header component
 type HeaderProps struct {
-	Title   string
-	Actions []HeaderAction
+	Title        string
+	Actions      []HeaderAction
+	OnMenuToggle func() // Called when hamburger menu is clicked (mobile)
 }
 
 // Header is a page header component
@@ -30,15 +31,34 @@ func NewHeader(props HeaderProps) *Header {
 	document := js.Global().Get("document")
 
 	header := document.Call("createElement", "header")
-	header.Set("className", "bg-white dark:bg-gray-800 shadow dark:shadow-gray-900 px-6 py-4 flex justify-between items-center")
+	header.Set("className", "bg-white dark:bg-gray-800 shadow dark:shadow-gray-900 px-4 md:px-6 py-4 flex justify-between items-center")
+
+	// Left side: hamburger menu (mobile) + title
+	leftDiv := document.Call("createElement", "div")
+	leftDiv.Set("className", "flex items-center gap-3")
+
+	// Hamburger menu button (mobile only)
+	if props.OnMenuToggle != nil {
+		menuBtn := document.Call("createElement", "button")
+		menuBtn.Set("className", "md:hidden p-2 -ml-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors")
+		menuBtn.Set("innerHTML", `<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>`)
+		menuBtn.Set("ariaLabel", "Open menu")
+		menuBtn.Call("addEventListener", "click", js.FuncOf(func(this js.Value, args []js.Value) any {
+			props.OnMenuToggle()
+			return nil
+		}))
+		leftDiv.Call("appendChild", menuBtn)
+	}
 
 	title := document.Call("createElement", "h1")
-	title.Set("className", "text-2xl font-semibold text-gray-800 dark:text-gray-100")
+	title.Set("className", "text-xl md:text-2xl font-semibold text-gray-800 dark:text-gray-100 truncate")
 	title.Set("textContent", props.Title)
-	header.Call("appendChild", title)
+	leftDiv.Call("appendChild", title)
+
+	header.Call("appendChild", leftDiv)
 
 	actionsDiv := document.Call("createElement", "div")
-	actionsDiv.Set("className", "flex gap-2")
+	actionsDiv.Set("className", "flex gap-2 flex-shrink-0")
 	header.Call("appendChild", actionsDiv)
 
 	h := &Header{

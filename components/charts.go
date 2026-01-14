@@ -42,13 +42,14 @@ func BarChart(props BarChartProps) js.Value {
 	}
 
 	container := document.Call("createElement", "div")
-	className := "bar-chart"
+	className := "bar-chart w-full"
 	if props.ClassName != "" {
 		className += " " + props.ClassName
 	}
 	container.Set("className", className)
 	container.Get("style").Set("width", props.Width)
 	container.Get("style").Set("height", props.Height)
+	container.Get("style").Set("maxWidth", "100%")
 
 	if len(props.Data) == 0 {
 		return container
@@ -175,9 +176,14 @@ func LineChart(props LineChartProps) js.Value {
 	}
 
 	container := document.Call("createElement", "div")
-	container.Set("className", props.ClassName)
+	className := "w-full"
+	if props.ClassName != "" {
+		className += " " + props.ClassName
+	}
+	container.Set("className", className)
 	container.Get("style").Set("width", props.Width)
 	container.Get("style").Set("height", props.Height)
+	container.Get("style").Set("maxWidth", "100%")
 	container.Get("style").Set("position", "relative")
 
 	if len(props.Data) == 0 {
@@ -316,7 +322,8 @@ func PieChart(props PieChartProps) js.Value {
 	}
 
 	container := document.Call("createElement", "div")
-	className := "flex items-center gap-4"
+	// Responsive: stack vertically on mobile, horizontal on larger screens
+	className := "flex flex-col sm:flex-row items-center gap-4"
 	if props.ClassName != "" {
 		className += " " + props.ClassName
 	}

@@ -1,0 +1,143 @@
+# Gux - Full-Stack Go Framework for WebAssembly
+
+> Gux is a full-stack Go framework for building modern web applications with WebAssembly. Write backend and frontend entirely in Go, compile to WASM, and run natively in the browser.
+
+## Project Overview
+
+Gux enables developers to build complete web applications using only Go:
+- Type-safe API clients and server handlers via code generation
+- 45+ production-ready UI components with Tailwind CSS
+- Reactive state management with Go generics
+- WebSocket support with automatic reconnection
+- Compiles to ~500KB WASM (TinyGo) or ~5MB (standard Go)
+
+## Repository Structure
+
+```
+gux/
+├── api/              # Server-side error handling and query parsing
+├── auth/             # WASM: JWT parsing, auth state, role-based access
+├── cmd/apigen/       # Code generation CLI for API clients/handlers
+├── components/       # WASM: 45+ UI components (buttons, forms, charts, etc.)
+├── fetch/            # WASM: Browser fetch API wrapper
+├── server/           # Server middleware, SPA handler, CORS
+├── state/            # WASM: Reactive stores, async state, query caching
+├── storage/          # WASM: localStorage/sessionStorage access
+├── ws/               # WASM: Type-safe WebSocket client
+├── example/          # Complete working demo application
+│   ├── api/          # API interface definitions with annotations
+│   ├── app/          # WASM frontend application
+│   └── server/       # Go HTTP server implementation
+└── docs/             # Documentation files
+```
+
+## Key Concepts
+
+### Build Targets
+- **WASM packages** (auth, components, fetch, state, storage, ws): Use `//go:build js && wasm`
+- **Server packages** (api, server): Standard Go, no build tags
+- **Shared types**: Can be used by both (API interfaces, models)
+
+### Code Generation (apigen)
+Define API interfaces with annotations:
+```go
+// @client PostsClient
+// @basepath /api/posts
+type PostsAPI interface {
+    // @route GET /
+    List(ctx context.Context, page, perPage int) (*PaginatedResult[Post], error)
+    // @route POST /
+    Create(ctx context.Context, post *CreatePost) (*Post, error)
+    // @route GET /{id}
+    Get(ctx context.Context, id string) (*Post, error)
+}
+```
+
+Generate with: `go run ./cmd/apigen -source=api/posts.go -output=posts_client_gen.go`
+
+### State Management
+- `Store[T]` - Reactive store with Subscribe/Update/Get
+- `AsyncStore[T]` - Loading/error states with Load()
+- `Derived[T,U]` - Computed stores from other stores
+- `UseQuery[T]` - SWR-style caching with stale time
+
+### Components Pattern
+All components use Props structs:
+```go
+button := components.Button(components.ButtonProps{
+    Text:    "Click me",
+    Variant: components.VariantPrimary,
+    OnClick: func() { /* handler */ },
+})
+parent.AppendChild(button.Element())
+```
+
+## Important Files
+
+| File | Purpose |
+|------|---------|
+| `cmd/apigen/main.go` | Code generator for API clients/handlers |
+| `server/middleware.go` | Logger, CORS, Recover, RequestID middleware |
+| `server/spa.go` | SPA handler with static file serving |
+| `components/app.go` | App initialization, Tailwind loading |
+| `state/store.go` | Generic reactive store implementation |
+| `state/querycache.go` | SWR-style query caching |
+| `ws/ws.go` | Type-safe WebSocket client |
+| `auth/auth.go` | JWT parsing, auth state management |
+| `example/Makefile` | Build targets for dev and production |
+
+## Build Commands
+
+```bash
+# Development (from example/)
+make setup-tinygo  # First time: copy wasm_exec.js
+make generate      # Generate API code from interfaces
+make dev           # Build WASM + run server (standard Go)
+make dev-tinygo    # Build WASM + run server (TinyGo, smaller)
+
+# Production
+make docker        # Multi-stage Docker build
+make docker-run    # Run container locally
+flyctl deploy      # Deploy to Fly.io
+```
+
+## Dependencies
+
+- **Go 1.24.3** - Language runtime
+- **TinyGo 0.30+** - Optional, for smaller WASM builds
+- **gorilla/websocket** - WebSocket server support
+- **Tailwind CSS** - Styling (loaded dynamically in WASM)
+
+## Conventions
+
+1. **Error Handling**: Use structured errors from `api/errors.go` (NotFound, BadRequest, etc.)
+2. **Middleware**: Compose with `server.Chain(middleware1, middleware2, ...)`
+3. **WebSocket Messages**: Use `Message{Type, Payload, ID}` for typed communication
+4. **Auth**: Store JWT in localStorage, use `AuthHeader()` for requests
+5. **Path Parameters**: Use `{id}` syntax in route annotations
+
+## Common Tasks
+
+### Add a new API endpoint
+1. Add method to interface in `api/posts.go` with `@route` annotation
+2. Run `make generate`
+3. Implement method in `server/posts.go`
+
+### Add a new component
+1. Create file in `components/` with `//go:build js && wasm`
+2. Define Props struct and constructor function
+3. Return struct implementing component interface
+
+### Add persistent state
+```go
+store := state.NewPersistentStore("key", defaultValue)
+unsubscribe := store.Subscribe(func(value T) { /* update UI */ })
+```
+
+## Architecture Notes
+
+- Frontend runs entirely in WASM - no JavaScript in application code
+- Server uses standard net/http with middleware composition
+- API generation ensures type-safety between client and server
+- SPA routing handled client-side; server falls back to index.html
+- Auth tokens parsed client-side (expiry extraction, not verification)
