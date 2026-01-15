@@ -54,14 +54,24 @@ func NewAlert(props AlertProps) *Alert {
 	alert := document.Call("createElement", "div")
 	alert.Set("className", style.bg+" "+style.border+" "+style.text+" border rounded-lg p-4 mb-4")
 
+	// ARIA live region: urgent alerts interrupt, status messages wait
+	if variant == AlertError || variant == AlertWarning {
+		alert.Call("setAttribute", "role", "alert")
+		alert.Call("setAttribute", "aria-live", "assertive")
+	} else {
+		alert.Call("setAttribute", "role", "status")
+		alert.Call("setAttribute", "aria-live", "polite")
+	}
+
 	// Content wrapper
 	content := document.Call("createElement", "div")
 	content.Set("className", "flex items-start")
 
-	// Icon
+	// Icon (decorative)
 	icon := document.Call("createElement", "span")
 	icon.Set("className", "mr-3 text-lg")
 	icon.Set("textContent", style.icon)
+	icon.Call("setAttribute", "aria-hidden", "true")
 	content.Call("appendChild", icon)
 
 	// Text container
@@ -91,6 +101,7 @@ func NewAlert(props AlertProps) *Alert {
 		dismiss := document.Call("createElement", "button")
 		dismiss.Set("className", "ml-4 text-lg opacity-50 hover:opacity-100 cursor-pointer")
 		dismiss.Set("textContent", "×")
+		dismiss.Call("setAttribute", "aria-label", "Dismiss alert")
 		dismiss.Call("addEventListener", "click", js.FuncOf(func(this js.Value, args []js.Value) any {
 			alert.Get("parentNode").Call("removeChild", alert)
 			if props.OnDismiss != nil {

@@ -46,6 +46,10 @@ func InitToasts() *ToastManager {
 	container := document.Call("createElement", "div")
 	container.Set("id", "toast-container")
 	container.Set("className", "fixed top-4 right-4 z-50 flex flex-col gap-2")
+	// ARIA live region for toast notifications
+	container.Call("setAttribute", "role", "status")
+	container.Call("setAttribute", "aria-live", "polite")
+	container.Call("setAttribute", "aria-atomic", "true")
 
 	document.Get("body").Call("appendChild", container)
 
@@ -78,10 +82,11 @@ func (tm *ToastManager) Show(props ToastProps) {
 	toast := document.Call("createElement", "div")
 	toast.Set("className", style.bg+" "+style.text+" px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 min-w-64 transform transition-all duration-300 translate-x-full opacity-0")
 
-	// Icon
+	// Icon (decorative)
 	icon := document.Call("createElement", "span")
 	icon.Set("className", "text-lg")
 	icon.Set("textContent", style.icon)
+	icon.Call("setAttribute", "aria-hidden", "true")
 	toast.Call("appendChild", icon)
 
 	// Message
@@ -94,6 +99,7 @@ func (tm *ToastManager) Show(props ToastProps) {
 	closeBtn := document.Call("createElement", "button")
 	closeBtn.Set("className", "opacity-70 hover:opacity-100 cursor-pointer text-lg")
 	closeBtn.Set("textContent", "×")
+	closeBtn.Call("setAttribute", "aria-label", "Dismiss notification")
 
 	var removeToast js.Func
 	removeToast = js.FuncOf(func(this js.Value, args []js.Value) any {
