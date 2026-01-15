@@ -384,6 +384,14 @@ func (s *Sidebar) SetCollapsed(collapsed bool) {
 	}
 }
 
+// ClearSavedState removes the saved collapse preference from localStorage
+func (s *Sidebar) ClearSavedState() {
+	localStorage := js.Global().Get("localStorage")
+	if !localStorage.IsUndefined() && !localStorage.IsNull() {
+		localStorage.Call("removeItem", sidebarStorageKey)
+	}
+}
+
 // RegisterKeyboardShortcut registers Cmd/Ctrl+B to toggle sidebar collapse
 func (s *Sidebar) RegisterKeyboardShortcut() {
 	document := js.Global().Get("document")
