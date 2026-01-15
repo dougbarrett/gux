@@ -58,11 +58,14 @@ Plans:
 
 **Goal**: Add sorting, filtering, pagination, and bulk selection with actions to tables
 **Depends on**: Phase 2
-**Research**: Unlikely (standard table patterns)
-**Plans**: TBD
+**Research**: Skipped (Level 0 - all patterns exist: Checkbox, Pagination, Input)
+**Plans**: 4 plans, 9 tasks
 
 Plans:
-- [ ] 03-01: TBD
+- [ ] 03-01: Table Sorting (sortable columns, sort icons, client-side sort)
+- [ ] 03-02: Table Filtering (search input, real-time filter, debounce)
+- [ ] 03-03: Table Pagination (integrate Pagination component, page-aware rendering)
+- [ ] 03-04: Bulk Selection & Actions (checkbox column, select-all, action bar)
 
 #### Phase 4: UX Polish
 
@@ -105,7 +108,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 |-------|-----------|-------|--------|-----------|
 | 1. Header Components | v1.0 | 2/2 | Complete | 2026-01-15 |
 | 2. Layout & Navigation | v1.0 | 2/2 | Complete | 2026-01-15 |
-| 3. Table Enhancements | v1.0 | 0/? | Not started | - |
+| 3. Table Enhancements | v1.0 | 0/4 | Planned | - |
 | 4. UX Polish | v1.0 | 0/? | Not started | - |
 | 5. Data & States | v1.0 | 0/? | Not started | - |
 | 6. Progressive Enhancement | v1.0 | 0/? | Not started | - |
