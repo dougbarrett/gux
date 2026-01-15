@@ -3,6 +3,7 @@
 package components
 
 import (
+	"strconv"
 	"strings"
 	"syscall/js"
 )
@@ -41,6 +42,8 @@ type Combobox struct {
 	highlightIdx  int
 	props         ComboboxProps
 	cleanup       js.Func
+	listboxID     string   // unique ID for listbox
+	baseOptionID  string   // base ID for generating option IDs
 }
 
 // NewCombobox creates a new Combobox component
@@ -51,12 +54,20 @@ func NewCombobox(props ComboboxProps) *Combobox {
 		props.EmptyMessage = "No results found"
 	}
 
+	// Generate unique IDs for ARIA relationships
+	crypto := js.Global().Get("crypto")
+	uuid := crypto.Call("randomUUID").String()
+	listboxID := "combobox-listbox-" + uuid
+	baseOptionID := "combobox-option-" + uuid
+
 	c := &Combobox{
 		options:      props.Options,
 		filteredOpts: props.Options,
 		value:        props.Value,
 		highlightIdx: -1,
 		props:        props,
+		listboxID:    listboxID,
+		baseOptionID: baseOptionID,
 	}
 
 	container := document.Call("createElement", "div")
@@ -80,6 +91,14 @@ func NewCombobox(props ComboboxProps) *Combobox {
 	input.Set("className", "w-full px-3 py-2 pr-10 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500")
 	input.Set("placeholder", props.Placeholder)
 	input.Set("autocomplete", "off")
+
+	// ARIA combobox attributes
+	input.Call("setAttribute", "role", "combobox")
+	input.Call("setAttribute", "aria-expanded", "false")
+	input.Call("setAttribute", "aria-haspopup", "listbox")
+	input.Call("setAttribute", "aria-controls", listboxID)
+	input.Call("setAttribute", "aria-autocomplete", "list")
+
 	if props.Disabled {
 		input.Set("disabled", true)
 		input.Set("className", "w-full px-3 py-2 pr-10 border border-gray-300 rounded-md shadow-sm bg-gray-100 cursor-not-allowed")
@@ -109,9 +128,15 @@ func NewCombobox(props ComboboxProps) *Combobox {
 
 	container.Call("appendChild", inputWrap)
 
-	// Dropdown
+	// Dropdown (listbox)
 	dropdown := document.Call("createElement", "div")
 	dropdown.Set("className", "absolute w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto z-50 hidden")
+
+	// ARIA listbox attributes
+	dropdown.Call("setAttribute", "role", "listbox")
+	dropdown.Set("id", listboxID)
+	dropdown.Call("setAttribute", "aria-label", "Options")
+
 	c.dropdown = dropdown
 	container.Call("appendChild", dropdown)
 
@@ -184,6 +209,8 @@ func (c *Combobox) renderOptions() {
 		empty.Set("className", "px-3 py-2 text-sm text-gray-500")
 		empty.Set("textContent", c.props.EmptyMessage)
 		c.dropdown.Call("appendChild", empty)
+		// Clear aria-activedescendant when no options
+		c.input.Call("removeAttribute", "aria-activedescendant")
 		return
 	}
 
@@ -198,6 +225,18 @@ func (c *Combobox) renderOptions() {
 			itemClass = "px-3 py-2 cursor-pointer hover:bg-gray-100"
 		}
 		item.Set("className", itemClass)
+
+		// ARIA option attributes
+		optionID := c.baseOptionID + "-" + strconv.Itoa(i)
+		item.Call("setAttribute", "role", "option")
+		item.Set("id", optionID)
+		if i == c.highlightIdx {
+			item.Call("setAttribute", "aria-selected", "true")
+			// Update aria-activedescendant on input
+			c.input.Call("setAttribute", "aria-activedescendant", optionID)
+		} else {
+			item.Call("setAttribute", "aria-selected", "false")
+		}
 
 		label := document.Call("createElement", "div")
 		label.Set("className", "text-sm font-medium")
@@ -221,6 +260,11 @@ func (c *Combobox) renderOptions() {
 		}
 
 		c.dropdown.Call("appendChild", item)
+	}
+
+	// Clear aria-activedescendant if nothing is highlighted
+	if c.highlightIdx < 0 {
+		c.input.Call("removeAttribute", "aria-activedescendant")
 	}
 }
 
@@ -291,6 +335,7 @@ func (c *Combobox) Element() js.Value {
 func (c *Combobox) Open() {
 	c.dropdown.Get("classList").Call("remove", "hidden")
 	c.isOpen = true
+	c.input.Call("setAttribute", "aria-expanded", "true")
 }
 
 // Close closes the dropdown
@@ -298,6 +343,8 @@ func (c *Combobox) Close() {
 	c.dropdown.Get("classList").Call("add", "hidden")
 	c.isOpen = false
 	c.highlightIdx = -1
+	c.input.Call("setAttribute", "aria-expanded", "false")
+	c.input.Call("removeAttribute", "aria-activedescendant")
 }
 
 // Value returns the current value
