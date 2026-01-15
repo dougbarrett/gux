@@ -35,6 +35,9 @@ type DatePicker struct {
 	selected    time.Time
 	isOpen      bool
 	props       DatePickerProps
+	focusedDay  int        // currently focused day (1-31)
+	keyHandler  js.Func    // keyboard navigation handler
+	dayButtons  []js.Value // day button references for focus management
 }
 
 // NewDatePicker creates a new DatePicker component
@@ -241,6 +244,9 @@ func (dp *DatePicker) renderCalendar() {
 		cellIndex++
 	}
 
+	// Initialize dayButtons slice for focus management
+	dp.dayButtons = make([]js.Value, daysInMonth)
+
 	// Day cells
 	for day := 1; day <= daysInMonth; day++ {
 		// Start new row if needed
@@ -285,6 +291,16 @@ func (dp *DatePicker) renderCalendar() {
 
 		dayBtn.Set("className", className)
 		dayBtn.Set("textContent", fmt.Sprintf("%d", day))
+
+		// Roving tabindex - focused day gets tabindex=0, others get -1
+		if day == dp.focusedDay {
+			dayBtn.Call("setAttribute", "tabindex", "0")
+		} else {
+			dayBtn.Call("setAttribute", "tabindex", "-1")
+		}
+
+		// Store button reference for focus management
+		dp.dayButtons[day-1] = dayBtn
 
 		// ARIA attributes for gridcell
 		if isSelected {
@@ -358,13 +374,88 @@ func (dp *DatePicker) open() {
 	dp.isOpen = true
 	dp.calendar.Get("classList").Call("remove", "hidden")
 	dp.input.Call("setAttribute", "aria-expanded", "true")
+
+	// Initialize focusedDay: prefer selected date, then today if in displayed month, else 1
+	if !dp.selected.IsZero() && dp.selected.Year() == dp.displayed.Year() && dp.selected.Month() == dp.displayed.Month() {
+		dp.focusedDay = dp.selected.Day()
+	} else {
+		today := time.Now()
+		if today.Year() == dp.displayed.Year() && today.Month() == dp.displayed.Month() {
+			dp.focusedDay = today.Day()
+		} else {
+			dp.focusedDay = 1
+		}
+	}
+
 	dp.renderCalendar()
+
+	// Focus the focused day button
+	if dp.focusedDay > 0 && dp.focusedDay <= len(dp.dayButtons) {
+		dp.dayButtons[dp.focusedDay-1].Call("focus")
+	}
+
+	// Set up keyboard handler for arrow navigation
+	dp.keyHandler = js.FuncOf(func(this js.Value, args []js.Value) any {
+		event := args[0]
+		key := event.Get("key").String()
+
+		switch key {
+		case "ArrowRight":
+			event.Call("preventDefault")
+			dp.moveFocusBy(1)
+		case "ArrowLeft":
+			event.Call("preventDefault")
+			dp.moveFocusBy(-1)
+		case "ArrowDown":
+			event.Call("preventDefault")
+			dp.moveFocusBy(7)
+		case "ArrowUp":
+			event.Call("preventDefault")
+			dp.moveFocusBy(-7)
+		}
+		return nil
+	})
+	dp.calendar.Call("addEventListener", "keydown", dp.keyHandler)
 }
 
 func (dp *DatePicker) close() {
 	dp.isOpen = false
 	dp.calendar.Get("classList").Call("add", "hidden")
 	dp.input.Call("setAttribute", "aria-expanded", "false")
+}
+
+// moveFocusBy moves the focused day by the specified number of days
+// Handles month boundary transitions automatically
+func (dp *DatePicker) moveFocusBy(days int) {
+	// Calculate current focused date
+	currentDate := time.Date(dp.displayed.Year(), dp.displayed.Month(), dp.focusedDay, 0, 0, 0, 0, time.Local)
+
+	// Calculate new date
+	newDate := currentDate.AddDate(0, 0, days)
+
+	// Check if we've crossed a month boundary
+	if newDate.Month() != dp.displayed.Month() || newDate.Year() != dp.displayed.Year() {
+		// Update displayed month and re-render
+		dp.displayed = time.Date(newDate.Year(), newDate.Month(), 1, 0, 0, 0, 0, time.Local)
+		dp.focusedDay = newDate.Day()
+		dp.renderCalendar()
+	} else {
+		// Same month, just update focus
+		dp.focusedDay = newDate.Day()
+	}
+
+	// Focus the new day button
+	if dp.focusedDay > 0 && dp.focusedDay <= len(dp.dayButtons) {
+		// Update tabindex for roving tabindex pattern
+		for i, btn := range dp.dayButtons {
+			if i+1 == dp.focusedDay {
+				btn.Call("setAttribute", "tabindex", "0")
+				btn.Call("focus")
+			} else {
+				btn.Call("setAttribute", "tabindex", "-1")
+			}
+		}
+	}
 }
 
 // Element returns the DOM element
