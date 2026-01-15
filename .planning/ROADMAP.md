@@ -11,7 +11,8 @@ Transform GoQuery from a functional database query tool into a polished, product
 
 ## Milestones
 
-- ✅ **v1.0 UX Polish** - Phases 1-6 (complete)
+- ✅ **v1.0 UX Polish** - Phases 1-6 (shipped 2026-01-15)
+- 🚧 **v1.1 Accessibility** - Phases 7-11 (in progress)
 
 ## Phases
 
@@ -24,11 +25,17 @@ Transform GoQuery from a functional database query tool into a polished, product
 - [x] **Phase 3: Table Enhancements** - Sorting, filtering, pagination, bulk actions
 - [x] **Phase 4: UX Polish** - Persistent Preferences + Keyboard Navigation + Confirmation Dialog
 - [x] **Phase 5: Data & States** - Data Export + Empty States
-- [ ] **Phase 6: Progressive Enhancement** - Skeleton Loaders + Connection Status + Breadcrumbs + PWA
+- [x] **Phase 6: Progressive Enhancement** - Skeleton Loaders + Connection Status + Breadcrumbs + PWA
+- [ ] **Phase 7: Accessibility Audit** - Review all components, document gaps, establish baseline
+- [ ] **Phase 8: ARIA & Semantic Markup** - Screen reader support, labels, roles, live regions
+- [ ] **Phase 9: Keyboard Navigation** - Comprehensive keyboard support for all components
+- [ ] **Phase 10: Visual Accessibility** - Focus indicators, contrast, reduced motion
+- [ ] **Phase 11: A11y Testing Infrastructure** - axe-core integration, testing patterns
 
 ## Phase Details
 
-### 🚧 v1.0 UX Polish (In Progress)
+<details>
+<summary>✅ v1.0 UX Polish (Phases 1-6) - SHIPPED 2026-01-15</summary>
 
 **Milestone Goal:** Comprehensive UI/UX enhancements to bring the application to production-ready quality
 
@@ -104,10 +111,70 @@ Plans:
 - [x] 06-02: PWA Foundation (manifest, service worker, asset caching)
 - [x] 06-03: PWA Install Experience (install prompt, offline fallback)
 
+</details>
+
+### 🚧 v1.1 Accessibility (In Progress)
+
+**Milestone Goal:** Enterprise-ready accessibility compliance with WCAG 2.1 AA standards
+
+#### Phase 7: Accessibility Audit
+
+**Goal**: Review all components, document gaps, establish baseline
+**Depends on**: v1.0 complete
+**Research**: Likely (WCAG 2.1 AA guidelines, audit methodology)
+**Research topics**: WCAG 2.1 AA checklist, audit patterns, gap assessment methodology
+**Plans**: TBD
+
+Plans:
+- [ ] 07-01: TBD (run /gsd:plan-phase 7 to break down)
+
+#### Phase 8: ARIA & Semantic Markup
+
+**Goal**: Add screen reader support with proper labels, roles, and live regions
+**Depends on**: Phase 7
+**Research**: Likely (WAI-ARIA authoring practices, screen reader patterns)
+**Research topics**: WAI-ARIA authoring practices, screen reader testing, live region patterns
+**Plans**: TBD
+
+Plans:
+- [ ] 08-01: TBD (run /gsd:plan-phase 8 to break down)
+
+#### Phase 9: Keyboard Navigation
+
+**Goal**: Ensure comprehensive keyboard support for all interactive components
+**Depends on**: Phase 8
+**Research**: Unlikely (patterns exist from v1.0: Dropdown 04-02, Command Palette 02-02)
+**Plans**: TBD
+
+Plans:
+- [ ] 09-01: TBD (run /gsd:plan-phase 9 to break down)
+
+#### Phase 10: Visual Accessibility
+
+**Goal**: Implement focus indicators, color contrast compliance, and reduced motion support
+**Depends on**: Phase 9
+**Research**: Likely (WCAG contrast ratios, focus-visible patterns)
+**Research topics**: Contrast ratio requirements, focus-visible patterns, prefers-reduced-motion
+**Plans**: TBD
+
+Plans:
+- [ ] 10-01: TBD (run /gsd:plan-phase 10 to break down)
+
+#### Phase 11: A11y Testing Infrastructure
+
+**Goal**: Integrate axe-core for automated accessibility regression testing
+**Depends on**: Phase 10
+**Research**: Likely (axe-core API, Go/WASM testing integration)
+**Research topics**: axe-core API, automated testing integration, Go testing patterns
+**Plans**: TBD
+
+Plans:
+- [ ] 11-01: TBD (run /gsd:plan-phase 11 to break down)
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
+Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 10 → 11
 
 | Phase | Milestone | Plans | Status | Completed |
 |-------|-----------|-------|--------|-----------|
@@ -117,3 +184,8 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | 4. UX Polish | v1.0 | 3/3 | Complete | 2026-01-15 |
 | 5. Data & States | v1.0 | 3/3 | Complete | 2026-01-15 |
 | 6. Progressive Enhancement | v1.0 | 3/3 | Complete | 2026-01-15 |
+| 7. Accessibility Audit | v1.1 | 0/? | Not started | - |
+| 8. ARIA & Semantic Markup | v1.1 | 0/? | Not started | - |
+| 9. Keyboard Navigation | v1.1 | 0/? | Not started | - |
+| 10. Visual Accessibility | v1.1 | 0/? | Not started | - |
+| 11. A11y Testing Infrastructure | v1.1 | 0/? | Not started | - |
