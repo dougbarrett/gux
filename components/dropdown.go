@@ -249,6 +249,11 @@ func (d *Dropdown) Close() {
 	// Remove keydown handler
 	js.Global().Get("document").Call("removeEventListener", "keydown", d.keyHandler)
 	d.keyHandler.Release()
+
+	// Restore focus to trigger
+	if !d.trigger.IsUndefined() && !d.trigger.IsNull() {
+		d.trigger.Call("focus")
+	}
 }
 
 // updateHighlightStyles updates highlight visually without re-rendering DOM
