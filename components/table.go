@@ -162,6 +162,8 @@ func (t *Table) createFilterInput(document js.Value) js.Value {
 		// Set new debounced timer (150ms)
 		t.debounceTimer = js.Global().Call("setTimeout", js.FuncOf(func(this js.Value, args []js.Value) any {
 			t.filterText = value
+			// Reset to page 1 when filter changes
+			t.currentPage = 1
 			if t.props.OnFilter != nil {
 				t.props.OnFilter(value)
 			}
@@ -318,13 +320,83 @@ func (t *Table) filterData(data []map[string]any) []map[string]any {
 	return filtered
 }
 
-// renderData applies filter and sort, then renders
+// paginateData returns the slice of data for the current page
+func (t *Table) paginateData(data []map[string]any) []map[string]any {
+	if !t.props.Paginated || len(data) == 0 {
+		return data
+	}
+
+	start := (t.currentPage - 1) * t.props.PageSize
+	end := start + t.props.PageSize
+
+	if start >= len(data) {
+		// Current page exceeds data, return empty (shouldn't happen if page is reset properly)
+		return nil
+	}
+	if end > len(data) {
+		end = len(data)
+	}
+
+	return data[start:end]
+}
+
+// updatePagination creates or updates the pagination component based on current data
+func (t *Table) updatePagination(totalItems int) {
+	if !t.props.Paginated {
+		return
+	}
+
+	// Calculate total pages
+	totalPages := (totalItems + t.props.PageSize - 1) / t.props.PageSize
+	if totalPages == 0 {
+		totalPages = 1
+	}
+
+	// Reset to page 1 if current page exceeds total
+	if t.currentPage > totalPages {
+		t.currentPage = 1
+	}
+
+	// Show page info - default is true if TotalItems > 0
+	showInfo := totalItems > 0
+
+	// Create new pagination component
+	t.pagination = NewPagination(PaginationProps{
+		CurrentPage:  t.currentPage,
+		TotalPages:   totalPages,
+		TotalItems:   totalItems,
+		ItemsPerPage: t.props.PageSize,
+		ShowInfo:     showInfo,
+		OnPageChange: func(page int) {
+			t.currentPage = page
+			if t.props.OnPageChange != nil {
+				t.props.OnPageChange(page)
+			}
+			t.renderData()
+		},
+	})
+
+	// Mount pagination
+	if !t.paginationMount.IsUndefined() && !t.paginationMount.IsNull() {
+		t.paginationMount.Set("innerHTML", "")
+		t.paginationMount.Call("appendChild", t.pagination.Element())
+	}
+}
+
+// renderData applies filter, sort, and paginate, then renders
 func (t *Table) renderData() {
 	document := js.Global().Get("document")
 
 	// Apply filter first, then sort
 	displayData := t.filterData(t.allData)
 	displayData = t.sortData(displayData)
+
+	// Update pagination based on filtered/sorted data count
+	filteredCount := len(displayData)
+	t.updatePagination(filteredCount)
+
+	// Apply pagination to get current page slice
+	displayData = t.paginateData(displayData)
 
 	t.tbody.Set("innerHTML", "")
 
@@ -496,6 +568,8 @@ func (t *Table) Sort(column string) {
 // SetFilter programmatically sets the filter text
 func (t *Table) SetFilter(text string) {
 	t.filterText = text
+	// Reset to page 1 when filter changes
+	t.currentPage = 1
 
 	// Update input field if it exists
 	if !t.filterInput.IsUndefined() && !t.filterInput.IsNull() {
@@ -516,6 +590,52 @@ func (t *Table) SetFilter(text string) {
 // ClearFilter resets the filter to show all rows
 func (t *Table) ClearFilter() {
 	t.SetFilter("")
+}
+
+// SetPage navigates to a specific page
+func (t *Table) SetPage(page int) {
+	if page < 1 {
+		page = 1
+	}
+	totalPages := t.TotalPages()
+	if page > totalPages && totalPages > 0 {
+		page = totalPages
+	}
+	t.currentPage = page
+	if t.props.OnPageChange != nil {
+		t.props.OnPageChange(page)
+	}
+	t.renderData()
+}
+
+// NextPage navigates to the next page
+func (t *Table) NextPage() {
+	if t.currentPage < t.TotalPages() {
+		t.SetPage(t.currentPage + 1)
+	}
+}
+
+// PrevPage navigates to the previous page
+func (t *Table) PrevPage() {
+	if t.currentPage > 1 {
+		t.SetPage(t.currentPage - 1)
+	}
+}
+
+// TotalPages returns the total number of pages
+func (t *Table) TotalPages() int {
+	if !t.props.Paginated || len(t.allData) == 0 {
+		return 1
+	}
+	// Get filtered count
+	filteredData := t.filterData(t.allData)
+	totalItems := len(filteredData)
+	return (totalItems + t.props.PageSize - 1) / t.props.PageSize
+}
+
+// CurrentPage returns the current page number
+func (t *Table) CurrentPage() int {
+	return t.currentPage
 }
 
 // Helper to convert any to string

@@ -291,6 +291,15 @@ func dataDemo() js.Value {
 		{"id": 1, "name": "John Doe", "email": "john@example.com", "status": "Active"},
 		{"id": 2, "name": "Jane Smith", "email": "jane@example.com", "status": "Pending"},
 		{"id": 3, "name": "Bob Wilson", "email": "bob@example.com", "status": "Inactive"},
+		{"id": 4, "name": "Alice Brown", "email": "alice@example.com", "status": "Active"},
+		{"id": 5, "name": "Charlie Davis", "email": "charlie@example.com", "status": "Active"},
+		{"id": 6, "name": "Diana Evans", "email": "diana@example.com", "status": "Pending"},
+		{"id": 7, "name": "Edward Foster", "email": "edward@example.com", "status": "Inactive"},
+		{"id": 8, "name": "Fiona Green", "email": "fiona@example.com", "status": "Active"},
+		{"id": 9, "name": "George Harris", "email": "george@example.com", "status": "Pending"},
+		{"id": 10, "name": "Helen Irving", "email": "helen@example.com", "status": "Active"},
+		{"id": 11, "name": "Ian Jackson", "email": "ian@example.com", "status": "Inactive"},
+		{"id": 12, "name": "Julia King", "email": "julia@example.com", "status": "Active"},
 	}
 
 	table := components.NewTable(components.TableProps{
@@ -316,6 +325,8 @@ func dataDemo() js.Value {
 		Striped:    true,
 		Hoverable:  true,
 		Filterable: true,
+		Paginated:  true,
+		PageSize:   5,
 	})
 
 	return components.Div("space-y-4",
