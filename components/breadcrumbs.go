@@ -25,8 +25,12 @@ func Breadcrumbs(props BreadcrumbsProps) js.Value {
 	document := js.Global().Get("document")
 
 	nav := document.Call("createElement", "nav")
-	nav.Set("className", "flex items-center space-x-2 text-sm")
-	nav.Set("aria-label", "Breadcrumb")
+	nav.Set("className", "text-sm")
+	nav.Call("setAttribute", "aria-label", "Breadcrumb")
+
+	// Use ordered list for semantic structure (per WAI-ARIA best practices)
+	ol := document.Call("createElement", "ol")
+	ol.Set("className", "flex items-center space-x-2")
 
 	separator := props.Separator
 	if separator == "" {
@@ -34,12 +38,18 @@ func Breadcrumbs(props BreadcrumbsProps) js.Value {
 	}
 
 	for i, item := range props.Items {
+		// List item wrapper
+		li := document.Call("createElement", "li")
+		li.Set("className", "flex items-center")
+
 		// Separator (except before first item)
 		if i > 0 {
 			sep := document.Call("createElement", "span")
-			sep.Set("className", "text-gray-400 dark:text-gray-500")
+			sep.Set("className", "mr-2 text-gray-400 dark:text-gray-500")
 			sep.Set("textContent", separator)
-			nav.Call("appendChild", sep)
+			// Separators are decorative - hide from screen readers
+			sep.Call("setAttribute", "aria-hidden", "true")
+			li.Call("appendChild", sep)
 		}
 
 		// Item container
@@ -84,9 +94,11 @@ func Breadcrumbs(props BreadcrumbsProps) js.Value {
 			itemEl.Call("appendChild", text)
 		}
 
-		nav.Call("appendChild", itemEl)
+		li.Call("appendChild", itemEl)
+		ol.Call("appendChild", li)
 	}
 
+	nav.Call("appendChild", ol)
 	return nav
 }
 
