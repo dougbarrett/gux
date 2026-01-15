@@ -10,26 +10,33 @@ type TableColumn struct {
 	Key       string
 	Width     string
 	ClassName string
+	Sortable  bool                                          // Whether this column is sortable
+	SortKey   string                                        // Key to sort by (defaults to Key if not set)
 	Render    func(row map[string]any, value any) js.Value // Custom cell renderer
 }
 
 // TableProps configures a Table component
 type TableProps struct {
-	Columns   []TableColumn
-	Data      []map[string]any
-	Striped   bool
-	Hoverable bool
-	Bordered  bool
-	Compact   bool
+	Columns    []TableColumn
+	Data       []map[string]any
+	Striped    bool
+	Hoverable  bool
+	Bordered   bool
+	Compact    bool
 	OnRowClick func(row map[string]any, index int)
+	OnSort     func(column string, direction string) // Callback when sort changes
 }
 
 // Table creates a data table component
 type Table struct {
-	container js.Value
-	tbody     js.Value
-	columns   []TableColumn
-	props     TableProps
+	container     js.Value
+	tbody         js.Value
+	thead         js.Value
+	columns       []TableColumn
+	props         TableProps
+	data          []map[string]any
+	sortColumn    string
+	sortDirection string // "asc", "desc", or "" (none)
 }
 
 // NewTable creates a new Table component
@@ -49,25 +56,6 @@ func NewTable(props TableProps) *Table {
 	// Header
 	thead := document.Call("createElement", "thead")
 	thead.Set("className", "bg-gray-50 dark:bg-gray-800")
-
-	headerRow := document.Call("createElement", "tr")
-	for _, col := range props.Columns {
-		th := document.Call("createElement", "th")
-		thClass := "px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
-		if props.Compact {
-			thClass = "px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
-		}
-		if props.Bordered {
-			thClass += " border-b border-gray-200 dark:border-gray-700"
-		}
-		if col.Width != "" {
-			th.Get("style").Set("width", col.Width)
-		}
-		th.Set("className", thClass)
-		th.Set("textContent", col.Header)
-		headerRow.Call("appendChild", th)
-	}
-	thead.Call("appendChild", headerRow)
 	table.Call("appendChild", thead)
 
 	// Body
@@ -81,14 +69,107 @@ func NewTable(props TableProps) *Table {
 	t := &Table{
 		container: container,
 		tbody:     tbody,
+		thead:     thead,
 		columns:   props.Columns,
 		props:     props,
 	}
+
+	// Render headers (with sort indicators)
+	t.renderHeaders()
 
 	// Render initial data
 	t.SetData(props.Data)
 
 	return t
+}
+
+// renderHeaders creates or updates the table header row with sort indicators
+func (t *Table) renderHeaders() {
+	document := js.Global().Get("document")
+	t.thead.Set("innerHTML", "")
+
+	headerRow := document.Call("createElement", "tr")
+	for _, col := range t.columns {
+		th := document.Call("createElement", "th")
+		thClass := "px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
+		if t.props.Compact {
+			thClass = "px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
+		}
+		if t.props.Bordered {
+			thClass += " border-b border-gray-200 dark:border-gray-700"
+		}
+		if col.Sortable {
+			thClass += " cursor-pointer select-none hover:bg-gray-100 dark:hover:bg-gray-700"
+		}
+		if col.Width != "" {
+			th.Get("style").Set("width", col.Width)
+		}
+		th.Set("className", thClass)
+
+		// Header text with sort indicator
+		headerText := col.Header
+		if col.Sortable {
+			sortKey := col.SortKey
+			if sortKey == "" {
+				sortKey = col.Key
+			}
+
+			// Determine sort indicator
+			indicator := " ⇅" // neutral/unsorted
+			if t.sortColumn == sortKey {
+				if t.sortDirection == "asc" {
+					indicator = " ▲"
+				} else if t.sortDirection == "desc" {
+					indicator = " ▼"
+				}
+			}
+			headerText += indicator
+
+			// Add click handler
+			colSortKey := sortKey // capture for closure
+			th.Call("addEventListener", "click", js.FuncOf(func(this js.Value, args []js.Value) any {
+				t.handleHeaderClick(colSortKey)
+				return nil
+			}))
+		}
+		th.Set("textContent", headerText)
+
+		headerRow.Call("appendChild", th)
+	}
+	t.thead.Call("appendChild", headerRow)
+}
+
+// handleHeaderClick cycles sort direction: none -> asc -> desc -> none
+func (t *Table) handleHeaderClick(sortKey string) {
+	if t.sortColumn == sortKey {
+		// Cycle: asc -> desc -> none
+		switch t.sortDirection {
+		case "asc":
+			t.sortDirection = "desc"
+		case "desc":
+			t.sortColumn = ""
+			t.sortDirection = ""
+		default:
+			t.sortDirection = "asc"
+		}
+	} else {
+		// New column, start with asc
+		t.sortColumn = sortKey
+		t.sortDirection = "asc"
+	}
+
+	// Re-render headers to update indicators
+	t.renderHeaders()
+
+	// Call OnSort callback if provided
+	if t.props.OnSort != nil {
+		t.props.OnSort(t.sortColumn, t.sortDirection)
+	}
+
+	// Re-sort and render data
+	if len(t.data) > 0 {
+		t.SetData(t.data)
+	}
 }
 
 // Element returns the container DOM element
