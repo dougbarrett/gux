@@ -3,11 +3,11 @@
 ## Current Position
 
 Phase: 3 of 6 (Table Enhancements)
-Plan: 1 of 4 in current phase
+Plan: 2 of 4 in current phase
 Status: In progress
-Last activity: 2026-01-15 - Completed 03-01-PLAN.md (Table Sorting)
+Last activity: 2026-01-15 - Completed 03-02-PLAN.md (Table Filtering)
 
-Progress: █████░░░░░ 42%
+Progress: █████░░░░░ 43%
 
 ## Accumulated Context
 
@@ -24,6 +24,9 @@ Progress: █████░░░░░ 42%
 - 02-02: Use updateHighlightStyles() for hover to preserve click handlers
 - 03-01: Emoji sort indicators (▲/▼/⇅) for simplicity
 - 03-01: Case-insensitive string sorting, nil values sort to end
+- 03-02: 150ms debounce for filter input
+- 03-02: Case-insensitive substring matching
+- 03-02: Filter → sort → render pipeline order
 
 ### Blockers/Concerns Carried Forward
 - None
@@ -39,5 +42,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-01-15
-Stopped at: Completed 03-01-PLAN.md (Table Sorting)
-Resume file: None (ready for 03-02)
+Stopped at: Completed 03-02-PLAN.md (Table Filtering)
+Resume file: None (ready for 03-03)
