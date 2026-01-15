@@ -12,15 +12,17 @@ import (
 )
 
 var (
-	app              *components.App
-	layout           *components.Layout
-	display          *components.DataDisplay
-	router           *components.Router
-	posts            *api.PostsClient
-	modal            *components.Modal
-	postsStore       *state.AsyncStore[[]api.Post]
-	commandPalette   *components.CommandPalette
-	connectionStatus *components.ConnectionStatus
+	app                  *components.App
+	layout               *components.Layout
+	display              *components.DataDisplay
+	router               *components.Router
+	posts                *api.PostsClient
+	modal                *components.Modal
+	postsStore           *state.AsyncStore[[]api.Post]
+	commandPalette       *components.CommandPalette
+	connectionStatus     *components.ConnectionStatus
+	installPromptManager *components.InstallPromptManager
+	installPrompt        *components.InstallPrompt
 )
 
 func main() {
@@ -141,6 +143,29 @@ func main() {
 
 	// Register global Cmd+K / Ctrl+K shortcut
 	commandPalette.RegisterKeyboardShortcut()
+
+	// Initialize PWA install prompt manager
+	installPromptManager = components.NewInstallPromptManager()
+
+	// Create install prompt banner (positioned bottom-right)
+	installPrompt = components.NewInstallPrompt(components.InstallPromptProps{
+		Position: components.InstallPromptBottomRight,
+		AppName:  "Gux",
+		OnDismiss: func() {
+			components.Toast("Remind you later!", components.ToastInfo)
+		},
+		OnInstall: func() {
+			installPrompt.Hide()
+		},
+	}, installPromptManager)
+
+	// Mount install prompt to document body
+	js.Global().Get("document").Get("body").Call("appendChild", installPrompt.Element())
+
+	// Show install prompt when PWA install is available
+	installPromptManager.OnCanInstall(func() {
+		installPrompt.Show()
+	})
 
 	// Start router
 	router.Start()
