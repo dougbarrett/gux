@@ -3,11 +3,11 @@
 ## Current Position
 
 Phase: 4 of 6 (UX Polish)
-Plan: 1 of 3 in current phase
+Plan: 2 of 3 in current phase
 Status: In progress
-Last activity: 2026-01-15 - Completed 04-01-PLAN.md (Sidebar localStorage Persistence)
+Last activity: 2026-01-15 - Completed 04-02-PLAN.md (Dropdown Keyboard Navigation)
 
-Progress: ██████░░░░ 53%
+Progress: ███████░░░ 60%
 
 ## Accumulated Context
 
@@ -35,6 +35,9 @@ Progress: ██████░░░░ 53%
 - 03-04: Bulk action bar positioned between filter and table
 - 04-01: Follow theme.go localStorage pattern for sidebar persistence
 - 04-01: Use applyCollapsedState() helper to avoid callback during init
+- 04-02: Follow CommandPalette pattern for keyboard handling
+- 04-02: Use crypto.randomUUID() for unique menuitem IDs
+- 04-02: Skip disabled items during keyboard navigation
 
 ### Blockers/Concerns Carried Forward
 - None
@@ -51,5 +54,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-01-15
-Stopped at: Completed 04-01-PLAN.md
-Resume file: None (ready for 04-02)
+Stopped at: Completed 04-02-PLAN.md
+Resume file: None (ready for 04-03)

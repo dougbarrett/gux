@@ -76,7 +76,7 @@ Plans:
 
 Plans:
 - [x] 04-01: Sidebar localStorage Persistence
-- [ ] 04-02: TBD
+- [x] 04-02: Dropdown Keyboard Navigation
 - [ ] 04-03: TBD
 
 #### Phase 5: Data & States
@@ -111,6 +111,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | 1. Header Components | v1.0 | 2/2 | Complete | 2026-01-15 |
 | 2. Layout & Navigation | v1.0 | 2/2 | Complete | 2026-01-15 |
 | 3. Table Enhancements | v1.0 | 4/4 | Complete | 2026-01-15 |
-| 4. UX Polish | v1.0 | 1/3 | In progress | - |
+| 4. UX Polish | v1.0 | 2/3 | In progress | - |
 | 5. Data & States | v1.0 | 0/? | Not started | - |
 | 6. Progressive Enhancement | v1.0 | 0/? | Not started | - |
