@@ -325,6 +325,9 @@ func (t *Table) SetData(data []map[string]any) {
 	t.allData = data
 	t.data = data
 
+	// Clear selection when data changes
+	t.selectedKeys = make(map[any]bool)
+
 	// Render with current filter/sort state
 	t.renderData()
 }
@@ -840,6 +843,64 @@ func (t *Table) notifySelectionChange() {
 		}
 		t.props.OnSelectionChange(keys)
 	}
+}
+
+// SelectedKeys returns the keys of currently selected rows
+func (t *Table) SelectedKeys() []any {
+	keys := make([]any, 0, len(t.selectedKeys))
+	for key := range t.selectedKeys {
+		keys = append(keys, key)
+	}
+	return keys
+}
+
+// SelectedRows returns the full row data for selected rows
+func (t *Table) SelectedRows() []map[string]any {
+	rows := make([]map[string]any, 0, len(t.selectedKeys))
+	for _, row := range t.allData {
+		key := t.getRowKey(row)
+		if t.selectedKeys[key] {
+			rows = append(rows, row)
+		}
+	}
+	return rows
+}
+
+// SelectAll selects all visible rows (respects filter/pagination)
+func (t *Table) SelectAll() {
+	visibleKeys := t.getVisibleRowKeys()
+	for _, key := range visibleKeys {
+		t.selectedKeys[key] = true
+	}
+	t.renderData()
+	t.notifySelectionChange()
+}
+
+// ClearSelection deselects all rows
+func (t *Table) ClearSelection() {
+	t.selectedKeys = make(map[any]bool)
+	t.renderData()
+	t.notifySelectionChange()
+}
+
+// SetSelection programmatically sets the selection to specific keys
+func (t *Table) SetSelection(keys []any) {
+	t.selectedKeys = make(map[any]bool)
+	for _, key := range keys {
+		t.selectedKeys[key] = true
+	}
+	t.renderData()
+	t.notifySelectionChange()
+}
+
+// IsSelected checks if a row with the given key is selected
+func (t *Table) IsSelected(key any) bool {
+	return t.selectedKeys[key]
+}
+
+// SelectionCount returns the number of selected rows
+func (t *Table) SelectionCount() int {
+	return len(t.selectedKeys)
 }
 
 // Helper to convert any to string
