@@ -24,10 +24,13 @@ type DropdownProps struct {
 
 // Dropdown creates a dropdown menu component
 type Dropdown struct {
-	container js.Value
-	menu      js.Value
-	isOpen    bool
-	cleanup   js.Func
+	container    js.Value
+	menu         js.Value
+	isOpen       bool
+	cleanup      js.Func
+	highlightIdx int
+	menuItems    []js.Value
+	keyHandler   js.Func
 }
 
 // NewDropdown creates a new Dropdown component
@@ -72,6 +75,7 @@ func NewDropdown(props DropdownProps) *Dropdown {
 	}
 
 	// Add items
+	itemIdx := 0
 	for _, item := range props.Items {
 		if item.Divider {
 			divider := document.Call("createElement", "div")
@@ -89,6 +93,7 @@ func NewDropdown(props DropdownProps) *Dropdown {
 		}
 		menuItem.Set("className", itemClass)
 		menuItem.Set("disabled", item.Disabled)
+		menuItem.Set("data-index", itemIdx)
 
 		if item.Icon != "" {
 			icon := document.Call("createElement", "span")
@@ -109,7 +114,19 @@ func NewDropdown(props DropdownProps) *Dropdown {
 			}))
 		}
 
+		// Add mouseenter handler to sync highlight on hover
+		if !item.Disabled {
+			idx := itemIdx
+			menuItem.Call("addEventListener", "mouseenter", js.FuncOf(func(this js.Value, args []js.Value) any {
+				d.highlightIdx = idx
+				d.updateHighlightStyles()
+				return nil
+			}))
+		}
+
 		menu.Call("appendChild", menuItem)
+		d.menuItems = append(d.menuItems, menuItem)
+		itemIdx++
 	}
 
 	container.Call("appendChild", menu)
@@ -144,14 +161,115 @@ func (d *Dropdown) Element() js.Value {
 
 // Open opens the dropdown menu
 func (d *Dropdown) Open() {
+	if d.isOpen {
+		return
+	}
 	d.menu.Get("classList").Call("remove", "hidden")
 	d.isOpen = true
+	d.highlightIdx = 0
+	d.updateHighlightStyles()
+
+	// Register keydown handler
+	d.keyHandler = js.FuncOf(func(this js.Value, args []js.Value) any {
+		event := args[0]
+		key := event.Get("key").String()
+
+		switch key {
+		case "ArrowDown":
+			event.Call("preventDefault")
+			d.highlightNext()
+		case "ArrowUp":
+			event.Call("preventDefault")
+			d.highlightPrev()
+		case "Enter":
+			event.Call("preventDefault")
+			d.executeHighlighted()
+		case "Escape":
+			event.Call("preventDefault")
+			d.Close()
+		}
+		return nil
+	})
+	js.Global().Get("document").Call("addEventListener", "keydown", d.keyHandler)
 }
 
 // Close closes the dropdown menu
 func (d *Dropdown) Close() {
+	if !d.isOpen {
+		return
+	}
 	d.menu.Get("classList").Call("add", "hidden")
 	d.isOpen = false
+
+	// Remove keydown handler
+	js.Global().Get("document").Call("removeEventListener", "keydown", d.keyHandler)
+	d.keyHandler.Release()
+}
+
+// updateHighlightStyles updates highlight visually without re-rendering DOM
+func (d *Dropdown) updateHighlightStyles() {
+	baseClass := "w-full text-left px-4 py-2 text-sm flex items-center gap-2 text-gray-700 dark:text-gray-200 cursor-pointer"
+	highlightClass := baseClass + " bg-gray-100 dark:bg-gray-700"
+	normalClass := baseClass + " hover:bg-gray-100 dark:hover:bg-gray-700"
+
+	for i, item := range d.menuItems {
+		if item.Get("disabled").Bool() {
+			continue
+		}
+		if i == d.highlightIdx {
+			item.Set("className", highlightClass)
+		} else {
+			item.Set("className", normalClass)
+		}
+	}
+}
+
+// highlightNext moves highlight to next item
+func (d *Dropdown) highlightNext() {
+	if len(d.menuItems) == 0 {
+		return
+	}
+	d.highlightIdx++
+	if d.highlightIdx >= len(d.menuItems) {
+		d.highlightIdx = 0
+	}
+	// Skip disabled items
+	for d.menuItems[d.highlightIdx].Get("disabled").Bool() {
+		d.highlightIdx++
+		if d.highlightIdx >= len(d.menuItems) {
+			d.highlightIdx = 0
+		}
+	}
+	d.updateHighlightStyles()
+}
+
+// highlightPrev moves highlight to previous item
+func (d *Dropdown) highlightPrev() {
+	if len(d.menuItems) == 0 {
+		return
+	}
+	d.highlightIdx--
+	if d.highlightIdx < 0 {
+		d.highlightIdx = len(d.menuItems) - 1
+	}
+	// Skip disabled items
+	for d.menuItems[d.highlightIdx].Get("disabled").Bool() {
+		d.highlightIdx--
+		if d.highlightIdx < 0 {
+			d.highlightIdx = len(d.menuItems) - 1
+		}
+	}
+	d.updateHighlightStyles()
+}
+
+// executeHighlighted executes the currently highlighted item
+func (d *Dropdown) executeHighlighted() {
+	if d.highlightIdx >= 0 && d.highlightIdx < len(d.menuItems) {
+		item := d.menuItems[d.highlightIdx]
+		if !item.Get("disabled").Bool() {
+			item.Call("click")
+		}
+	}
 }
 
 // Toggle toggles the dropdown menu
@@ -170,6 +288,8 @@ func (d *Dropdown) IsOpen() bool {
 
 // Destroy cleans up event listeners
 func (d *Dropdown) Destroy() {
+	// Close first to clean up keyHandler
+	d.Close()
 	js.Global().Get("document").Call("removeEventListener", "click", d.cleanup)
 	d.cleanup.Release()
 }
