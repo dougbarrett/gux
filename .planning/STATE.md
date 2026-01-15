@@ -3,11 +3,11 @@
 ## Current Position
 
 Phase: 8 of 11 (ARIA & Semantic Markup)
-Plan: 2 of 6 in current phase
+Plan: 3 of 6 in current phase
 Status: In progress
-Last activity: 2026-01-15 - Completed 08-02-PLAN.md
+Last activity: 2026-01-15 - Completed 08-03-PLAN.md
 
-Progress: ██████░░░░ 70% (v1.1: 2/5 phases in progress)
+Progress: ██████░░░░ 72% (v1.1: 3/6 plans in Phase 8)
 
 ## Accumulated Context
 
@@ -70,6 +70,9 @@ Progress: ██████░░░░ 70% (v1.1: 2/5 phases in progress)
 - 08-02: Toast container gets live region, not individual toasts
 - 08-02: Progress aria-valuenow omitted for indeterminate state
 - 08-02: Spinner default aria-label="Loading", custom via AriaLabel prop
+- 08-03: crypto.randomUUID() for form control IDs (consistent with 08-01)
+- 08-03: Error elements use role="alert" for immediate announcement
+- 08-03: htmlFor attribute for label-input association
 
 ### Blockers/Concerns Carried Forward
 - None
@@ -88,10 +91,10 @@ None yet.
 - **v1.0 UX Polish milestone complete** - All 6 phases, 17 plans executed (shipped 2026-01-15)
 - Milestone v1.1 Accessibility created: Enterprise-ready a11y compliance, 5 phases (Phase 7-11)
 - Phase 7 (Accessibility Audit) complete with all 3 plans executed - 114 gaps documented, prioritized, and mapped
-- Phase 8 (ARIA & Semantic Markup) started - 2/6 plans executed
+- Phase 8 (ARIA & Semantic Markup) in progress - 3/6 plans executed
 
 ## Session Continuity
 
 Last session: 2026-01-15
-Stopped at: Completed 08-02-PLAN.md (ARIA Live Regions)
+Stopped at: Completed 08-03-PLAN.md (Form Control Labels)
 Resume file: None
