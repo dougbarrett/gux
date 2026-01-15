@@ -33,20 +33,22 @@ type SidebarProps struct {
 
 // Sidebar is a navigation sidebar component
 type Sidebar struct {
-	element          js.Value
-	overlay          js.Value
-	header           js.Value
-	title            js.Value // Store title for show/hide on collapse
-	nav              js.Value
-	items            []NavItem
-	navItems         []js.Value
-	navLabels        []js.Value // Store label elements for show/hide on collapse
-	isOpen           bool
-	isCollapsed      bool
-	onToggle         func(isOpen bool)
-	onCollapse       func(isCollapsed bool)
-	collapseBtn      js.Value
-	keyboardShortcut js.Func // Stored for cleanup
+	element            js.Value
+	overlay            js.Value
+	header             js.Value
+	title              js.Value // Store title for show/hide on collapse
+	nav                js.Value
+	items              []NavItem
+	navItems           []js.Value
+	navLabels          []js.Value // Store label elements for show/hide on collapse
+	isOpen             bool
+	isCollapsed        bool
+	onToggle           func(isOpen bool)
+	onCollapse         func(isCollapsed bool)
+	collapseBtn        js.Value
+	closeBtn           js.Value // Mobile close button for focus management
+	lastFocusedElement js.Value // Stores element that had focus before sidebar opened
+	keyboardShortcut   js.Func  // Stored for cleanup
 }
 
 // NewSidebar creates a new Sidebar component
@@ -113,6 +115,7 @@ func NewSidebar(props SidebarProps) *Sidebar {
 		onToggle:    props.OnToggle,
 		onCollapse:  props.OnCollapse,
 		collapseBtn: collapseBtn,
+		closeBtn:    closeBtn,
 	}
 
 	// Collapse button click handler
@@ -244,10 +247,20 @@ func (s *Sidebar) Overlay() js.Value {
 // Open opens the sidebar on mobile
 func (s *Sidebar) Open() {
 	s.isOpen = true
+
+	// Store current focus for restoration on close
+	document := js.Global().Get("document")
+	s.lastFocusedElement = document.Get("activeElement")
+
 	// Remove -translate-x-full to show sidebar
 	s.element.Set("className", "fixed md:static inset-y-0 left-0 z-50 w-64 bg-gray-800 text-white flex flex-col h-screen transform translate-x-0 transition-transform duration-300 ease-in-out")
 	// Show overlay
 	s.overlay.Set("className", "fixed inset-0 bg-black bg-opacity-50 z-40 block md:hidden")
+
+	// Focus close button for keyboard accessibility
+	if !s.closeBtn.IsUndefined() && !s.closeBtn.IsNull() {
+		s.closeBtn.Call("focus")
+	}
 
 	if s.onToggle != nil {
 		s.onToggle(true)
@@ -261,6 +274,12 @@ func (s *Sidebar) Close() {
 	s.element.Set("className", "fixed md:static inset-y-0 left-0 z-50 w-64 bg-gray-800 text-white flex flex-col h-screen transform -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out")
 	// Hide overlay
 	s.overlay.Set("className", "fixed inset-0 bg-black bg-opacity-50 z-40 hidden md:hidden")
+
+	// Restore focus to element that had focus before sidebar opened
+	if !s.lastFocusedElement.IsUndefined() && !s.lastFocusedElement.IsNull() {
+		s.lastFocusedElement.Call("focus")
+		s.lastFocusedElement = js.Undefined()
+	}
 
 	if s.onToggle != nil {
 		s.onToggle(false)
