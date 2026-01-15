@@ -412,6 +412,17 @@ func (dp *DatePicker) open() {
 		case "ArrowUp":
 			event.Call("preventDefault")
 			dp.moveFocusBy(-7)
+		case "Enter", " ":
+			event.Call("preventDefault")
+			// Select the focused date if not disabled
+			focusedDate := time.Date(dp.displayed.Year(), dp.displayed.Month(), dp.focusedDay, 0, 0, 0, 0, time.Local)
+			if !dp.isDateDisabled(focusedDate) {
+				dp.selectDate(focusedDate)
+			}
+		case "Escape":
+			event.Call("preventDefault")
+			dp.close()
+			dp.input.Call("focus") // Return focus to input
 		}
 		return nil
 	})
@@ -422,6 +433,26 @@ func (dp *DatePicker) close() {
 	dp.isOpen = false
 	dp.calendar.Get("classList").Call("add", "hidden")
 	dp.input.Call("setAttribute", "aria-expanded", "false")
+
+	// Clean up keyboard handler
+	if dp.keyHandler.Truthy() {
+		dp.calendar.Call("removeEventListener", "keydown", dp.keyHandler)
+		dp.keyHandler.Release()
+	}
+
+	// Clear dayButtons slice
+	dp.dayButtons = nil
+}
+
+// isDateDisabled checks if a date is outside the allowed range
+func (dp *DatePicker) isDateDisabled(date time.Time) bool {
+	if !dp.props.MinDate.IsZero() && date.Before(dp.props.MinDate) {
+		return true
+	}
+	if !dp.props.MaxDate.IsZero() && date.After(dp.props.MaxDate) {
+		return true
+	}
+	return false
 }
 
 // moveFocusBy moves the focused day by the specified number of days
