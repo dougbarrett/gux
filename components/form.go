@@ -103,6 +103,7 @@ type Form struct {
 type formFieldInstance struct {
 	input      *Input
 	errorEl    js.Value
+	errorID    string
 	rules      []ValidationRule
 	errorShown bool
 }
@@ -110,6 +111,7 @@ type formFieldInstance struct {
 // NewForm creates a new Form component
 func NewForm(props FormProps) *Form {
 	document := js.Global().Get("document")
+	crypto := js.Global().Get("crypto")
 
 	form := document.Call("createElement", "form")
 	form.Set("className", "space-y-4")
@@ -132,9 +134,14 @@ func NewForm(props FormProps) *Form {
 
 		fieldContainer.Call("appendChild", input.Element())
 
-		// Error message element
+		// Generate unique ID for error message
+		errorID := "form-error-" + field.Name + "-" + crypto.Call("randomUUID").String()
+
+		// Error message element with id for aria-describedby
 		errorEl := document.Call("createElement", "p")
+		errorEl.Set("id", errorID)
 		errorEl.Set("className", "text-red-500 text-sm mt-1 hidden")
+		errorEl.Call("setAttribute", "role", "alert")
 		fieldContainer.Call("appendChild", errorEl)
 
 		form.Call("appendChild", fieldContainer)
@@ -142,6 +149,7 @@ func NewForm(props FormProps) *Form {
 		f.fields[field.Name] = &formFieldInstance{
 			input:   input,
 			errorEl: errorEl,
+			errorID: errorID,
 			rules:   field.Rules,
 		}
 	}
@@ -236,7 +244,12 @@ func (f *Form) validateField(field *formFieldInstance) bool {
 
 	for _, rule := range field.rules {
 		if !rule.Validate(value) {
-			field.input.SetError(rule.Message)
+			// Set error styling on input (without creating duplicate error element)
+			field.input.input.Set("className", "w-full px-3 py-2 border border-red-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500")
+			field.input.input.Call("setAttribute", "aria-invalid", "true")
+			field.input.input.Call("setAttribute", "aria-describedby", field.errorID)
+
+			// Show error message
 			field.errorEl.Set("textContent", rule.Message)
 			field.errorEl.Get("classList").Call("remove", "hidden")
 			field.errorShown = true
@@ -246,7 +259,11 @@ func (f *Form) validateField(field *formFieldInstance) bool {
 
 	// Clear any previous error
 	if field.errorShown {
-		field.input.ClearError()
+		// Remove error styling and ARIA attributes
+		field.input.input.Set("className", "w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500")
+		field.input.input.Call("removeAttribute", "aria-invalid")
+		field.input.input.Call("removeAttribute", "aria-describedby")
+
 		field.errorEl.Get("classList").Call("add", "hidden")
 		field.errorShown = false
 	}
@@ -258,7 +275,10 @@ func (f *Form) validateField(field *formFieldInstance) bool {
 func (f *Form) Reset() {
 	for _, field := range f.fields {
 		field.input.SetValue("")
-		field.input.ClearError()
+		// Remove error styling and ARIA attributes
+		field.input.input.Set("className", "w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500")
+		field.input.input.Call("removeAttribute", "aria-invalid")
+		field.input.input.Call("removeAttribute", "aria-describedby")
 		field.errorEl.Get("classList").Call("add", "hidden")
 		field.errorShown = false
 	}
@@ -267,7 +287,12 @@ func (f *Form) Reset() {
 // SetFieldError manually sets an error on a field (e.g., from server validation)
 func (f *Form) SetFieldError(name, message string) {
 	if field, ok := f.fields[name]; ok {
-		field.input.SetError(message)
+		// Set error styling and ARIA attributes on input
+		field.input.input.Set("className", "w-full px-3 py-2 border border-red-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500")
+		field.input.input.Call("setAttribute", "aria-invalid", "true")
+		field.input.input.Call("setAttribute", "aria-describedby", field.errorID)
+
+		// Show error message
 		field.errorEl.Set("textContent", message)
 		field.errorEl.Get("classList").Call("remove", "hidden")
 		field.errorShown = true

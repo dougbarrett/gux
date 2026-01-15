@@ -287,6 +287,7 @@ func (fb *FormBuilder) renderField(field BuilderField) js.Value {
 		errorEl := document.Call("createElement", "p")
 		errorEl.Set("className", "text-sm text-red-500 hidden")
 		errorEl.Set("id", field.Name+"-error")
+		errorEl.Call("setAttribute", "role", "alert")
 		container.Call("appendChild", errorEl)
 	}
 
@@ -585,17 +586,20 @@ func (fb *FormBuilder) validateField(field BuilderField) bool {
 
 func (fb *FormBuilder) showError(name, message string) {
 	document := js.Global().Get("document")
-	errorEl := document.Call("getElementById", name+"-error")
+	errorID := name + "-error"
+	errorEl := document.Call("getElementById", errorID)
 	if !errorEl.IsNull() && !errorEl.IsUndefined() {
 		errorEl.Set("textContent", message)
 		errorEl.Get("classList").Call("remove", "hidden")
 	}
 
-	// Add error styling to input
+	// Add error styling and ARIA attributes to input
 	input := document.Call("getElementById", name)
 	if !input.IsNull() && !input.IsUndefined() {
 		input.Get("classList").Call("add", "border-red-500")
 		input.Get("classList").Call("remove", "border-gray-300")
+		input.Call("setAttribute", "aria-invalid", "true")
+		input.Call("setAttribute", "aria-describedby", errorID)
 	}
 }
 
@@ -606,11 +610,13 @@ func (fb *FormBuilder) hideError(name string) {
 		errorEl.Get("classList").Call("add", "hidden")
 	}
 
-	// Remove error styling from input
+	// Remove error styling and ARIA attributes from input
 	input := document.Call("getElementById", name)
 	if !input.IsNull() && !input.IsUndefined() {
 		input.Get("classList").Call("remove", "border-red-500")
 		input.Get("classList").Call("add", "border-gray-300")
+		input.Call("removeAttribute", "aria-invalid")
+		input.Call("removeAttribute", "aria-describedby")
 	}
 }
 
