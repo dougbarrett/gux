@@ -30,6 +30,7 @@ type DatePicker struct {
 	container   js.Value
 	input       js.Value
 	calendar    js.Value
+	calendarID  string    // unique ID for aria-controls
 	displayed   time.Time // currently displayed month
 	selected    time.Time
 	isOpen      bool
@@ -43,11 +44,16 @@ func NewDatePicker(props DatePickerProps) *DatePicker {
 	container := document.Call("createElement", "div")
 	container.Set("className", "relative mb-4")
 
+	// Generate unique IDs for ARIA associations
+	inputID := "datepicker-input-" + js.Global().Get("crypto").Call("randomUUID").String()
+	calendarID := "datepicker-calendar-" + js.Global().Get("crypto").Call("randomUUID").String()
+
 	dp := &DatePicker{
-		container: container,
-		displayed: time.Now(),
-		selected:  props.Value,
-		props:     props,
+		container:  container,
+		calendarID: calendarID,
+		displayed:  time.Now(),
+		selected:   props.Value,
+		props:      props,
 	}
 
 	if !props.Value.IsZero() {
@@ -59,6 +65,7 @@ func NewDatePicker(props DatePickerProps) *DatePicker {
 		label := document.Call("createElement", "label")
 		label.Set("className", "block text-sm font-medium text-gray-700 mb-1")
 		label.Set("textContent", props.Label)
+		label.Call("setAttribute", "for", inputID)
 		container.Call("appendChild", label)
 	}
 
@@ -68,6 +75,7 @@ func NewDatePicker(props DatePickerProps) *DatePicker {
 
 	input := document.Call("createElement", "input")
 	input.Set("type", "text")
+	input.Set("id", inputID)
 	input.Set("readOnly", true)
 	input.Set("className", "w-full px-3 py-2 pr-10 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 cursor-pointer")
 
@@ -76,6 +84,16 @@ func NewDatePicker(props DatePickerProps) *DatePicker {
 		placeholder = "Select date"
 	}
 	input.Set("placeholder", placeholder)
+
+	// ARIA combobox pattern
+	input.Call("setAttribute", "role", "combobox")
+	input.Call("setAttribute", "aria-haspopup", "dialog")
+	input.Call("setAttribute", "aria-expanded", "false")
+	input.Call("setAttribute", "aria-controls", calendarID)
+	if props.Label == "" {
+		// Provide aria-label if no visible label
+		input.Call("setAttribute", "aria-label", placeholder)
+	}
 
 	if !props.Value.IsZero() {
 		input.Set("value", props.Value.Format("Jan 2, 2006"))
@@ -92,9 +110,13 @@ func NewDatePicker(props DatePickerProps) *DatePicker {
 
 	dp.input = input
 
-	// Calendar dropdown
+	// Calendar dropdown with dialog role
 	calendar := document.Call("createElement", "div")
+	calendar.Set("id", calendarID)
 	calendar.Set("className", "absolute z-50 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg p-4 hidden")
+	calendar.Call("setAttribute", "role", "dialog")
+	calendar.Call("setAttribute", "aria-modal", "false")
+	calendar.Call("setAttribute", "aria-label", "Choose date")
 	container.Call("appendChild", calendar)
 	dp.calendar = calendar
 
@@ -129,6 +151,7 @@ func (dp *DatePicker) renderCalendar() {
 	prevBtn := document.Call("createElement", "button")
 	prevBtn.Set("type", "button")
 	prevBtn.Set("className", "p-1 hover:bg-gray-100 rounded cursor-pointer")
+	prevBtn.Call("setAttribute", "aria-label", "Previous month")
 	prevBtn.Set("innerHTML", `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>`)
 	prevBtn.Call("addEventListener", "click", js.FuncOf(func(this js.Value, args []js.Value) any {
 		args[0].Call("stopPropagation")
@@ -140,10 +163,13 @@ func (dp *DatePicker) renderCalendar() {
 	monthYear := document.Call("createElement", "span")
 	monthYear.Set("className", "font-semibold text-gray-800")
 	monthYear.Set("textContent", fmt.Sprintf("%s %d", monthNames[dp.displayed.Month()-1], dp.displayed.Year()))
+	monthYear.Call("setAttribute", "aria-live", "polite")
+	monthYear.Call("setAttribute", "aria-atomic", "true")
 
 	nextBtn := document.Call("createElement", "button")
 	nextBtn.Set("type", "button")
 	nextBtn.Set("className", "p-1 hover:bg-gray-100 rounded cursor-pointer")
+	nextBtn.Call("setAttribute", "aria-label", "Next month")
 	nextBtn.Set("innerHTML", `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>`)
 	nextBtn.Call("addEventListener", "click", js.FuncOf(func(this js.Value, args []js.Value) any {
 		args[0].Call("stopPropagation")
@@ -157,20 +183,29 @@ func (dp *DatePicker) renderCalendar() {
 	header.Call("appendChild", nextBtn)
 	dp.calendar.Call("appendChild", header)
 
-	// Day names
-	dayNamesRow := document.Call("createElement", "div")
-	dayNamesRow.Set("className", "grid grid-cols-7 gap-1 mb-2")
-	for _, day := range dayNames {
-		d := document.Call("createElement", "div")
-		d.Set("className", "text-center text-xs text-gray-500 font-medium py-1")
-		d.Set("textContent", day)
-		dayNamesRow.Call("appendChild", d)
-	}
-	dp.calendar.Call("appendChild", dayNamesRow)
+	// Days grid with ARIA grid pattern
+	daysGrid := document.Call("createElement", "table")
+	daysGrid.Set("className", "w-full")
+	daysGrid.Call("setAttribute", "role", "grid")
+	daysGrid.Call("setAttribute", "aria-label", fmt.Sprintf("%s %d", monthNames[dp.displayed.Month()-1], dp.displayed.Year()))
 
-	// Days grid
-	daysGrid := document.Call("createElement", "div")
-	daysGrid.Set("className", "grid grid-cols-7 gap-1")
+	// Day names header row
+	thead := document.Call("createElement", "thead")
+	dayNamesRow := document.Call("createElement", "tr")
+	dayNamesRow.Call("setAttribute", "role", "row")
+	for _, day := range dayNames {
+		th := document.Call("createElement", "th")
+		th.Set("className", "text-center text-xs text-gray-500 font-medium py-1 w-8")
+		th.Set("textContent", day)
+		th.Call("setAttribute", "role", "columnheader")
+		th.Call("setAttribute", "abbr", day)
+		dayNamesRow.Call("appendChild", th)
+	}
+	thead.Call("appendChild", dayNamesRow)
+	daysGrid.Call("appendChild", thead)
+
+	// Days body - organized into weeks (rows)
+	tbody := document.Call("createElement", "tbody")
 
 	// Get first day of month and number of days
 	firstOfMonth := time.Date(dp.displayed.Year(), dp.displayed.Month(), 1, 0, 0, 0, 0, time.Local)
@@ -179,31 +214,58 @@ func (dp *DatePicker) renderCalendar() {
 
 	today := time.Now()
 
+	// Build calendar as rows of 7 days each
+	cellIndex := 0
+	var currentRow js.Value
+
+	// Helper to create a new row
+	createRow := func() js.Value {
+		row := document.Call("createElement", "tr")
+		row.Call("setAttribute", "role", "row")
+		return row
+	}
+
+	// Helper to create an empty cell
+	createEmptyCell := func() js.Value {
+		td := document.Call("createElement", "td")
+		td.Set("className", "w-8 h-8")
+		td.Call("setAttribute", "role", "gridcell")
+		return td
+	}
+
+	currentRow = createRow()
+
 	// Empty cells for days before first of month
 	for i := 0; i < startWeekday; i++ {
-		empty := document.Call("createElement", "div")
-		empty.Set("className", "w-8 h-8")
-		daysGrid.Call("appendChild", empty)
+		currentRow.Call("appendChild", createEmptyCell())
+		cellIndex++
 	}
 
 	// Day cells
 	for day := 1; day <= daysInMonth; day++ {
+		// Start new row if needed
+		if cellIndex%7 == 0 && cellIndex > 0 {
+			tbody.Call("appendChild", currentRow)
+			currentRow = createRow()
+		}
+
 		dayDate := time.Date(dp.displayed.Year(), dp.displayed.Month(), day, 0, 0, 0, 0, time.Local)
 
+		// Create cell
+		td := document.Call("createElement", "td")
+		td.Call("setAttribute", "role", "gridcell")
+
+		// Create button
 		dayBtn := document.Call("createElement", "button")
 		dayBtn.Set("type", "button")
 
 		className := "w-8 h-8 rounded-full text-sm hover:bg-gray-100 cursor-pointer"
 
-		// Check if selected
-		if !dp.selected.IsZero() && dp.selected.Year() == dayDate.Year() && dp.selected.Month() == dayDate.Month() && dp.selected.Day() == dayDate.Day() {
-			className = "w-8 h-8 rounded-full text-sm bg-blue-500 text-white cursor-pointer"
-		} else if today.Year() == dayDate.Year() && today.Month() == dayDate.Month() && today.Day() == dayDate.Day() {
-			className = "w-8 h-8 rounded-full text-sm border border-blue-500 text-blue-500 cursor-pointer"
-		}
-
-		// Check if disabled by min/max
+		// Determine states
+		isSelected := !dp.selected.IsZero() && dp.selected.Year() == dayDate.Year() && dp.selected.Month() == dayDate.Month() && dp.selected.Day() == dayDate.Day()
+		isToday := today.Year() == dayDate.Year() && today.Month() == dayDate.Month() && today.Day() == dayDate.Day()
 		disabled := false
+
 		if !dp.props.MinDate.IsZero() && dayDate.Before(dp.props.MinDate) {
 			disabled = true
 		}
@@ -211,6 +273,12 @@ func (dp *DatePicker) renderCalendar() {
 			disabled = true
 		}
 
+		// Apply visual styles
+		if isSelected {
+			className = "w-8 h-8 rounded-full text-sm bg-blue-500 text-white cursor-pointer"
+		} else if isToday {
+			className = "w-8 h-8 rounded-full text-sm border border-blue-500 text-blue-500 cursor-pointer"
+		}
 		if disabled {
 			className = "w-8 h-8 rounded-full text-sm text-gray-300 cursor-not-allowed"
 		}
@@ -218,6 +286,18 @@ func (dp *DatePicker) renderCalendar() {
 		dayBtn.Set("className", className)
 		dayBtn.Set("textContent", fmt.Sprintf("%d", day))
 
+		// ARIA attributes for gridcell
+		if isSelected {
+			td.Call("setAttribute", "aria-selected", "true")
+		}
+		if disabled {
+			td.Call("setAttribute", "aria-disabled", "true")
+		}
+		if isToday {
+			td.Call("setAttribute", "aria-current", "date")
+		}
+
+		// Click handler
 		if !disabled {
 			capturedDay := day
 			dayBtn.Call("addEventListener", "click", js.FuncOf(func(this js.Value, args []js.Value) any {
@@ -227,9 +307,20 @@ func (dp *DatePicker) renderCalendar() {
 			}))
 		}
 
-		daysGrid.Call("appendChild", dayBtn)
+		td.Call("appendChild", dayBtn)
+		currentRow.Call("appendChild", td)
+		cellIndex++
 	}
 
+	// Add remaining empty cells to complete last row
+	for cellIndex%7 != 0 {
+		currentRow.Call("appendChild", createEmptyCell())
+		cellIndex++
+	}
+
+	// Append final row
+	tbody.Call("appendChild", currentRow)
+	daysGrid.Call("appendChild", tbody)
 	dp.calendar.Call("appendChild", daysGrid)
 
 	// Today button
@@ -266,12 +357,14 @@ func (dp *DatePicker) toggle() {
 func (dp *DatePicker) open() {
 	dp.isOpen = true
 	dp.calendar.Get("classList").Call("remove", "hidden")
+	dp.input.Call("setAttribute", "aria-expanded", "true")
 	dp.renderCalendar()
 }
 
 func (dp *DatePicker) close() {
 	dp.isOpen = false
 	dp.calendar.Get("classList").Call("add", "hidden")
+	dp.input.Call("setAttribute", "aria-expanded", "false")
 }
 
 // Element returns the DOM element
