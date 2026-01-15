@@ -37,6 +37,9 @@ type TableProps struct {
 	PageSize          int                                   // Items per page (default 10)
 	ShowPageInfo      bool                                  // Show "Showing X-Y of Z" (default true)
 	OnPageChange      func(page int)                        // Callback when page changes
+	Selectable        bool                                  // Enable row selection with checkboxes
+	RowKey            string                                // Unique identifier field in data (default "id")
+	OnSelectionChange func(selectedKeys []any)              // Callback when selection changes
 }
 
 // Table creates a data table component
@@ -56,6 +59,9 @@ type Table struct {
 	currentPage     int         // Current page (1-indexed)
 	pagination      *Pagination // Pagination component instance
 	paginationMount js.Value    // Container where pagination is mounted
+	selectedKeys    map[any]bool // Set of selected row keys
+	rowCheckboxes   []js.Value   // References to row checkboxes for updates
+	selectAllCb     js.Value     // Reference to select-all checkbox
 }
 
 // NewTable creates a new Table component
@@ -65,6 +71,11 @@ func NewTable(props TableProps) *Table {
 	// Set default PageSize if not specified
 	if props.PageSize == 0 {
 		props.PageSize = 10
+	}
+
+	// Set default RowKey if not specified
+	if props.RowKey == "" {
+		props.RowKey = "id"
 	}
 
 	// Outer container - wraps everything (filter input + table + pagination)
@@ -96,12 +107,13 @@ func NewTable(props TableProps) *Table {
 	tableWrapper.Call("appendChild", table)
 
 	t := &Table{
-		container:   container,
-		tbody:       tbody,
-		thead:       thead,
-		columns:     props.Columns,
-		props:       props,
-		currentPage: 1,
+		container:    container,
+		tbody:        tbody,
+		thead:        thead,
+		columns:      props.Columns,
+		props:        props,
+		currentPage:  1,
+		selectedKeys: make(map[any]bool),
 	}
 
 	// Add filter input if Filterable
@@ -187,6 +199,38 @@ func (t *Table) renderHeaders() {
 	t.thead.Set("innerHTML", "")
 
 	headerRow := document.Call("createElement", "tr")
+
+	// Add checkbox column header if selectable
+	if t.props.Selectable {
+		th := document.Call("createElement", "th")
+		thClass := "px-4 py-3 w-10"
+		if t.props.Compact {
+			thClass = "px-2 py-2 w-10"
+		}
+		if t.props.Bordered {
+			thClass += " border-b border-gray-200 dark:border-gray-700"
+		}
+		th.Set("className", thClass)
+
+		// Create select-all checkbox
+		checkbox := document.Call("createElement", "input")
+		checkbox.Set("type", "checkbox")
+		checkbox.Set("className", "h-4 w-4 text-blue-600 border-gray-300 dark:border-gray-600 rounded focus:ring-blue-500 dark:bg-gray-700 cursor-pointer")
+
+		// Set initial state based on current selection
+		t.updateSelectAllState(checkbox)
+
+		// Add click handler for select-all
+		checkbox.Call("addEventListener", "change", js.FuncOf(func(this js.Value, args []js.Value) any {
+			t.handleSelectAll(checkbox.Get("checked").Bool())
+			return nil
+		}))
+
+		th.Call("appendChild", checkbox)
+		t.selectAllCb = checkbox
+		headerRow.Call("appendChild", th)
+	}
+
 	for _, col := range t.columns {
 		th := document.Call("createElement", "th")
 		thClass := "px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
@@ -400,11 +444,19 @@ func (t *Table) renderData() {
 
 	t.tbody.Set("innerHTML", "")
 
+	// Reset row checkboxes array
+	t.rowCheckboxes = nil
+
 	for i, row := range displayData {
 		tr := document.Call("createElement", "tr")
+		rowKey := t.getRowKey(row)
+		isSelected := t.selectedKeys[rowKey]
 
 		rowClass := ""
-		if t.props.Striped && i%2 == 1 {
+		if isSelected {
+			// Selected row highlight
+			rowClass = "bg-blue-50 dark:bg-blue-900/30"
+		} else if t.props.Striped && i%2 == 1 {
 			rowClass = "bg-gray-50 dark:bg-gray-800"
 		}
 		if t.props.Hoverable {
@@ -420,6 +472,44 @@ func (t *Table) renderData() {
 			}))
 		}
 		tr.Set("className", rowClass)
+
+		// Add checkbox cell if selectable
+		if t.props.Selectable {
+			td := document.Call("createElement", "td")
+			tdClass := "px-4 py-4 w-10"
+			if t.props.Compact {
+				tdClass = "px-2 py-2 w-10"
+			}
+			if t.props.Bordered {
+				tdClass += " border-b border-gray-200 dark:border-gray-700"
+			}
+			td.Set("className", tdClass)
+
+			checkbox := document.Call("createElement", "input")
+			checkbox.Set("type", "checkbox")
+			checkbox.Set("className", "h-4 w-4 text-blue-600 border-gray-300 dark:border-gray-600 rounded focus:ring-blue-500 dark:bg-gray-700 cursor-pointer")
+			checkbox.Set("checked", isSelected)
+
+			// Capture key for closure
+			capturedKey := rowKey
+			checkbox.Call("addEventListener", "change", js.FuncOf(func(this js.Value, args []js.Value) any {
+				checked := checkbox.Get("checked").Bool()
+				t.handleRowSelection(capturedKey, checked)
+				// Re-render to update row styling
+				t.renderData()
+				return nil
+			}))
+
+			// Stop click propagation so row click doesn't fire
+			checkbox.Call("addEventListener", "click", js.FuncOf(func(this js.Value, args []js.Value) any {
+				args[0].Call("stopPropagation")
+				return nil
+			}))
+
+			td.Call("appendChild", checkbox)
+			tr.Call("appendChild", td)
+			t.rowCheckboxes = append(t.rowCheckboxes, checkbox)
+		}
 
 		for _, col := range t.columns {
 			td := document.Call("createElement", "td")
@@ -453,6 +543,9 @@ func (t *Table) renderData() {
 
 		t.tbody.Call("appendChild", tr)
 	}
+
+	// Update select-all checkbox state
+	t.updateSelectAllState(t.selectAllCb)
 }
 
 // sortData returns a sorted copy of the data based on current sort state
@@ -636,6 +729,117 @@ func (t *Table) TotalPages() int {
 // CurrentPage returns the current page number
 func (t *Table) CurrentPage() int {
 	return t.currentPage
+}
+
+// getRowKey extracts the unique key from a row based on RowKey prop
+func (t *Table) getRowKey(row map[string]any) any {
+	return row[t.props.RowKey]
+}
+
+// getVisibleRowKeys returns keys for currently visible rows (after filter/sort/paginate)
+func (t *Table) getVisibleRowKeys() []any {
+	displayData := t.filterData(t.allData)
+	displayData = t.sortData(displayData)
+	displayData = t.paginateData(displayData)
+
+	keys := make([]any, 0, len(displayData))
+	for _, row := range displayData {
+		key := t.getRowKey(row)
+		if key != nil {
+			keys = append(keys, key)
+		}
+	}
+	return keys
+}
+
+// updateSelectAllState updates the select-all checkbox state (checked, unchecked, or indeterminate)
+func (t *Table) updateSelectAllState(checkbox js.Value) {
+	if checkbox.IsUndefined() || checkbox.IsNull() {
+		return
+	}
+
+	visibleKeys := t.getVisibleRowKeys()
+	if len(visibleKeys) == 0 {
+		checkbox.Set("checked", false)
+		checkbox.Set("indeterminate", false)
+		return
+	}
+
+	selectedCount := 0
+	for _, key := range visibleKeys {
+		if t.selectedKeys[key] {
+			selectedCount++
+		}
+	}
+
+	if selectedCount == 0 {
+		checkbox.Set("checked", false)
+		checkbox.Set("indeterminate", false)
+	} else if selectedCount == len(visibleKeys) {
+		checkbox.Set("checked", true)
+		checkbox.Set("indeterminate", false)
+	} else {
+		checkbox.Set("checked", false)
+		checkbox.Set("indeterminate", true)
+	}
+}
+
+// handleSelectAll handles click on select-all checkbox
+func (t *Table) handleSelectAll(checked bool) {
+	visibleKeys := t.getVisibleRowKeys()
+
+	if checked {
+		// Select all visible rows
+		for _, key := range visibleKeys {
+			t.selectedKeys[key] = true
+		}
+	} else {
+		// Deselect all visible rows
+		for _, key := range visibleKeys {
+			delete(t.selectedKeys, key)
+		}
+	}
+
+	// Update row checkboxes and notify
+	t.updateRowCheckboxes()
+	t.notifySelectionChange()
+}
+
+// handleRowSelection handles click on individual row checkbox
+func (t *Table) handleRowSelection(key any, checked bool) {
+	if checked {
+		t.selectedKeys[key] = true
+	} else {
+		delete(t.selectedKeys, key)
+	}
+
+	// Update select-all checkbox state
+	t.updateSelectAllState(t.selectAllCb)
+	t.notifySelectionChange()
+}
+
+// updateRowCheckboxes updates the checked state of all row checkboxes
+func (t *Table) updateRowCheckboxes() {
+	visibleKeys := t.getVisibleRowKeys()
+	for i, checkbox := range t.rowCheckboxes {
+		if i < len(visibleKeys) {
+			key := visibleKeys[i]
+			checkbox.Set("checked", t.selectedKeys[key])
+		}
+	}
+	// Update select-all too
+	t.updateSelectAllState(t.selectAllCb)
+}
+
+// notifySelectionChange calls the OnSelectionChange callback with current selection
+func (t *Table) notifySelectionChange() {
+	if t.props.OnSelectionChange != nil {
+		keys := make([]any, 0, len(t.selectedKeys))
+		for key := range t.selectedKeys {
+			keys = append(keys, key)
+		}
+		t.props.OnSelectionChange(keys)
+	}
 }
 
 // Helper to convert any to string
