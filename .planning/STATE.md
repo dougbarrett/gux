@@ -3,11 +3,11 @@
 ## Current Position
 
 Phase: 9 of 11 (Keyboard Navigation)
-Plan: 1 of 4 in current phase
+Plan: 2 of 4 in current phase
 Status: In progress
-Last activity: 2026-01-15 - Completed 09-01-PLAN.md
+Last activity: 2026-01-15 - Completed 09-02-PLAN.md
 
-Progress: ████████░░ 82% (v1.1: Phase 9 started, 1/4 plans complete)
+Progress: ████████░░ 84% (v1.1: Phase 9 in progress, 2/4 plans complete)
 
 ## Accumulated Context
 
@@ -86,6 +86,8 @@ Progress: ████████░░ 82% (v1.1: Phase 9 started, 1/4 plans c
 - 08-06: Table aria-sort tracks none/ascending/descending state
 - 09-01: Reuse existing FocusTrap component for Modal (consistent with CommandPalette)
 - 09-01: FocusTrap.Activate() stores trigger, FocusTrap.Deactivate() restores focus
+- 09-02: Automatic activation on arrow press (WAI-ARIA Tabs pattern)
+- 09-02: Horizontal arrows only (Left/Right) matching tablist orientation
 
 ### Blockers/Concerns Carried Forward
 - None
@@ -109,5 +111,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-01-15
-Stopped at: Completed 09-01-PLAN.md (Modal Focus Management)
+Stopped at: Completed 09-02-PLAN.md (Tabs Keyboard Navigation)
 Resume file: None
