@@ -52,12 +52,14 @@ func NewNotificationCenter(props NotificationCenterProps) *NotificationCenter {
 	triggerContainer.Call("appendChild", bellIcon)
 
 	// Unread badge (positioned absolute top-right)
+	// aria-hidden: badge is supplementary visual info, not part of accessible name
 	badgeEl := Badge(BadgeProps{
 		Text:    "0",
 		Variant: BadgeError,
 		Rounded: true,
 	})
 	badgeEl.Set("className", "absolute -top-1 -right-1 min-w-[18px] h-[18px] flex items-center justify-center text-xs font-bold bg-red-500 text-white rounded-full hidden")
+	badgeEl.Call("setAttribute", "aria-hidden", "true")
 	triggerContainer.Call("appendChild", badgeEl)
 
 	// Create dropdown content

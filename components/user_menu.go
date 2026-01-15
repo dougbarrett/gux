@@ -30,11 +30,13 @@ func NewUserMenu(props UserMenuProps) *UserMenu {
 	trigger.Call("setAttribute", "aria-label", "User menu for "+props.Name)
 
 	// Create avatar inside the button
+	// aria-hidden: initials are supplementary visual info, button already has aria-label
 	avatar := Avatar(AvatarProps{
 		Src:  props.AvatarSrc,
 		Name: props.Name,
 		Size: AvatarSM,
 	})
+	avatar.Call("setAttribute", "aria-hidden", "true")
 	trigger.Call("appendChild", avatar)
 
 	// Create dropdown content container
