@@ -30,18 +30,19 @@ type SidebarProps struct {
 
 // Sidebar is a navigation sidebar component
 type Sidebar struct {
-	element     js.Value
-	overlay     js.Value
-	header      js.Value
-	nav         js.Value
-	items       []NavItem
-	navItems    []js.Value
-	navLabels   []js.Value // Store label elements for show/hide on collapse
-	isOpen      bool
-	isCollapsed bool
-	onToggle    func(isOpen bool)
-	onCollapse  func(isCollapsed bool)
-	collapseBtn js.Value
+	element          js.Value
+	overlay          js.Value
+	header           js.Value
+	nav              js.Value
+	items            []NavItem
+	navItems         []js.Value
+	navLabels        []js.Value // Store label elements for show/hide on collapse
+	isOpen           bool
+	isCollapsed      bool
+	onToggle         func(isOpen bool)
+	onCollapse       func(isCollapsed bool)
+	collapseBtn      js.Value
+	keyboardShortcut js.Func // Stored for cleanup
 }
 
 // NewSidebar creates a new Sidebar component
@@ -333,4 +334,33 @@ func (s *Sidebar) ToggleCollapse() {
 // IsCollapsed returns whether the sidebar is currently collapsed
 func (s *Sidebar) IsCollapsed() bool {
 	return s.isCollapsed
+}
+
+// RegisterKeyboardShortcut registers Cmd/Ctrl+B to toggle sidebar collapse
+func (s *Sidebar) RegisterKeyboardShortcut() {
+	document := js.Global().Get("document")
+
+	s.keyboardShortcut = js.FuncOf(func(this js.Value, args []js.Value) any {
+		event := args[0]
+		key := event.Get("key").String()
+
+		// Check for Cmd+B (Mac) or Ctrl+B (Windows/Linux)
+		// event.key returns lowercase "b" for the B key
+		if (key == "b" || key == "B") && (event.Get("metaKey").Bool() || event.Get("ctrlKey").Bool()) {
+			event.Call("preventDefault") // Prevent browser default (e.g., bold in rich text)
+			s.ToggleCollapse()
+		}
+		return nil
+	})
+
+	document.Call("addEventListener", "keydown", s.keyboardShortcut)
+}
+
+// UnregisterKeyboardShortcut removes the Cmd/Ctrl+B keyboard shortcut
+func (s *Sidebar) UnregisterKeyboardShortcut() {
+	if s.keyboardShortcut.Truthy() {
+		document := js.Global().Get("document")
+		document.Call("removeEventListener", "keydown", s.keyboardShortcut)
+		s.keyboardShortcut.Release()
+	}
 }

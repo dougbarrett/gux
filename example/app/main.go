@@ -116,6 +116,9 @@ func main() {
 
 	app.Mount(layout.Element())
 
+	// Register keyboard shortcut for sidebar collapse (Cmd/Ctrl+B)
+	layout.Sidebar().RegisterKeyboardShortcut()
+
 	// Start router
 	router.Start()
 
