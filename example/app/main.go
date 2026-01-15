@@ -54,6 +54,44 @@ func main() {
 	// Create data display (used by API Test page)
 	display = components.NewDataDisplay()
 
+	// Create UserMenu with sample data
+	userMenu := components.NewUserMenu(components.UserMenuProps{
+		Name:  "Admin User",
+		Email: "admin@example.com",
+		OnProfile: func() {
+			components.Toast("Profile clicked", components.ToastInfo)
+		},
+		OnSettings: func() {
+			router.Navigate("/settings")
+		},
+		OnLogout: func() {
+			components.Toast("Logged out", components.ToastSuccess)
+		},
+	})
+
+	// Create NotificationCenter with sample notifications
+	notifications := []components.Notification{
+		{ID: "1", Title: "New Post Created", Message: "A new post 'Hello World' was published", Time: "2 min ago", Type: "success"},
+		{ID: "2", Title: "System Update", Message: "Version 2.0 is now available", Time: "1 hour ago", Type: "info"},
+		{ID: "3", Title: "Warning", Message: "Storage is almost full", Time: "3 hours ago", Type: "warning", Read: true},
+	}
+
+	notificationCenter := components.NewNotificationCenter(components.NotificationCenterProps{
+		Notifications: notifications,
+		OnMarkRead: func(id string) {
+			components.Toast("Marked notification "+id+" as read", components.ToastInfo)
+		},
+		OnMarkAllRead: func() {
+			components.Toast("All notifications marked as read", components.ToastSuccess)
+		},
+		OnClear: func() {
+			components.Toast("Notifications cleared", components.ToastInfo)
+		},
+		OnNotificationClick: func(id string) {
+			components.Toast("Clicked notification "+id, components.ToastInfo)
+		},
+	})
+
 	// Create layout
 	layout = components.NewLayout(components.LayoutProps{
 		Sidebar: components.SidebarProps{
@@ -67,7 +105,9 @@ func main() {
 			},
 		},
 		Header: components.HeaderProps{
-			Title: "Dashboard",
+			Title:              "Dashboard",
+			NotificationCenter: notificationCenter,
+			UserMenu:           userMenu,
 			Actions: []components.HeaderAction{
 				{Label: "Refresh", OnClick: func() { js.Global().Get("location").Call("reload") }},
 			},
