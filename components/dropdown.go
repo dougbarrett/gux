@@ -74,6 +74,11 @@ func NewDropdown(props DropdownProps) *Dropdown {
 		menu.Get("style").Set("width", width)
 	}
 
+	// Accessibility attributes
+	menu.Call("setAttribute", "tabindex", "0")
+	menu.Call("setAttribute", "role", "menu")
+	menu.Call("setAttribute", "aria-orientation", "vertical")
+
 	// Add items
 	itemIdx := 0
 	for _, item := range props.Items {
@@ -94,6 +99,8 @@ func NewDropdown(props DropdownProps) *Dropdown {
 		menuItem.Set("className", itemClass)
 		menuItem.Set("disabled", item.Disabled)
 		menuItem.Set("data-index", itemIdx)
+		menuItem.Call("setAttribute", "role", "menuitem")
+		menuItem.Set("id", js.Global().Get("crypto").Call("randomUUID").String())
 
 		if item.Icon != "" {
 			icon := document.Call("createElement", "span")
@@ -139,6 +146,20 @@ func NewDropdown(props DropdownProps) *Dropdown {
 		return nil
 	}))
 
+	// Close on blur (when focus leaves dropdown)
+	menu.Call("addEventListener", "focusout", js.FuncOf(func(this js.Value, args []js.Value) any {
+		if !d.isOpen {
+			return nil
+		}
+		event := args[0]
+		relatedTarget := event.Get("relatedTarget")
+		// If focus is moving outside the dropdown container, close it
+		if relatedTarget.IsNull() || !container.Call("contains", relatedTarget).Bool() {
+			d.Close()
+		}
+		return nil
+	}))
+
 	// Close on outside click
 	d.cleanup = js.FuncOf(func(this js.Value, args []js.Value) any {
 		if d.isOpen {
@@ -168,6 +189,9 @@ func (d *Dropdown) Open() {
 	d.isOpen = true
 	d.highlightIdx = 0
 	d.updateHighlightStyles()
+
+	// Focus menu for keyboard navigation
+	d.menu.Call("focus")
 
 	// Register keydown handler
 	d.keyHandler = js.FuncOf(func(this js.Value, args []js.Value) any {
@@ -218,6 +242,9 @@ func (d *Dropdown) updateHighlightStyles() {
 		}
 		if i == d.highlightIdx {
 			item.Set("className", highlightClass)
+			// Update aria-activedescendant for screen readers
+			itemId := item.Get("id").String()
+			d.menu.Call("setAttribute", "aria-activedescendant", itemId)
 		} else {
 			item.Set("className", normalClass)
 		}
