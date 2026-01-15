@@ -2,7 +2,11 @@
 
 package components
 
-import "syscall/js"
+import (
+	"sort"
+	"strings"
+	"syscall/js"
+)
 
 // TableColumn defines a table column
 type TableColumn struct {
@@ -181,9 +185,15 @@ func (t *Table) Element() js.Value {
 func (t *Table) SetData(data []map[string]any) {
 	document := js.Global().Get("document")
 
+	// Store original data
+	t.data = data
+
+	// Apply sorting if active
+	displayData := t.sortData(data)
+
 	t.tbody.Set("innerHTML", "")
 
-	for i, row := range data {
+	for i, row := range displayData {
 		tr := document.Call("createElement", "tr")
 
 		rowClass := ""
@@ -236,6 +246,116 @@ func (t *Table) SetData(data []map[string]any) {
 
 		t.tbody.Call("appendChild", tr)
 	}
+}
+
+// sortData returns a sorted copy of the data based on current sort state
+func (t *Table) sortData(data []map[string]any) []map[string]any {
+	if t.sortColumn == "" || t.sortDirection == "" || len(data) == 0 {
+		return data
+	}
+
+	// Create a copy to avoid mutating original
+	sorted := make([]map[string]any, len(data))
+	copy(sorted, data)
+
+	sort.SliceStable(sorted, func(i, j int) bool {
+		valI := sorted[i][t.sortColumn]
+		valJ := sorted[j][t.sortColumn]
+
+		// Handle nil values - sort to end
+		if valI == nil && valJ == nil {
+			return false
+		}
+		if valI == nil {
+			return false // nil goes to end
+		}
+		if valJ == nil {
+			return true // non-nil before nil
+		}
+
+		result := compareValues(valI, valJ)
+
+		// Reverse for descending
+		if t.sortDirection == "desc" {
+			return result > 0
+		}
+		return result < 0
+	})
+
+	return sorted
+}
+
+// compareValues compares two values for sorting
+// Returns -1 if a < b, 0 if a == b, 1 if a > b
+func compareValues(a, b any) int {
+	// Try string comparison (case-insensitive)
+	if strA, okA := a.(string); okA {
+		if strB, okB := b.(string); okB {
+			return strings.Compare(strings.ToLower(strA), strings.ToLower(strB))
+		}
+	}
+
+	// Try numeric comparison
+	numA := toFloat64(a)
+	numB := toFloat64(b)
+	if numA != nil && numB != nil {
+		if *numA < *numB {
+			return -1
+		}
+		if *numA > *numB {
+			return 1
+		}
+		return 0
+	}
+
+	// Try bool comparison (false < true)
+	if boolA, okA := a.(bool); okA {
+		if boolB, okB := b.(bool); okB {
+			if boolA == boolB {
+				return 0
+			}
+			if !boolA && boolB {
+				return -1
+			}
+			return 1
+		}
+	}
+
+	// Fallback: convert to string
+	return strings.Compare(toString(a), toString(b))
+}
+
+// toFloat64 attempts to convert a value to float64
+func toFloat64(v any) *float64 {
+	switch val := v.(type) {
+	case int:
+		f := float64(val)
+		return &f
+	case int64:
+		f := float64(val)
+		return &f
+	case float64:
+		return &val
+	case float32:
+		f := float64(val)
+		return &f
+	}
+	return nil
+}
+
+// SetSort programmatically sets the sort column and direction
+func (t *Table) SetSort(column, direction string) {
+	t.sortColumn = column
+	t.sortDirection = direction
+	t.renderHeaders()
+	if len(t.data) > 0 {
+		t.SetData(t.data)
+	}
+}
+
+// Sort toggles sorting on the specified column
+func (t *Table) Sort(column string) {
+	t.handleHeaderClick(column)
 }
 
 // Helper to convert any to string
