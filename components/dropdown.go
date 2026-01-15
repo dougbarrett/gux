@@ -25,7 +25,9 @@ type DropdownProps struct {
 // Dropdown creates a dropdown menu component
 type Dropdown struct {
 	container    js.Value
+	trigger      js.Value // trigger element for ARIA state updates
 	menu         js.Value
+	menuID       string // unique ID for aria-controls
 	isOpen       bool
 	cleanup      js.Func
 	highlightIdx int
@@ -40,13 +42,22 @@ func NewDropdown(props DropdownProps) *Dropdown {
 	container := document.Call("createElement", "div")
 	container.Set("className", "relative inline-block")
 
-	d := &Dropdown{container: container}
+	// Generate unique ID for menu (for aria-controls)
+	menuID := "dropdown-menu-" + js.Global().Get("crypto").Call("randomUUID").String()
+
+	d := &Dropdown{container: container, menuID: menuID}
 
 	// Wrap trigger
 	triggerWrap := document.Call("createElement", "div")
 	triggerWrap.Set("className", "cursor-pointer")
 	triggerWrap.Call("appendChild", props.Trigger)
 	container.Call("appendChild", triggerWrap)
+
+	// Store trigger reference and set ARIA attributes for menu button pattern
+	d.trigger = props.Trigger
+	props.Trigger.Call("setAttribute", "aria-haspopup", "menu")
+	props.Trigger.Call("setAttribute", "aria-expanded", "false")
+	props.Trigger.Call("setAttribute", "aria-controls", menuID)
 
 	// Create menu
 	menu := document.Call("createElement", "div")
@@ -75,6 +86,7 @@ func NewDropdown(props DropdownProps) *Dropdown {
 	}
 
 	// Accessibility attributes
+	menu.Set("id", menuID)
 	menu.Call("setAttribute", "tabindex", "0")
 	menu.Call("setAttribute", "role", "menu")
 	menu.Call("setAttribute", "aria-orientation", "vertical")
@@ -101,6 +113,9 @@ func NewDropdown(props DropdownProps) *Dropdown {
 		menuItem.Set("data-index", itemIdx)
 		menuItem.Call("setAttribute", "role", "menuitem")
 		menuItem.Set("id", js.Global().Get("crypto").Call("randomUUID").String())
+		if item.Disabled {
+			menuItem.Call("setAttribute", "aria-disabled", "true")
+		}
 
 		if item.Icon != "" {
 			icon := document.Call("createElement", "span")
@@ -190,6 +205,9 @@ func (d *Dropdown) Open() {
 	d.highlightIdx = 0
 	d.updateHighlightStyles()
 
+	// Update trigger ARIA state
+	d.trigger.Call("setAttribute", "aria-expanded", "true")
+
 	// Focus menu for keyboard navigation
 	d.menu.Call("focus")
 
@@ -224,6 +242,9 @@ func (d *Dropdown) Close() {
 	}
 	d.menu.Get("classList").Call("add", "hidden")
 	d.isOpen = false
+
+	// Update trigger ARIA state
+	d.trigger.Call("setAttribute", "aria-expanded", "false")
 
 	// Remove keydown handler
 	js.Global().Get("document").Call("removeEventListener", "keydown", d.keyHandler)
