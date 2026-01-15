@@ -2,12 +2,12 @@
 
 ## Current Position
 
-Phase: 3 of 6 (Table Enhancements)
-Plan: 4 of 4 in current phase
-Status: Phase complete
-Last activity: 2026-01-15 - Completed 03-04-PLAN.md (Bulk Selection & Actions)
+Phase: 4 of 6 (UX Polish)
+Plan: 1 of 3 in current phase
+Status: In progress
+Last activity: 2026-01-15 - Completed 04-01-PLAN.md (Sidebar localStorage Persistence)
 
-Progress: ██████░░░░ 50%
+Progress: ██████░░░░ 53%
 
 ## Accumulated Context
 
@@ -33,6 +33,8 @@ Progress: ██████░░░░ 50%
 - 03-04: Clear selection when SetData is called
 - 03-04: Selection persists across pages
 - 03-04: Bulk action bar positioned between filter and table
+- 04-01: Follow theme.go localStorage pattern for sidebar persistence
+- 04-01: Use applyCollapsedState() helper to avoid callback during init
 
 ### Blockers/Concerns Carried Forward
 - None
@@ -49,5 +51,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-01-15
-Stopped at: Completed 03-04-PLAN.md (Phase 3 complete)
-Resume file: None (ready for Phase 4)
+Stopped at: Completed 04-01-PLAN.md
+Resume file: None (ready for 04-02)
