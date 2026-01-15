@@ -33,29 +33,41 @@ type TableProps struct {
 	FilterPlaceholder string                                // Placeholder text (default "Search...")
 	FilterColumns     []string                              // Columns to filter (nil = all)
 	OnFilter          func(text string)                     // Callback when filter changes
+	Paginated         bool                                  // Enable pagination
+	PageSize          int                                   // Items per page (default 10)
+	ShowPageInfo      bool                                  // Show "Showing X-Y of Z" (default true)
+	OnPageChange      func(page int)                        // Callback when page changes
 }
 
 // Table creates a data table component
 type Table struct {
-	container     js.Value
-	tbody         js.Value
-	thead         js.Value
-	columns       []TableColumn
-	props         TableProps
-	data          []map[string]any
-	allData       []map[string]any // Unfiltered data
-	sortColumn    string
-	sortDirection string // "asc", "desc", or "" (none)
-	filterText    string
-	filterInput   js.Value
-	debounceTimer js.Value // For debouncing filter input
+	container       js.Value
+	tbody           js.Value
+	thead           js.Value
+	columns         []TableColumn
+	props           TableProps
+	data            []map[string]any
+	allData         []map[string]any // Unfiltered data
+	sortColumn      string
+	sortDirection   string // "asc", "desc", or "" (none)
+	filterText      string
+	filterInput     js.Value
+	debounceTimer   js.Value    // For debouncing filter input
+	currentPage     int         // Current page (1-indexed)
+	pagination      *Pagination // Pagination component instance
+	paginationMount js.Value    // Container where pagination is mounted
 }
 
 // NewTable creates a new Table component
 func NewTable(props TableProps) *Table {
 	document := js.Global().Get("document")
 
-	// Outer container - wraps everything (filter input + table)
+	// Set default PageSize if not specified
+	if props.PageSize == 0 {
+		props.PageSize = 10
+	}
+
+	// Outer container - wraps everything (filter input + table + pagination)
 	container := document.Call("createElement", "div")
 	container.Set("className", "w-full")
 
@@ -84,11 +96,12 @@ func NewTable(props TableProps) *Table {
 	tableWrapper.Call("appendChild", table)
 
 	t := &Table{
-		container: container,
-		tbody:     tbody,
-		thead:     thead,
-		columns:   props.Columns,
-		props:     props,
+		container:   container,
+		tbody:       tbody,
+		thead:       thead,
+		columns:     props.Columns,
+		props:       props,
+		currentPage: 1,
 	}
 
 	// Add filter input if Filterable
@@ -98,6 +111,14 @@ func NewTable(props TableProps) *Table {
 	}
 
 	container.Call("appendChild", tableWrapper)
+
+	// Add pagination container if Paginated
+	if props.Paginated {
+		paginationMount := document.Call("createElement", "div")
+		paginationMount.Set("className", "mt-4")
+		container.Call("appendChild", paginationMount)
+		t.paginationMount = paginationMount
+	}
 
 	// Render headers (with sort indicators)
 	t.renderHeaders()
