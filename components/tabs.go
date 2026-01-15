@@ -125,6 +125,15 @@ func NewTabs(props TabsProps) *Tabs {
 			}
 			t.SetActive(prevIdx)
 			t.tabButtons[prevIdx].Call("focus")
+		case "Home":
+			event.Call("preventDefault")
+			t.SetActive(0)
+			t.tabButtons[0].Call("focus")
+		case "End":
+			event.Call("preventDefault")
+			lastIdx := len(t.tabButtons) - 1
+			t.SetActive(lastIdx)
+			t.tabButtons[lastIdx].Call("focus")
 		}
 		return nil
 	})
