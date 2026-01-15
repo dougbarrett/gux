@@ -26,8 +26,9 @@ type ConfirmDialogProps struct {
 
 // ConfirmDialog wraps Modal for confirmation workflows
 type ConfirmDialog struct {
-	modal *Modal
-	props ConfirmDialogProps
+	modal     *Modal
+	props     ConfirmDialogProps
+	messageID string // ARIA: unique ID for aria-describedby
 }
 
 // NewConfirmDialog creates a new confirmation dialog
@@ -43,8 +44,13 @@ func NewConfirmDialog(props ConfirmDialogProps) *ConfirmDialog {
 		props.Variant = ConfirmVariantDefault
 	}
 
+	// Generate unique ID for aria-describedby
+	document := js.Global().Get("document")
+	messageID := "confirm-desc-" + js.Global().Get("crypto").Call("randomUUID").String()
+
 	cd := &ConfirmDialog{
-		props: props,
+		props:     props,
+		messageID: messageID,
 	}
 
 	// Determine confirm button variant
@@ -78,13 +84,24 @@ func NewConfirmDialog(props ConfirmDialogProps) *ConfirmDialog {
 		}),
 	)
 
+	// Create message element with ID for aria-describedby
+	messageEl := document.Call("createElement", "p")
+	messageEl.Set("id", messageID)
+	messageEl.Set("className", "text-gray-700 dark:text-gray-300")
+	messageEl.Set("textContent", props.Message)
+
 	// Create the modal
 	cd.modal = NewModal(ModalProps{
 		Title:      props.Title,
-		Content:    Text(props.Message),
+		Content:    messageEl,
 		Footer:     footer,
 		CloseOnEsc: true,
 	})
+
+	// Override to alertdialog role and add aria-describedby
+	modalEl := cd.modal.ModalElement()
+	modalEl.Call("setAttribute", "role", "alertdialog")
+	modalEl.Call("setAttribute", "aria-describedby", messageID)
 
 	return cd
 }
