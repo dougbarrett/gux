@@ -69,7 +69,7 @@ func (a *Accordion) createPanel(item AccordionItem, index int, allowMultiple boo
 
 	// Header button
 	header := document.Call("createElement", "button")
-	header.Set("className", "w-full px-4 py-3 flex items-center justify-between text-left hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:bg-gray-50 dark:focus:bg-gray-700 transition-colors cursor-pointer")
+	header.Set("className", "w-full px-4 py-3 flex items-center justify-between text-left hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500 transition-colors cursor-pointer")
 	header.Set("type", "button")
 
 	// ARIA attributes for trigger button

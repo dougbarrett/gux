@@ -265,7 +265,7 @@ func (dp *DatePicker) renderCalendar() {
 		dayBtn := document.Call("createElement", "button")
 		dayBtn.Set("type", "button")
 
-		className := "w-8 h-8 rounded-full text-sm hover:bg-gray-100 cursor-pointer"
+		className := "w-8 h-8 rounded-full text-sm hover:bg-gray-100 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset"
 
 		// Determine states
 		isSelected := !dp.selected.IsZero() && dp.selected.Year() == dayDate.Year() && dp.selected.Month() == dayDate.Month() && dp.selected.Day() == dayDate.Day()
@@ -281,12 +281,12 @@ func (dp *DatePicker) renderCalendar() {
 
 		// Apply visual styles
 		if isSelected {
-			className = "w-8 h-8 rounded-full text-sm bg-blue-500 text-white cursor-pointer"
+			className = "w-8 h-8 rounded-full text-sm bg-blue-500 text-white cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset"
 		} else if isToday {
-			className = "w-8 h-8 rounded-full text-sm border border-blue-500 text-blue-500 cursor-pointer"
+			className = "w-8 h-8 rounded-full text-sm border border-blue-500 text-blue-500 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset"
 		}
 		if disabled {
-			className = "w-8 h-8 rounded-full text-sm text-gray-300 cursor-not-allowed"
+			className = "w-8 h-8 rounded-full text-sm text-gray-300 cursor-not-allowed focus:outline-none"
 		}
 
 		dayBtn.Set("className", className)

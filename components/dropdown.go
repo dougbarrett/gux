@@ -363,7 +363,7 @@ func ActionDropdown(buttonText string, items []DropdownItem) *Dropdown {
 func IconDropdown(icon string, items []DropdownItem) *Dropdown {
 	document := js.Global().Get("document")
 	trigger := document.Call("createElement", "button")
-	trigger.Set("className", "p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full text-gray-600 dark:text-gray-300")
+	trigger.Set("className", "p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full text-gray-600 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500")
 	trigger.Set("textContent", icon)
 
 	return NewDropdown(DropdownProps{
