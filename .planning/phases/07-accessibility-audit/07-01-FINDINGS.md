@@ -301,3 +301,37 @@
 3. Prioritize High gaps for Phase 08 (Core Components)
 4. Address Medium gaps in Phase 09 (Forms & Navigation)
 5. Address Low gaps and live regions in Phase 10 (Live & Focus)
+
+---
+
+## Structural Components ARIA Pattern Reference
+
+### Tab Pattern (WAI-ARIA 1.2)
+```
+<div role="tablist">
+  <button role="tab" aria-selected="true" aria-controls="panel-1" id="tab-1" tabindex="0">Tab 1</button>
+  <button role="tab" aria-selected="false" aria-controls="panel-2" id="tab-2" tabindex="-1">Tab 2</button>
+</div>
+<div role="tabpanel" id="panel-1" aria-labelledby="tab-1">Content 1</div>
+<div role="tabpanel" id="panel-2" aria-labelledby="tab-2" hidden>Content 2</div>
+```
+
+### Accordion Pattern (WAI-ARIA 1.2)
+```
+<div class="accordion">
+  <button aria-expanded="true" aria-controls="content-1" id="header-1">Section 1</button>
+  <div role="region" id="content-1" aria-labelledby="header-1">Content</div>
+</div>
+```
+
+### Table Sorting Pattern
+```
+<table>
+  <thead>
+    <tr>
+      <th scope="col" aria-sort="ascending">Name</th>
+      <th scope="col" aria-sort="none">Date</th>
+    </tr>
+  </thead>
+</table>
+```
