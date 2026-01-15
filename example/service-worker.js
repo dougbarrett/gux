@@ -5,6 +5,7 @@ const CACHE_NAME = 'gux-v1';
 const PRECACHE_URLS = [
   '/',
   '/index.html',
+  '/offline.html',
   '/wasm_exec.js',
   '/main.wasm',
   '/manifest.json',
@@ -75,6 +76,14 @@ self.addEventListener('fetch', (event) => {
   }
 });
 
+// Check if request is a navigation request (page load)
+function isNavigationRequest(request) {
+  return request.mode === 'navigate' ||
+    (request.method === 'GET' &&
+      request.headers.get('accept') &&
+      request.headers.get('accept').includes('text/html'));
+}
+
 // Cache-first strategy
 async function cacheFirstStrategy(request) {
   const cachedResponse = await caches.match(request);
@@ -94,7 +103,12 @@ async function cacheFirstStrategy(request) {
     return networkResponse;
   } catch (error) {
     console.error('[SW] Fetch failed:', error);
-    // Return offline fallback if available
+    // For navigation requests, return offline page
+    if (isNavigationRequest(request)) {
+      console.log('[SW] Returning offline page for navigation request');
+      return caches.match('/offline.html');
+    }
+    // For other requests, try to return cached index as fallback
     return caches.match('/index.html');
   }
 }
@@ -116,6 +130,8 @@ async function networkFirstStrategy(request) {
     if (cachedResponse) {
       return cachedResponse;
     }
-    throw error;
+    // Return empty response instead of throwing to prevent console errors
+    console.log('[SW] No cache available for:', request.url);
+    return new Response('', { status: 503, statusText: 'Service Unavailable' });
   }
 }
