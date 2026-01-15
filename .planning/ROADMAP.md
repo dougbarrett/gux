@@ -27,7 +27,7 @@ Transform GoQuery from a functional database query tool into a polished, product
 - [x] **Phase 5: Data & States** - Data Export + Empty States
 - [x] **Phase 6: Progressive Enhancement** - Skeleton Loaders + Connection Status + Breadcrumbs + PWA
 - [x] **Phase 7: Accessibility Audit** - Review all components, document gaps, establish baseline
-- [ ] **Phase 8: ARIA & Semantic Markup** - Screen reader support, labels, roles, live regions
+- [x] **Phase 8: ARIA & Semantic Markup** - Screen reader support, labels, roles, live regions
 - [ ] **Phase 9: Keyboard Navigation** - Comprehensive keyboard support for all components
 - [ ] **Phase 10: Visual Accessibility** - Focus indicators, contrast, reduced motion
 - [ ] **Phase 11: A11y Testing Infrastructure** - axe-core integration, testing patterns
@@ -130,7 +130,7 @@ Plans:
 - [x] 07-02: Form & Navigation Audit (Input, Select, Checkbox, Toggle, TextArea, DatePicker, Form, FormBuilder, Sidebar, Breadcrumbs, Pagination, Link, Alert, Toast, Progress, Spinner, Skeleton)
 - [x] 07-03: Combined Findings & Remediation Plan
 
-#### Phase 8: ARIA & Semantic Markup (In Progress)
+#### Phase 8: ARIA & Semantic Markup (Complete)
 
 **Goal**: Add screen reader support with proper labels, roles, and live regions
 **Depends on**: Phase 7
@@ -143,7 +143,7 @@ Plans:
 - [x] 08-03: Form Control Labels (Input, Select, TextArea, Checkbox, Form, FormBuilder)
 - [x] 08-04: Widget ARIA Patterns (Tabs, Combobox, Accordion)
 - [x] 08-05: Navigation ARIA Patterns (Dropdown, Sidebar, Breadcrumbs)
-- [ ] 08-06: Interactive Widget ARIA
+- [x] 08-06: Complex Data ARIA Patterns (DatePicker, Table)
 
 #### Phase 9: Keyboard Navigation
 
@@ -191,7 +191,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | 5. Data & States | v1.0 | 3/3 | Complete | 2026-01-15 |
 | 6. Progressive Enhancement | v1.0 | 3/3 | Complete | 2026-01-15 |
 | 7. Accessibility Audit | v1.1 | 3/3 | Complete | 2026-01-15 |
-| 8. ARIA & Semantic Markup | v1.1 | 5/6 | In progress | - |
+| 8. ARIA & Semantic Markup | v1.1 | 6/6 | Complete | 2026-01-15 |
 | 9. Keyboard Navigation | v1.1 | 0/? | Not started | - |
 | 10. Visual Accessibility | v1.1 | 0/? | Not started | - |
 | 11. A11y Testing Infrastructure | v1.1 | 0/? | Not started | - |

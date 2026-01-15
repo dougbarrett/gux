@@ -3,11 +3,11 @@
 ## Current Position
 
 Phase: 8 of 11 (ARIA & Semantic Markup)
-Plan: 5 of 6 in current phase
-Status: In progress
-Last activity: 2026-01-15 - Completed 08-05-PLAN.md
+Plan: 6 of 6 in current phase
+Status: Phase complete
+Last activity: 2026-01-15 - Completed 08-06-PLAN.md
 
-Progress: ███████░░░ 76% (v1.1: 5/6 plans in Phase 8)
+Progress: ████████░░ 80% (v1.1: Phase 8 complete, ready for Phase 9)
 
 ## Accumulated Context
 
@@ -81,6 +81,9 @@ Progress: ███████░░░ 76% (v1.1: 5/6 plans in Phase 8)
 - 08-05: Sidebar nav uses role=navigation with aria-label
 - 08-05: Breadcrumbs use semantic ol/li per WAI-ARIA practices
 - 08-05: Separators hidden from AT with aria-hidden=true
+- 08-06: DatePicker uses semantic table for calendar grid (not divs)
+- 08-06: aria-live=polite on month/year for navigation announcements
+- 08-06: Table aria-sort tracks none/ascending/descending state
 
 ### Blockers/Concerns Carried Forward
 - None
@@ -99,10 +102,10 @@ None yet.
 - **v1.0 UX Polish milestone complete** - All 6 phases, 17 plans executed (shipped 2026-01-15)
 - Milestone v1.1 Accessibility created: Enterprise-ready a11y compliance, 5 phases (Phase 7-11)
 - Phase 7 (Accessibility Audit) complete with all 3 plans executed - 114 gaps documented, prioritized, and mapped
-- Phase 8 (ARIA & Semantic Markup) in progress - 5/6 plans executed
+- Phase 8 (ARIA & Semantic Markup) complete - 6/6 plans executed
 
 ## Session Continuity
 
 Last session: 2026-01-15
-Stopped at: Completed 08-05-PLAN.md (Navigation ARIA Patterns)
+Stopped at: Completed 08-06-PLAN.md (Complex Data ARIA Patterns)
 Resume file: None
