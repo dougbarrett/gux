@@ -16,11 +16,12 @@ type ModalProps struct {
 
 // Modal creates a modal dialog overlay
 type Modal struct {
-	overlay js.Value
-	modal   js.Value
-	content js.Value
-	isOpen  bool
-	titleID string // ARIA: unique ID for aria-labelledby
+	overlay   js.Value
+	modal     js.Value
+	content   js.Value
+	isOpen    bool
+	titleID   string // ARIA: unique ID for aria-labelledby
+	focusTrap *FocusTrap
 }
 
 var modalWidths = map[string]string{
@@ -70,6 +71,9 @@ func NewModal(props ModalProps) *Modal {
 		modal:   modal,
 		titleID: titleID,
 	}
+
+	// Create focus trap for the modal content
+	m.focusTrap = NewFocusTrap(modal)
 
 	// Header
 	if props.Title != "" {
@@ -154,6 +158,8 @@ func (m *Modal) Open() {
 	m.isOpen = true
 	// Prevent body scroll
 	js.Global().Get("document").Get("body").Get("style").Set("overflow", "hidden")
+	// Activate focus trap (stores trigger element and focuses first focusable)
+	m.focusTrap.Activate()
 }
 
 // Close hides the modal
@@ -162,6 +168,8 @@ func (m *Modal) Close() {
 	m.isOpen = false
 	// Restore body scroll
 	js.Global().Get("document").Get("body").Get("style").Set("overflow", "")
+	// Deactivate focus trap (restores focus to trigger element)
+	m.focusTrap.Deactivate()
 
 	// Call onClose callback
 	onClose := m.overlay.Get("_onClose")
@@ -189,4 +197,9 @@ func (m *Modal) TitleID() string {
 // ModalElement returns the inner modal container (for ARIA attribute access)
 func (m *Modal) ModalElement() js.Value {
 	return m.modal
+}
+
+// Destroy cleans up the modal's resources
+func (m *Modal) Destroy() {
+	m.focusTrap.Destroy()
 }
