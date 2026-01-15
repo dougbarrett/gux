@@ -3,11 +3,11 @@
 ## Current Position
 
 Phase: 5 of 6 (Data & States)
-Plan: 1 of 3 in current phase
+Plan: 2 of 3 in current phase
 Status: In progress
-Last activity: 2026-01-15 - Completed 05-01-PLAN.md (Data Export)
+Last activity: 2026-01-15 - Completed 05-02-PLAN.md (PDF Export)
 
-Progress: █████████░ 72%
+Progress: █████████░ 78%
 
 ## Accumulated Context
 
@@ -43,6 +43,9 @@ Progress: █████████░ 72%
 - 05-01: Manual CSV building instead of encoding/csv (cleaner for WASM)
 - 05-01: Export dropdown in toolbar next to filter input
 - 05-01: Export selected rows when selection exists, otherwise filtered data
+- 05-02: Load jsPDF from CDN (no bundler in project)
+- 05-02: Use positional arguments for jsPDF constructor (orientation, unit, format)
+- 05-02: Use autoTable plugin for professional table formatting
 
 ### Blockers/Concerns Carried Forward
 - None
@@ -60,5 +63,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-01-15
-Stopped at: Completed 05-01-PLAN.md
-Resume file: None (ready for 05-02)
+Stopped at: Completed 05-02-PLAN.md
+Resume file: None (ready for 05-03)

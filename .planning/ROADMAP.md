@@ -89,8 +89,8 @@ Plans:
 
 Plans:
 - [x] 05-01: Data Export (CSV/JSON with Table integration)
-- [ ] 05-02: Empty States
-- [ ] 05-03: TBD
+- [x] 05-02: PDF Export (jsPDF with autoTable)
+- [ ] 05-03: Empty States
 
 #### Phase 6: Progressive Enhancement
 
@@ -114,5 +114,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | 2. Layout & Navigation | v1.0 | 2/2 | Complete | 2026-01-15 |
 | 3. Table Enhancements | v1.0 | 4/4 | Complete | 2026-01-15 |
 | 4. UX Polish | v1.0 | 3/3 | Complete | 2026-01-15 |
-| 5. Data & States | v1.0 | 1/3 | In progress | - |
+| 5. Data & States | v1.0 | 2/3 | In progress | - |
 | 6. Progressive Enhancement | v1.0 | 0/? | Not started | - |
