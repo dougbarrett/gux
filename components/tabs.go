@@ -25,12 +25,14 @@ type TabsProps struct {
 // Tabs creates a tabbed content component
 type Tabs struct {
 	container   js.Value
+	tabNav      js.Value   // tablist element for keyboard handler
 	tabButtons  []js.Value
 	tabPanels   []js.Value
 	tabIDs      []string // unique IDs for tabs
 	panelIDs    []string // unique IDs for panels
 	activeIndex int
 	props       TabsProps
+	keyHandler  js.Func // keyboard navigation handler
 }
 
 // NewTabs creates a new Tabs component
@@ -99,6 +101,34 @@ func NewTabs(props TabsProps) *Tabs {
 		t.tabButtons[i] = btn
 		tabNav.Call("appendChild", btn)
 	}
+
+	t.tabNav = tabNav
+
+	// Keyboard navigation handler - WAI-ARIA Tabs pattern
+	t.keyHandler = js.FuncOf(func(this js.Value, args []js.Value) any {
+		event := args[0]
+		key := event.Get("key").String()
+
+		switch key {
+		case "ArrowRight":
+			event.Call("preventDefault")
+			// Move to next tab, wrap to first if at end
+			nextIdx := (t.activeIndex + 1) % len(t.tabButtons)
+			t.SetActive(nextIdx)
+			t.tabButtons[nextIdx].Call("focus")
+		case "ArrowLeft":
+			event.Call("preventDefault")
+			// Move to previous tab, wrap to last if at start
+			prevIdx := t.activeIndex - 1
+			if prevIdx < 0 {
+				prevIdx = len(t.tabButtons) - 1
+			}
+			t.SetActive(prevIdx)
+			t.tabButtons[prevIdx].Call("focus")
+		}
+		return nil
+	})
+	tabNav.Call("addEventListener", "keydown", t.keyHandler)
 
 	tabList.Call("appendChild", tabNav)
 	container.Call("appendChild", tabList)
