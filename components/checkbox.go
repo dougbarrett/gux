@@ -15,23 +15,29 @@ type CheckboxProps struct {
 
 // Checkbox creates a checkbox input with label
 type Checkbox struct {
-	container js.Value
-	input     js.Value
-	label     js.Value
+	container  js.Value
+	input      js.Value
+	label      js.Value
+	checkboxID string
 }
 
 // NewCheckbox creates a new Checkbox component
 func NewCheckbox(props CheckboxProps) *Checkbox {
 	document := js.Global().Get("document")
+	crypto := js.Global().Get("crypto")
 
 	container := document.Call("createElement", "div")
 	container.Set("className", "flex items-center mb-4")
 
-	cb := &Checkbox{container: container}
+	// Generate unique ID for label-input association
+	checkboxID := "checkbox-" + crypto.Call("randomUUID").String()
+
+	cb := &Checkbox{container: container, checkboxID: checkboxID}
 
 	// Checkbox input
 	input := document.Call("createElement", "input")
 	input.Set("type", "checkbox")
+	input.Set("id", checkboxID)
 	className := "h-4 w-4 text-blue-600 border-gray-300 dark:border-gray-600 rounded focus:ring-blue-500 dark:bg-gray-700"
 	if props.Disabled {
 		className += " cursor-not-allowed"
@@ -59,20 +65,13 @@ func NewCheckbox(props CheckboxProps) *Checkbox {
 	// Label
 	if props.Label != "" {
 		label := document.Call("createElement", "label")
-		labelClass := "ml-2 text-sm text-gray-700 dark:text-gray-300"
+		labelClass := "ml-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer"
 		if props.Disabled {
 			labelClass += " text-gray-400 dark:text-gray-500"
 		}
 		label.Set("className", labelClass)
 		label.Set("textContent", props.Label)
-
-		// Click label to toggle checkbox
-		label.Call("addEventListener", "click", js.FuncOf(func(this js.Value, args []js.Value) any {
-			if !props.Disabled {
-				input.Call("click")
-			}
-			return nil
-		}))
+		label.Set("htmlFor", checkboxID)
 
 		container.Call("appendChild", label)
 		cb.label = label
