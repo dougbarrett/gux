@@ -2,12 +2,12 @@
 
 ## Current Position
 
-Phase: 4 of 6 (UX Polish)
-Plan: 3 of 3 in current phase
-Status: Phase complete
-Last activity: 2026-01-15 - Completed 04-03-PLAN.md (ConfirmDialog Component)
+Phase: 5 of 6 (Data & States)
+Plan: 1 of 3 in current phase
+Status: In progress
+Last activity: 2026-01-15 - Completed 05-01-PLAN.md (Data Export)
 
-Progress: ████████░░ 67%
+Progress: █████████░ 72%
 
 ## Accumulated Context
 
@@ -40,6 +40,9 @@ Progress: ████████░░ 67%
 - 04-02: Skip disabled items during keyboard navigation
 - 04-03: Use ConfirmVariant* prefix for constants to avoid name collision with convenience functions
 - 04-03: Wrap Modal internally rather than exposing Modal configuration
+- 05-01: Manual CSV building instead of encoding/csv (cleaner for WASM)
+- 05-01: Export dropdown in toolbar next to filter input
+- 05-01: Export selected rows when selection exists, otherwise filtered data
 
 ### Blockers/Concerns Carried Forward
 - None
@@ -57,5 +60,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-01-15
-Stopped at: Completed 04-03-PLAN.md
-Resume file: None (ready for Phase 5)
+Stopped at: Completed 05-01-PLAN.md
+Resume file: None (ready for 05-02)
