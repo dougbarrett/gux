@@ -12,14 +12,15 @@ import (
 )
 
 var (
-	app            *components.App
-	layout         *components.Layout
-	display        *components.DataDisplay
-	router         *components.Router
-	posts          *api.PostsClient
-	modal          *components.Modal
-	postsStore     *state.AsyncStore[[]api.Post]
-	commandPalette *components.CommandPalette
+	app              *components.App
+	layout           *components.Layout
+	display          *components.DataDisplay
+	router           *components.Router
+	posts            *api.PostsClient
+	modal            *components.Modal
+	postsStore       *state.AsyncStore[[]api.Post]
+	commandPalette   *components.CommandPalette
+	connectionStatus *components.ConnectionStatus
 )
 
 func main() {
@@ -93,6 +94,13 @@ func main() {
 		},
 	})
 
+	// Create ConnectionStatus for header (shows real-time connection state)
+	connectionStatus = components.NewConnectionStatus(components.ConnectionStatusProps{
+		Variant:   components.ConnectionStatusDotVariant,
+		Size:      components.ConnectionStatusMD,
+		ShowLabel: false, // Just dot with tooltip
+	})
+
 	// Create layout
 	layout = components.NewLayout(components.LayoutProps{
 		Sidebar: components.SidebarProps{
@@ -108,6 +116,7 @@ func main() {
 		Header: components.HeaderProps{
 			Title:              "Dashboard",
 			NotificationCenter: notificationCenter,
+			ConnectionStatus:   connectionStatus,
 			UserMenu:           userMenu,
 			Actions: []components.HeaderAction{
 				{Label: "Refresh", OnClick: func() { js.Global().Get("location").Call("reload") }},
@@ -640,6 +649,8 @@ func utilitiesDemo() js.Value {
 				appendEchoMessage("[Error] " + err)
 			},
 		})
+		// Bind header ConnectionStatus to this WebSocket store
+		connectionStatus.BindToWebSocket(wsStore)
 		wsStore.Connect()
 	}
 
@@ -647,6 +658,8 @@ func utilitiesDemo() js.Value {
 		if wsStore != nil {
 			wsStore.Close()
 			wsStore = nil
+			// Reset connection status to disconnected
+			connectionStatus.SetState(state.WSClosed)
 		}
 	}
 

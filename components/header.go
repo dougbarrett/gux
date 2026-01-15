@@ -17,6 +17,7 @@ type HeaderProps struct {
 	OnMenuToggle       func() // Called when hamburger menu is clicked (mobile)
 	UserMenu           *UserMenu
 	NotificationCenter *NotificationCenter
+	ConnectionStatus   *ConnectionStatus
 }
 
 // Header is a page header component
@@ -28,6 +29,7 @@ type Header struct {
 	actions            []HeaderAction
 	userMenu           *UserMenu
 	notificationCenter *NotificationCenter
+	connectionStatus   *ConnectionStatus
 }
 
 // NewHeader creates a new Header component
@@ -70,6 +72,11 @@ func NewHeader(props HeaderProps) *Header {
 		actionsDiv.Call("appendChild", props.NotificationCenter.Element())
 	}
 
+	// Add ConnectionStatus if provided
+	if props.ConnectionStatus != nil {
+		actionsDiv.Call("appendChild", props.ConnectionStatus.Element())
+	}
+
 	// Add UserMenu if provided
 	if props.UserMenu != nil {
 		actionsDiv.Call("appendChild", props.UserMenu.Element())
@@ -88,6 +95,7 @@ func NewHeader(props HeaderProps) *Header {
 		actions:            props.Actions,
 		userMenu:           props.UserMenu,
 		notificationCenter: props.NotificationCenter,
+		connectionStatus:   props.ConnectionStatus,
 	}
 
 	for _, action := range props.Actions {
@@ -121,4 +129,9 @@ func (h *Header) UserMenu() *UserMenu {
 // NotificationCenter returns the NotificationCenter component if set
 func (h *Header) NotificationCenter() *NotificationCenter {
 	return h.notificationCenter
+}
+
+// ConnectionStatus returns the ConnectionStatus component if set
+func (h *Header) ConnectionStatus() *ConnectionStatus {
+	return h.connectionStatus
 }
