@@ -3,11 +3,11 @@
 ## Current Position
 
 Phase: 8 of 11 (ARIA & Semantic Markup)
-Plan: 3 of 6 in current phase
+Plan: 4 of 6 in current phase
 Status: In progress
-Last activity: 2026-01-15 - Completed 08-03-PLAN.md
+Last activity: 2026-01-15 - Completed 08-04-PLAN.md
 
-Progress: ██████░░░░ 72% (v1.1: 3/6 plans in Phase 8)
+Progress: ██████░░░░ 74% (v1.1: 4/6 plans in Phase 8)
 
 ## Accumulated Context
 
@@ -73,6 +73,10 @@ Progress: ██████░░░░ 72% (v1.1: 3/6 plans in Phase 8)
 - 08-03: crypto.randomUUID() for form control IDs (consistent with 08-01)
 - 08-03: Error elements use role="alert" for immediate announcement
 - 08-03: htmlFor attribute for label-input association
+- 08-04: strconv.Itoa + UUID for indexed widget IDs
+- 08-04: Tabs roving tabindex (active=0, inactive=-1)
+- 08-04: Combobox aria-activedescendant for virtual listbox focus
+- 08-04: Accordion role=region on panels for screen reader context
 
 ### Blockers/Concerns Carried Forward
 - None
@@ -91,10 +95,10 @@ None yet.
 - **v1.0 UX Polish milestone complete** - All 6 phases, 17 plans executed (shipped 2026-01-15)
 - Milestone v1.1 Accessibility created: Enterprise-ready a11y compliance, 5 phases (Phase 7-11)
 - Phase 7 (Accessibility Audit) complete with all 3 plans executed - 114 gaps documented, prioritized, and mapped
-- Phase 8 (ARIA & Semantic Markup) in progress - 3/6 plans executed
+- Phase 8 (ARIA & Semantic Markup) in progress - 4/6 plans executed
 
 ## Session Continuity
 
 Last session: 2026-01-15
-Stopped at: Completed 08-03-PLAN.md (Form Control Labels)
+Stopped at: Completed 08-04-PLAN.md (Widget ARIA Patterns)
 Resume file: None

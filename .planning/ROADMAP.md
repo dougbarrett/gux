@@ -141,7 +141,7 @@ Plans:
 - [x] 08-01: ARIA Dialog Patterns (Modal, ConfirmDialog, CommandPalette)
 - [x] 08-02: ARIA Live Regions (Alert, Toast, Progress, Spinner)
 - [x] 08-03: Form Control Labels (Input, Select, TextArea, Checkbox, Form, FormBuilder)
-- [ ] 08-04: Navigation & Landmark Roles
+- [x] 08-04: Widget ARIA Patterns (Tabs, Combobox, Accordion)
 - [ ] 08-05: Live Regions & Status Updates
 - [ ] 08-06: Interactive Widget ARIA
 
@@ -191,7 +191,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | 5. Data & States | v1.0 | 3/3 | Complete | 2026-01-15 |
 | 6. Progressive Enhancement | v1.0 | 3/3 | Complete | 2026-01-15 |
 | 7. Accessibility Audit | v1.1 | 3/3 | Complete | 2026-01-15 |
-| 8. ARIA & Semantic Markup | v1.1 | 3/6 | In progress | - |
+| 8. ARIA & Semantic Markup | v1.1 | 4/6 | In progress | - |
 | 9. Keyboard Navigation | v1.1 | 0/? | Not started | - |
 | 10. Visual Accessibility | v1.1 | 0/? | Not started | - |
 | 11. A11y Testing Infrastructure | v1.1 | 0/? | Not started | - |
