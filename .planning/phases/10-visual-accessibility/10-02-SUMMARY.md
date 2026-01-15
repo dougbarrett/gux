@@ -1,6 +1,6 @@
 # Phase 10-02: Motion Preferences & Color Contrast
 **Status:** ✅ Complete
-**Commits:** 2983860, 7641e2e, 03ef83d, a22afda
+**Commits:** 2983860, 7641e2e, 03ef83d, a22afda, f6b5aff, 3675402
 
 ## Objectives Achieved
 
@@ -38,13 +38,28 @@ Fixed contrast issues identified by axe DevTools:
 **Accessibility fixes**:
 - dropdown.go: IconDropdown trigger now has aria-label="More actions"
 
+### Lighthouse Audit Fixes (Additional Pass)
+
+**aria-allowed-attr (Critical)**:
+- notification_center.go: Changed triggerContainer from div to button with aria-label="Notifications"
+- user_menu.go: Wrapped Avatar in button element with aria-label for valid ARIA
+
+**button-name (Critical)**:
+- Both components now have accessible names via aria-label
+
+**color-contrast (Serious)**:
+- button.go: Changed ButtonSuccess from bg-green-600 to bg-green-700 (3.29:1 → 4.5:1)
+
+**heading-order (Moderate)**:
+- install_prompt.go: Changed h4 to div (floating banner shouldn't use heading semantics)
+
 ## Files Modified
 
 | File | Changes |
 |------|---------|
 | animation.go | PrefersReducedMotion(), Animate() check, CSS media query |
 | theme.go | Darker status text colors (700-level) |
-| button.go | bg-blue-600 for variants |
+| button.go | bg-blue-600 for primary, bg-green-700 for success |
 | table.go | text-gray-500 for search |
 | empty_state.go | text-gray-500/600 for icon/description |
 | tooltip.go | border-gray-500 |
@@ -52,7 +67,7 @@ Fixed contrast issues identified by axe DevTools:
 | install_prompt.go | bg-blue-600 for install button |
 | datepicker.go | bg-blue-600, text-gray-500, dark mode |
 | stepper.go | bg-blue-600, text-gray-500 |
-| notification_center.go | bg-blue-600 for dots |
+| notification_center.go | bg-blue-600 for dots, button trigger with aria-label |
 | drawer.go | Complete dark mode support |
 | dropdown.go | aria-label for IconDropdown |
 | fileupload.go | text-gray-500 for hints |
@@ -60,6 +75,8 @@ Fixed contrast issues identified by axe DevTools:
 | combobox.go | text-gray-500, dark mode dropdown |
 | breadcrumbs.go | text-gray-500 for separator |
 | input.go | placeholder-gray-500 |
+| user_menu.go | Button wrapper for Avatar, aria-label |
+| install_prompt.go | bg-blue-600, div instead of h4 for title |
 
 ## Verification
 
@@ -69,6 +86,9 @@ Fixed contrast issues identified by axe DevTools:
 - [x] CSS includes @media (prefers-reduced-motion: reduce) block
 - [x] axe DevTools scan triggered color contrast fixes
 - [x] All modified components include dark mode support
+- [x] Lighthouse accessibility audit: aria-allowed-attr fixed
+- [x] Lighthouse accessibility audit: button-name fixed
+- [x] Lighthouse accessibility audit: heading-order fixed
 
 ## Key Decisions
 
