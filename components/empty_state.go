@@ -42,7 +42,7 @@ func NewEmptyState(props EmptyStateProps) *EmptyState {
 
 	// Icon
 	iconEl := document.Call("createElement", "div")
-	iconClass := "text-gray-400 dark:text-gray-500 mb-3"
+	iconClass := "text-gray-500 dark:text-gray-400 mb-3"
 	if props.Compact {
 		iconClass = "text-4xl " + iconClass
 	} else {
@@ -67,7 +67,7 @@ func NewEmptyState(props EmptyStateProps) *EmptyState {
 	// Description (optional)
 	if props.Description != "" {
 		descEl := document.Call("createElement", "p")
-		descClass := "text-sm text-gray-500 dark:text-gray-400 mt-1"
+		descClass := "text-sm text-gray-600 dark:text-gray-400 mt-1"
 		if props.Compact {
 			descClass += " max-w-xs"
 		} else {

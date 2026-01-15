@@ -292,7 +292,7 @@ func (t *Table) createFilterInput(document js.Value) js.Value {
 
 	// Search icon
 	iconSpan := document.Call("createElement", "span")
-	iconSpan.Set("className", "absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none")
+	iconSpan.Set("className", "absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none")
 	iconSpan.Set("textContent", "🔍")
 	filterContainer.Call("appendChild", iconSpan)
 
@@ -304,7 +304,7 @@ func (t *Table) createFilterInput(document js.Value) js.Value {
 		placeholder = "Search..."
 	}
 	input.Set("placeholder", placeholder)
-	input.Set("className", "w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 placeholder-gray-400 dark:placeholder-gray-500")
+	input.Set("className", "w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 placeholder-gray-500 dark:placeholder-gray-400")
 
 	// Debounced input handler
 	input.Call("addEventListener", "input", js.FuncOf(func(this js.Value, args []js.Value) any {

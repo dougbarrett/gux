@@ -18,13 +18,13 @@ const (
 )
 
 var buttonVariantClasses = map[ButtonVariant]string{
-	ButtonPrimary:   "bg-blue-500 text-white hover:bg-blue-600",
+	ButtonPrimary:   "bg-blue-600 text-white hover:bg-blue-700",
 	ButtonSecondary: "bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600",
-	ButtonSuccess:   "bg-green-500 text-white hover:bg-green-600",
-	ButtonWarning:   "bg-yellow-500 text-white hover:bg-yellow-600",
-	ButtonDanger:    "bg-red-500 text-white hover:bg-red-600",
-	ButtonInfo:      "bg-cyan-500 text-white hover:bg-cyan-600",
-	ButtonGhost:     "bg-transparent text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700",
+	ButtonSuccess:   "bg-green-600 text-white hover:bg-green-700",
+	ButtonWarning:   "bg-yellow-500 text-gray-900 hover:bg-yellow-600",
+	ButtonDanger:    "bg-red-600 text-white hover:bg-red-700",
+	ButtonInfo:      "bg-cyan-600 text-white hover:bg-cyan-700",
+	ButtonGhost:     "bg-transparent text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700",
 }
 
 // ButtonSize defines button sizes

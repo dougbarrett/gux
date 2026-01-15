@@ -372,15 +372,21 @@ func (tm *ThemeManager) apply() {
 		box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 	}
 
-	/* Status colors */
-	.text-success { color: var(--success); }
-	.text-warning { color: var(--warning); }
-	.text-error { color: var(--error); }
-	.text-info { color: var(--info); }
+	/* Status colors - text uses darker shades for WCAG 1.4.3 contrast */
+	.text-success { color: #15803d; } /* green-700: 5.5:1 on white */
+	.text-warning { color: #b45309; } /* amber-700: 4.7:1 on white */
+	.text-error { color: #b91c1c; } /* red-700: 5.8:1 on white */
+	.text-info { color: #1d4ed8; } /* blue-700: 8.6:1 on white */
 	.bg-success { background-color: var(--success); }
 	.bg-warning { background-color: var(--warning); }
 	.bg-error { background-color: var(--error); }
 	.bg-info { background-color: var(--info); }
+
+	/* Dark mode text colors - lighter for contrast on dark backgrounds */
+	.dark .text-success, .theme-dark .text-success { color: #4ade80; } /* green-400 */
+	.dark .text-warning, .theme-dark .text-warning { color: #fbbf24; } /* amber-400 */
+	.dark .text-error, .theme-dark .text-error { color: #f87171; } /* red-400 */
+	.dark .text-info, .theme-dark .text-info { color: #60a5fa; } /* blue-400 */
 	`
 
 	tm.styleElement.Set("textContent", css)

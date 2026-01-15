@@ -90,6 +90,6 @@ func Tooltip(text, tooltip string) js.Value {
 	document := js.Global().Get("document")
 	span := document.Call("createElement", "span")
 	span.Set("textContent", text)
-	span.Set("className", "border-b border-dotted border-gray-400 cursor-help")
+	span.Set("className", "border-b border-dotted border-gray-500 cursor-help")
 	return WithTooltip(span, TooltipProps{Text: tooltip})
 }
