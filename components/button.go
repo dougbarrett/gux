@@ -20,7 +20,7 @@ const (
 var buttonVariantClasses = map[ButtonVariant]string{
 	ButtonPrimary:   "bg-blue-600 text-white hover:bg-blue-700",
 	ButtonSecondary: "bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600",
-	ButtonSuccess:   "bg-green-600 text-white hover:bg-green-700",
+	ButtonSuccess:   "bg-green-700 text-white hover:bg-green-800",
 	ButtonWarning:   "bg-yellow-500 text-gray-900 hover:bg-yellow-600",
 	ButtonDanger:    "bg-red-600 text-white hover:bg-red-700",
 	ButtonInfo:      "bg-cyan-600 text-white hover:bg-cyan-700",

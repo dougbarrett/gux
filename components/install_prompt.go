@@ -89,8 +89,8 @@ func NewInstallPrompt(props InstallPromptProps, manager *InstallPromptManager) *
 	textContainer := document.Call("createElement", "div")
 	textContainer.Set("className", "flex-1 min-w-0")
 
-	// Title
-	title := document.Call("createElement", "h4")
+	// Title (use div, not heading - this is a floating banner, not part of page structure)
+	title := document.Call("createElement", "div")
 	title.Set("className", "font-semibold text-gray-900 dark:text-white text-sm")
 	title.Set("textContent", "Install "+appName)
 	textContainer.Call("appendChild", title)

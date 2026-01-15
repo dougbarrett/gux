@@ -24,12 +24,18 @@ type UserMenu struct {
 func NewUserMenu(props UserMenuProps) *UserMenu {
 	document := js.Global().Get("document")
 
-	// Create avatar trigger (small size)
-	trigger := Avatar(AvatarProps{
+	// Create button trigger wrapping avatar (button needed for valid ARIA)
+	trigger := document.Call("createElement", "button")
+	trigger.Set("className", "rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2")
+	trigger.Call("setAttribute", "aria-label", "User menu for "+props.Name)
+
+	// Create avatar inside the button
+	avatar := Avatar(AvatarProps{
 		Src:  props.AvatarSrc,
 		Name: props.Name,
 		Size: AvatarSM,
 	})
+	trigger.Call("appendChild", avatar)
 
 	// Create dropdown content container
 	content := document.Call("createElement", "div")
