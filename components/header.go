@@ -12,18 +12,22 @@ type HeaderAction struct {
 
 // HeaderProps configures a Header component
 type HeaderProps struct {
-	Title        string
-	Actions      []HeaderAction
-	OnMenuToggle func() // Called when hamburger menu is clicked (mobile)
+	Title              string
+	Actions            []HeaderAction
+	OnMenuToggle       func() // Called when hamburger menu is clicked (mobile)
+	UserMenu           *UserMenu
+	NotificationCenter *NotificationCenter
 }
 
 // Header is a page header component
 type Header struct {
-	element    js.Value
-	titleEl    js.Value
-	actionsEl  js.Value
-	titleText  string
-	actions    []HeaderAction
+	element            js.Value
+	titleEl            js.Value
+	actionsEl          js.Value
+	titleText          string
+	actions            []HeaderAction
+	userMenu           *UserMenu
+	notificationCenter *NotificationCenter
 }
 
 // NewHeader creates a new Header component
@@ -58,15 +62,32 @@ func NewHeader(props HeaderProps) *Header {
 	header.Call("appendChild", leftDiv)
 
 	actionsDiv := document.Call("createElement", "div")
-	actionsDiv.Set("className", "flex gap-2 flex-shrink-0")
+	actionsDiv.Set("className", "flex items-center gap-3 flex-shrink-0")
 	header.Call("appendChild", actionsDiv)
 
+	// Add NotificationCenter if provided
+	if props.NotificationCenter != nil {
+		actionsDiv.Call("appendChild", props.NotificationCenter.Element())
+	}
+
+	// Add UserMenu if provided
+	if props.UserMenu != nil {
+		actionsDiv.Call("appendChild", props.UserMenu.Element())
+	}
+
+	// Add action buttons wrapper with tighter gap
+	buttonsDiv := document.Call("createElement", "div")
+	buttonsDiv.Set("className", "flex gap-2")
+	actionsDiv.Call("appendChild", buttonsDiv)
+
 	h := &Header{
-		element:   header,
-		titleEl:   title,
-		actionsEl: actionsDiv,
-		titleText: props.Title,
-		actions:   props.Actions,
+		element:            header,
+		titleEl:            title,
+		actionsEl:          actionsDiv,
+		titleText:          props.Title,
+		actions:            props.Actions,
+		userMenu:           props.UserMenu,
+		notificationCenter: props.NotificationCenter,
 	}
 
 	for _, action := range props.Actions {
@@ -75,7 +96,7 @@ func NewHeader(props HeaderProps) *Header {
 			ClassName: "px-3 py-1 text-sm bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 rounded transition-colors cursor-pointer",
 			OnClick:   action.OnClick,
 		})
-		actionsDiv.Call("appendChild", btn)
+		buttonsDiv.Call("appendChild", btn)
 	}
 
 	return h
@@ -90,4 +111,14 @@ func (h *Header) Element() js.Value {
 func (h *Header) SetTitle(title string) {
 	h.titleText = title
 	h.titleEl.Set("textContent", title)
+}
+
+// UserMenu returns the UserMenu component if set
+func (h *Header) UserMenu() *UserMenu {
+	return h.userMenu
+}
+
+// NotificationCenter returns the NotificationCenter component if set
+func (h *Header) NotificationCenter() *NotificationCenter {
+	return h.notificationCenter
 }
