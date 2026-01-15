@@ -94,14 +94,15 @@ Plans:
 
 #### Phase 6: Progressive Enhancement
 
-**Goal**: Add skeleton loaders, connection status indicator, breadcrumbs, and PWA support
+**Goal**: Add connection status indicator and PWA support (skeleton loaders and breadcrumbs already exist)
 **Depends on**: Phase 5
-**Research**: Likely (PWA architecture)
-**Research topics**: Service worker setup, offline capability, PWA manifest, cache strategies
-**Plans**: TBD
+**Research**: Skipped (Level 0 - existing patterns for UI, standard PWA patterns)
+**Plans**: 3 plans, 7 tasks
 
 Plans:
-- [ ] 06-01: TBD
+- [ ] 06-01: Connection Status Component (visual indicator for WebSocket state)
+- [ ] 06-02: PWA Foundation (manifest, service worker, asset caching)
+- [ ] 06-03: PWA Install Experience (install prompt, offline fallback)
 
 ## Progress
 
@@ -115,4 +116,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | 3. Table Enhancements | v1.0 | 4/4 | Complete | 2026-01-15 |
 | 4. UX Polish | v1.0 | 3/3 | Complete | 2026-01-15 |
 | 5. Data & States | v1.0 | 3/3 | Complete | 2026-01-15 |
-| 6. Progressive Enhancement | v1.0 | 0/? | Not started | - |
+| 6. Progressive Enhancement | v1.0 | 0/3 | Planned | - |
