@@ -3,11 +3,11 @@
 ## Current Position
 
 Phase: 9 of 11 (Keyboard Navigation)
-Plan: 2 of 4 in current phase
+Plan: 3 of 4 in current phase
 Status: In progress
-Last activity: 2026-01-15 - Completed 09-02-PLAN.md
+Last activity: 2026-01-15 - Completed 09-03-PLAN.md
 
-Progress: ████████░░ 84% (v1.1: Phase 9 in progress, 2/4 plans complete)
+Progress: ████████░░ 86% (v1.1: Phase 9 in progress, 3/4 plans complete)
 
 ## Accumulated Context
 
@@ -88,6 +88,9 @@ Progress: ████████░░ 84% (v1.1: Phase 9 in progress, 2/4 pla
 - 09-01: FocusTrap.Activate() stores trigger, FocusTrap.Deactivate() restores focus
 - 09-02: Automatic activation on arrow press (WAI-ARIA Tabs pattern)
 - 09-02: Horizontal arrows only (Left/Right) matching tablist orientation
+- 09-03: moveFocusBy() handles month boundary transitions automatically
+- 09-03: Roving tabindex pattern for DatePicker grid (focused=0, others=-1)
+- 09-03: Focus initialization priority: selected date > today > day 1
 
 ### Blockers/Concerns Carried Forward
 - None
@@ -111,5 +114,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-01-15
-Stopped at: Completed 09-02-PLAN.md (Tabs Keyboard Navigation)
+Stopped at: Completed 09-03-PLAN.md (DatePicker Calendar Navigation)
 Resume file: None
