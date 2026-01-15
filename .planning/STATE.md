@@ -3,11 +3,11 @@
 ## Current Position
 
 Phase: 8 of 11 (ARIA & Semantic Markup)
-Plan: 1 of 6 in current phase
+Plan: 2 of 6 in current phase
 Status: In progress
-Last activity: 2026-01-15 - Completed 08-01-PLAN.md
+Last activity: 2026-01-15 - Completed 08-02-PLAN.md
 
-Progress: ██████░░░░ 68% (v1.1: 2/5 phases in progress)
+Progress: ██████░░░░ 70% (v1.1: 2/5 phases in progress)
 
 ## Accumulated Context
 
@@ -66,6 +66,10 @@ Progress: ██████░░░░ 68% (v1.1: 2/5 phases in progress)
 - 08-01: crypto.randomUUID() for unique ARIA IDs
 - 08-01: ModalElement() getter for ConfirmDialog role override
 - 08-01: role=combobox on CommandPalette input
+- 08-02: Alert error/warning → role="alert", info/success → role="status"
+- 08-02: Toast container gets live region, not individual toasts
+- 08-02: Progress aria-valuenow omitted for indeterminate state
+- 08-02: Spinner default aria-label="Loading", custom via AriaLabel prop
 
 ### Blockers/Concerns Carried Forward
 - None
@@ -84,10 +88,10 @@ None yet.
 - **v1.0 UX Polish milestone complete** - All 6 phases, 17 plans executed (shipped 2026-01-15)
 - Milestone v1.1 Accessibility created: Enterprise-ready a11y compliance, 5 phases (Phase 7-11)
 - Phase 7 (Accessibility Audit) complete with all 3 plans executed - 114 gaps documented, prioritized, and mapped
-- Phase 8 (ARIA & Semantic Markup) started - 1/6 plans executed
+- Phase 8 (ARIA & Semantic Markup) started - 2/6 plans executed
 
 ## Session Continuity
 
 Last session: 2026-01-15
-Stopped at: Completed 08-01-PLAN.md (ARIA Dialog Patterns)
+Stopped at: Completed 08-02-PLAN.md (ARIA Live Regions)
 Resume file: None
