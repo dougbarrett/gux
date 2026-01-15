@@ -3,11 +3,11 @@
 ## Current Position
 
 Phase: 8 of 11 (ARIA & Semantic Markup)
-Plan: 4 of 6 in current phase
+Plan: 5 of 6 in current phase
 Status: In progress
-Last activity: 2026-01-15 - Completed 08-04-PLAN.md
+Last activity: 2026-01-15 - Completed 08-05-PLAN.md
 
-Progress: ██████░░░░ 74% (v1.1: 4/6 plans in Phase 8)
+Progress: ███████░░░ 76% (v1.1: 5/6 plans in Phase 8)
 
 ## Accumulated Context
 
@@ -77,6 +77,10 @@ Progress: ██████░░░░ 74% (v1.1: 4/6 plans in Phase 8)
 - 08-04: Tabs roving tabindex (active=0, inactive=-1)
 - 08-04: Combobox aria-activedescendant for virtual listbox focus
 - 08-04: Accordion role=region on panels for screen reader context
+- 08-05: Dropdown trigger stores reference for ARIA state updates
+- 08-05: Sidebar nav uses role=navigation with aria-label
+- 08-05: Breadcrumbs use semantic ol/li per WAI-ARIA practices
+- 08-05: Separators hidden from AT with aria-hidden=true
 
 ### Blockers/Concerns Carried Forward
 - None
@@ -95,10 +99,10 @@ None yet.
 - **v1.0 UX Polish milestone complete** - All 6 phases, 17 plans executed (shipped 2026-01-15)
 - Milestone v1.1 Accessibility created: Enterprise-ready a11y compliance, 5 phases (Phase 7-11)
 - Phase 7 (Accessibility Audit) complete with all 3 plans executed - 114 gaps documented, prioritized, and mapped
-- Phase 8 (ARIA & Semantic Markup) in progress - 4/6 plans executed
+- Phase 8 (ARIA & Semantic Markup) in progress - 5/6 plans executed
 
 ## Session Continuity
 
 Last session: 2026-01-15
-Stopped at: Completed 08-04-PLAN.md (Widget ARIA Patterns)
+Stopped at: Completed 08-05-PLAN.md (Navigation ARIA Patterns)
 Resume file: None
