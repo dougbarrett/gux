@@ -2,12 +2,12 @@
 
 ## Current Position
 
-Phase: 1 of 6 (Header Components)
-Plan: 2 of 2 in current phase
-Status: Phase complete
-Last activity: 2026-01-15 - Completed 01-02-PLAN.md
+Phase: 2 of 6 (Layout & Navigation)
+Plan: 1 of ? in current phase
+Status: In progress
+Last activity: 2026-01-14 - Completed 02-01-PLAN.md
 
-Progress: ██░░░░░░░░ 17%
+Progress: ███░░░░░░░ 25%
 
 ## Accumulated Context
 
@@ -17,6 +17,9 @@ Progress: ██░░░░░░░░ 17%
 - 01-01: Used emoji icons for menu items for simplicity
 - 01-02: Display order in header: bell icon, user avatar, then action buttons
 - 01-02: Used nested div for action buttons to maintain tighter gap
+- 02-01: Hide title completely when collapsed (cleaner than truncating)
+- 02-01: Use w-16 for collapsed width (fits icons with padding)
+- 02-01: Keyboard shortcut registration pattern with js.Func cleanup
 
 ### Blockers/Concerns Carried Forward
 - None
@@ -31,6 +34,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-01-15
-Stopped at: Completed Phase 1 - Header Components
-Resume file: None (ready for Phase 2 planning)
+Last session: 2026-01-14
+Stopped at: Completed 02-01-PLAN.md (Collapsible Sidebar)
+Resume file: None (ready for 02-02 or next phase planning)
