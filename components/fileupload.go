@@ -62,7 +62,7 @@ func NewFileUpload(props FileUploadProps) *FileUpload {
 
 	// Icon
 	icon := document.Call("createElement", "div")
-	icon.Set("className", "text-4xl text-gray-400 mb-2")
+	icon.Set("className", "text-4xl text-gray-500 mb-2")
 	icon.Set("textContent", "📁")
 	dropzone.Call("appendChild", icon)
 
@@ -74,7 +74,7 @@ func NewFileUpload(props FileUploadProps) *FileUpload {
 
 	// Hint
 	hint := document.Call("createElement", "div")
-	hint.Set("className", "text-xs text-gray-400 mt-1")
+	hint.Set("className", "text-xs text-gray-500 mt-1")
 	hintText := ""
 	if props.Accept != "" {
 		hintText = props.Accept
@@ -258,7 +258,7 @@ func (f *FileUpload) createFilePreview(info FileInfo) {
 
 	// File size
 	size := document.Call("createElement", "div")
-	size.Set("className", "text-xs text-gray-400")
+	size.Set("className", "text-xs text-gray-500")
 	size.Set("textContent", formatFileSize(info.Size))
 	card.Call("appendChild", size)
 

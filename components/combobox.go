@@ -122,7 +122,7 @@ func NewCombobox(props ComboboxProps) *Combobox {
 
 	// Dropdown arrow
 	arrow := document.Call("createElement", "div")
-	arrow.Set("className", "absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none")
+	arrow.Set("className", "absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 pointer-events-none")
 	arrow.Set("textContent", "▼")
 	inputWrap.Call("appendChild", arrow)
 
@@ -130,7 +130,7 @@ func NewCombobox(props ComboboxProps) *Combobox {
 
 	// Dropdown (listbox)
 	dropdown := document.Call("createElement", "div")
-	dropdown.Set("className", "absolute w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto z-50 hidden")
+	dropdown.Set("className", "absolute w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg max-h-60 overflow-auto z-50 hidden")
 
 	// ARIA listbox attributes
 	dropdown.Call("setAttribute", "role", "listbox")

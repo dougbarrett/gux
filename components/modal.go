@@ -87,7 +87,7 @@ func NewModal(props ModalProps) *Modal {
 		header.Call("appendChild", title)
 
 		closeBtn := document.Call("createElement", "button")
-		closeBtn.Set("className", "text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-2xl leading-none cursor-pointer")
+		closeBtn.Set("className", "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 text-2xl leading-none cursor-pointer")
 		closeBtn.Set("innerHTML", "&times;")
 		closeBtn.Call("setAttribute", "aria-label", "Close") // ARIA: accessible name for close button
 		closeBtn.Call("addEventListener", "click", js.FuncOf(func(this js.Value, args []js.Value) any {

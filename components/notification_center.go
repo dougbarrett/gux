@@ -201,7 +201,7 @@ func (nc *NotificationCenter) createNotificationItem(document js.Value, notifica
 
 	// Type indicator dot
 	dot := document.Call("createElement", "div")
-	dotColor := "bg-blue-500"
+	dotColor := "bg-blue-600"
 	switch notification.Type {
 	case "success":
 		dotColor = "bg-green-500"

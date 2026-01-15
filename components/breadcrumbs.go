@@ -45,7 +45,7 @@ func Breadcrumbs(props BreadcrumbsProps) js.Value {
 		// Separator (except before first item)
 		if i > 0 {
 			sep := document.Call("createElement", "span")
-			sep.Set("className", "mr-2 text-gray-400 dark:text-gray-500")
+			sep.Set("className", "mr-2 text-gray-500 dark:text-gray-400")
 			sep.Set("textContent", separator)
 			// Separators are decorative - hide from screen readers
 			sep.Call("setAttribute", "aria-hidden", "true")

@@ -104,7 +104,7 @@ func NewDatePicker(props DatePickerProps) *DatePicker {
 
 	// Calendar icon
 	icon := document.Call("createElement", "div")
-	icon.Set("className", "absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400")
+	icon.Set("className", "absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-500")
 	icon.Set("innerHTML", `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>`)
 
 	inputWrapper.Call("appendChild", input)
@@ -116,7 +116,7 @@ func NewDatePicker(props DatePickerProps) *DatePicker {
 	// Calendar dropdown with dialog role
 	calendar := document.Call("createElement", "div")
 	calendar.Set("id", calendarID)
-	calendar.Set("className", "absolute z-50 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg p-4 hidden")
+	calendar.Set("className", "absolute z-50 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-4 hidden")
 	calendar.Call("setAttribute", "role", "dialog")
 	calendar.Call("setAttribute", "aria-modal", "false")
 	calendar.Call("setAttribute", "aria-label", "Choose date")
@@ -281,7 +281,7 @@ func (dp *DatePicker) renderCalendar() {
 
 		// Apply visual styles
 		if isSelected {
-			className = "w-8 h-8 rounded-full text-sm bg-blue-500 text-white cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset"
+			className = "w-8 h-8 rounded-full text-sm bg-blue-600 text-white cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-inset"
 		} else if isToday {
 			className = "w-8 h-8 rounded-full text-sm border border-blue-500 text-blue-500 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset"
 		}

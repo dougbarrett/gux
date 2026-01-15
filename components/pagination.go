@@ -130,7 +130,7 @@ func (p *Pagination) createPageButton(page int) js.Value {
 	isCurrent := page == p.props.CurrentPage
 	className := "w-8 h-8 rounded text-sm"
 	if isCurrent {
-		className += " bg-blue-500 text-white"
+		className += " bg-blue-600 text-white"
 	} else {
 		className += " hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 cursor-pointer"
 	}

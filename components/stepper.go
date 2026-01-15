@@ -125,7 +125,7 @@ func (s *Stepper) createStepIndicator(index int, step Step, vertical bool, onCli
 	case StepComplete:
 		circleClass = "w-8 h-8 rounded-full bg-green-500 text-white flex items-center justify-center"
 	case StepCurrent:
-		circleClass = "w-8 h-8 rounded-full bg-blue-500 text-white flex items-center justify-center ring-4 ring-blue-100"
+		circleClass = "w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center ring-4 ring-blue-100"
 	case StepError:
 		circleClass = "w-8 h-8 rounded-full bg-red-500 text-white flex items-center justify-center"
 	default:
@@ -164,7 +164,7 @@ func (s *Stepper) createStepIndicator(index int, step Step, vertical bool, onCli
 
 	if step.Description != "" {
 		desc := document.Call("createElement", "div")
-		desc.Set("className", "text-xs text-gray-400")
+		desc.Set("className", "text-xs text-gray-500 dark:text-gray-400")
 		desc.Set("textContent", step.Description)
 		labels.Call("appendChild", desc)
 	}
@@ -256,7 +256,7 @@ func (s *Stepper) updateIndicators() {
 			circle.Set("innerHTML", `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>`)
 			title.Set("className", "text-sm font-medium text-green-600")
 		case StepCurrent:
-			circle.Set("className", "w-8 h-8 rounded-full bg-blue-500 text-white flex items-center justify-center ring-4 ring-blue-100")
+			circle.Set("className", "w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center ring-4 ring-blue-100")
 			circle.Set("textContent", fmt.Sprintf("%d", i+1))
 			title.Set("className", "text-sm font-medium text-blue-600")
 		default:

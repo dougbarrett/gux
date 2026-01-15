@@ -60,7 +60,7 @@ func NewDrawer(props DrawerProps) *Drawer {
 
 	// Drawer panel
 	drawer := document.Call("createElement", "div")
-	baseClass := "fixed bg-white shadow-xl z-50 transition-transform duration-300 ease-in-out flex flex-col"
+	baseClass := "fixed bg-white dark:bg-gray-800 shadow-xl z-50 transition-transform duration-300 ease-in-out flex flex-col"
 
 	var transformHidden, transformVisible string
 	var positionClass string
@@ -103,20 +103,20 @@ func NewDrawer(props DrawerProps) *Drawer {
 	// Header
 	if props.Title != "" || props.ShowClose {
 		header := document.Call("createElement", "div")
-		header.Set("className", "flex items-center justify-between p-4 border-b")
+		header.Set("className", "flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700")
 
 		if props.Title != "" {
 			title := document.Call("createElement", "h2")
-			title.Set("className", "text-lg font-semibold")
+			title.Set("className", "text-lg font-semibold text-gray-900 dark:text-gray-100")
 			title.Set("textContent", props.Title)
 			header.Call("appendChild", title)
 		}
 
 		if props.ShowClose {
 			closeBtn := document.Call("createElement", "button")
-			closeBtn.Set("className", "p-1 hover:bg-gray-100 rounded text-gray-500 text-xl")
+			closeBtn.Set("className", "p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded text-gray-500 dark:text-gray-400 text-xl")
 			closeBtn.Set("textContent", "×")
-			closeBtn.Set("aria-label", "Close drawer")
+			closeBtn.Call("setAttribute", "aria-label", "Close drawer")
 			closeBtn.Call("addEventListener", "click", js.FuncOf(func(this js.Value, args []js.Value) any {
 				d.Close()
 				return nil

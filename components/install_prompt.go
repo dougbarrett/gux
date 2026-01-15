@@ -129,7 +129,7 @@ func NewInstallPrompt(props InstallPromptProps, manager *InstallPromptManager) *
 
 	// Install button
 	installBtn := document.Call("createElement", "button")
-	installBtn.Set("className", "flex-1 px-3 py-1.5 text-sm bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors cursor-pointer font-medium")
+	installBtn.Set("className", "flex-1 px-3 py-1.5 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors cursor-pointer font-medium")
 	installBtn.Set("textContent", "Install")
 	installBtn.Call("addEventListener", "click", js.FuncOf(func(this js.Value, args []js.Value) any {
 		if manager != nil {
