@@ -40,7 +40,7 @@ Transform GoQuery from a functional database query tool into a polished, product
 **Plans**: 2 plans, 4 tasks
 
 Plans:
-- [ ] 01-01: Core Header Components (UserMenu + NotificationCenter components)
+- [x] 01-01: Core Header Components (UserMenu + NotificationCenter components)
 - [ ] 01-02: Header Integration (extend Header, update example app)
 
 #### Phase 2: Layout & Navigation
@@ -103,7 +103,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 
 | Phase | Milestone | Plans | Status | Completed |
 |-------|-----------|-------|--------|-----------|
-| 1. Header Components | v1.0 | 0/2 | Planned | - |
+| 1. Header Components | v1.0 | 1/2 | In progress | - |
 | 2. Layout & Navigation | v1.0 | 0/? | Not started | - |
 | 3. Table Enhancements | v1.0 | 0/? | Not started | - |
 | 4. UX Polish | v1.0 | 0/? | Not started | - |
