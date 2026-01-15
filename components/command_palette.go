@@ -249,15 +249,33 @@ func (cp *CommandPalette) renderCommandItem(cmd Command, index int) js.Value {
 		return nil
 	}))
 
-	// Hover handler to update highlight
+	// Hover handler to update highlight visually without re-rendering
 	idx := index
 	item.Call("addEventListener", "mouseenter", js.FuncOf(func(this js.Value, args []js.Value) any {
 		cp.highlightIdx = idx
-		cp.renderCommands()
+		cp.updateHighlightStyles()
 		return nil
 	}))
 
 	return item
+}
+
+// updateHighlightStyles updates highlight visually without re-rendering DOM
+func (cp *CommandPalette) updateHighlightStyles() {
+	items := cp.resultsList.Call("querySelectorAll", "[data-index]")
+	baseClass := "px-4 py-2 cursor-pointer flex items-center gap-3"
+
+	for i := 0; i < items.Length(); i++ {
+		item := items.Index(i)
+		idx := item.Get("dataset").Get("index").String()
+		highlightStr := js.ValueOf(cp.highlightIdx).String()
+
+		if idx == highlightStr {
+			item.Set("className", baseClass+" bg-blue-50 dark:bg-blue-900/30")
+		} else {
+			item.Set("className", baseClass+" hover:bg-gray-100 dark:hover:bg-gray-700/50")
+		}
+	}
 }
 
 func (cp *CommandPalette) filter() {
@@ -288,7 +306,7 @@ func (cp *CommandPalette) highlightNext() {
 	if cp.highlightIdx >= len(cp.filteredCommands) {
 		cp.highlightIdx = 0
 	}
-	cp.renderCommands()
+	cp.updateHighlightStyles()
 	cp.scrollToHighlighted()
 }
 
@@ -300,7 +318,7 @@ func (cp *CommandPalette) highlightPrev() {
 	if cp.highlightIdx < 0 {
 		cp.highlightIdx = len(cp.filteredCommands) - 1
 	}
-	cp.renderCommands()
+	cp.updateHighlightStyles()
 	cp.scrollToHighlighted()
 }
 
