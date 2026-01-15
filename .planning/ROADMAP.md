@@ -164,10 +164,11 @@ Plans:
 **Depends on**: Phase 9
 **Research**: Likely (WCAG contrast ratios, focus-visible patterns)
 **Research topics**: Contrast ratio requirements, focus-visible patterns, prefers-reduced-motion
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 10-01: TBD (run /gsd:plan-phase 10 to break down)
+- [x] 10-01: Visible Focus Indicators (Toggle, Dropdown, Accordion, Tabs, DatePicker)
+- [ ] 10-02: TBD
 
 #### Phase 11: A11y Testing Infrastructure
 
@@ -196,5 +197,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | 7. Accessibility Audit | v1.1 | 3/3 | Complete | 2026-01-15 |
 | 8. ARIA & Semantic Markup | v1.1 | 6/6 | Complete | 2026-01-15 |
 | 9. Keyboard Navigation | v1.1 | 4/4 | Complete | 2026-01-15 |
-| 10. Visual Accessibility | v1.1 | 0/? | Not started | - |
+| 10. Visual Accessibility | v1.1 | 1/2 | In progress | - |
 | 11. A11y Testing Infrastructure | v1.1 | 0/? | Not started | - |

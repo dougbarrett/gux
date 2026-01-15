@@ -2,12 +2,12 @@
 
 ## Current Position
 
-Phase: 9 of 11 (Keyboard Navigation)
-Plan: 4 of 4 in current phase
-Status: Phase complete
-Last activity: 2026-01-15 - Completed 09-04-PLAN.md
+Phase: 10 of 11 (Visual Accessibility)
+Plan: 1 of 2 in current phase
+Status: In progress
+Last activity: 2026-01-15 - Completed 10-01-PLAN.md
 
-Progress: █████████░ 90% (v1.1: Phase 9 complete, ready for Phase 10)
+Progress: █████████░ 92% (v1.1: Phase 10 plan 1/2 complete)
 
 ## Accumulated Context
 
@@ -94,6 +94,8 @@ Progress: █████████░ 90% (v1.1: Phase 9 complete, ready for 
 - 09-04: Dropdown focus restoration in Close() handles all close paths
 - 09-04: Sidebar stores lastFocusedElement, focuses close button on mobile open
 - 09-04: SkipLink already exists in skiplinks.go with MainSkipLink() function
+- 10-01: focus:ring-offset-2 for Toggle (separation from track)
+- 10-01: focus:ring-inset for full-width elements (Accordion, Tabs, DatePicker)
 
 ### Blockers/Concerns Carried Forward
 - None
@@ -118,5 +120,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-01-15
-Stopped at: Completed 09-04-PLAN.md (Focus Management Polish)
+Stopped at: Completed 10-01-PLAN.md (Visible Focus Indicators)
 Resume file: None
