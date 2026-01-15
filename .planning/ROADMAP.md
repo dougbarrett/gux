@@ -21,7 +21,7 @@ Transform GoQuery from a functional database query tool into a polished, product
 
 - [x] **Phase 1: Header Components** - User Menu + Notification Center
 - [x] **Phase 2: Layout & Navigation** - Collapsible Sidebar + Command Palette
-- [ ] **Phase 3: Table Enhancements** - Sorting, filtering, pagination, bulk actions
+- [x] **Phase 3: Table Enhancements** - Sorting, filtering, pagination, bulk actions
 - [ ] **Phase 4: UX Polish** - Persistent Preferences + Keyboard Navigation + Confirmation Dialog
 - [ ] **Phase 5: Data & States** - Data Export + Empty States
 - [ ] **Phase 6: Progressive Enhancement** - Skeleton Loaders + Connection Status + Breadcrumbs + PWA
@@ -65,7 +65,7 @@ Plans:
 - [x] 03-01: Table Sorting (sortable columns, sort icons, client-side sort)
 - [x] 03-02: Table Filtering (search input, real-time filter, debounce)
 - [x] 03-03: Table Pagination (integrate Pagination component, page-aware rendering)
-- [ ] 03-04: Bulk Selection & Actions (checkbox column, select-all, action bar)
+- [x] 03-04: Bulk Selection & Actions (checkbox column, select-all, action bar)
 
 #### Phase 4: UX Polish
 
@@ -108,7 +108,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 |-------|-----------|-------|--------|-----------|
 | 1. Header Components | v1.0 | 2/2 | Complete | 2026-01-15 |
 | 2. Layout & Navigation | v1.0 | 2/2 | Complete | 2026-01-15 |
-| 3. Table Enhancements | v1.0 | 3/4 | In progress | - |
+| 3. Table Enhancements | v1.0 | 4/4 | Complete | 2026-01-15 |
 | 4. UX Polish | v1.0 | 0/? | Not started | - |
 | 5. Data & States | v1.0 | 0/? | Not started | - |
 | 6. Progressive Enhancement | v1.0 | 0/? | Not started | - |
