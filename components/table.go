@@ -49,6 +49,9 @@ type TableProps struct {
 	RowKey            string                                // Unique identifier field in data (default "id")
 	OnSelectionChange func(selectedKeys []any)              // Callback when selection changes
 	BulkActions       []BulkAction                          // Available bulk actions for selected rows
+	Exportable        bool                                  // Enable export dropdown
+	ExportFilename    string                                // Base filename for exports (default "export")
+	ExportColumns     []string                              // Columns to export (nil = all column keys)
 }
 
 // Table creates a data table component
@@ -73,6 +76,7 @@ type Table struct {
 	selectAllCb     js.Value     // Reference to select-all checkbox
 	bulkActionBar   js.Value     // Container for bulk action bar
 	bulkActionCount js.Value     // Element showing selected count
+	exportDropdown  *Dropdown    // Export dropdown component
 }
 
 // NewTable creates a new Table component
@@ -127,10 +131,10 @@ func NewTable(props TableProps) *Table {
 		selectedKeys: make(map[any]bool),
 	}
 
-	// Add filter input if Filterable
-	if props.Filterable {
-		filterContainer := t.createFilterInput(document)
-		container.Call("appendChild", filterContainer)
+	// Add toolbar if Filterable or Exportable
+	if props.Filterable || props.Exportable {
+		toolbar := t.createToolbar(document)
+		container.Call("appendChild", toolbar)
 	}
 
 	// Add bulk action bar if selectable with bulk actions
@@ -158,10 +162,102 @@ func NewTable(props TableProps) *Table {
 	return t
 }
 
+// createToolbar creates the toolbar containing filter and export dropdown
+func (t *Table) createToolbar(document js.Value) js.Value {
+	toolbar := document.Call("createElement", "div")
+	toolbar.Set("className", "flex items-center gap-4 mb-4")
+
+	// Add filter input if Filterable
+	if t.props.Filterable {
+		filterContainer := t.createFilterInput(document)
+		toolbar.Call("appendChild", filterContainer)
+	}
+
+	// Add export dropdown if Exportable
+	if t.props.Exportable {
+		exportDropdown := t.createExportDropdown()
+		toolbar.Call("appendChild", exportDropdown.Element())
+		t.exportDropdown = exportDropdown
+	}
+
+	return toolbar
+}
+
+// createExportDropdown creates the export dropdown with CSV/JSON options
+func (t *Table) createExportDropdown() *Dropdown {
+	return NewDropdown(DropdownProps{
+		Trigger: Button(ButtonProps{
+			Text:    "📥 Export ▼",
+			Variant: ButtonSecondary,
+			Size:    ButtonSM,
+		}),
+		Items: []DropdownItem{
+			{
+				Label: "CSV",
+				Icon:  "📄",
+				OnClick: func() {
+					t.exportData("csv")
+				},
+			},
+			{
+				Label: "JSON",
+				Icon:  "📋",
+				OnClick: func() {
+					t.exportData("json")
+				},
+			},
+		},
+		Align: "right",
+	})
+}
+
+// exportData exports table data in the specified format
+func (t *Table) exportData(format string) {
+	// Determine which data to export
+	var dataToExport []map[string]any
+
+	// If selectable and has selection, export selected rows only
+	if t.props.Selectable && len(t.selectedKeys) > 0 {
+		dataToExport = t.SelectedRows()
+	} else {
+		// Export all filtered data (respects current filter)
+		dataToExport = t.filterData(t.allData)
+		dataToExport = t.sortData(dataToExport)
+	}
+
+	if len(dataToExport) == 0 {
+		return
+	}
+
+	// Determine filename
+	filename := t.props.ExportFilename
+	if filename == "" {
+		filename = "export"
+	}
+
+	// Determine columns to export
+	columns := t.props.ExportColumns
+	if len(columns) == 0 {
+		// Use all column keys from table definition
+		columns = make([]string, len(t.columns))
+		for i, col := range t.columns {
+			columns[i] = col.Key
+		}
+	}
+
+	// Export based on format
+	switch format {
+	case "csv":
+		ExportCSV(dataToExport, columns, filename)
+	case "json":
+		ExportJSON(dataToExport, filename)
+	}
+}
+
 // createFilterInput creates the filter input with search icon
 func (t *Table) createFilterInput(document js.Value) js.Value {
 	filterContainer := document.Call("createElement", "div")
-	filterContainer.Set("className", "relative mb-4")
+	filterContainer.Set("className", "relative flex-1")
 
 	// Search icon
 	iconSpan := document.Call("createElement", "span")

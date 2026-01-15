@@ -349,12 +349,14 @@ func dataDemo() js.Value {
 				return components.Badge(components.BadgeProps{Text: status, Variant: variant})
 			}},
 		},
-		Data:       tableData,
-		Striped:    true,
-		Hoverable:  true,
-		Filterable: true,
-		Paginated:  true,
-		PageSize:   5,
+		Data:           tableData,
+		Striped:        true,
+		Hoverable:      true,
+		Filterable:     true,
+		Paginated:      true,
+		PageSize:       5,
+		Exportable:     true,
+		ExportFilename: "users",
 	})
 
 	return components.Div("space-y-4",
