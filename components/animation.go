@@ -45,6 +45,13 @@ type AnimateProps struct {
 	OnComplete func()
 }
 
+// PrefersReducedMotion returns true if user has enabled reduced motion preference
+func PrefersReducedMotion() bool {
+	window := js.Global()
+	matchMedia := window.Call("matchMedia", "(prefers-reduced-motion: reduce)")
+	return matchMedia.Get("matches").Bool()
+}
+
 // predefined animations CSS
 var animationsCSS = `
 @keyframes fadeIn {
@@ -158,6 +165,15 @@ var animationsCSS = `
 .duration-500 { transition-duration: 500ms; }
 .duration-700 { transition-duration: 700ms; }
 .duration-1000 { transition-duration: 1000ms; }
+
+/* Reduced motion: respect user preference for vestibular disorders */
+@media (prefers-reduced-motion: reduce) {
+	*, *::before, *::after {
+		animation-duration: 0.01ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: 0.01ms !important;
+	}
+}
 `
 
 var animationsInitialized = false
@@ -181,6 +197,15 @@ func InitAnimations() {
 // Animate applies an animation to an element
 func Animate(props AnimateProps) {
 	InitAnimations()
+
+	// Respect user's reduced motion preference (WCAG 2.3.3)
+	if PrefersReducedMotion() {
+		// Skip animation, immediately fire completion callback
+		if props.OnComplete != nil {
+			props.OnComplete()
+		}
+		return
+	}
 
 	el := props.Element
 	anim := props.Animation
