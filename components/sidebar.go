@@ -11,6 +11,9 @@ const (
 	// Collapsed mode classes (icon centered, no text)
 	sidebarItemCollapsedClass   = "flex items-center justify-center px-2 py-3 text-gray-300 hover:bg-gray-700 hover:text-white rounded-lg transition-colors cursor-pointer"
 	sidebarActiveCollapsedClass = "flex items-center justify-center px-2 py-3 bg-gray-700 text-white rounded-lg cursor-pointer"
+
+	// localStorage key for sidebar collapse state
+	sidebarStorageKey = "gux-sidebar-collapsed"
 )
 
 // NavItem represents a navigation menu item
@@ -136,6 +139,17 @@ func NewSidebar(props SidebarProps) *Sidebar {
 
 	sidebar.Call("appendChild", nav)
 
+	// Load saved collapse state from localStorage
+	localStorage := js.Global().Get("localStorage")
+	if !localStorage.IsUndefined() && !localStorage.IsNull() {
+		saved := localStorage.Call("getItem", sidebarStorageKey)
+		if !saved.IsNull() && !saved.IsUndefined() && saved.String() == "true" {
+			// Directly set collapsed state without triggering callback during init
+			s.isCollapsed = true
+			s.applyCollapsedState()
+		}
+	}
+
 	return s
 }
 
@@ -260,9 +274,8 @@ func (s *Sidebar) IsOpen() bool {
 	return s.isOpen
 }
 
-// Collapse collapses the sidebar to icons-only mode (desktop)
-func (s *Sidebar) Collapse() {
-	s.isCollapsed = true
+// applyCollapsedState applies the visual collapsed state without triggering callbacks
+func (s *Sidebar) applyCollapsedState() {
 	// Update sidebar width: w-16 for collapsed (icons-only)
 	s.element.Set("className", "fixed md:static inset-y-0 left-0 z-50 w-16 bg-gray-800 text-white flex flex-col h-screen transform -translate-x-full md:translate-x-0 transition-all duration-300 ease-in-out")
 
@@ -288,6 +301,18 @@ func (s *Sidebar) Collapse() {
 		} else {
 			s.navItems[i].Set("className", sidebarItemCollapsedClass)
 		}
+	}
+}
+
+// Collapse collapses the sidebar to icons-only mode (desktop)
+func (s *Sidebar) Collapse() {
+	s.isCollapsed = true
+	s.applyCollapsedState()
+
+	// Save state to localStorage
+	localStorage := js.Global().Get("localStorage")
+	if !localStorage.IsUndefined() && !localStorage.IsNull() {
+		localStorage.Call("setItem", sidebarStorageKey, "true")
 	}
 
 	if s.onCollapse != nil {
@@ -325,6 +350,12 @@ func (s *Sidebar) Expand() {
 		}
 	}
 
+	// Save state to localStorage
+	localStorage := js.Global().Get("localStorage")
+	if !localStorage.IsUndefined() && !localStorage.IsNull() {
+		localStorage.Call("setItem", sidebarStorageKey, "false")
+	}
+
 	if s.onCollapse != nil {
 		s.onCollapse(false)
 	}
@@ -342,6 +373,15 @@ func (s *Sidebar) ToggleCollapse() {
 // IsCollapsed returns whether the sidebar is currently collapsed
 func (s *Sidebar) IsCollapsed() bool {
 	return s.isCollapsed
+}
+
+// SetCollapsed sets the collapsed state programmatically and persists to localStorage
+func (s *Sidebar) SetCollapsed(collapsed bool) {
+	if collapsed {
+		s.Collapse()
+	} else {
+		s.Expand()
+	}
 }
 
 // RegisterKeyboardShortcut registers Cmd/Ctrl+B to toggle sidebar collapse
