@@ -33,6 +33,7 @@ type Sidebar struct {
 	element          js.Value
 	overlay          js.Value
 	header           js.Value
+	title            js.Value // Store title for show/hide on collapse
 	nav              js.Value
 	items            []NavItem
 	navItems         []js.Value
@@ -96,6 +97,7 @@ func NewSidebar(props SidebarProps) *Sidebar {
 		element:     sidebar,
 		overlay:     overlay,
 		header:      header,
+		title:       title,
 		nav:         nav,
 		items:       props.Items,
 		navItems:    make([]js.Value, len(props.Items)),
@@ -267,6 +269,9 @@ func (s *Sidebar) Collapse() {
 	// Update header padding for collapsed state
 	s.header.Set("className", "p-2 border-b border-gray-700 flex flex-col items-center gap-2")
 
+	// Hide title when collapsed
+	s.title.Set("className", "hidden")
+
 	// Update nav padding
 	s.nav.Set("className", "flex-1 p-2 space-y-2 overflow-y-auto")
 
@@ -298,6 +303,9 @@ func (s *Sidebar) Expand() {
 
 	// Update header padding for expanded state
 	s.header.Set("className", "p-4 border-b border-gray-700 flex items-center justify-between")
+
+	// Show title when expanded
+	s.title.Set("className", "text-xl font-bold whitespace-nowrap overflow-hidden")
 
 	// Update nav padding
 	s.nav.Set("className", "flex-1 p-4 space-y-2 overflow-y-auto")
