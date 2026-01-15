@@ -183,7 +183,7 @@ func (t *Table) createToolbar(document js.Value) js.Value {
 	return toolbar
 }
 
-// createExportDropdown creates the export dropdown with CSV/JSON options
+// createExportDropdown creates the export dropdown with CSV/JSON/PDF options
 func (t *Table) createExportDropdown() *Dropdown {
 	return NewDropdown(DropdownProps{
 		Trigger: Button(ButtonProps{
@@ -204,6 +204,13 @@ func (t *Table) createExportDropdown() *Dropdown {
 				Icon:  "📋",
 				OnClick: func() {
 					t.exportData("json")
+				},
+			},
+			{
+				Label: "PDF",
+				Icon:  "📑",
+				OnClick: func() {
+					t.exportData("pdf")
 				},
 			},
 		},
@@ -251,6 +258,13 @@ func (t *Table) exportData(format string) {
 		ExportCSV(dataToExport, columns, filename)
 	case "json":
 		ExportJSON(dataToExport, filename)
+	case "pdf":
+		// Extract headers from columns
+		headers := make([]string, len(t.columns))
+		for i, col := range t.columns {
+			headers[i] = col.Header
+		}
+		ExportPDF(dataToExport, headers, columns, filename, PDFExportOptions{})
 	}
 }
 
