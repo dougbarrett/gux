@@ -19,6 +19,14 @@ type TableColumn struct {
 	Render    func(row map[string]any, value any) js.Value // Custom cell renderer
 }
 
+// BulkAction defines an action that can be performed on selected rows
+type BulkAction struct {
+	Label     string                   // Button text
+	Icon      string                   // Optional emoji icon
+	Variant   string                   // Button style: primary, danger, secondary (default)
+	OnExecute func(selectedKeys []any) // Action handler
+}
+
 // TableProps configures a Table component
 type TableProps struct {
 	Columns           []TableColumn
@@ -40,6 +48,7 @@ type TableProps struct {
 	Selectable        bool                                  // Enable row selection with checkboxes
 	RowKey            string                                // Unique identifier field in data (default "id")
 	OnSelectionChange func(selectedKeys []any)              // Callback when selection changes
+	BulkActions       []BulkAction                          // Available bulk actions for selected rows
 }
 
 // Table creates a data table component
@@ -62,6 +71,8 @@ type Table struct {
 	selectedKeys    map[any]bool // Set of selected row keys
 	rowCheckboxes   []js.Value   // References to row checkboxes for updates
 	selectAllCb     js.Value     // Reference to select-all checkbox
+	bulkActionBar   js.Value     // Container for bulk action bar
+	bulkActionCount js.Value     // Element showing selected count
 }
 
 // NewTable creates a new Table component
@@ -120,6 +131,12 @@ func NewTable(props TableProps) *Table {
 	if props.Filterable {
 		filterContainer := t.createFilterInput(document)
 		container.Call("appendChild", filterContainer)
+	}
+
+	// Add bulk action bar if selectable with bulk actions
+	if props.Selectable && len(props.BulkActions) > 0 {
+		bulkBar := t.createBulkActionBar(document)
+		container.Call("appendChild", bulkBar)
 	}
 
 	container.Call("appendChild", tableWrapper)
@@ -191,6 +208,101 @@ func (t *Table) createFilterInput(document js.Value) js.Value {
 	t.filterInput = input
 
 	return filterContainer
+}
+
+// createBulkActionBar creates the bulk action bar that appears when rows are selected
+func (t *Table) createBulkActionBar(document js.Value) js.Value {
+	// Container - hidden by default
+	bar := document.Call("createElement", "div")
+	bar.Set("className", "mb-4 px-4 py-3 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg flex items-center gap-4 hidden")
+	t.bulkActionBar = bar
+
+	// Selected count text
+	countText := document.Call("createElement", "span")
+	countText.Set("className", "text-sm font-medium text-blue-700 dark:text-blue-300")
+	countText.Set("textContent", "0 items selected")
+	t.bulkActionCount = countText
+	bar.Call("appendChild", countText)
+
+	// Action buttons container
+	buttonsContainer := document.Call("createElement", "div")
+	buttonsContainer.Set("className", "flex items-center gap-2")
+
+	for _, action := range t.props.BulkActions {
+		btn := document.Call("createElement", "button")
+
+		// Determine button style based on variant
+		btnClass := "px-3 py-1.5 text-sm font-medium rounded-md transition-colors "
+		switch action.Variant {
+		case "primary":
+			btnClass += "bg-blue-600 hover:bg-blue-700 text-white"
+		case "danger":
+			btnClass += "bg-red-600 hover:bg-red-700 text-white"
+		default: // secondary
+			btnClass += "bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600"
+		}
+		btn.Set("className", btnClass)
+
+		// Button content
+		buttonText := action.Label
+		if action.Icon != "" {
+			buttonText = action.Icon + " " + action.Label
+		}
+		btn.Set("textContent", buttonText)
+
+		// Click handler
+		capturedAction := action
+		btn.Call("addEventListener", "click", js.FuncOf(func(this js.Value, args []js.Value) any {
+			if capturedAction.OnExecute != nil {
+				capturedAction.OnExecute(t.SelectedKeys())
+			}
+			return nil
+		}))
+
+		buttonsContainer.Call("appendChild", btn)
+	}
+
+	bar.Call("appendChild", buttonsContainer)
+
+	// Clear selection link
+	clearLink := document.Call("createElement", "button")
+	clearLink.Set("className", "ml-auto text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-200 hover:underline")
+	clearLink.Set("textContent", "Clear selection")
+	clearLink.Call("addEventListener", "click", js.FuncOf(func(this js.Value, args []js.Value) any {
+		t.ClearSelection()
+		return nil
+	}))
+	bar.Call("appendChild", clearLink)
+
+	return bar
+}
+
+// updateBulkActionBar shows/hides the bulk action bar and updates the count
+func (t *Table) updateBulkActionBar() {
+	if t.bulkActionBar.IsUndefined() || t.bulkActionBar.IsNull() {
+		return
+	}
+
+	count := len(t.selectedKeys)
+	if count > 0 {
+		// Show bar and update count
+		currentClass := t.bulkActionBar.Get("className").String()
+		newClass := strings.Replace(currentClass, " hidden", "", 1)
+		t.bulkActionBar.Set("className", newClass)
+
+		// Update count text
+		itemText := "items"
+		if count == 1 {
+			itemText = "item"
+		}
+		t.bulkActionCount.Set("textContent", toString(count)+" "+itemText+" selected")
+	} else {
+		// Hide bar
+		currentClass := t.bulkActionBar.Get("className").String()
+		if !strings.Contains(currentClass, "hidden") {
+			t.bulkActionBar.Set("className", currentClass+" hidden")
+		}
+	}
 }
 
 // renderHeaders creates or updates the table header row with sort indicators
@@ -836,6 +948,9 @@ func (t *Table) updateRowCheckboxes() {
 
 // notifySelectionChange calls the OnSelectionChange callback with current selection
 func (t *Table) notifySelectionChange() {
+	// Update bulk action bar visibility
+	t.updateBulkActionBar()
+
 	if t.props.OnSelectionChange != nil {
 		keys := make([]any, 0, len(t.selectedKeys))
 		for key := range t.selectedKeys {
