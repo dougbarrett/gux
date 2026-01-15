@@ -2,12 +2,12 @@
 
 ## Current Position
 
-Phase: 5 of 6 (Data & States)
-Plan: 3 of 3 in current phase
-Status: Phase complete
-Last activity: 2026-01-15 - Completed 05-03-PLAN.md (Empty States)
+Phase: 6 of 6 (Progressive Enhancement)
+Plan: 1 of 3 in current phase
+Status: In progress
+Last activity: 2026-01-15 - Completed 06-01-PLAN.md (Connection Status)
 
-Progress: █████████░ 83%
+Progress: █████████░ 89%
 
 ## Accumulated Context
 
@@ -49,6 +49,9 @@ Progress: █████████░ 83%
 - 05-03: Default icon 📭 for no-data, 🔍 for no-results
 - 05-03: EmptyState hides table wrapper and pagination when active
 - 05-03: Clear filter action built into no-results state
+- 06-01: Dot variant as default for header ConnectionStatus
+- 06-01: BindToWebSocket() for reactive subscription to store
+- 06-01: SetState() for manual state control in demos
 
 ### Blockers/Concerns Carried Forward
 - None
@@ -67,5 +70,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-01-15
-Stopped at: Completed 05-03-PLAN.md (Phase 5 complete)
-Resume file: None (ready for Phase 6)
+Stopped at: Completed 06-01-PLAN.md (Connection Status)
+Resume file: None (ready for 06-02)
