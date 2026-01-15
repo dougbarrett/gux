@@ -130,16 +130,20 @@ Plans:
 - [x] 07-02: Form & Navigation Audit (Input, Select, Checkbox, Toggle, TextArea, DatePicker, Form, FormBuilder, Sidebar, Breadcrumbs, Pagination, Link, Alert, Toast, Progress, Spinner, Skeleton)
 - [x] 07-03: Combined Findings & Remediation Plan
 
-#### Phase 8: ARIA & Semantic Markup
+#### Phase 8: ARIA & Semantic Markup (In Progress)
 
 **Goal**: Add screen reader support with proper labels, roles, and live regions
 **Depends on**: Phase 7
-**Research**: Likely (WAI-ARIA authoring practices, screen reader patterns)
-**Research topics**: WAI-ARIA authoring practices, screen reader testing, live region patterns
-**Plans**: TBD
+**Research**: Completed during planning
+**Plans**: 6 plans
 
 Plans:
-- [ ] 08-01: TBD (run /gsd:plan-phase 8 to break down)
+- [x] 08-01: ARIA Dialog Patterns (Modal, ConfirmDialog, CommandPalette)
+- [ ] 08-02: Form Labels & Descriptions
+- [ ] 08-03: Table Accessibility
+- [ ] 08-04: Navigation & Landmark Roles
+- [ ] 08-05: Live Regions & Status Updates
+- [ ] 08-06: Interactive Widget ARIA
 
 #### Phase 9: Keyboard Navigation
 
@@ -187,7 +191,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | 5. Data & States | v1.0 | 3/3 | Complete | 2026-01-15 |
 | 6. Progressive Enhancement | v1.0 | 3/3 | Complete | 2026-01-15 |
 | 7. Accessibility Audit | v1.1 | 3/3 | Complete | 2026-01-15 |
-| 8. ARIA & Semantic Markup | v1.1 | 0/? | Not started | - |
+| 8. ARIA & Semantic Markup | v1.1 | 1/6 | In progress | - |
 | 9. Keyboard Navigation | v1.1 | 0/? | Not started | - |
 | 10. Visual Accessibility | v1.1 | 0/? | Not started | - |
 | 11. A11y Testing Infrastructure | v1.1 | 0/? | Not started | - |
