@@ -113,6 +113,11 @@ func NewTable(props TableProps) *Table {
 	}
 	table.Set("className", tableClass)
 
+	// ARIA attributes for table
+	if props.Selectable {
+		table.Call("setAttribute", "aria-multiselectable", "true")
+	}
+
 	// Header
 	thead := document.Call("createElement", "thead")
 	thead.Set("className", "bg-gray-50 dark:bg-gray-800")
@@ -446,10 +451,11 @@ func (t *Table) renderHeaders() {
 		}
 		th.Set("className", thClass)
 
-		// Create select-all checkbox
+		// Create select-all checkbox with accessible label
 		checkbox := document.Call("createElement", "input")
 		checkbox.Set("type", "checkbox")
 		checkbox.Set("className", "h-4 w-4 text-blue-600 border-gray-300 dark:border-gray-600 rounded focus:ring-blue-500 dark:bg-gray-700 cursor-pointer")
+		checkbox.Call("setAttribute", "aria-label", "Select all rows")
 
 		// Set initial state based on current selection
 		t.updateSelectAllState(checkbox)
@@ -482,6 +488,9 @@ func (t *Table) renderHeaders() {
 		}
 		th.Set("className", thClass)
 
+		// ARIA: scope for column header
+		th.Call("setAttribute", "scope", "col")
+
 		// Header text with sort indicator
 		headerText := col.Header
 		if col.Sortable {
@@ -490,16 +499,22 @@ func (t *Table) renderHeaders() {
 				sortKey = col.Key
 			}
 
-			// Determine sort indicator
+			// Determine sort indicator and aria-sort value
 			indicator := " ⇅" // neutral/unsorted
+			ariaSort := "none"
 			if t.sortColumn == sortKey {
 				if t.sortDirection == "asc" {
 					indicator = " ▲"
+					ariaSort = "ascending"
 				} else if t.sortDirection == "desc" {
 					indicator = " ▼"
+					ariaSort = "descending"
 				}
 			}
 			headerText += indicator
+
+			// ARIA: aria-sort for sortable columns
+			th.Call("setAttribute", "aria-sort", ariaSort)
 
 			// Add click handler
 			colSortKey := sortKey // capture for closure
@@ -725,6 +740,13 @@ func (t *Table) renderData() {
 
 		// Add checkbox cell if selectable
 		if t.props.Selectable {
+			// ARIA: aria-selected for row selection state
+			if isSelected {
+				tr.Call("setAttribute", "aria-selected", "true")
+			} else {
+				tr.Call("setAttribute", "aria-selected", "false")
+			}
+
 			td := document.Call("createElement", "td")
 			tdClass := "px-4 py-4 w-10"
 			if t.props.Compact {
@@ -739,6 +761,13 @@ func (t *Table) renderData() {
 			checkbox.Set("type", "checkbox")
 			checkbox.Set("className", "h-4 w-4 text-blue-600 border-gray-300 dark:border-gray-600 rounded focus:ring-blue-500 dark:bg-gray-700 cursor-pointer")
 			checkbox.Set("checked", isSelected)
+
+			// ARIA: label for row checkbox
+			rowLabel := "Select row"
+			if rowKey != nil {
+				rowLabel = "Select row " + toString(rowKey)
+			}
+			checkbox.Call("setAttribute", "aria-label", rowLabel)
 
 			// Capture key for closure
 			capturedKey := rowKey
