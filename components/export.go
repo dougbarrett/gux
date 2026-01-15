@@ -140,7 +140,7 @@ func ExportPDF(data []map[string]any, headers []string, keys []string, filename 
 	// Set defaults
 	orientation := options.Orientation
 	if orientation == "" {
-		orientation = "portrait"
+		orientation = "p" // portrait shorthand
 	}
 	pageSize := options.PageSize
 	if pageSize == "" {
@@ -148,22 +148,21 @@ func ExportPDF(data []map[string]any, headers []string, keys []string, filename 
 	}
 
 	// Get jsPDF constructor from global scope
+	// jsPDF UMD exposes window.jspdf.jsPDF
 	jspdfModule := js.Global().Get("jspdf")
-	if jspdfModule.IsUndefined() {
-		return // jsPDF not loaded
+	if jspdfModule.IsUndefined() || jspdfModule.IsNull() {
+		js.Global().Get("console").Call("error", "jsPDF module not loaded")
+		return
 	}
 
 	jsPDFConstructor := jspdfModule.Get("jsPDF")
-	if jsPDFConstructor.IsUndefined() {
-		return // jsPDF class not found
+	if jsPDFConstructor.IsUndefined() || jsPDFConstructor.IsNull() {
+		js.Global().Get("console").Call("error", "jsPDF constructor not found")
+		return
 	}
 
-	// Create new jsPDF instance
-	doc := jsPDFConstructor.New(js.ValueOf(map[string]any{
-		"orientation": orientation,
-		"unit":        "mm",
-		"format":      pageSize,
-	}))
+	// Create new jsPDF instance using positional arguments: orientation, unit, format
+	doc := jsPDFConstructor.New(orientation, "mm", pageSize)
 
 	// Starting Y position
 	startY := 15.0
