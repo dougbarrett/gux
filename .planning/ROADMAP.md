@@ -11,7 +11,7 @@ Transform GoQuery from a functional database query tool into a polished, product
 
 ## Milestones
 
-- 🚧 **v1.0 UX Polish** - Phases 1-6 (in progress)
+- ✅ **v1.0 UX Polish** - Phases 1-6 (complete)
 
 ## Phases
 
@@ -102,7 +102,7 @@ Plans:
 Plans:
 - [x] 06-01: Connection Status Component (visual indicator for WebSocket state)
 - [x] 06-02: PWA Foundation (manifest, service worker, asset caching)
-- [ ] 06-03: PWA Install Experience (install prompt, offline fallback)
+- [x] 06-03: PWA Install Experience (install prompt, offline fallback)
 
 ## Progress
 
@@ -116,4 +116,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | 3. Table Enhancements | v1.0 | 4/4 | Complete | 2026-01-15 |
 | 4. UX Polish | v1.0 | 3/3 | Complete | 2026-01-15 |
 | 5. Data & States | v1.0 | 3/3 | Complete | 2026-01-15 |
-| 6. Progressive Enhancement | v1.0 | 2/3 | In Progress | - |
+| 6. Progressive Enhancement | v1.0 | 3/3 | Complete | 2026-01-15 |
