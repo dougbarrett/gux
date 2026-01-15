@@ -234,6 +234,21 @@ func feedbackDemo() js.Value {
 		CloseOnEsc: true,
 	})
 
+	// Confirmation dialogs
+	confirmDialog := components.Confirm("Confirm Action",
+		"Are you sure you want to proceed?",
+		func() {
+			components.Toast("Action confirmed!", components.ToastSuccess)
+		},
+	)
+
+	dangerDialog := components.ConfirmDanger("Delete Item",
+		"This action cannot be undone. Are you sure you want to delete this item?",
+		func() {
+			components.Toast("Item deleted!", components.ToastError)
+		},
+	)
+
 	return components.Div("space-y-4",
 		components.Section("Toasts",
 			components.Div("flex flex-wrap gap-2",
@@ -276,6 +291,19 @@ func feedbackDemo() js.Value {
 				components.Spinner(components.SpinnerProps{Size: components.SpinnerMD}),
 				components.Spinner(components.SpinnerProps{Size: components.SpinnerLG, Label: "Loading..."}),
 			),
+		),
+
+		components.Section("Confirmation Dialogs",
+			components.Div("flex gap-2",
+				components.PrimaryButton("Confirm Dialog", func() { confirmDialog.Open() }),
+				components.Button(components.ButtonProps{
+					Text:    "Danger Confirm",
+					Variant: components.ButtonDanger,
+					OnClick: func() { dangerDialog.Open() },
+				}),
+			),
+			confirmDialog.Element(),
+			dangerDialog.Element(),
 		),
 
 		components.Section("Modal",
