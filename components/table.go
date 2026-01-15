@@ -52,6 +52,9 @@ type TableProps struct {
 	Exportable        bool                                  // Enable export dropdown
 	ExportFilename    string                                // Base filename for exports (default "export")
 	ExportColumns     []string                              // Columns to export (nil = all column keys)
+	EmptyState        *EmptyState                           // Custom empty state (optional)
+	EmptyTitle        string                                // Title for default empty state (optional)
+	EmptyDescription  string                                // Description for default empty state (optional)
 }
 
 // Table creates a data table component
@@ -77,6 +80,8 @@ type Table struct {
 	bulkActionBar   js.Value     // Container for bulk action bar
 	bulkActionCount js.Value     // Element showing selected count
 	exportDropdown  *Dropdown    // Export dropdown component
+	emptyStateEl    js.Value     // Container for empty state display
+	tableWrapper    js.Value     // Table wrapper element (to show/hide)
 }
 
 // NewTable creates a new Table component
@@ -121,6 +126,10 @@ func NewTable(props TableProps) *Table {
 
 	tableWrapper.Call("appendChild", table)
 
+	// Empty state container (hidden by default)
+	emptyStateEl := document.Call("createElement", "div")
+	emptyStateEl.Set("className", "hidden")
+
 	t := &Table{
 		container:    container,
 		tbody:        tbody,
@@ -129,6 +138,8 @@ func NewTable(props TableProps) *Table {
 		props:        props,
 		currentPage:  1,
 		selectedKeys: make(map[any]bool),
+		tableWrapper: tableWrapper,
+		emptyStateEl: emptyStateEl,
 	}
 
 	// Add toolbar if Filterable or Exportable
@@ -144,6 +155,7 @@ func NewTable(props TableProps) *Table {
 	}
 
 	container.Call("appendChild", tableWrapper)
+	container.Call("appendChild", emptyStateEl)
 
 	// Add pagination container if Paginated
 	if props.Paginated {
@@ -660,8 +672,21 @@ func (t *Table) renderData() {
 	displayData := t.filterData(t.allData)
 	displayData = t.sortData(displayData)
 
-	// Update pagination based on filtered/sorted data count
+	// Check for empty state conditions
 	filteredCount := len(displayData)
+	hasData := len(t.allData) > 0
+	hasFilteredData := filteredCount > 0
+
+	// Handle empty states
+	if !hasFilteredData {
+		t.showEmptyState(!hasData)
+		return
+	}
+
+	// Hide empty state and show table
+	t.hideEmptyState()
+
+	// Update pagination based on filtered/sorted data count
 	t.updatePagination(filteredCount)
 
 	// Apply pagination to get current page slice
@@ -1145,4 +1170,62 @@ func toString(v any) string {
 	default:
 		return ""
 	}
+}
+
+// showEmptyState displays the appropriate empty state
+// noData=true means the table has no data at all
+// noData=false means the filter returned no results
+func (t *Table) showEmptyState(noData bool) {
+	// Hide table and pagination
+	t.tableWrapper.Set("className", "hidden")
+	if !t.paginationMount.IsUndefined() && !t.paginationMount.IsNull() {
+		t.paginationMount.Set("className", "hidden")
+	}
+
+	// Clear and populate empty state container
+	t.emptyStateEl.Set("innerHTML", "")
+	t.emptyStateEl.Set("className", "")
+
+	var emptyState *EmptyState
+
+	// Use custom empty state if provided
+	if t.props.EmptyState != nil {
+		emptyState = t.props.EmptyState
+	} else if noData {
+		// No data at all - show "no data" state
+		title := t.props.EmptyTitle
+		if title == "" {
+			title = "No data"
+		}
+		desc := t.props.EmptyDescription
+		if desc == "" {
+			desc = "There's nothing here yet."
+		}
+		emptyState = NewEmptyState(EmptyStateProps{
+			Icon:        "📭",
+			Title:       title,
+			Description: desc,
+		})
+	} else {
+		// Has data but filter returned nothing - show "no results" state
+		emptyState = NoResults(func() {
+			t.ClearFilter()
+		})
+	}
+
+	t.emptyStateEl.Call("appendChild", emptyState.Element())
+}
+
+// hideEmptyState hides the empty state and shows the table
+func (t *Table) hideEmptyState() {
+	// Show table
+	t.tableWrapper.Set("className", "overflow-x-auto")
+
+	// Show pagination if enabled
+	if !t.paginationMount.IsUndefined() && !t.paginationMount.IsNull() {
+		t.paginationMount.Set("className", "mt-4")
+	}
+
+	// Hide empty state
+	t.emptyStateEl.Set("className", "hidden")
 }

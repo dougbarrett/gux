@@ -359,9 +359,59 @@ func dataDemo() js.Value {
 		ExportFilename: "users",
 	})
 
-	return components.Div("space-y-4",
-		components.H3("Table"),
-		table.Element(),
+	// Empty table demo - shows custom empty state
+	emptyTable := components.NewTable(components.TableProps{
+		Columns: []components.TableColumn{
+			{Header: "ID", Key: "id", Width: "60px"},
+			{Header: "Name", Key: "name"},
+			{Header: "Status", Key: "status"},
+		},
+		Data:             []map[string]any{}, // Empty data
+		Striped:          true,
+		Hoverable:        true,
+		EmptyTitle:       "No users found",
+		EmptyDescription: "Get started by adding your first user to the system.",
+	})
+
+	// Table with custom empty state
+	customEmptyTable := components.NewTable(components.TableProps{
+		Columns: []components.TableColumn{
+			{Header: "Task", Key: "task"},
+			{Header: "Priority", Key: "priority"},
+			{Header: "Due Date", Key: "due"},
+		},
+		Data:      []map[string]any{}, // Empty data
+		Striped:   true,
+		Hoverable: true,
+		EmptyState: components.NewEmptyState(components.EmptyStateProps{
+			Icon:        "🎉",
+			Title:       "All caught up!",
+			Description: "You have no pending tasks. Great job!",
+			ActionLabel: "Create task",
+			OnAction: func() {
+				components.Toast("Create task clicked!", components.ToastInfo)
+			},
+		}),
+	})
+
+	return components.Div("space-y-6",
+		components.Section("Data Table",
+			components.Text("Full-featured table with sorting, filtering, pagination, and export."),
+			components.Div("mt-3", table.Element()),
+		),
+		components.Section("Empty States",
+			components.Text("Tables automatically show friendly empty states when there's no data or no filter results. Try typing 'xyz' in the filter above to see the 'no results' state."),
+			components.Div("grid grid-cols-1 md:grid-cols-2 gap-4 mt-3",
+				components.Div("",
+					components.Text("Default empty state:"),
+					components.Div("mt-2 border border-gray-200 dark:border-gray-700 rounded-lg", emptyTable.Element()),
+				),
+				components.Div("",
+					components.Text("Custom empty state:"),
+					components.Div("mt-2 border border-gray-200 dark:border-gray-700 rounded-lg", customEmptyTable.Element()),
+				),
+			),
+		),
 	)
 }
 
