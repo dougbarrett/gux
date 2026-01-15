@@ -79,7 +79,8 @@ func NewSidebar(props SidebarProps) *Sidebar {
 	collapseBtn := document.Call("createElement", "button")
 	collapseBtn.Set("className", "hidden md:block p-2 text-gray-400 hover:text-white rounded-lg hover:bg-gray-700 transition-colors")
 	collapseBtn.Set("innerHTML", `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>`)
-	collapseBtn.Set("ariaLabel", "Collapse sidebar")
+	collapseBtn.Call("setAttribute", "aria-label", "Collapse sidebar")
+	collapseBtn.Call("setAttribute", "aria-expanded", "true") // Sidebar starts expanded
 	btnContainer.Call("appendChild", collapseBtn)
 
 	// Close button (mobile only)
@@ -92,9 +93,11 @@ func NewSidebar(props SidebarProps) *Sidebar {
 	header.Call("appendChild", btnContainer)
 	sidebar.Call("appendChild", header)
 
-	// Navigation
+	// Navigation with accessibility landmark
 	nav := document.Call("createElement", "nav")
 	nav.Set("className", "flex-1 p-4 space-y-2 overflow-y-auto")
+	nav.Call("setAttribute", "role", "navigation")
+	nav.Call("setAttribute", "aria-label", "Main navigation")
 
 	s := &Sidebar{
 		element:     sidebar,
@@ -167,12 +170,16 @@ func (s *Sidebar) SetActive(path string) {
 			} else {
 				s.navItems[i].Set("className", sidebarActiveClass)
 			}
+			// Mark current page for screen readers
+			s.navItems[i].Call("setAttribute", "aria-current", "page")
 		} else {
 			if s.isCollapsed {
 				s.navItems[i].Set("className", sidebarItemCollapsedClass)
 			} else {
 				s.navItems[i].Set("className", sidebarItemClass)
 			}
+			// Remove aria-current from non-active items
+			s.navItems[i].Call("removeAttribute", "aria-current")
 		}
 	}
 }
@@ -290,7 +297,8 @@ func (s *Sidebar) applyCollapsedState() {
 
 	// Update collapse button icon to chevron-right (expand)
 	s.collapseBtn.Set("innerHTML", `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>`)
-	s.collapseBtn.Set("ariaLabel", "Expand sidebar")
+	s.collapseBtn.Call("setAttribute", "aria-label", "Expand sidebar")
+	s.collapseBtn.Call("setAttribute", "aria-expanded", "false")
 
 	// Hide labels, update nav item classes
 	for i, label := range s.navLabels {
@@ -337,7 +345,8 @@ func (s *Sidebar) Expand() {
 
 	// Update collapse button icon to chevron-left (collapse)
 	s.collapseBtn.Set("innerHTML", `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>`)
-	s.collapseBtn.Set("ariaLabel", "Collapse sidebar")
+	s.collapseBtn.Call("setAttribute", "aria-label", "Collapse sidebar")
+	s.collapseBtn.Call("setAttribute", "aria-expanded", "true")
 
 	// Show labels, update nav item classes
 	for i, label := range s.navLabels {
