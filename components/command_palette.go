@@ -40,6 +40,8 @@ type CommandPalette struct {
 	props            CommandPaletteProps
 	focusTrap        *FocusTrap
 	keyboardListener js.Func
+	listboxID        string // ARIA: unique ID for listbox
+	optionIDs        []string // ARIA: generated IDs for each option
 }
 
 // NewCommandPalette creates a new CommandPalette component
@@ -53,11 +55,15 @@ func NewCommandPalette(props CommandPaletteProps) *CommandPalette {
 		props.Placeholder = "Search commands..."
 	}
 
+	// Generate unique IDs for ARIA
+	listboxID := "cmdpalette-listbox-" + js.Global().Get("crypto").Call("randomUUID").String()
+
 	cp := &CommandPalette{
 		commands:         props.Commands,
 		filteredCommands: props.Commands,
 		highlightIdx:     -1,
 		props:            props,
+		listboxID:        listboxID,
 	}
 
 	// Overlay - full screen backdrop
@@ -65,29 +71,39 @@ func NewCommandPalette(props CommandPaletteProps) *CommandPalette {
 	overlay.Set("className", "fixed inset-0 bg-black/50 z-50 flex items-start justify-center pt-[20vh] hidden")
 	cp.overlay = overlay
 
-	// Palette container
+	// Palette container with dialog role
 	container := document.Call("createElement", "div")
 	container.Set("className", "bg-white dark:bg-gray-800 rounded-lg shadow-2xl max-w-lg w-full mx-4 overflow-hidden")
+	container.Call("setAttribute", "role", "dialog")
+	container.Call("setAttribute", "aria-modal", "true")
+	container.Call("setAttribute", "aria-label", "Command palette")
 	cp.container = container
 
 	// Search input container
 	inputContainer := document.Call("createElement", "div")
 	inputContainer.Set("className", "px-4 py-3 border-b border-gray-200 dark:border-gray-700")
 
-	// Search input
+	// Search input with ARIA combobox attributes
 	input := document.Call("createElement", "input")
 	input.Set("type", "text")
 	input.Set("className", "w-full bg-transparent text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none text-base")
 	input.Set("placeholder", props.Placeholder)
 	input.Set("autocomplete", "off")
+	input.Call("setAttribute", "role", "combobox")
+	input.Call("setAttribute", "aria-autocomplete", "list")
+	input.Call("setAttribute", "aria-controls", listboxID)
+	input.Call("setAttribute", "aria-expanded", "true")
 	cp.input = input
 
 	inputContainer.Call("appendChild", input)
 	container.Call("appendChild", inputContainer)
 
-	// Results list
+	// Results list with listbox role
 	resultsList := document.Call("createElement", "div")
 	resultsList.Set("className", "max-h-[60vh] overflow-y-auto")
+	resultsList.Set("id", listboxID)
+	resultsList.Call("setAttribute", "role", "listbox")
+	resultsList.Call("setAttribute", "aria-label", "Commands")
 	cp.resultsList = resultsList
 	container.Call("appendChild", resultsList)
 
@@ -152,12 +168,22 @@ func (cp *CommandPalette) renderCommands() {
 	document := js.Global().Get("document")
 	cp.resultsList.Set("innerHTML", "")
 
+	// Reset option IDs
+	cp.optionIDs = nil
+
 	if len(cp.filteredCommands) == 0 {
 		empty := document.Call("createElement", "div")
 		empty.Set("className", "px-4 py-8 text-center text-gray-500 dark:text-gray-400")
 		empty.Set("textContent", cp.props.EmptyMessage)
 		cp.resultsList.Call("appendChild", empty)
+		cp.input.Call("removeAttribute", "aria-activedescendant")
 		return
+	}
+
+	// Generate option IDs for each filtered command
+	crypto := js.Global().Get("crypto")
+	for i := 0; i < len(cp.filteredCommands); i++ {
+		cp.optionIDs = append(cp.optionIDs, "cmdpalette-option-"+crypto.Call("randomUUID").String())
 	}
 
 	// Group commands by category
@@ -181,10 +207,11 @@ func (cp *CommandPalette) renderCommands() {
 	for _, category := range categoryOrder {
 		cmds := categories[category]
 
-		// Category header
+		// Category header (not a listbox option)
 		header := document.Call("createElement", "div")
 		header.Set("className", "px-4 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider bg-gray-50 dark:bg-gray-900/50")
 		header.Set("textContent", category)
+		header.Call("setAttribute", "role", "presentation") // Not an option
 		cp.resultsList.Call("appendChild", header)
 
 		// Command items
@@ -194,6 +221,9 @@ func (cp *CommandPalette) renderCommands() {
 			overallIdx++
 		}
 	}
+
+	// Update aria-activedescendant on input
+	cp.updateARIAActiveDescendant()
 }
 
 func (cp *CommandPalette) renderCommandItem(cmd Command, index int) js.Value {
@@ -207,6 +237,15 @@ func (cp *CommandPalette) renderCommandItem(cmd Command, index int) js.Value {
 		item.Set("className", baseClass+" hover:bg-gray-100 dark:hover:bg-gray-700/50")
 	}
 	item.Set("data-index", index)
+
+	// ARIA option attributes
+	item.Set("id", cp.optionIDs[index])
+	item.Call("setAttribute", "role", "option")
+	if index == cp.highlightIdx {
+		item.Call("setAttribute", "aria-selected", "true")
+	} else {
+		item.Call("setAttribute", "aria-selected", "false")
+	}
 
 	// Icon
 	if cmd.Icon != "" {
@@ -272,9 +311,23 @@ func (cp *CommandPalette) updateHighlightStyles() {
 
 		if idx == highlightStr {
 			item.Set("className", baseClass+" bg-blue-50 dark:bg-blue-900/30")
+			item.Call("setAttribute", "aria-selected", "true")
 		} else {
 			item.Set("className", baseClass+" hover:bg-gray-100 dark:hover:bg-gray-700/50")
+			item.Call("setAttribute", "aria-selected", "false")
 		}
+	}
+
+	// Update aria-activedescendant on input
+	cp.updateARIAActiveDescendant()
+}
+
+// updateARIAActiveDescendant updates the input's aria-activedescendant to point to highlighted option
+func (cp *CommandPalette) updateARIAActiveDescendant() {
+	if cp.highlightIdx >= 0 && cp.highlightIdx < len(cp.optionIDs) {
+		cp.input.Call("setAttribute", "aria-activedescendant", cp.optionIDs[cp.highlightIdx])
+	} else {
+		cp.input.Call("removeAttribute", "aria-activedescendant")
 	}
 }
 
