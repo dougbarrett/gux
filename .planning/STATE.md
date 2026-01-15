@@ -2,12 +2,12 @@
 
 ## Current Position
 
-Phase: 2 of 6 (Layout & Navigation) - COMPLETE
-Plan: 2 of 2 in phase
-Status: Phase complete
-Last activity: 2026-01-15 - Completed 02-02-PLAN.md (Command Palette)
+Phase: 3 of 6 (Table Enhancements)
+Plan: 1 of 4 in current phase
+Status: In progress
+Last activity: 2026-01-15 - Completed 03-01-PLAN.md (Table Sorting)
 
-Progress: ████░░░░░░ 33%
+Progress: █████░░░░░ 42%
 
 ## Accumulated Context
 
@@ -22,6 +22,8 @@ Progress: ████░░░░░░ 33%
 - 02-01: Keyboard shortcut registration pattern with js.Func cleanup
 - 02-02: Group commands by category with sticky headers
 - 02-02: Use updateHighlightStyles() for hover to preserve click handlers
+- 03-01: Emoji sort indicators (▲/▼/⇅) for simplicity
+- 03-01: Case-insensitive string sorting, nil values sort to end
 
 ### Blockers/Concerns Carried Forward
 - None
@@ -37,5 +39,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-01-15
-Stopped at: Completed Phase 2 (Layout & Navigation)
-Resume file: None (ready for Phase 3 planning)
+Stopped at: Completed 03-01-PLAN.md (Table Sorting)
+Resume file: None (ready for 03-02)
