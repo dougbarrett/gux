@@ -21,9 +21,10 @@ var spinnerSizes = map[SpinnerSize]string{
 
 // SpinnerProps configures a Spinner component
 type SpinnerProps struct {
-	Size  SpinnerSize
-	Color string // Tailwind color class like "blue-500"
-	Label string
+	Size      SpinnerSize
+	Color     string // Tailwind color class like "blue-500"
+	Label     string // visible text label below spinner
+	AriaLabel string // accessible label (defaults to "Loading" if empty)
 }
 
 // Spinner creates a loading spinner animation
@@ -32,6 +33,15 @@ func Spinner(props SpinnerProps) js.Value {
 
 	container := document.Call("createElement", "div")
 	container.Set("className", "flex flex-col items-center justify-center")
+	// ARIA live region for loading status
+	container.Call("setAttribute", "role", "status")
+	container.Call("setAttribute", "aria-live", "polite")
+	// Default to "Loading" if no custom label provided
+	ariaLabel := props.AriaLabel
+	if ariaLabel == "" {
+		ariaLabel = "Loading"
+	}
+	container.Call("setAttribute", "aria-label", ariaLabel)
 
 	size := props.Size
 	if size == "" {
@@ -48,8 +58,10 @@ func Spinner(props SpinnerProps) js.Value {
 		sizeClass = spinnerSizes[SpinnerMD]
 	}
 
+	// Visual spinner (decorative - aria-hidden since container has label)
 	spinner := document.Call("createElement", "div")
 	spinner.Set("className", sizeClass+" border-gray-200 border-t-"+color+" rounded-full animate-spin")
+	spinner.Call("setAttribute", "aria-hidden", "true")
 	container.Call("appendChild", spinner)
 
 	// Add CSS animation if not exists
@@ -83,6 +95,9 @@ func SpinnerInline(size SpinnerSize, color string) js.Value {
 
 	spinner := document.Call("createElement", "div")
 	spinner.Set("className", sizeClass+" border-gray-200 border-t-"+color+" rounded-full animate-spin inline-block")
+	// Inline spinner has role and label directly on the element
+	spinner.Call("setAttribute", "role", "status")
+	spinner.Call("setAttribute", "aria-label", "Loading")
 
 	addSpinnerStyles()
 

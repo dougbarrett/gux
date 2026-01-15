@@ -28,19 +28,21 @@ var progressColors = map[ProgressVariant]string{
 
 // ProgressProps configures a Progress bar
 type ProgressProps struct {
-	Value       int // 0-100
-	Variant     ProgressVariant
-	ShowLabel   bool
-	Striped     bool
-	Animated    bool
-	Height      string // e.g., "h-2", "h-4"
-	Label       string // custom label, defaults to percentage
-	Indeterminate bool // shows infinite animation
+	Value         int // 0-100
+	Variant       ProgressVariant
+	ShowLabel     bool
+	Striped       bool
+	Animated      bool
+	Height        string // e.g., "h-2", "h-4"
+	Label         string // custom label, defaults to percentage
+	Indeterminate bool   // shows infinite animation
+	AriaLabel     string // accessible label for context (e.g., "Uploading file")
 }
 
 // Progress is a progress bar component
 type Progress struct {
 	container js.Value
+	track     js.Value
 	bar       js.Value
 	label     js.Value
 	props     ProgressProps
@@ -63,9 +65,18 @@ func NewProgress(props ProgressProps) *Progress {
 		variant = ProgressPrimary
 	}
 
-	// Track
+	// Track (ARIA progressbar widget)
 	track := document.Call("createElement", "div")
 	track.Set("className", "w-full "+height+" bg-gray-200 rounded-full overflow-hidden")
+	track.Call("setAttribute", "role", "progressbar")
+	track.Call("setAttribute", "aria-valuemin", "0")
+	track.Call("setAttribute", "aria-valuemax", "100")
+	if !props.Indeterminate {
+		track.Call("setAttribute", "aria-valuenow", fmt.Sprintf("%d", props.Value))
+	}
+	if props.AriaLabel != "" {
+		track.Call("setAttribute", "aria-label", props.AriaLabel)
+	}
 
 	// Bar
 	bar := document.Call("createElement", "div")
@@ -90,6 +101,7 @@ func NewProgress(props ProgressProps) *Progress {
 
 	p := &Progress{
 		container: container,
+		track:     track,
 		bar:       bar,
 		props:     props,
 	}
@@ -137,6 +149,8 @@ func (p *Progress) SetValue(value int) {
 	}
 	p.props.Value = value
 	p.bar.Get("style").Set("width", fmt.Sprintf("%d%%", value))
+	// Update ARIA value for screen readers
+	p.track.Call("setAttribute", "aria-valuenow", fmt.Sprintf("%d", value))
 	if p.label.Truthy() {
 		p.label.Set("textContent", fmt.Sprintf("%d%%", value))
 	}
