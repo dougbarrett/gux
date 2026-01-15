@@ -12,13 +12,14 @@ import (
 )
 
 var (
-	app        *components.App
-	layout     *components.Layout
-	display    *components.DataDisplay
-	router     *components.Router
-	posts      *api.PostsClient
-	modal      *components.Modal
-	postsStore *state.AsyncStore[[]api.Post]
+	app            *components.App
+	layout         *components.Layout
+	display        *components.DataDisplay
+	router         *components.Router
+	posts          *api.PostsClient
+	modal          *components.Modal
+	postsStore     *state.AsyncStore[[]api.Post]
+	commandPalette *components.CommandPalette
 )
 
 func main() {
@@ -118,6 +119,19 @@ func main() {
 
 	// Register keyboard shortcut for sidebar collapse (Cmd/Ctrl+B)
 	layout.Sidebar().RegisterKeyboardShortcut()
+
+	// Create command palette with navigation and action commands
+	commandPalette = components.NewCommandPalette(components.CommandPaletteProps{
+		Placeholder:  "Search commands...",
+		EmptyMessage: "No commands found",
+		Commands:     getCommandPaletteCommands(),
+	})
+
+	// Mount command palette to document body
+	js.Global().Get("document").Get("body").Call("appendChild", commandPalette.Element())
+
+	// Register global Cmd+K / Ctrl+K shortcut
+	commandPalette.RegisterKeyboardShortcut()
 
 	// Start router
 	router.Start()
@@ -894,4 +908,92 @@ func fetchAllPosts() {
 	}
 	display.ShowJSON(allPosts)
 	components.Toast("Posts loaded successfully", components.ToastSuccess)
+}
+
+// getCommandPaletteCommands returns the commands for the command palette
+func getCommandPaletteCommands() []components.Command {
+	return []components.Command{
+		// Navigation commands
+		{
+			ID:          "nav-dashboard",
+			Label:       "Dashboard",
+			Description: "Go to the main dashboard",
+			Icon:        "📊",
+			Category:    "Navigation",
+			OnExecute:   func() { router.Navigate("/") },
+		},
+		{
+			ID:          "nav-api-test",
+			Label:       "API Test",
+			Description: "Test API endpoints",
+			Icon:        "🔌",
+			Category:    "Navigation",
+			OnExecute:   func() { router.Navigate("/api-test") },
+		},
+		{
+			ID:          "nav-create-post",
+			Label:       "Create Post",
+			Description: "Create a new blog post",
+			Icon:        "✏️",
+			Category:    "Navigation",
+			OnExecute:   func() { router.Navigate("/create-post") },
+		},
+		{
+			ID:          "nav-components",
+			Label:       "Components",
+			Description: "View component showcase",
+			Icon:        "🧩",
+			Category:    "Navigation",
+			OnExecute:   func() { router.Navigate("/components") },
+		},
+		{
+			ID:          "nav-settings",
+			Label:       "Settings",
+			Description: "Manage application settings",
+			Icon:        "⚙️",
+			Category:    "Navigation",
+			OnExecute:   func() { router.Navigate("/settings") },
+		},
+		// Action commands
+		{
+			ID:          "action-toggle-sidebar",
+			Label:       "Toggle Sidebar",
+			Description: "Collapse or expand the sidebar",
+			Icon:        "📐",
+			Category:    "Actions",
+			Shortcut:    "Ctrl+B",
+			OnExecute:   func() { layout.Sidebar().ToggleCollapse() },
+		},
+		{
+			ID:          "action-toggle-theme",
+			Label:       "Toggle Dark Mode",
+			Description: "Switch between light and dark theme",
+			Icon:        "🌙",
+			Category:    "Actions",
+			OnExecute: func() {
+				components.ToggleTheme()
+				components.Toast("Theme toggled", components.ToastInfo)
+			},
+		},
+		{
+			ID:          "action-refresh",
+			Label:       "Refresh Page",
+			Description: "Reload the current page",
+			Icon:        "🔄",
+			Category:    "Actions",
+			OnExecute: func() {
+				js.Global().Get("location").Call("reload")
+			},
+		},
+		{
+			ID:          "action-clear-notifications",
+			Label:       "Clear Notifications",
+			Description: "Mark all notifications as read",
+			Icon:        "🔔",
+			Category:    "Actions",
+			OnExecute: func() {
+				components.Toast("Notifications cleared", components.ToastSuccess)
+			},
+		},
+	}
 }
