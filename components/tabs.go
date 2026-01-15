@@ -2,7 +2,10 @@
 
 package components
 
-import "syscall/js"
+import (
+	"strconv"
+	"syscall/js"
+)
 
 // Tab represents a single tab
 type Tab struct {
@@ -24,6 +27,8 @@ type Tabs struct {
 	container   js.Value
 	tabButtons  []js.Value
 	tabPanels   []js.Value
+	tabIDs      []string // unique IDs for tabs
+	panelIDs    []string // unique IDs for panels
 	activeIndex int
 	props       TabsProps
 }
@@ -39,10 +44,22 @@ func NewTabs(props TabsProps) *Tabs {
 	}
 	container.Set("className", className)
 
+	// Generate unique IDs for tabs and panels
+	crypto := js.Global().Get("crypto")
+	tabIDs := make([]string, len(props.Tabs))
+	panelIDs := make([]string, len(props.Tabs))
+	for i := range props.Tabs {
+		uuid := crypto.Call("randomUUID").String()
+		tabIDs[i] = "tabs-tab-" + strconv.Itoa(i) + "-" + uuid
+		panelIDs[i] = "tabs-panel-" + strconv.Itoa(i) + "-" + uuid
+	}
+
 	t := &Tabs{
 		container:   container,
 		tabButtons:  make([]js.Value, len(props.Tabs)),
 		tabPanels:   make([]js.Value, len(props.Tabs)),
+		tabIDs:      tabIDs,
+		panelIDs:    panelIDs,
 		activeIndex: props.ActiveIndex,
 		props:       props,
 	}
@@ -53,10 +70,25 @@ func NewTabs(props TabsProps) *Tabs {
 
 	tabNav := document.Call("createElement", "nav")
 	tabNav.Set("className", "flex space-x-4 md:space-x-8 min-w-max px-1")
+	tabNav.Call("setAttribute", "role", "tablist")
+	tabNav.Call("setAttribute", "aria-label", "Tabs")
 
 	for i, tab := range props.Tabs {
 		btn := document.Call("createElement", "button")
 		btn.Set("textContent", tab.Label)
+		btn.Set("type", "button")
+
+		// ARIA tab attributes
+		btn.Call("setAttribute", "role", "tab")
+		btn.Set("id", tabIDs[i])
+		btn.Call("setAttribute", "aria-controls", panelIDs[i])
+		if i == props.ActiveIndex {
+			btn.Call("setAttribute", "aria-selected", "true")
+			btn.Call("setAttribute", "tabindex", "0")
+		} else {
+			btn.Call("setAttribute", "aria-selected", "false")
+			btn.Call("setAttribute", "tabindex", "-1")
+		}
 
 		idx := i
 		btn.Call("addEventListener", "click", js.FuncOf(func(this js.Value, args []js.Value) any {
@@ -77,6 +109,13 @@ func NewTabs(props TabsProps) *Tabs {
 
 	for i, tab := range props.Tabs {
 		panel := document.Call("createElement", "div")
+
+		// ARIA tabpanel attributes
+		panel.Call("setAttribute", "role", "tabpanel")
+		panel.Set("id", panelIDs[i])
+		panel.Call("setAttribute", "aria-labelledby", tabIDs[i])
+		panel.Call("setAttribute", "tabindex", "0")
+
 		if !tab.Content.IsUndefined() && !tab.Content.IsNull() {
 			panel.Call("appendChild", tab.Content)
 		}
@@ -130,9 +169,15 @@ func (t *Tabs) updateStyles() {
 		if i == t.activeIndex {
 			t.tabButtons[i].Set("className", activeClass)
 			t.tabPanels[i].Get("style").Set("display", "block")
+			// Update ARIA states for active tab
+			t.tabButtons[i].Call("setAttribute", "aria-selected", "true")
+			t.tabButtons[i].Call("setAttribute", "tabindex", "0")
 		} else {
 			t.tabButtons[i].Set("className", inactiveClass)
 			t.tabPanels[i].Get("style").Set("display", "none")
+			// Update ARIA states for inactive tabs
+			t.tabButtons[i].Call("setAttribute", "aria-selected", "false")
+			t.tabButtons[i].Call("setAttribute", "tabindex", "-1")
 		}
 	}
 }
