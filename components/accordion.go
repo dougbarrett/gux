@@ -2,7 +2,10 @@
 
 package components
 
-import "syscall/js"
+import (
+	"strconv"
+	"syscall/js"
+)
 
 // AccordionItem represents a single accordion section
 type AccordionItem struct {
@@ -19,13 +22,20 @@ type AccordionProps struct {
 
 // Accordion creates a collapsible accordion component
 type Accordion struct {
-	element js.Value
-	panels  []js.Value
+	element  js.Value
+	panels   []js.Value
+	headers  []js.Value // store headers for ARIA updates
+	baseID   string     // base ID for generating unique IDs
 }
 
 // NewAccordion creates a new Accordion component
 func NewAccordion(props AccordionProps) *Accordion {
 	document := js.Global().Get("document")
+
+	// Generate unique base ID for this accordion
+	crypto := js.Global().Get("crypto")
+	uuid := crypto.Call("randomUUID").String()
+	baseID := "accordion-" + uuid
 
 	container := document.Call("createElement", "div")
 	container.Set("className", "border border-gray-200 dark:border-gray-700 rounded-lg divide-y divide-gray-200 dark:divide-gray-700")
@@ -33,19 +43,26 @@ func NewAccordion(props AccordionProps) *Accordion {
 	acc := &Accordion{
 		element: container,
 		panels:  make([]js.Value, len(props.Items)),
+		headers: make([]js.Value, len(props.Items)),
+		baseID:  baseID,
 	}
 
 	for i, item := range props.Items {
-		panel := acc.createPanel(item, i, props.AllowMultiple)
+		panel, header := acc.createPanel(item, i, props.AllowMultiple)
 		container.Call("appendChild", panel)
 		acc.panels[i] = panel
+		acc.headers[i] = header
 	}
 
 	return acc
 }
 
-func (a *Accordion) createPanel(item AccordionItem, index int, allowMultiple bool) js.Value {
+func (a *Accordion) createPanel(item AccordionItem, index int, allowMultiple bool) (js.Value, js.Value) {
 	document := js.Global().Get("document")
+
+	// Generate unique IDs for ARIA relationships
+	triggerID := a.baseID + "-trigger-" + strconv.Itoa(index)
+	panelID := a.baseID + "-panel-" + strconv.Itoa(index)
 
 	panel := document.Call("createElement", "div")
 	panel.Set("className", "")
@@ -54,6 +71,15 @@ func (a *Accordion) createPanel(item AccordionItem, index int, allowMultiple boo
 	header := document.Call("createElement", "button")
 	header.Set("className", "w-full px-4 py-3 flex items-center justify-between text-left hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:bg-gray-50 dark:focus:bg-gray-700 transition-colors cursor-pointer")
 	header.Set("type", "button")
+
+	// ARIA attributes for trigger button
+	header.Set("id", triggerID)
+	header.Call("setAttribute", "aria-controls", panelID)
+	if item.Open {
+		header.Call("setAttribute", "aria-expanded", "true")
+	} else {
+		header.Call("setAttribute", "aria-expanded", "false")
+	}
 
 	title := document.Call("createElement", "span")
 	title.Set("className", "font-medium text-gray-900 dark:text-gray-100")
@@ -71,6 +97,11 @@ func (a *Accordion) createPanel(item AccordionItem, index int, allowMultiple boo
 	// Content
 	content := document.Call("createElement", "div")
 	content.Set("className", "overflow-hidden transition-all duration-200")
+
+	// ARIA attributes for content panel
+	content.Set("id", panelID)
+	content.Call("setAttribute", "role", "region")
+	content.Call("setAttribute", "aria-labelledby", triggerID)
 
 	contentInner := document.Call("createElement", "div")
 	contentInner.Set("className", "px-4 py-3 text-gray-600 dark:text-gray-300")
@@ -100,20 +131,24 @@ func (a *Accordion) createPanel(item AccordionItem, index int, allowMultiple boo
 						pChevron := p.Get("children").Index(0).Get("children").Index(1)
 						pContent.Get("style").Set("maxHeight", "0")
 						pChevron.Get("classList").Call("remove", "rotate-180")
+						// Update aria-expanded on other headers
+						a.headers[i].Call("setAttribute", "aria-expanded", "false")
 					}
 				}
 			}
 			content.Get("style").Set("maxHeight", "1000px")
 			chevron.Get("classList").Call("add", "rotate-180")
+			header.Call("setAttribute", "aria-expanded", "true")
 		} else {
 			content.Get("style").Set("maxHeight", "0")
 			chevron.Get("classList").Call("remove", "rotate-180")
+			header.Call("setAttribute", "aria-expanded", "false")
 		}
 
 		return nil
 	}))
 
-	return panel
+	return panel, header
 }
 
 // Element returns the DOM element
@@ -131,6 +166,7 @@ func (a *Accordion) OpenPanel(index int) {
 	chevron := panel.Get("children").Index(0).Get("children").Index(1)
 	content.Get("style").Set("maxHeight", "1000px")
 	chevron.Get("classList").Call("add", "rotate-180")
+	a.headers[index].Call("setAttribute", "aria-expanded", "true")
 }
 
 // ClosePanel closes a specific panel by index
@@ -143,6 +179,7 @@ func (a *Accordion) ClosePanel(index int) {
 	chevron := panel.Get("children").Index(0).Get("children").Index(1)
 	content.Get("style").Set("maxHeight", "0")
 	chevron.Get("classList").Call("remove", "rotate-180")
+	a.headers[index].Call("setAttribute", "aria-expanded", "false")
 }
 
 // CloseAll closes all panels
