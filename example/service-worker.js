@@ -1,5 +1,5 @@
-// GoQuery Service Worker - Cache-first strategy for assets
-const CACHE_NAME = 'goquery-v1';
+// Gux Service Worker - Cache-first strategy for assets
+const CACHE_NAME = 'gux-v1';
 
 // Assets to precache on install
 const PRECACHE_URLS = [

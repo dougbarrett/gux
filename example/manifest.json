@@ -1,7 +1,7 @@
 {
-  "name": "GoQuery",
-  "short_name": "GoQuery",
-  "description": "Database query tool built with Go and WebAssembly",
+  "name": "Gux",
+  "short_name": "Gux",
+  "description": "UI component library built with Go and WebAssembly",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
