@@ -20,6 +20,7 @@ type Modal struct {
 	modal   js.Value
 	content js.Value
 	isOpen  bool
+	titleID string // ARIA: unique ID for aria-labelledby
 }
 
 var modalWidths = map[string]string{
@@ -51,9 +52,23 @@ func NewModal(props ModalProps) *Modal {
 	modal := document.Call("createElement", "div")
 	modal.Set("className", "bg-white dark:bg-gray-800 rounded-lg shadow-xl "+widthClass+" w-full mx-4 max-h-[90vh] flex flex-col")
 
+	// Generate unique ID for ARIA labelledby
+	titleID := ""
+	if props.Title != "" {
+		titleID = "modal-title-" + js.Global().Get("crypto").Call("randomUUID").String()
+	}
+
+	// Add ARIA dialog attributes
+	modal.Call("setAttribute", "role", "dialog")
+	modal.Call("setAttribute", "aria-modal", "true")
+	if titleID != "" {
+		modal.Call("setAttribute", "aria-labelledby", titleID)
+	}
+
 	m := &Modal{
 		overlay: overlay,
 		modal:   modal,
+		titleID: titleID,
 	}
 
 	// Header
@@ -64,11 +79,13 @@ func NewModal(props ModalProps) *Modal {
 		title := document.Call("createElement", "h3")
 		title.Set("className", "text-lg font-semibold text-gray-900 dark:text-gray-100")
 		title.Set("textContent", props.Title)
+		title.Set("id", m.titleID) // ARIA: referenced by aria-labelledby
 		header.Call("appendChild", title)
 
 		closeBtn := document.Call("createElement", "button")
 		closeBtn.Set("className", "text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-2xl leading-none cursor-pointer")
 		closeBtn.Set("innerHTML", "&times;")
+		closeBtn.Call("setAttribute", "aria-label", "Close") // ARIA: accessible name for close button
 		closeBtn.Call("addEventListener", "click", js.FuncOf(func(this js.Value, args []js.Value) any {
 			m.Close()
 			return nil
@@ -162,4 +179,14 @@ func (m *Modal) IsOpen() bool {
 func (m *Modal) SetContent(content js.Value) {
 	m.content.Set("innerHTML", "")
 	m.content.Call("appendChild", content)
+}
+
+// TitleID returns the unique ID used for aria-labelledby
+func (m *Modal) TitleID() string {
+	return m.titleID
+}
+
+// ModalElement returns the inner modal container (for ARIA attribute access)
+func (m *Modal) ModalElement() js.Value {
+	return m.modal
 }
