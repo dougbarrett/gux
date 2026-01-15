@@ -295,10 +295,10 @@ func dataDemo() js.Value {
 
 	table := components.NewTable(components.TableProps{
 		Columns: []components.TableColumn{
-			{Header: "ID", Key: "id", Width: "60px"},
-			{Header: "Name", Key: "name"},
-			{Header: "Email", Key: "email"},
-			{Header: "Status", Key: "status", Render: func(row map[string]any, value any) js.Value {
+			{Header: "ID", Key: "id", Width: "60px", Sortable: true},
+			{Header: "Name", Key: "name", Sortable: true},
+			{Header: "Email", Key: "email", Sortable: true},
+			{Header: "Status", Key: "status", Sortable: true, Render: func(row map[string]any, value any) js.Value {
 				status := value.(string)
 				var variant components.BadgeVariant
 				switch status {
@@ -312,9 +312,10 @@ func dataDemo() js.Value {
 				return components.Badge(components.BadgeProps{Text: status, Variant: variant})
 			}},
 		},
-		Data:      tableData,
-		Striped:   true,
-		Hoverable: true,
+		Data:       tableData,
+		Striped:    true,
+		Hoverable:  true,
+		Filterable: true,
 	})
 
 	return components.Div("space-y-4",

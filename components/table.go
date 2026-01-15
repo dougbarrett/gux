@@ -462,14 +462,39 @@ func (t *Table) SetSort(column, direction string) {
 	t.sortColumn = column
 	t.sortDirection = direction
 	t.renderHeaders()
-	if len(t.data) > 0 {
-		t.SetData(t.data)
+	if len(t.allData) > 0 {
+		t.renderData()
 	}
 }
 
 // Sort toggles sorting on the specified column
 func (t *Table) Sort(column string) {
 	t.handleHeaderClick(column)
+}
+
+// SetFilter programmatically sets the filter text
+func (t *Table) SetFilter(text string) {
+	t.filterText = text
+
+	// Update input field if it exists
+	if !t.filterInput.IsUndefined() && !t.filterInput.IsNull() {
+		t.filterInput.Set("value", text)
+	}
+
+	// Notify callback
+	if t.props.OnFilter != nil {
+		t.props.OnFilter(text)
+	}
+
+	// Re-render
+	if len(t.allData) > 0 {
+		t.renderData()
+	}
+}
+
+// ClearFilter resets the filter to show all rows
+func (t *Table) ClearFilter() {
+	t.SetFilter("")
 }
 
 // Helper to convert any to string
