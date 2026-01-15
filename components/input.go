@@ -35,11 +35,15 @@ type Input struct {
 	container js.Value
 	input     js.Value
 	label     js.Value
+	errorEl   js.Value
+	inputID   string
+	errorID   string
 }
 
 // NewInput creates a new Input component
 func NewInput(props InputProps) *Input {
 	document := js.Global().Get("document")
+	crypto := js.Global().Get("crypto")
 
 	container := document.Call("createElement", "div")
 	container.Set("className", "mb-4")
@@ -49,13 +53,17 @@ func NewInput(props InputProps) *Input {
 		inputType = InputText
 	}
 
-	inp := &Input{container: container}
+	// Generate unique ID for label-input association
+	inputID := "input-" + crypto.Call("randomUUID").String()
+
+	inp := &Input{container: container, inputID: inputID}
 
 	// Label
 	if props.Label != "" {
 		label := document.Call("createElement", "label")
 		label.Set("className", "block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1")
 		label.Set("textContent", props.Label)
+		label.Set("htmlFor", inputID)
 		container.Call("appendChild", label)
 		inp.label = label
 	}
@@ -71,6 +79,7 @@ func NewInput(props InputProps) *Input {
 	}
 
 	input.Set("type", string(inputType))
+	input.Set("id", inputID)
 	input.Set("className", className)
 
 	if props.Placeholder != "" {
@@ -131,14 +140,44 @@ func (i *Input) Focus() {
 	i.input.Call("focus")
 }
 
-// SetError adds error styling to the input
+// SetError adds error styling to the input and ARIA error attributes
 func (i *Input) SetError(message string) {
+	document := js.Global().Get("document")
+	crypto := js.Global().Get("crypto")
+
 	i.input.Set("className", "w-full px-3 py-2 border border-red-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500")
+	i.input.Call("setAttribute", "aria-invalid", "true")
+
+	// Generate error ID if not already set
+	if i.errorID == "" {
+		i.errorID = "input-error-" + crypto.Call("randomUUID").String()
+	}
+
+	// Create or update error message element
+	if i.errorEl.IsUndefined() || i.errorEl.IsNull() {
+		i.errorEl = document.Call("createElement", "p")
+		i.errorEl.Set("id", i.errorID)
+		i.errorEl.Set("className", "text-red-500 text-sm mt-1")
+		i.errorEl.Call("setAttribute", "role", "alert")
+		i.container.Call("appendChild", i.errorEl)
+	}
+	i.errorEl.Set("textContent", message)
+	i.errorEl.Get("classList").Call("remove", "hidden")
+
+	// Link error message to input via aria-describedby
+	i.input.Call("setAttribute", "aria-describedby", i.errorID)
 }
 
-// ClearError removes error styling
+// ClearError removes error styling and ARIA error attributes
 func (i *Input) ClearError() {
 	i.input.Set("className", "w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500")
+	i.input.Call("removeAttribute", "aria-invalid")
+	i.input.Call("removeAttribute", "aria-describedby")
+
+	// Hide error message element
+	if !i.errorEl.IsUndefined() && !i.errorEl.IsNull() {
+		i.errorEl.Get("classList").Call("add", "hidden")
+	}
 }
 
 // Quick input constructors

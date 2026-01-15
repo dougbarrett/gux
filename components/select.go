@@ -27,27 +27,36 @@ type SelectProps struct {
 type Select struct {
 	container js.Value
 	selectEl  js.Value
+	label     js.Value
+	selectID  string
 }
 
 // NewSelect creates a new Select component
 func NewSelect(props SelectProps) *Select {
 	document := js.Global().Get("document")
+	crypto := js.Global().Get("crypto")
 
 	container := document.Call("createElement", "div")
 	container.Set("className", "mb-4")
 
-	s := &Select{container: container}
+	// Generate unique ID for label-input association
+	selectID := "select-" + crypto.Call("randomUUID").String()
+
+	s := &Select{container: container, selectID: selectID}
 
 	// Label
 	if props.Label != "" {
 		label := document.Call("createElement", "label")
 		label.Set("className", "block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1")
 		label.Set("textContent", props.Label)
+		label.Set("htmlFor", selectID)
 		container.Call("appendChild", label)
+		s.label = label
 	}
 
 	// Select
 	selectEl := document.Call("createElement", "select")
+	selectEl.Set("id", selectID)
 	className := "w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
 	if props.Disabled {
 		className += " bg-gray-100 dark:bg-gray-800 cursor-not-allowed"

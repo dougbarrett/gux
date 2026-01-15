@@ -18,29 +18,38 @@ type TextAreaProps struct {
 
 // TextArea creates a multi-line text input
 type TextArea struct {
-	container js.Value
-	textarea  js.Value
+	container  js.Value
+	textarea   js.Value
+	label      js.Value
+	textareaID string
 }
 
 // NewTextArea creates a new TextArea component
 func NewTextArea(props TextAreaProps) *TextArea {
 	document := js.Global().Get("document")
+	crypto := js.Global().Get("crypto")
 
 	container := document.Call("createElement", "div")
 	container.Set("className", "mb-4")
 
-	ta := &TextArea{container: container}
+	// Generate unique ID for label-input association
+	textareaID := "textarea-" + crypto.Call("randomUUID").String()
+
+	ta := &TextArea{container: container, textareaID: textareaID}
 
 	// Label
 	if props.Label != "" {
 		label := document.Call("createElement", "label")
 		label.Set("className", "block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1")
 		label.Set("textContent", props.Label)
+		label.Set("htmlFor", textareaID)
 		container.Call("appendChild", label)
+		ta.label = label
 	}
 
 	// TextArea
 	textarea := document.Call("createElement", "textarea")
+	textarea.Set("id", textareaID)
 	className := "w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-y placeholder-gray-400 dark:placeholder-gray-500"
 	if props.Disabled {
 		className += " bg-gray-100 dark:bg-gray-800 cursor-not-allowed"
