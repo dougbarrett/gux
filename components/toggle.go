@@ -75,7 +75,7 @@ func NewToggle(props ToggleProps) *Toggle {
 	}
 
 	toggle := document.Call("createElement", "div")
-	toggle.Set("className", "relative inline-block rounded-full transition-colors duration-200")
+	toggle.Set("className", "relative inline-block rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2")
 	toggle.Get("style").Set("width", trackWidth)
 	toggle.Get("style").Set("height", trackHeight)
 	toggle.Set("role", "switch")
