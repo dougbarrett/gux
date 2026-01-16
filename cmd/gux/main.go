@@ -30,8 +30,9 @@ func main() {
 		initCmd.Parse(os.Args[2:])
 
 		if initCmd.NArg() < 1 {
-			fmt.Println("Error: app name required")
+			fmt.Println("Error: app name required (use '.' for current directory)")
 			fmt.Println("Usage: gux init [--module <module-path>] <appname>")
+			fmt.Println("       gux init --module <module-path> .")
 			os.Exit(1)
 		}
 
@@ -88,6 +89,7 @@ func printUsage() {
 
 Usage:
     gux init [--module <module-path>] <appname>   Create a new Gux application
+    gux init --module <module-path> .             Initialize in current directory
     gux setup [--tinygo]                          Copy wasm_exec.js from Go/TinyGo
     gux gen [--dir <api-dir>]                     Generate API client code
     gux build [--tinygo]                          Build WASM module
@@ -97,7 +99,8 @@ Usage:
     gux help                                       Show this help
 
 Examples:
-    gux init --module github.com/myuser/myapp myapp
+    gux init --module github.com/myuser/myapp myapp   # Create new directory
+    gux init --module github.com/myuser/myapp .       # Use current directory
     gux setup                # Copy wasm_exec.js from Go
     gux setup --tinygo       # Copy wasm_exec.js from TinyGo
     gux build --tinygo       # Build with TinyGo (~500KB)
@@ -105,8 +108,7 @@ Examples:
     gux dev --port 3000      # Run on custom port
     gux claude               # Install Claude Code skill for AI assistance
 
-The init command creates a new directory with your app name and generates
-a minimal Gux application scaffold including:
+The init command creates a Gux application scaffold including:
     - app/main.go       - WASM frontend entry point
     - server/main.go    - HTTP server
     - api/              - Shared API definitions
@@ -117,7 +119,6 @@ a minimal Gux application scaffold including:
     - service-worker.js - PWA caching
 
 After scaffolding, run:
-    cd <appname>
     gux setup     # Copy wasm_exec.js from Go installation
     gux claude    # Install Claude Code skill (optional)
     gux dev       # Build and run dev server`)
