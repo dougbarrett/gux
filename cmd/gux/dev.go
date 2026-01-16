@@ -1,7 +1,6 @@
 package main
 
 import (
-	"crypto/sha256"
 	"fmt"
 	"io"
 	"os"
@@ -76,7 +75,8 @@ func runSetup(tinygo bool) {
 	fmt.Printf("Copied wasm_exec.js to public/ from %s installation\n", compiler)
 }
 
-func runBuild(tinygo bool) {
+// buildWasm builds the WASM module only (used by dev mode)
+func buildWasm(tinygo bool) {
 	// Check we're in a gux project (has cmd/app/ directory)
 	if _, err := os.Stat("cmd/app"); os.IsNotExist(err) {
 		fmt.Println("Error: no cmd/app/ directory found")
@@ -100,67 +100,66 @@ func runBuild(tinygo bool) {
 	cmd.Stderr = os.Stderr
 
 	if err := cmd.Run(); err != nil {
-		fmt.Printf("Build failed: %v\n", err)
+		fmt.Printf("WASM build failed: %v\n", err)
 		os.Exit(1)
 	}
 
-	// Get file size and hash for versioning
-	info, err := os.Stat("public/main.wasm")
+	// Get WASM file size for display
+	wasmInfo, err := os.Stat("public/main.wasm")
 	if err != nil {
 		fmt.Printf("Error reading public/main.wasm: %v\n", err)
 		os.Exit(1)
 	}
 
-	// Compute content hash for cache busting
-	hash, err := hashFile("public/main.wasm")
-	if err != nil {
-		fmt.Printf("Error hashing public/main.wasm: %v\n", err)
-		os.Exit(1)
-	}
+	// Clean up any old versioned files (from previous gux versions)
+	cleanOldWasmFiles("")
 
-	// Create versioned filename
-	versionedName := fmt.Sprintf("main.%s.wasm", hash)
-
-	// Remove old versioned files
-	cleanOldWasmFiles(versionedName)
-
-	// Rename to versioned filename
-	if err := os.Rename("public/main.wasm", filepath.Join("public", versionedName)); err != nil {
-		fmt.Printf("Error renaming to versioned file: %v\n", err)
-		os.Exit(1)
-	}
-
-	// Update index.html with new filename
-	if err := updateIndexHTML(versionedName); err != nil {
-		fmt.Printf("Error updating public/index.html: %v\n", err)
-		os.Exit(1)
-	}
-
-	size := float64(info.Size()) / 1024 / 1024
+	wasmSize := float64(wasmInfo.Size()) / 1024 / 1024
 	compiler := "Go"
 	if tinygo {
 		compiler = "TinyGo"
 	}
-	fmt.Printf("Built public/%s (%.2f MB) with %s\n", versionedName, size, compiler)
+	fmt.Printf("Built public/main.wasm (%.2f MB) with %s\n", wasmSize, compiler)
 }
 
-// hashFile computes SHA256 hash of file content, returns first 8 chars
-func hashFile(path string) (string, error) {
-	f, err := os.Open(path)
+// runBuild builds the WASM and then the server binary with all assets embedded
+func runBuild(tinygo bool) {
+	// Check for wasm_exec.js
+	if _, err := os.Stat("public/wasm_exec.js"); os.IsNotExist(err) {
+		fmt.Println("Error: public/wasm_exec.js not found")
+		fmt.Println("Run 'gux setup' first to copy wasm_exec.js from your Go/TinyGo installation.")
+		os.Exit(1)
+	}
+
+	// Build the WASM first
+	buildWasm(tinygo)
+
+	// Build the server binary with embedded assets
+	fmt.Println("Building server binary with embedded assets...")
+
+	cmd := exec.Command("go", "build", "-ldflags=-s -w", "-o", "server", "./cmd/server")
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	if err := cmd.Run(); err != nil {
+		fmt.Printf("Server build failed: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Get server binary size for display
+	serverInfo, err := os.Stat("server")
 	if err != nil {
-		return "", err
-	}
-	defer f.Close()
-
-	h := sha256.New()
-	if _, err := io.Copy(h, f); err != nil {
-		return "", err
+		fmt.Printf("Error reading server binary: %v\n", err)
+		os.Exit(1)
 	}
 
-	return fmt.Sprintf("%x", h.Sum(nil))[:8], nil
+	serverSize := float64(serverInfo.Size()) / 1024 / 1024
+	fmt.Printf("Built ./server (%.2f MB) with all assets embedded\n", serverSize)
+	fmt.Println("\nRun with: ./server")
 }
 
-// cleanOldWasmFiles removes old versioned wasm files, keeping the current one
+// cleanOldWasmFiles removes old versioned wasm files from previous gux versions.
+// These are files matching main.<hash>.wasm pattern.
 func cleanOldWasmFiles(keepFile string) {
 	entries, err := os.ReadDir("public")
 	if err != nil {
@@ -169,7 +168,7 @@ func cleanOldWasmFiles(keepFile string) {
 
 	for _, entry := range entries {
 		name := entry.Name()
-		// Match main.<hash>.wasm pattern (not main.wasm) and not the one we're keeping
+		// Match main.<hash>.wasm pattern (not main.wasm)
 		// Versioned files have format: main.XXXXXXXX.wasm (8 char hash)
 		if name != "main.wasm" && strings.HasPrefix(name, "main.") && strings.HasSuffix(name, ".wasm") && name != keepFile {
 			os.Remove(filepath.Join("public", name))
@@ -177,40 +176,7 @@ func cleanOldWasmFiles(keepFile string) {
 	}
 }
 
-// updateIndexHTML replaces the WASM filename reference in public/index.html
-func updateIndexHTML(wasmFile string) error {
-	content, err := os.ReadFile("public/index.html")
-	if err != nil {
-		return err
-	}
-
-	// Replace any main.*.wasm or main.wasm reference
-	lines := strings.Split(string(content), "\n")
-	for i, line := range lines {
-		// Look for fetch("/main or fetch("main with .wasm
-		if (strings.Contains(line, `fetch("/main`) || strings.Contains(line, `fetch("main`)) && strings.Contains(line, `.wasm"`) {
-			// Replace the wasm filename in the fetch call, preserving the leading slash
-			start := strings.Index(line, `fetch("`)
-			if start != -1 {
-				end := strings.Index(line[start:], `.wasm"`)
-				if end != -1 {
-					lines[i] = line[:start] + `fetch("/` + wasmFile + `"` + line[start+end+6:]
-				}
-			}
-		}
-	}
-
-	return os.WriteFile("public/index.html", []byte(strings.Join(lines, "\n")), 0644)
-}
-
 func runDev(port int, tinygo bool) {
-	// Check we're in a gux project
-	if _, err := os.Stat("cmd/app"); os.IsNotExist(err) {
-		fmt.Println("Error: no cmd/app/ directory found")
-		fmt.Println("Run this command from your gux project root.")
-		os.Exit(1)
-	}
-
 	// Check for wasm_exec.js
 	if _, err := os.Stat("public/wasm_exec.js"); os.IsNotExist(err) {
 		fmt.Println("Error: public/wasm_exec.js not found")
@@ -218,8 +184,8 @@ func runDev(port int, tinygo bool) {
 		os.Exit(1)
 	}
 
-	// Build first
-	runBuild(tinygo)
+	// Build WASM only (not the full binary - we'll use go run for dev)
+	buildWasm(tinygo)
 
 	fmt.Printf("\nStarting dev server on http://localhost:%d\n", port)
 

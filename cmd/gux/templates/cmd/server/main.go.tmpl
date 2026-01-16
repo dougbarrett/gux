@@ -1,6 +1,7 @@
 package main
 
 import (
+	"embed"
 	"flag"
 	"fmt"
 	"log"
@@ -9,9 +10,17 @@ import (
 	"{{.GuxModule}}/server"
 )
 
+// Embed all static assets from public/ directory.
+// This enables single-binary deployment with all assets bundled in.
+// Note: Files added to public/ will be included in the binary.
+// For large assets (videos, large images), consider using a CDN instead.
+//
+//go:embed public/*
+var staticFS embed.FS
+
 func main() {
 	port := flag.Int("port", 8080, "Port to serve on")
-	dir := flag.String("dir", "public", "Directory to serve static files from")
+	dir := flag.String("dir", "", "Directory to serve static files from (dev mode). If empty, uses embedded files.")
 	flag.Parse()
 
 	mux := http.NewServeMux()
@@ -23,13 +32,21 @@ func main() {
 	// itemsHandler.RegisterRoutes(mux)
 
 	// SPA handler for static files
-	spaHandler := server.NewSPAHandler(*dir)
+	var spaHandler *server.SPAHandler
+	if *dir != "" {
+		// Development mode: serve from filesystem for hot reload
+		spaHandler = server.NewSPAHandler(*dir)
+		fmt.Printf("{{.AppName}} running at http://localhost:%d\n", *port)
+		fmt.Printf("Serving static files from: %s (dev mode)\n", *dir)
+	} else {
+		// Production mode: serve from embedded filesystem
+		spaHandler = server.NewEmbeddedSPAHandler(staticFS, "public")
+		fmt.Printf("{{.AppName}} running at http://localhost:%d\n", *port)
+		fmt.Println("Serving static files from embedded filesystem")
+	}
 	mux.HandleFunc("/", spaHandler.ServeHTTP)
 
 	addr := fmt.Sprintf(":%d", *port)
-	fmt.Printf("{{.AppName}} running at http://localhost%s\n", addr)
-	fmt.Printf("Serving static files from: %s\n", *dir)
-
 	if err := http.ListenAndServe(addr, mux); err != nil {
 		log.Fatal(err)
 	}

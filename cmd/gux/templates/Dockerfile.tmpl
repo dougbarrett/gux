@@ -1,8 +1,8 @@
 # Multi-stage Dockerfile for {{.AppName}}
-# Builds both the WASM frontend and Go server
+# Produces a single binary with all static assets embedded
 
-# Stage 1: Build WASM with TinyGo
-FROM tinygo/tinygo:latest AS wasm-builder
+# Stage 1: Build with TinyGo using gux
+FROM tinygo/tinygo:latest AS builder
 
 WORKDIR /app
 
@@ -10,37 +10,16 @@ WORKDIR /app
 COPY go.mod go.sum* ./
 RUN go mod download || true
 
-# Copy source code
-COPY . .
-
-# Build WASM module and version it with content hash
-# Copy index.html to /app (writable) for sed modification
-RUN GOFLAGS=-buildvcs=false tinygo build -o main.wasm -target wasm -no-debug ./cmd/app && \
-    HASH=$(sha256sum main.wasm | cut -c1-8) && \
-    mv main.wasm main.${HASH}.wasm && \
-    cp public/index.html index.html && \
-    sed -i "s|fetch(\"/main\.[^\"]*\.wasm\"|fetch(\"/main.${HASH}.wasm\"|g" index.html && \
-    sed -i "s|fetch(\"/main\.wasm\"|fetch(\"/main.${HASH}.wasm\"|g" index.html
-
-# Stage 2: Build Go server
-FROM golang:1.25-alpine AS server-builder
-
-WORKDIR /app
-
-# Install build dependencies
-RUN apk add --no-cache git
-
-# Copy go.mod and go.sum
-COPY go.mod go.sum* ./
-RUN go mod download || true
+# Install gux CLI
+RUN go install {{.GuxModule}}/cmd/gux@{{.GuxVersion}}
 
 # Copy source code
 COPY . .
 
-# Build server binary
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o server ./cmd/server
+# Build everything: WASM + server binary with embedded assets
+RUN gux setup --tinygo && gux build --tinygo
 
-# Stage 3: Production image
+# Stage 2: Minimal production image
 FROM alpine:3.21
 
 WORKDIR /app
@@ -48,23 +27,8 @@ WORKDIR /app
 # Install CA certificates for HTTPS
 RUN apk add --no-cache ca-certificates
 
-# Copy server binary
-COPY --from=server-builder /app/server .
-
-# Create public directory for static files
-RUN mkdir -p public
-
-# Copy wasm_exec.js from TinyGo image (no need for local copy)
-COPY --from=wasm-builder /usr/local/tinygo/targets/wasm_exec.js ./public/
-
-# Copy static files to public directory
-COPY public/manifest.json ./public/
-COPY public/offline.html ./public/
-COPY public/service-worker.js ./public/
-
-# Copy index.html with updated WASM reference and versioned WASM from builder
-COPY --from=wasm-builder /app/index.html ./public/
-COPY --from=wasm-builder /app/main.*.wasm ./public/
+# Copy the single binary (all assets are embedded)
+COPY --from=builder /app/server .
 
 # Expose port
 EXPOSE 8080
@@ -74,4 +38,4 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD wget --no-verbose --tries=1 --spider http://localhost:8080/ || exit 1
 
 # Run server
-CMD ["./server", "-port", "8080", "-dir", "public"]
+CMD ["./server", "-port", "8080"]
