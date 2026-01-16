@@ -168,18 +168,17 @@ Plans:
 
 Plans:
 - [x] 10-01: Visible Focus Indicators (Toggle, Dropdown, Accordion, Tabs, DatePicker)
-- [ ] 10-02: TBD
+- [x] 10-02: Motion Preferences & Color Contrast
 
 #### Phase 11: A11y Testing Infrastructure
 
 **Goal**: Integrate axe-core for automated accessibility regression testing
 **Depends on**: Phase 10
-**Research**: Likely (axe-core API, Go/WASM testing integration)
-**Research topics**: axe-core API, automated testing integration, Go testing patterns
-**Plans**: TBD
+**Research**: Completed (Playwright + @axe-core/playwright standard pattern)
+**Plans**: 1 plan
 
 Plans:
-- [ ] 11-01: TBD (run /gsd:plan-phase 11 to break down)
+- [ ] 11-01: axe-core Test Foundation (Playwright setup, baseline tests, Makefile integration)
 
 ## Progress
 
@@ -197,5 +196,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | 7. Accessibility Audit | v1.1 | 3/3 | Complete | 2026-01-15 |
 | 8. ARIA & Semantic Markup | v1.1 | 6/6 | Complete | 2026-01-15 |
 | 9. Keyboard Navigation | v1.1 | 4/4 | Complete | 2026-01-15 |
-| 10. Visual Accessibility | v1.1 | 1/2 | In progress | - |
-| 11. A11y Testing Infrastructure | v1.1 | 0/? | Not started | - |
+| 10. Visual Accessibility | v1.1 | 2/2 | Complete | 2026-01-15 |
+| 11. A11y Testing Infrastructure | v1.1 | 0/1 | Planned | - |
