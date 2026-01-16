@@ -1,0 +1,14 @@
+package api
+
+// Item represents an example data type
+type Item struct {
+	ID    int    `json:"id"`
+	Name  string `json:"name"`
+	Value string `json:"value"`
+}
+
+// CreateItemRequest is the request body for creating an item
+type CreateItemRequest struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
+}

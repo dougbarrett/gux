@@ -1,0 +1,83 @@
+//go:build js && wasm
+
+package main
+
+import (
+	"{{.GuxModule}}/components"
+)
+
+var layout *components.Layout
+
+func main() {
+	// Initialize app (loads Tailwind, clears #app)
+	app := components.NewApp("app")
+
+	// Initialize toast notifications
+	components.InitToasts()
+
+	// Create router
+	router := components.NewRouter()
+	components.SetGlobalRouter(router)
+
+	// Register routes
+	router.Register("/", showHome)
+	router.Register("/about", showAbout)
+
+	// Create layout with sidebar
+	layout = components.NewLayout(components.LayoutProps{
+		Sidebar: components.SidebarProps{
+			Title: "{{.AppName}}",
+			Items: []components.NavItem{
+				{Label: "Home", Icon: "home", Path: "/"},
+				{Label: "About", Icon: "info", Path: "/about"},
+			},
+		},
+		Header: components.HeaderProps{
+			Title: "{{.AppName}}",
+		},
+	})
+
+	// Update sidebar on navigation
+	router.OnNavigate(func(path string) {
+		layout.Sidebar().SetActive(path)
+	})
+
+	app.Mount(layout.Element())
+
+	// Start router
+	router.Start()
+
+	// Keep running
+	app.Run()
+}
+
+func showHome() {
+	layout.SetContent(
+		components.Div("space-y-6",
+			components.TitledCard("Welcome to {{.AppName}}",
+				"Your Gux application is ready. Start building!",
+			),
+			components.Div("grid grid-cols-1 md:grid-cols-2 gap-4",
+				components.TitledCard("Get Started",
+					"Edit app/main.go to add new routes and components.",
+				),
+				components.TitledCard("Documentation",
+					"Visit github.com/dougbarrett/gux for full documentation.",
+				),
+			),
+		),
+	)
+}
+
+func showAbout() {
+	layout.SetContent(
+		components.Div("space-y-4",
+			components.TitledCard("About {{.AppName}}",
+				"This app was created with gux init.",
+			),
+			components.TitledCard("Built With",
+				"Gux - A Go + WebAssembly UI framework with Tailwind CSS.",
+			),
+		),
+	)
+}

@@ -1,0 +1,26 @@
+package api
+
+import "context"
+
+// ItemsAPI defines the items endpoints
+// Run `gux gen` to generate client and server code from this interface
+//
+// @client ItemsClient
+// @basepath /api/items
+type ItemsAPI interface {
+	// GetAll returns all items
+	// @route GET /
+	GetAll(ctx context.Context) ([]Item, error)
+
+	// GetByID returns a single item by ID
+	// @route GET /{id}
+	GetByID(ctx context.Context, id int) (*Item, error)
+
+	// Create creates a new item
+	// @route POST /
+	Create(ctx context.Context, req CreateItemRequest) (*Item, error)
+
+	// Delete removes an item
+	// @route DELETE /{id}
+	Delete(ctx context.Context, id int) error
+}

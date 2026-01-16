@@ -1,0 +1,36 @@
+package main
+
+import (
+	"flag"
+	"fmt"
+	"log"
+	"net/http"
+
+	"{{.GuxModule}}/server"
+)
+
+func main() {
+	port := flag.Int("port", 8080, "Port to serve on")
+	dir := flag.String("dir", ".", "Directory to serve static files from")
+	flag.Parse()
+
+	mux := http.NewServeMux()
+
+	// Add your API routes here
+	// Example:
+	// itemsService := NewItemsService()
+	// itemsHandler := api.NewItemsAPIHandler(itemsService)
+	// itemsHandler.RegisterRoutes(mux)
+
+	// SPA handler for static files
+	spaHandler := server.NewSPAHandler(*dir)
+	mux.HandleFunc("/", spaHandler.ServeHTTP)
+
+	addr := fmt.Sprintf(":%d", *port)
+	fmt.Printf("{{.AppName}} running at http://localhost%s\n", addr)
+	fmt.Printf("Serving static files from: %s\n", *dir)
+
+	if err := http.ListenAndServe(addr, mux); err != nil {
+		log.Fatal(err)
+	}
+}

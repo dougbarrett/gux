@@ -28,8 +28,39 @@ A full-stack Go framework for building modern web applications with WebAssembly.
 ### Installation
 
 ```bash
-go get github.com/yourusername/gux
+# Install the Gux CLI tool
+go install github.com/dougbarrett/gux/cmd/gux@latest
 ```
+
+### Create a New App
+
+```bash
+# Scaffold a new application
+gux init --module github.com/youruser/myapp myapp
+
+# Setup and run
+cd myapp
+make setup    # Copy wasm_exec.js from Go installation
+go mod tidy   # Download dependencies
+make dev      # Build and run at http://localhost:8080
+```
+
+This creates a minimal Gux application with:
+- `app/main.go` — WASM frontend with router and layout
+- `server/main.go` — HTTP server with SPA handler
+- `api/` — Example API interface for code generation
+- `Makefile` — Build commands (setup, build, dev, clean)
+- PWA files — manifest.json, service-worker.js, offline.html
+
+### Generate API Code
+
+```bash
+# Generate client and server code from API interfaces
+gux gen                  # Scans ./api directory
+gux gen --dir src/api    # Custom directory
+```
+
+This finds all `.go` files with `@client` annotations and generates type-safe HTTP clients and server handlers.
 
 ### Run the Example
 
@@ -50,8 +81,6 @@ make dev-tinygo     # Build and start server
 package api
 
 import "context"
-
-//go:generate go run gux/cmd/apigen -source=posts.go -output=posts_client_gen.go
 
 // @client PostsClient
 // @basepath /api/posts
@@ -76,10 +105,10 @@ type PostsAPI interface {
 ### 2. Generate Client & Server Code
 
 ```bash
-go generate ./api/...
+gux gen
 ```
 
-This generates:
+This scans the `api/` directory and generates:
 - `posts_client_gen.go` — Type-safe HTTP client for WASM
 - `posts_server_gen.go` — HTTP handler with automatic routing
 
@@ -485,7 +514,7 @@ make test-a11y-debug  # Run with visible browser
 gux/
 ├── api/           # Error handling, query utilities, pagination
 ├── auth/          # Authentication helpers
-├── cmd/apigen/    # Code generator CLI tool
+├── cmd/gux/       # CLI tool (gux init, gux gen)
 ├── components/    # 45+ UI components (WASM)
 ├── example/       # Complete working application
 │   ├── app/       # WASM frontend
