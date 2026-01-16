@@ -2,12 +2,12 @@
 
 ## Current Position
 
-Phase: 10 of 11 (Visual Accessibility)
-Plan: 2 of 2 in current phase
+Phase: 11 of 11 (A11y Testing Infrastructure)
+Plan: 1 of 1 in current phase
 Status: Complete
-Last activity: 2026-01-15 - Completed 10-02-PLAN.md
+Last activity: 2026-01-16 - Completed 11-01-PLAN.md
 
-Progress: █████████░ 95% (v1.1: Phase 10 complete, ready for Phase 11)
+Progress: ██████████ 100% (v1.1 Accessibility milestone complete!)
 
 ## Accumulated Context
 
@@ -101,6 +101,10 @@ Progress: █████████░ 95% (v1.1: Phase 10 complete, ready for
 - 10-02: bg-blue-600 for 4.5:1 contrast (replaces bg-blue-500)
 - 10-02: text-gray-500 for decorative elements (replaces text-gray-400)
 - 10-02: axe DevTools for contrast testing (more accurate than CSS Overview)
+- 11-01: Playwright webServer starts make dev on port 8093
+- 11-01: WCAG 2.1 AA tags: wcag2a, wcag2aa, wcag21a, wcag21aa
+- 11-01: 30s timeout for WASM load reliability
+- 11-01: Go 1.24 wasm_exec.js path: lib/wasm (not misc/wasm)
 
 ### Blockers/Concerns Carried Forward
 - None
@@ -122,9 +126,11 @@ None yet.
 - Phase 8 (ARIA & Semantic Markup) complete - 6/6 plans executed
 - Phase 9 (Keyboard Navigation) complete - 4/4 plans executed
 - Phase 10 (Visual Accessibility) complete - 2/2 plans executed
+- Phase 11 (A11y Testing Infrastructure) complete - 1/1 plans executed
+- **v1.1 Accessibility milestone complete** - All 5 phases, 16 plans executed (shipped 2026-01-16)
 
 ## Session Continuity
 
-Last session: 2026-01-15
-Stopped at: Completed 10-02-PLAN.md (Motion Preferences & Color Contrast)
+Last session: 2026-01-16
+Stopped at: Completed 11-01-PLAN.md (axe-core Test Foundation)
 Resume file: None

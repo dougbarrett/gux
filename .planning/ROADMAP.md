@@ -12,7 +12,7 @@ Transform GoQuery from a functional database query tool into a polished, product
 ## Milestones
 
 - ✅ **v1.0 UX Polish** - Phases 1-6 (shipped 2026-01-15)
-- 🚧 **v1.1 Accessibility** - Phases 7-11 (in progress)
+- ✅ **v1.1 Accessibility** - Phases 7-11 (shipped 2026-01-16)
 
 ## Phases
 
@@ -29,8 +29,8 @@ Transform GoQuery from a functional database query tool into a polished, product
 - [x] **Phase 7: Accessibility Audit** - Review all components, document gaps, establish baseline
 - [x] **Phase 8: ARIA & Semantic Markup** - Screen reader support, labels, roles, live regions
 - [x] **Phase 9: Keyboard Navigation** - Comprehensive keyboard support for all components
-- [ ] **Phase 10: Visual Accessibility** - Focus indicators, contrast, reduced motion
-- [ ] **Phase 11: A11y Testing Infrastructure** - axe-core integration, testing patterns
+- [x] **Phase 10: Visual Accessibility** - Focus indicators, contrast, reduced motion
+- [x] **Phase 11: A11y Testing Infrastructure** - axe-core integration, testing patterns
 
 ## Phase Details
 
@@ -113,7 +113,7 @@ Plans:
 
 </details>
 
-### 🚧 v1.1 Accessibility (In Progress)
+### ✅ v1.1 Accessibility (Complete)
 
 **Milestone Goal:** Enterprise-ready accessibility compliance with WCAG 2.1 AA standards
 
@@ -158,7 +158,7 @@ Plans:
 - [x] 09-03: DatePicker Calendar Navigation (grid arrows, Enter, Escape)
 - [x] 09-04: Focus Polish (Dropdown, Sidebar, SkipLink)
 
-#### Phase 10: Visual Accessibility
+#### Phase 10: Visual Accessibility (Complete)
 
 **Goal**: Implement focus indicators, color contrast compliance, and reduced motion support
 **Depends on**: Phase 9
@@ -170,7 +170,7 @@ Plans:
 - [x] 10-01: Visible Focus Indicators (Toggle, Dropdown, Accordion, Tabs, DatePicker)
 - [x] 10-02: Motion Preferences & Color Contrast
 
-#### Phase 11: A11y Testing Infrastructure
+#### Phase 11: A11y Testing Infrastructure (Complete)
 
 **Goal**: Integrate axe-core for automated accessibility regression testing
 **Depends on**: Phase 10
@@ -178,7 +178,7 @@ Plans:
 **Plans**: 1 plan
 
 Plans:
-- [ ] 11-01: axe-core Test Foundation (Playwright setup, baseline tests, Makefile integration)
+- [x] 11-01: axe-core Test Foundation (Playwright setup, baseline tests, Makefile integration)
 
 ## Progress
 
@@ -197,4 +197,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | 8. ARIA & Semantic Markup | v1.1 | 6/6 | Complete | 2026-01-15 |
 | 9. Keyboard Navigation | v1.1 | 4/4 | Complete | 2026-01-15 |
 | 10. Visual Accessibility | v1.1 | 2/2 | Complete | 2026-01-15 |
-| 11. A11y Testing Infrastructure | v1.1 | 0/1 | Planned | - |
+| 11. A11y Testing Infrastructure | v1.1 | 1/1 | Complete | 2026-01-16 |
