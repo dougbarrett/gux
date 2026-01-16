@@ -14,11 +14,13 @@ RUN go mod download || true
 COPY . .
 
 # Build WASM module and version it with content hash
+# Copy index.html to /app (writable) for sed modification
 RUN GOFLAGS=-buildvcs=false tinygo build -o main.wasm -target wasm -no-debug ./cmd/app && \
     HASH=$(sha256sum main.wasm | cut -c1-8) && \
     mv main.wasm main.${HASH}.wasm && \
-    sed -i "s|fetch(\"/main\.[^\"]*\.wasm\"|fetch(\"/main.${HASH}.wasm\"|g" public/index.html && \
-    sed -i "s|fetch(\"/main\.wasm\"|fetch(\"/main.${HASH}.wasm\"|g" public/index.html
+    cp public/index.html index.html && \
+    sed -i "s|fetch(\"/main\.[^\"]*\.wasm\"|fetch(\"/main.${HASH}.wasm\"|g" index.html && \
+    sed -i "s|fetch(\"/main\.wasm\"|fetch(\"/main.${HASH}.wasm\"|g" index.html
 
 # Stage 2: Build Go server
 FROM golang:1.25-alpine AS server-builder
@@ -61,7 +63,7 @@ COPY public/offline.html ./public/
 COPY public/service-worker.js ./public/
 
 # Copy index.html with updated WASM reference and versioned WASM from builder
-COPY --from=wasm-builder /app/public/index.html ./public/
+COPY --from=wasm-builder /app/index.html ./public/
 COPY --from=wasm-builder /app/main.*.wasm ./public/
 
 # Expose port
