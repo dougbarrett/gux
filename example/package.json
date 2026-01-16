@@ -1,0 +1,14 @@
+{
+  "name": "goquery-example",
+  "version": "1.0.0",
+  "description": "Accessibility testing for GoQuery component library",
+  "private": true,
+  "scripts": {
+    "test": "playwright test",
+    "test:a11y": "playwright test tests/a11y.spec.ts"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.10.0",
+    "@playwright/test": "^1.48.0"
+  }
+}
