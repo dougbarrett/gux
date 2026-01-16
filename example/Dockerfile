@@ -48,6 +48,9 @@ COPY --from=server-builder /app/server .
 # Copy static files
 COPY example/index.html .
 COPY example/wasm_exec.js .
+COPY example/manifest.json .
+COPY example/offline.html .
+COPY example/service-worker.js .
 
 # Copy built WASM
 COPY --from=wasm-builder /app/main.wasm .
