@@ -13,7 +13,7 @@ Transform GoQuery from a functional database query tool into a polished, product
 
 - ✅ [v1.0 UX Polish](milestones/v1.0-ROADMAP.md) (Phases 1-6) - SHIPPED 2026-01-15
 - ✅ [v1.1 Accessibility](milestones/v1.1-ROADMAP.md) (Phases 7-11) - SHIPPED 2026-01-16
-- 🚧 **v1.2 Documentation** - Phases 12-15 (in progress)
+- ✅ [v1.2 Documentation](milestones/v1.2-ROADMAP.md) (Phases 12-15) - SHIPPED 2026-01-15
 
 ## Phases
 
@@ -54,49 +54,19 @@ Full details: [milestones/v1.1-ROADMAP.md](milestones/v1.1-ROADMAP.md)
 
 </details>
 
-### 🚧 v1.2 Documentation (In Progress)
+<details>
+<summary>v1.2 Documentation (Phases 12-15) - SHIPPED 2026-01-15</summary>
 
 **Milestone Goal:** Bring documentation up to date with v1.0 and v1.1 features
 
-#### Phase 12: README Update
+- [x] Phase 12: README Update (1/1 plans) - Comprehensive README with v1.0/v1.1 features
+- [x] Phase 13: Component Docs (1/1 plans) - 7 new component APIs documented
+- [x] Phase 14: Keyboard Shortcuts (1/1 plans) - 279 lines, all shortcuts by feature area
+- [x] Phase 15: Accessibility Guide (1/1 plans) - 570 lines, ARIA patterns, testing guide
 
-**Goal**: Comprehensive README.md update with features, keyboard shortcuts, and new capabilities
-**Depends on**: Phase 11 (previous milestone complete)
-**Research**: Unlikely (internal documentation)
-**Plans**: 1/1 complete
+Full details: [milestones/v1.2-ROADMAP.md](milestones/v1.2-ROADMAP.md)
 
-Plans:
-- [x] 12-01: README Update (v1.0 + v1.1 features, accessibility, keyboard shortcuts)
-
-#### Phase 13: Component Docs
-
-**Goal**: Update docs/components.md with new components (UserMenu, NotificationCenter, CommandPalette, DataExport)
-**Depends on**: Phase 12
-**Research**: Unlikely (documenting existing components)
-**Plans**: 1/1 complete
-
-Plans:
-- [x] 13-01: Component Documentation (7 new component APIs documented)
-
-#### Phase 14: Keyboard Shortcuts
-
-**Goal**: New documentation page with all keyboard shortcuts organized by feature area
-**Depends on**: Phase 13
-**Research**: Unlikely (documenting existing shortcuts)
-**Plans**: 1/1 complete
-
-Plans:
-- [x] 14-01: Keyboard Shortcuts Documentation (279 lines, all shortcuts by feature area)
-
-#### Phase 15: Accessibility Guide
-
-**Goal**: New documentation for contributors covering ARIA patterns, keyboard navigation, focus management
-**Depends on**: Phase 14
-**Research**: Unlikely (documenting existing patterns)
-**Plans**: 1/1 complete
-
-Plans:
-- [x] 15-01: Accessibility Guide (570 lines, ARIA patterns, FocusTrap API, testing guide)
+</details>
 
 ## Progress
 
@@ -116,7 +86,7 @@ Phases execute in numeric order: 1 → 2 → ... → 11 → 12 → 13 → 14 →
 | 9. Keyboard Navigation | v1.1 | 4/4 | Complete | 2026-01-15 |
 | 10. Visual Accessibility | v1.1 | 2/2 | Complete | 2026-01-15 |
 | 11. A11y Testing Infrastructure | v1.1 | 1/1 | Complete | 2026-01-16 |
-| 12. README Update | v1.2 | 1/1 | Complete | 2026-01-16 |
-| 13. Component Docs | v1.2 | 1/1 | Complete | 2026-01-16 |
-| 14. Keyboard Shortcuts | v1.2 | 1/1 | Complete | 2026-01-16 |
-| 15. Accessibility Guide | v1.2 | 1/1 | Complete | 2026-01-16 |
+| 12. README Update | v1.2 | 1/1 | Complete | 2026-01-15 |
+| 13. Component Docs | v1.2 | 1/1 | Complete | 2026-01-15 |
+| 14. Keyboard Shortcuts | v1.2 | 1/1 | Complete | 2026-01-15 |
+| 15. Accessibility Guide | v1.2 | 1/1 | Complete | 2026-01-15 |

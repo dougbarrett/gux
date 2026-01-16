@@ -1,5 +1,29 @@
 # Project Milestones: GoQuery
 
+## v1.2 Documentation (Shipped: 2026-01-15)
+
+**Delivered:** Comprehensive documentation update bringing README, component docs, keyboard shortcuts, and accessibility guide up to date with v1.0 and v1.1 features.
+
+**Phases completed:** 12-15 (4 plans total)
+
+**Key accomplishments:**
+- README updated with all v1.0/v1.1 features, accessibility section, keyboard shortcuts table
+- Component API documentation for 7 new components (UserMenu, NotificationCenter, CommandPalette, etc.)
+- Keyboard shortcuts reference (279 lines) organized by feature area
+- Accessibility contributor guide (570 lines) with ARIA patterns, FocusTrap API, testing guide
+
+**Stats:**
+- 31 files modified
+- ~2,650 lines of documentation
+- 4 phases, 4 plans
+- 3 days from v1.1 to v1.2
+
+**Git range:** `docs(12)` -> `docs(15-01)`
+
+**What's next:** TBD - next milestone planning
+
+---
+
 ## v1.1 Accessibility (Shipped: 2026-01-16)
 
 **Delivered:** Enterprise-ready accessibility compliance with WCAG 2.1 AA standards, ARIA patterns for all components, and automated axe-core testing infrastructure.
