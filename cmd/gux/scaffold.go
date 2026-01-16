@@ -4,6 +4,7 @@ import (
 	"embed"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"text/template"
 )
@@ -123,6 +124,19 @@ func runInit(appName, modulePath string) {
 		fmt.Printf("  created %s\n", f.destPath)
 	}
 
+	// Run go mod tidy to download dependencies
+	fmt.Println("\nRunning go mod tidy...")
+	cmd := exec.Command("go", "mod", "tidy")
+	cmd.Dir = targetDir
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		fmt.Printf("Warning: go mod tidy failed: %v\n", err)
+		fmt.Println("You may need to run 'go mod tidy' manually.")
+	} else {
+		fmt.Println("  dependencies downloaded")
+	}
+
 	printNextStepsWithDir(appName, initHere)
 }
 
@@ -203,11 +217,12 @@ func printNextStepsWithDir(appName string, initHere bool) {
 Created Gux application in current directory
 
 Next steps:
-  gux setup       # Copy wasm_exec.js from Go installation
-  go mod tidy     # Download dependencies
+  gux setup       # Copy wasm_exec.js for local development (optional)
   gux dev         # Build and run dev server
 
 Your app will be available at http://localhost:8080
+
+Note: Docker builds don't require wasm_exec.js locally - it's copied from the TinyGo image.
 `)
 	} else {
 		fmt.Printf(`
@@ -215,11 +230,12 @@ Created Gux application in ./%s
 
 Next steps:
   cd %s
-  gux setup       # Copy wasm_exec.js from Go installation
-  go mod tidy     # Download dependencies
+  gux setup       # Copy wasm_exec.js for local development (optional)
   gux dev         # Build and run dev server
 
 Your app will be available at http://localhost:8080
+
+Note: Docker builds don't require wasm_exec.js locally - it's copied from the TinyGo image.
 `, appName, appName)
 	}
 }
