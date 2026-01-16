@@ -598,6 +598,83 @@ list := components.VirtualList(components.VirtualListProps{
 })
 ```
 
+## Data Export
+
+### ExportCSV
+
+Export data to CSV file with browser download:
+
+```go
+data := []map[string]any{
+    {"id": 1, "name": "John", "email": "john@example.com"},
+    {"id": 2, "name": "Jane", "email": "jane@example.com"},
+}
+
+columns := []string{"id", "name", "email"}
+
+components.ExportCSV(data, columns, "users.csv")
+```
+
+**Parameters:**
+- `data` - Slice of maps containing row data
+- `columns` - Column order and which fields to include
+- `filename` - Output filename (.csv extension added automatically)
+
+**Note:** Handles proper CSV escaping for quotes, commas, and newlines.
+
+### ExportJSON
+
+Export data to JSON file with browser download:
+
+```go
+data := []map[string]any{
+    {"id": 1, "name": "John"},
+    {"id": 2, "name": "Jane"},
+}
+
+components.ExportJSON(data, "users.json")
+```
+
+**Parameters:**
+- `data` - Slice of maps to export
+- `filename` - Output filename (.json extension added automatically)
+
+**Note:** JSON is formatted with indentation for readability.
+
+### ExportPDF
+
+Export data to PDF table with browser download:
+
+```go
+data := []map[string]any{
+    {"id": 1, "name": "John", "status": "active"},
+    {"id": 2, "name": "Jane", "status": "pending"},
+}
+
+headers := []string{"ID", "Name", "Status"}
+keys := []string{"id", "name", "status"}
+
+components.ExportPDF(data, headers, keys, "report.pdf", components.PDFExportOptions{
+    Title:       "User Report",
+    Orientation: "landscape", // "portrait" or "landscape"
+    PageSize:    "a4",        // "a4" or "letter"
+})
+```
+
+**Parameters:**
+- `data` - Slice of maps containing row data
+- `headers` - Column display names
+- `keys` - Data field keys (order matches headers)
+- `filename` - Output filename (.pdf extension added automatically)
+- `options` - PDFExportOptions struct
+
+**PDFExportOptions:**
+- `Title` - Title shown at top of PDF
+- `Orientation` - `"portrait"` or `"landscape"` (default: portrait)
+- `PageSize` - `"a4"` or `"letter"` (default: a4)
+
+**Note:** Requires jsPDF and jsPDF-AutoTable libraries. Table component has built-in export dropdown when `Exportable: true`.
+
 ## Feedback Components
 
 ### Modal
@@ -713,6 +790,173 @@ buttonWithTooltip := components.WithTooltip(
     components.TooltipTop, // Top, Bottom, Left, Right
 )
 ```
+
+### ConnectionStatus
+
+Display WebSocket connection state with multiple variants:
+
+```go
+// Basic dot indicator
+status := components.NewConnectionStatus(components.ConnectionStatusProps{
+    Variant:   components.ConnectionStatusDotVariant, // "dot", "badge", "text", "full"
+    Size:      components.ConnectionStatusMD,         // "sm", "md", "lg"
+    ShowLabel: true,                                  // Show text label next to dot
+})
+
+// Bind to WebSocket store for automatic updates
+status.BindToWebSocket(wsStore)
+
+// Manual state control
+status.SetState(state.WSOpen)      // Connected
+status.SetState(state.WSConnecting) // Connecting
+status.SetState(state.WSClosed)     // Disconnected
+
+// Get current state
+currentState := status.State()
+
+// Cleanup
+status.Unbind()
+```
+
+**Convenience constructors:**
+
+```go
+components.ConnectionStatusDot(components.ConnectionStatusMD)  // Minimal dot
+components.ConnectionStatusBadge()                             // Badge with text
+components.ConnectionStatusText()                              // Text only
+components.ConnectionStatusFull()                              // Icon + message
+```
+
+**Variants:**
+- `ConnectionStatusDotVariant` - Colored dot indicator
+- `ConnectionStatusBadgeVariant` - Pill badge with status text
+- `ConnectionStatusTextVariant` - Text-only status
+- `ConnectionStatusFullVariant` - Full indicator with dot and label
+
+**Sizes:** `ConnectionStatusSM`, `ConnectionStatusMD`, `ConnectionStatusLG`
+
+**Props:**
+- `Variant` - Display variant (default: dot)
+- `Size` - Component size (default: md)
+- `Labels` - Custom labels for each state
+- `ShowLabel` - Show text label next to dot
+
+**Methods:**
+- `Element()` - Returns the DOM element
+- `SetState(state)` - Manually set connection state
+- `State()` - Get current state
+- `BindToWebSocket(store)` - Subscribe to WebSocketStore changes
+- `Unbind()` - Remove WebSocket subscription
+
+**Note:** Uses ARIA live region for accessibility announcements when state changes.
+
+### EmptyState
+
+Friendly empty state messages with optional action:
+
+```go
+empty := components.NewEmptyState(components.EmptyStateProps{
+    Icon:        "📭",              // Emoji icon
+    Title:       "No messages",
+    Description: "You don't have any messages yet.",
+    ActionLabel: "Compose",          // Optional button
+    OnAction:    func() { compose() },
+    Compact:     false,              // Smaller variant
+})
+
+container.Call("appendChild", empty.Element())
+```
+
+**Convenience constructors:**
+
+```go
+// Generic "no data" state
+components.NoData("No items")
+
+// "No results" with clear filter button
+components.NoResults(func() { clearFilters() })
+
+// "Nothing selected" state
+components.NoSelection()
+```
+
+**Props:**
+- `Icon` - Emoji or text icon (default: "📭")
+- `Title` - Main heading (required)
+- `Description` - Explanatory text (optional)
+- `ActionLabel` - Button text (optional)
+- `OnAction` - Button click handler (optional)
+- `Compact` - Smaller variant for inline use
+
+**Methods:**
+- `Element()` - Returns the container DOM element
+
+**Note:** Centered layout with large emoji icon and optional primary action button.
+
+### ConfirmDialog
+
+Confirmation dialog for destructive or important actions:
+
+```go
+dialog := components.NewConfirmDialog(components.ConfirmDialogProps{
+    Title:       "Delete Item",
+    Message:     "Are you sure you want to delete this item? This action cannot be undone.",
+    ConfirmText: "Delete",           // Default: "Confirm"
+    CancelText:  "Cancel",           // Default: "Cancel"
+    Variant:     components.ConfirmVariantDanger, // Button style
+    OnConfirm:   func() { deleteItem() },
+    OnCancel:    func() { /* optional */ },
+})
+
+document.Get("body").Call("appendChild", dialog.Element())
+
+// Show dialog
+dialog.Open()
+
+// Close programmatically
+dialog.Close()
+
+// Check state
+if dialog.IsOpen() { /* ... */ }
+```
+
+**Convenience constructors:**
+
+```go
+// Standard confirmation
+dialog := components.Confirm("Confirm Action", "Are you sure?", func() {
+    // Handle confirm
+})
+dialog.Open()
+
+// Dangerous action (red button)
+dialog := components.ConfirmDanger("Delete Account", "This cannot be undone.", func() {
+    // Handle delete
+})
+dialog.Open()
+```
+
+**Variants:**
+- `ConfirmVariantDefault` - Primary button style
+- `ConfirmVariantDanger` - Red/danger button style
+- `ConfirmVariantWarning` - Warning button style
+
+**Props:**
+- `Title` - Dialog title
+- `Message` - Confirmation message
+- `ConfirmText` - Confirm button text (default: "Confirm")
+- `CancelText` - Cancel button text (default: "Cancel")
+- `Variant` - Visual style (affects confirm button)
+- `OnConfirm` - Called when confirmed
+- `OnCancel` - Called when cancelled (optional)
+
+**Methods:**
+- `Element()` - Returns the dialog DOM element
+- `Open()` - Shows the confirmation dialog
+- `Close()` - Hides the dialog
+- `IsOpen()` - Returns whether dialog is open
+
+**Note:** Uses `alertdialog` ARIA role for accessibility. Wraps Modal component with focus management.
 
 ## Navigation Components
 
