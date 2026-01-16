@@ -48,25 +48,25 @@ func main() {
 
 	case "build":
 		buildCmd := flag.NewFlagSet("build", flag.ExitOnError)
-		tinygo := buildCmd.Bool("tinygo", false, "Use TinyGo for smaller output (~500KB vs ~5MB)")
+		useGo := buildCmd.Bool("go", false, "Use standard Go instead of TinyGo (~5MB vs ~500KB)")
 		buildCmd.Parse(os.Args[2:])
 
-		runBuild(*tinygo)
+		runBuild(!*useGo) // TinyGo is default
 
 	case "dev":
 		devCmd := flag.NewFlagSet("dev", flag.ExitOnError)
 		port := devCmd.Int("port", 8080, "Port to run dev server on")
-		tinygo := devCmd.Bool("tinygo", false, "Use TinyGo for smaller output")
+		useGo := devCmd.Bool("go", false, "Use standard Go instead of TinyGo")
 		devCmd.Parse(os.Args[2:])
 
-		runDev(*port, *tinygo)
+		runDev(*port, !*useGo) // TinyGo is default
 
 	case "setup":
 		setupCmd := flag.NewFlagSet("setup", flag.ExitOnError)
-		tinygo := setupCmd.Bool("tinygo", false, "Copy wasm_exec.js from TinyGo instead of Go")
+		useGo := setupCmd.Bool("go", false, "Copy wasm_exec.js from standard Go instead of TinyGo")
 		setupCmd.Parse(os.Args[2:])
 
-		runSetup(*tinygo)
+		runSetup(!*useGo) // TinyGo is default
 
 	case "claude":
 		runClaude()
@@ -90,21 +90,24 @@ func printUsage() {
 Usage:
     gux init [--module <module-path>] <appname>   Create a new Gux application
     gux init --module <module-path> .             Initialize in current directory
-    gux setup [--tinygo]                          Copy wasm_exec.js to public/
+    gux setup [--go]                              Copy wasm_exec.js to public/
     gux gen [--dir <api-dir>]                     Generate API client code
-    gux build [--tinygo]                          Build WASM module to public/
-    gux dev [--port <port>] [--tinygo]            Build and run dev server
-    gux claude                                     Install Claude Code skill
-    gux version                                    Show version
-    gux help                                       Show this help
+    gux build [--go]                              Build WASM and server binary
+    gux dev [--port <port>] [--go]                Build and run dev server
+    gux claude                                    Install Claude Code skill
+    gux version                                   Show version
+    gux help                                      Show this help
+
+TinyGo is the default compiler (~500KB WASM). Use --go for standard Go (~5MB).
 
 Examples:
     gux init --module github.com/myuser/myapp myapp   # Create new directory
     gux init --module github.com/myuser/myapp .       # Use current directory
-    gux setup                # Copy wasm_exec.js from Go to public/
-    gux setup --tinygo       # Copy wasm_exec.js from TinyGo to public/
-    gux build --tinygo       # Build with TinyGo (~500KB)
-    gux dev                  # Run dev server on :8080
+    gux setup                # Copy wasm_exec.js from TinyGo to public/
+    gux setup --go           # Copy wasm_exec.js from standard Go to public/
+    gux build                # Build with TinyGo (~500KB WASM)
+    gux build --go           # Build with standard Go (~5MB WASM)
+    gux dev                  # Run dev server on :8080 (TinyGo)
     gux dev --port 3000      # Run on custom port
     gux claude               # Install Claude Code skill for AI assistance
 

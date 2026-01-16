@@ -134,8 +134,16 @@ func runBuild(tinygo bool) {
 	// Build the WASM first
 	buildWasm(tinygo)
 
-	// Build the server binary with embedded assets
+	// Copy public/ to cmd/server/public/ for embedding
+	// (go:embed paths are relative to the source file)
 	fmt.Println("Building server binary with embedded assets...")
+
+	serverPublic := filepath.Join("cmd", "server", "public")
+	if err := copyDir("public", serverPublic); err != nil {
+		fmt.Printf("Error copying public directory: %v\n", err)
+		os.Exit(1)
+	}
+	defer os.RemoveAll(serverPublic) // Clean up after build
 
 	cmd := exec.Command("go", "build", "-ldflags=-s -w", "-o", "server", "./cmd/server")
 	cmd.Stdout = os.Stdout
@@ -156,6 +164,42 @@ func runBuild(tinygo bool) {
 	serverSize := float64(serverInfo.Size()) / 1024 / 1024
 	fmt.Printf("Built ./server (%.2f MB) with all assets embedded\n", serverSize)
 	fmt.Println("\nRun with: ./server")
+}
+
+// copyDir recursively copies a directory
+func copyDir(src, dst string) error {
+	return filepath.Walk(src, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		// Calculate destination path
+		relPath, err := filepath.Rel(src, path)
+		if err != nil {
+			return err
+		}
+		dstPath := filepath.Join(dst, relPath)
+
+		if info.IsDir() {
+			return os.MkdirAll(dstPath, info.Mode())
+		}
+
+		// Copy file
+		srcFile, err := os.Open(path)
+		if err != nil {
+			return err
+		}
+		defer srcFile.Close()
+
+		dstFile, err := os.Create(dstPath)
+		if err != nil {
+			return err
+		}
+		defer dstFile.Close()
+
+		_, err = io.Copy(dstFile, srcFile)
+		return err
+	})
 }
 
 // cleanOldWasmFiles removes old versioned wasm files from previous gux versions.

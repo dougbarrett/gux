@@ -91,34 +91,34 @@ gux dev           # Start development server
 
 ## gux setup
 
-Copies the `wasm_exec.js` runtime file from your Go or TinyGo installation into the current directory.
+Copies the `wasm_exec.js` runtime file from your TinyGo (default) or Go installation into the current directory.
 
 ```bash
-gux setup [--tinygo]
+gux setup [--go]
 ```
 
 ### Options
 
 | Flag | Description |
 |------|-------------|
-| `--tinygo` | Copy from TinyGo instead of standard Go |
+| `--go` | Copy from standard Go instead of TinyGo |
 
 ### Examples
 
 ```bash
-# Copy from standard Go installation
+# Copy from TinyGo installation (default)
 gux setup
 
-# Copy from TinyGo installation
-gux setup --tinygo
+# Copy from standard Go installation
+gux setup --go
 ```
 
 ### Notes
 
 - Run this command from your project root
 - The `wasm_exec.js` file is required to run Go WASM in the browser
-- Use `--tinygo` if you plan to build with TinyGo for smaller binaries
-- Must match your build toolchain (Go or TinyGo)
+- TinyGo is the default (smaller WASM binaries ~500KB)
+- Must match your build toolchain (TinyGo or Go)
 
 ---
 
@@ -234,23 +234,23 @@ See [API Generation](api-generation.md) for complete documentation.
 Builds a production-ready binary with WASM and all static assets embedded.
 
 ```bash
-gux build [--tinygo]
+gux build [--go]
 ```
 
 ### Options
 
 | Flag | Description |
 |------|-------------|
-| `--tinygo` | Use TinyGo for smaller WASM output (~500KB vs ~5MB) |
+| `--go` | Use standard Go instead of TinyGo (~5MB vs ~500KB) |
 
 ### Examples
 
 ```bash
-# Build with standard Go
+# Build with TinyGo (default, smaller WASM ~500KB)
 gux build
 
-# Build with TinyGo (recommended for smaller WASM)
-gux build --tinygo
+# Build with standard Go (larger WASM ~5MB, full stdlib)
+gux build --go
 
 # Run the production binary
 ./server
@@ -307,7 +307,7 @@ For large files (videos, large images), consider using a CDN instead of embeddin
 Builds the WASM module and starts a development server.
 
 ```bash
-gux dev [--port <port>] [--tinygo]
+gux dev [--port <port>] [--go]
 ```
 
 ### Options
@@ -315,19 +315,19 @@ gux dev [--port <port>] [--tinygo]
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--port` | `8080` | Port to run the server on |
-| `--tinygo` | `false` | Use TinyGo for building |
+| `--go` | `false` | Use standard Go instead of TinyGo |
 
 ### Examples
 
 ```bash
-# Run on default port 8080
+# Run on default port 8080 (uses TinyGo)
 gux dev
 
 # Run on custom port
 gux dev --port 3000
 
-# Build with TinyGo and run
-gux dev --tinygo
+# Build with standard Go and run
+gux dev --go
 ```
 
 ### What It Does
@@ -386,14 +386,14 @@ gux dev
 ### Daily Development
 
 ```bash
-# Start dev server (rebuilds WASM automatically)
+# Start dev server (rebuilds WASM automatically, uses TinyGo)
 gux dev
 
 # After changing API interfaces
 gux gen
 
 # Production build (single binary with embedded assets)
-gux build --tinygo
+gux build
 ./server
 ```
 
@@ -410,11 +410,11 @@ gux build --tinygo
 
 ### "wasm_exec.js not found"
 
-Run `gux setup` to copy the file from your Go installation:
+Run `gux setup` to copy the file from your TinyGo installation:
 
 ```bash
-gux setup          # For standard Go
-gux setup --tinygo # For TinyGo
+gux setup       # For TinyGo (default)
+gux setup --go  # For standard Go
 ```
 
 ### "no app/ directory found"
@@ -448,5 +448,5 @@ type MyAPI interface { ... }
 ### Build errors with TinyGo
 
 Some standard library features aren't supported. Either:
-- Use `gux build` (without `--tinygo`) for full compatibility
+- Use `gux build --go` for full standard library compatibility
 - Check [TinyGo compatibility](https://tinygo.org/docs/reference/lang-support/)

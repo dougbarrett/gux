@@ -9,9 +9,9 @@ Gux applications compile to a **single binary** with all static assets embedded.
 ### Building for Production
 
 ```bash
-# Build the production binary
-gux setup --tinygo
-gux build --tinygo
+# Build the production binary (TinyGo is the default)
+gux setup
+gux build
 
 # Run locally
 ./server
@@ -57,9 +57,11 @@ FROM tinygo/tinygo:latest AS builder
 WORKDIR /app
 COPY go.mod go.sum* ./
 RUN go mod download || true
-RUN go install github.com/dougbarrett/gux/cmd/gux@latest
-COPY . .
-RUN gux setup --tinygo && gux build --tinygo
+ENV GOBIN=/app/bin
+ENV PATH="/app/bin:${PATH}"
+RUN mkdir -p /app/bin && go install github.com/dougbarrett/gux/cmd/gux@latest
+COPY --chown=tinygo:tinygo . .
+RUN gux setup && gux build  # TinyGo is the default
 
 # Stage 2: Minimal production image
 FROM alpine:3.21
@@ -468,13 +470,13 @@ The built-in `server.Logger()` middleware logs all requests:
 ### WASM Size
 
 ```bash
-# Use TinyGo (recommended)
-tinygo build -o main.wasm -target wasm -no-debug ./app
-# ~500KB
+# TinyGo (default, recommended)
+gux build
+# ~500KB WASM
 
-# Standard Go (larger)
-GOOS=js GOARCH=wasm go build -o main.wasm ./app
-# ~5MB
+# Standard Go (larger, full stdlib)
+gux build --go
+# ~5MB WASM
 ```
 
 ### Compression
