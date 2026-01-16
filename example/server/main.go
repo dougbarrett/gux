@@ -6,8 +6,8 @@ import (
 	"log"
 	"net/http"
 
-	"gux/example/api"
-	"gux/server"
+	"github.com/dougbarrett/guxexample/api"
+	server "github.com/dougbarrett/guxserver"
 )
 
 func main() {
@@ -38,7 +38,11 @@ func main() {
 	postsService.SetEventCallbacks(
 		func(post api.Post) { postsWSHandler.broadcastEvent("post.created", post) },
 		func(post api.Post) { postsWSHandler.broadcastEvent("post.updated", post) },
-		func(id int) { postsWSHandler.broadcastEvent("post.deleted", struct{ ID int `json:"id"` }{id}) },
+		func(id int) {
+			postsWSHandler.broadcastEvent("post.deleted", struct {
+				ID int `json:"id"`
+			}{id})
+		},
 	)
 
 	// SPA handler for static files

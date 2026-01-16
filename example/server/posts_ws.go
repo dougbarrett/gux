@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"sync"
 
+	"github.com/dougbarrett/guxexample/api"
 	"github.com/gorilla/websocket"
-	"gux/example/api"
 )
 
 var upgrader = websocket.Upgrader{
@@ -26,10 +26,10 @@ type Message struct {
 
 // PostsWSHandler handles WebSocket connections for posts
 type PostsWSHandler struct {
-	service     *PostsService
-	clients     map[*websocket.Conn]bool
-	clientsMu   sync.RWMutex
-	broadcast   chan Message
+	service   *PostsService
+	clients   map[*websocket.Conn]bool
+	clientsMu sync.RWMutex
+	broadcast chan Message
 }
 
 // NewPostsWSHandler creates a new WebSocket handler
@@ -160,7 +160,9 @@ func (h *PostsWSHandler) handleMessage(conn *websocket.Conn, msg Message) {
 		}
 		h.sendResponse(conn, msg.Type+".response", msg.ID, struct{ Success bool }{true})
 		// Broadcast to all clients
-		h.broadcastEvent("post.deleted", struct{ ID int `json:"id"` }{req.ID})
+		h.broadcastEvent("post.deleted", struct {
+			ID int `json:"id"`
+		}{req.ID})
 
 	case "posts.subscribe":
 		// Client is subscribed by default when connected

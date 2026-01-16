@@ -91,7 +91,7 @@ package main
 
 import (
     "yourapp/api"
-    "gux/components"
+    "github.com/dougbarrett/guxcomponents"
 )
 
 func main() {
@@ -145,7 +145,7 @@ package main
 import (
     "net/http"
     "yourapp/api"
-    "gux/server"
+    "github.com/dougbarrett/guxserver"
 )
 
 func main() {

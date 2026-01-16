@@ -3,7 +3,7 @@
 package api
 
 import (
-	"gux/ws"
+	ws "github.com/dougbarrett/guxws"
 )
 
 // PostEvent represents a real-time event from the posts WebSocket
@@ -58,7 +58,9 @@ func (c *PostsClient) Subscribe(handler func(PostEvent)) (*Subscription, error) 
 		handler(PostEvent{Type: "updated", Post: &post, ID: post.ID})
 	})
 
-	ws.OnTyped(sub.client, "post.deleted", func(data struct{ ID int `json:"id"` }) {
+	ws.OnTyped(sub.client, "post.deleted", func(data struct {
+		ID int `json:"id"`
+	}) {
 		handler(PostEvent{Type: "deleted", ID: data.ID})
 	})
 

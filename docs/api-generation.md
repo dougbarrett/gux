@@ -266,7 +266,7 @@ if err != nil {
 Use the `api` package for structured errors:
 
 ```go
-import gqapi "gux/api"
+import gqapi "github.com/dougbarrett/guxapi"
 
 func (s *PostsService) GetByID(ctx context.Context, id int) (*Post, error) {
     post, ok := s.posts[id]

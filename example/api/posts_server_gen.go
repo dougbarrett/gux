@@ -8,9 +8,8 @@ import (
 	"strconv"
 	"strings"
 
-	gqapi "gux/api"
+	gqapi "github.com/dougbarrett/guxapi"
 )
-
 
 // PostsAPIHandler wraps a PostsAPI implementation with HTTP handlers
 type PostsAPIHandler struct {
@@ -81,7 +80,6 @@ func (h *PostsAPIHandler) handleWithID(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-
 func (h *PostsAPIHandler) handleGetAll(w http.ResponseWriter, r *http.Request) {
 
 	result, err := h.service.GetAll(r.Context())
@@ -145,5 +143,3 @@ func (h *PostsAPIHandler) handleDelete(w http.ResponseWriter, r *http.Request, i
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
-
-

@@ -6,9 +6,9 @@ import (
 	"syscall/js"
 	"time"
 
-	"gux/components"
-	"gux/example/api"
-	"gux/state"
+	components "github.com/dougbarrett/guxcomponents"
+	"github.com/dougbarrett/guxexample/api"
+	state "github.com/dougbarrett/guxstate"
 )
 
 var (

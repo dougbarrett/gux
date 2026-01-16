@@ -7,7 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"gux/fetch"
+	fetch "github.com/dougbarrett/guxfetch"
 )
 
 // ClientOption configures a client
@@ -113,7 +113,6 @@ func doRequestNoResponse(cfg *clientConfig, method, path string) error {
 	return nil
 }
 
-
 // PostsClient is a client for PostsAPI
 type PostsClient struct {
 	cfg *clientConfig
@@ -131,14 +130,13 @@ func NewPostsClient(opts ...ClientOption) *PostsClient {
 	return &PostsClient{cfg: cfg}
 }
 
-
 // GetAll fetches data via GET /api/posts/
 func (c *PostsClient) GetAll() ([]Post, error) {
 	return doRequest[[]Post](c.cfg, "GET", "/", nil)
 }
 
 // GetByID fetches data via GET /api/posts/{id}
-func (c *PostsClient) GetByID(id int, ) (*Post, error) {
+func (c *PostsClient) GetByID(id int) (*Post, error) {
 	result, err := doRequest[Post](c.cfg, "GET", fmt.Sprintf("/%d", id), nil)
 	if err != nil {
 		return nil, err
@@ -168,5 +166,3 @@ func (c *PostsClient) Update(id int, req CreatePostRequest) (*Post, error) {
 func (c *PostsClient) Delete(id int) error {
 	return doRequestNoResponse(c.cfg, "DELETE", fmt.Sprintf("/%d", id))
 }
-
-

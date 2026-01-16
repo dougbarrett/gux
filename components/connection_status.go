@@ -5,7 +5,7 @@ package components
 import (
 	"syscall/js"
 
-	"gux/state"
+	state "github.com/dougbarrett/guxstate"
 )
 
 // ConnectionStatusVariant defines the display variant

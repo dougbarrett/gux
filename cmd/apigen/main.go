@@ -260,7 +260,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"gux/fetch"
+	"github.com/dougbarrett/guxfetch"
 )
 
 // ClientOption configures a client
@@ -444,7 +444,7 @@ import (
 	"strconv"
 	"strings"
 
-	gqapi "gux/api"
+	gqapi "github.com/dougbarrett/guxapi"
 )
 
 {{range $iface := .}}

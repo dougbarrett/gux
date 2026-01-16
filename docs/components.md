@@ -5,7 +5,7 @@ Gux includes 45+ production-ready UI components built for Go WebAssembly. All co
 ## Getting Started
 
 ```go
-import "gux/components"
+import "github.com/dougbarrett/guxcomponents"
 
 func main() {
     // Load Tailwind CSS
