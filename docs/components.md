@@ -1183,11 +1183,21 @@ icon := components.Icon(components.IconProps{
 })
 
 // With additional CSS classes
+// NOTE: The field is "ClassName" (not "Class")
 icon := components.Icon(components.IconProps{
     Name:      "user",
-    ClassName: "text-blue-500",
+    ClassName: "text-blue-500",  // Additional CSS classes
 })
 ```
+
+### IconProps Reference
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| Name | string | "" | Icon name (see available icons below) |
+| Variant | IconVariant | IconOutline | `IconOutline` or `IconSolid` |
+| Size | IconSize | IconMD | Size class (see sizes below) |
+| **ClassName** | string | "" | Additional CSS classes (**not** `Class`) |
 
 ### Getting SVG String
 
@@ -1206,50 +1216,65 @@ btn.Set("innerHTML", svg + " Settings")
 
 **Navigation:** `home`, `menu`, `x-mark`, `chevron-left`, `chevron-right`, `chevron-up`, `chevron-down`, `arrow-left`, `arrow-right`, `arrow-up`, `arrow-down`
 
-**Actions:** `plus`, `minus`, `check`, `x`, `pencil`, `trash`, `search`, `cog`, `settings`
+**Actions:** `plus`, `minus`, `check`, `x`, `pencil`, `pencil-square`, `trash`, `search`, `cog`, `settings`
 
-**User & Account:** `user`, `users`, `user-plus`, `user-circle`
+**User & Account:** `user`, `users`, `user-plus`, `user-circle`, `user-group`
 
-**Communication:** `envelope`, `chat-bubble-left`, `bell`, `phone`
+**Communication:** `envelope`, `chat-bubble-left`, `chat-bubble-left-right`, `megaphone`, `paper-airplane`, `bell`, `phone`
 
-**Files:** `document`, `document-text`, `folder`, `folder-open`, `clipboard`
+**Files & Documents:** `document`, `document-text`, `folder`, `folder-open`, `clipboard`
 
-**Media:** `photo`, `camera`, `video-camera`, `musical-note`
+**Media:** `photo`, `camera`, `video-camera`, `play`, `pause`, `stop`
 
-**Status:** `check-circle`, `x-circle`, `exclamation-circle`, `information-circle`, `exclamation-triangle`
+**Status & Feedback:** `check-circle`, `x-circle`, `exclamation-circle`, `information-circle`, `question-mark-circle`, `info`
 
-**Data:** `chart-bar`, `chart-pie`, `presentation-chart-line`, `table-cells`
+**Buildings & Places:** `building-office`, `building-office-2`, `building-storefront`, `building-library`, `home-modern`
 
-**General:** `heart`, `star`, `bookmark`, `flag`, `tag`, `clock`, `calendar`, `map-pin`, `globe-alt`, `link`, `eye`, `eye-slash`, `lock-closed`, `lock-open`, `key`, `shield-check`, `finger-print`, `credit-card`, `currency-dollar`, `gift`, `shopping-cart`, `building-office`, `home-modern`, `academic-cap`, `beaker`, `bolt`, `fire`, `sun`, `moon`, `cloud`, `cpu-chip`, `server`, `wifi`, `signal`, `device-phone-mobile`, `computer-desktop`, `printer`, `qr-code`, `adjustments-horizontal`, `funnel`, `magnifying-glass-plus`, `magnifying-glass-minus`, `arrows-pointing-out`, `arrows-pointing-in`, `arrow-path`, `arrow-up-tray`, `arrow-down-tray`, `share`, `paper-airplane`, `inbox`, `archive-box`, `trash`, `clipboard-document`, `clipboard-document-check`, `document-duplicate`, `pencil-square`, `wrench-screwdriver`, `puzzle-piece`, `light-bulb`, `rocket-launch`, `sparkles`, `hand-thumb-up`, `hand-thumb-down`, `face-smile`, `face-frown`, `lifebuoy`, `question-mark-circle`, `info` (info circle)
+**Education & Work:** `academic-cap`, `briefcase`
+
+**Devices:** `device-phone-mobile`, `device-tablet`, `computer-desktop`
+
+**Misc:** `calendar`, `clock`, `globe`, `link`, `lock-closed`, `lock-open`, `key`, `star`, `heart`, `bookmark`, `tag`, `shield-check`, `fire`, `bolt`, `sparkles`, `light-bulb`, `cube`, `chart-bar`, `presentation-chart-line`, `code-bracket`, `command-line`, `server`, `database`, `cloud`, `arrow-download`, `arrow-upload`, `share`, `arrow-path`, `adjustments-horizontal`, `filter`, `funnel`, `bars-3`, `ellipsis-horizontal`, `ellipsis-vertical`, `eye`, `eye-slash`, `logout`, `login`
 
 **Sizes:**
-- `IconXS` - 12px (w-3 h-3)
-- `IconSM` - 16px (w-4 h-4)
-- `IconMD` - 20px (w-5 h-5) - default
-- `IconLG` - 24px (w-6 h-6)
-- `IconXL` - 32px (w-8 h-8)
+| Size | CSS Class | Pixels |
+|------|-----------|--------|
+| `IconXS` | w-3 h-3 | 12px |
+| `IconSM` | w-4 h-4 | 16px |
+| `IconMD` | w-5 h-5 | 20px (default) |
+| `IconLG` | w-6 h-6 | 24px |
+| `IconXL` | w-8 h-8 | 32px |
 
 **Variants:**
 - `IconOutline` - Stroke-based icons (default)
-- `IconSolid` - Filled icons
+- `IconSolid` - Filled icons (available for: `home`, `user`, `check-circle`, `x-circle`, `exclamation-circle`, `information-circle`, `star`, `heart`, `bell`, `cog`, `info`)
 
 ### Using Icons in Sidebar
 
+The `NavItem.Icon` field accepts icon names. Unrecognized names fall back to text rendering (supports emoji).
+
 ```go
+// Using named icons
 layout := components.NewLayout(components.LayoutProps{
     Sidebar: components.SidebarProps{
         Title: "My App",
         Items: []components.NavItem{
             {Label: "Dashboard", Path: "/", Icon: "home"},
-            {Label: "Users", Path: "/users", Icon: "users"},
+            {Label: "Users", Path: "/users", Icon: "user-group"},
+            {Label: "Messages", Path: "/messages", Icon: "chat-bubble-left-right"},
             {Label: "Settings", Path: "/settings", Icon: "cog"},
-            {Label: "Help", Path: "/help", Icon: "question-mark-circle"},
         },
     },
 })
+
+// Using emoji (falls back to text rendering)
+Items: []components.NavItem{
+    {Label: "Dashboard", Path: "/", Icon: "📊"},
+    {Label: "Settings", Path: "/settings", Icon: "⚙️"},
+}
 ```
 
-**Note:** Icons are automatically sized to 20px in sidebar navigation with proper flex shrinking.
+**Note:** Icons are automatically sized to 20px in sidebar navigation with proper flex shrinking. If an icon name is not recognized, it will be rendered as text (useful for emoji icons).
 
 ## Utility Components
 

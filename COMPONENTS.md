@@ -45,6 +45,9 @@
   - [VirtualList](#virtuallist)
   - [Dropdown](#dropdown)
   - [Inspector](#inspector)
+- [Icons](#icons)
+  - [Icon Component](#icon-component)
+  - [Available Icons](#available-icons)
 - [Utilities](#utilities)
   - [Theme](#theme)
   - [Animation](#animation)
@@ -664,6 +667,98 @@ inspector := components.NewInspector(components.InspectorProps{
     Collapsed: true,
 })
 ```
+
+---
+
+## Icons
+
+Gux includes a built-in icon system based on [Heroicons](https://heroicons.com). Icons can be used standalone or within components like `NavItem`.
+
+### Icon Component
+
+Create SVG icons with customizable size, variant, and styling.
+
+```go
+import "github.com/dougbarrett/gux/components"
+
+// Basic icon
+icon := components.Icon(components.IconProps{
+    Name: "home",
+})
+
+// Customized icon
+icon := components.Icon(components.IconProps{
+    Name:      "user",
+    Variant:   components.IconSolid,  // IconOutline (default) or IconSolid
+    Size:      components.IconLG,     // IconXS, IconSM, IconMD (default), IconLG, IconXL
+    ClassName: "text-blue-500",       // Additional CSS classes (note: ClassName, not Class)
+})
+
+// Get raw SVG string (useful for innerHTML)
+svg := components.IconSVG("check-circle", components.IconOutline)
+```
+
+**IconProps:**
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| Name | string | "" | Icon name (see available icons below) |
+| Variant | IconVariant | IconOutline | Icon style: `IconOutline` or `IconSolid` |
+| Size | IconSize | IconMD | Size class (see sizes below) |
+| ClassName | string | "" | Additional CSS classes |
+
+**Icon Sizes:**
+| Size | CSS Class | Pixels |
+|------|-----------|--------|
+| IconXS | w-3 h-3 | 12px |
+| IconSM | w-4 h-4 | 16px |
+| IconMD | w-5 h-5 | 20px |
+| IconLG | w-6 h-6 | 24px |
+| IconXL | w-8 h-8 | 32px |
+
+**Using Icons in NavItem:**
+
+The sidebar `NavItem.Icon` field accepts icon names. Unrecognized names fall back to text rendering, which also supports emoji.
+
+```go
+// Using named icons
+Items: []components.NavItem{
+    {Label: "Home", Icon: "home", Path: "/"},
+    {Label: "Users", Icon: "user-group", Path: "/users"},
+    {Label: "Settings", Icon: "cog", Path: "/settings"},
+}
+
+// Using emoji (falls back to text rendering)
+Items: []components.NavItem{
+    {Label: "Dashboard", Icon: "📊", Path: "/"},
+    {Label: "Settings", Icon: "⚙️", Path: "/settings"},
+}
+```
+
+### Available Icons
+
+**Navigation:** `home`, `menu`, `x-mark`, `chevron-left`, `chevron-right`, `chevron-up`, `chevron-down`, `arrow-left`, `arrow-right`, `arrow-up`, `arrow-down`
+
+**Actions:** `plus`, `minus`, `check`, `x`, `pencil`, `pencil-square`, `trash`, `search`, `cog`, `settings`
+
+**User & Account:** `user`, `users`, `user-plus`, `user-circle`, `user-group`
+
+**Communication:** `envelope`, `chat-bubble-left`, `chat-bubble-left-right`, `megaphone`, `paper-airplane`, `bell`, `phone`
+
+**Files & Documents:** `document`, `document-text`, `folder`, `folder-open`, `clipboard`
+
+**Media:** `photo`, `camera`, `video-camera`, `play`, `pause`, `stop`
+
+**Status & Feedback:** `check-circle`, `x-circle`, `exclamation-circle`, `information-circle`, `question-mark-circle`, `info`
+
+**Buildings & Places:** `building-office`, `building-office-2`, `building-storefront`, `building-library`, `home-modern`
+
+**Education & Work:** `academic-cap`, `briefcase`
+
+**Devices:** `device-phone-mobile`, `device-tablet`, `computer-desktop`
+
+**Misc:** `calendar`, `clock`, `globe`, `link`, `lock-closed`, `lock-open`, `key`, `star`, `heart`, `bookmark`, `tag`, `shield-check`, `fire`, `bolt`, `sparkles`, `light-bulb`, `cube`, `chart-bar`, `presentation-chart-line`, `code-bracket`, `command-line`, `server`, `database`, `cloud`, `arrow-download`, `arrow-upload`, `share`, `arrow-path`, `adjustments-horizontal`, `filter`, `funnel`, `bars-3`, `ellipsis-horizontal`, `ellipsis-vertical`, `eye`, `eye-slash`, `logout`, `login`
+
+**Solid Variants Available:** `home`, `user`, `check-circle`, `x-circle`, `exclamation-circle`, `information-circle`, `star`, `heart`, `bell`, `cog`, `info`
 
 ---
 
