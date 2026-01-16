@@ -16,6 +16,7 @@ type TemplateData struct {
 	AppName    string
 	ModulePath string
 	GuxModule  string
+	GuxVersion string
 }
 
 func runInit(appName, modulePath string) {
@@ -82,10 +83,17 @@ func runInit(appName, modulePath string) {
 		}
 	}
 
+	// Get gux version for go.mod pinning
+	guxVersion := getVersion()
+	if guxVersion == "dev" {
+		guxVersion = "latest"
+	}
+
 	data := TemplateData{
 		AppName:    appName,
 		ModulePath: modulePath,
 		GuxModule:  "github.com/dougbarrett/gux",
+		GuxVersion: guxVersion,
 	}
 
 	// Define files to create from templates
