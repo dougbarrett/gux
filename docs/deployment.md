@@ -2,29 +2,49 @@
 
 This guide covers deploying Gux applications to production environments.
 
+## Single Binary Deployment
+
+Gux applications compile to a **single binary** with all static assets embedded. This makes deployment simple—just copy and run.
+
+### Building for Production
+
+```bash
+# Build the production binary
+gux setup --tinygo
+gux build --tinygo
+
+# Run locally
+./server
+
+# Or deploy the binary anywhere
+scp ./server user@server:/app/
+ssh user@server '/app/server -port 8080'
+```
+
+### What's Embedded
+
+The `./server` binary contains:
+- WASM frontend (`main.wasm`)
+- Go WASM runtime (`wasm_exec.js`)
+- HTML, manifest, and service worker
+- Any CSS, JS, images, or other files in `public/`
+
+Cache-busting is handled automatically—the server computes a hash of `main.wasm` at startup and injects it into `index.html`.
+
 ## Docker
 
-Gux includes a multi-stage Dockerfile optimized for production:
+Gux includes a 2-stage Dockerfile optimized for production:
 
 ### Building the Image
 
 ```bash
-cd example
-make docker
-```
-
-Or manually:
-
-```bash
-docker build -f example/Dockerfile -t gux-example .
+docker build -t myapp .
 ```
 
 ### Running Locally
 
 ```bash
-make docker-run
-# Or
-docker run --rm -p 8080:8080 gux-example
+docker run --rm -p 8080:8080 myapp
 ```
 
 Open http://localhost:8080
@@ -32,44 +52,43 @@ Open http://localhost:8080
 ### Dockerfile Explained
 
 ```dockerfile
-# Stage 1: Build WASM with TinyGo (~500KB output)
-FROM tinygo/tinygo:latest AS wasm-builder
+# Stage 1: Build with TinyGo using gux
+FROM tinygo/tinygo:latest AS builder
 WORKDIR /app
 COPY go.mod go.sum* ./
 RUN go mod download || true
+RUN go install github.com/dougbarrett/gux/cmd/gux@latest
 COPY . .
-RUN tinygo build -o example/main.wasm -target wasm -no-debug ./example/app
+RUN gux setup --tinygo && gux build --tinygo
 
-# Stage 2: Build Go server
-FROM golang:1.24-alpine AS server-builder
-WORKDIR /app
-RUN apk add --no-cache git
-COPY go.mod go.sum* ./
-RUN go mod download || true
-COPY . .
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o server ./example/server
-
-# Stage 3: Minimal production image (~20MB)
+# Stage 2: Minimal production image
 FROM alpine:3.21
 WORKDIR /app
 RUN apk add --no-cache ca-certificates
-COPY --from=server-builder /app/server .
-COPY example/index.html .
-COPY example/wasm_exec.js .
-COPY --from=wasm-builder /app/example/main.wasm .
+COPY --from=builder /app/server .
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD wget --no-verbose --tries=1 --spider http://localhost:8080/ || exit 1
-CMD ["./server", "-port", "8080", "-dir", "."]
+CMD ["./server", "-port", "8080"]
 ```
 
 ### Key Optimizations
 
-1. **Multi-stage builds** — Separates build and runtime environments
-2. **TinyGo** — Produces ~500KB WASM vs ~5MB with standard Go
-3. **Alpine base** — Minimal ~5MB base image
-4. **Stripped binaries** — `-ldflags="-s -w"` removes debug info
-5. **Health checks** — Built-in health monitoring
+1. **Single binary** — All assets embedded, nothing to copy separately
+2. **2-stage build** — Only the binary goes into production image
+3. **TinyGo** — Produces ~500KB WASM vs ~5MB with standard Go
+4. **Alpine base** — Minimal ~5MB base image
+5. **Runtime cache-busting** — No build-time index.html modification needed
+6. **Health checks** — Built-in health monitoring
+
+### Large Assets
+
+For large files (videos, images >1MB), consider using a CDN instead of embedding:
+
+```html
+<!-- In your index.html or WASM code -->
+<video src="https://cdn.example.com/video.mp4"></video>
+```
 
 ## Docker Compose
 

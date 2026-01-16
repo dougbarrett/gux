@@ -298,16 +298,40 @@ For production, consider using a dedicated JWT library like `golang-jwt/jwt`.
 
 ## SPA Handler
 
-Serves static files with fallback to `index.html` for client-side routing:
+Serves static files with fallback to `index.html` for client-side routing.
+
+### Filesystem Mode (Development)
 
 ```go
-spa := server.NewSPAHandler("./static")
+spa := server.NewSPAHandler("./public")
 mux.HandleFunc("/", spa.ServeHTTP)
 ```
 
+### Embedded Mode (Production)
+
+For single-binary deployment with all assets embedded:
+
+```go
+import "embed"
+
+//go:embed public/*
+var staticFS embed.FS
+
+func main() {
+    spa := server.NewEmbeddedSPAHandler(staticFS, "public")
+    mux.HandleFunc("/", spa.ServeHTTP)
+}
+```
+
+The embedded handler automatically:
+- Computes a hash of `main.wasm` at startup
+- Injects the hash into `index.html` (`main.wasm` → `main.<hash>.wasm`)
+- Routes hashed WASM requests back to the embedded file
+- Sets proper cache headers (immutable for WASM, no-cache for HTML)
+
 ### How It Works
 
-1. Checks if requested file exists in static directory
+1. Checks if requested file exists
 2. If file exists, serves it with correct MIME type
 3. If file doesn't exist, serves `index.html` (for SPA routing)
 
@@ -316,39 +340,58 @@ mux.HandleFunc("/", spa.ServeHTTP)
 | Extension | MIME Type |
 |-----------|-----------|
 | `.html` | `text/html` |
-| `.js` | `application/javascript` |
+| `.js`, `.mjs` | `application/javascript` |
 | `.wasm` | `application/wasm` |
 | `.css` | `text/css` |
 | `.json` | `application/json` |
 | `.svg` | `image/svg+xml` |
-| `.png` | `image/png` |
+| `.png`, `.jpg`, `.gif`, `.webp` | `image/*` |
 | `.ico` | `image/x-icon` |
+| `.pdf` | `application/pdf` |
+| `.woff`, `.woff2`, `.ttf` | `font/*` |
+| `.mp4`, `.webm` | `video/*` |
+| `.mp3`, `.wav`, `.ogg` | `audio/*` |
 
-### Example Setup
+### Example: Dev vs Production
+
+The generated server automatically supports both modes:
 
 ```go
+//go:embed public/*
+var staticFS embed.FS
+
 func main() {
-    mux := http.NewServeMux()
+    dir := flag.String("dir", "", "Static files directory (dev mode)")
+    flag.Parse()
 
-    // API routes (more specific, registered first)
-    mux.HandleFunc("/api/", apiHandler)
-    mux.HandleFunc("/ws/", wsHandler)
-
-    // SPA handler (catch-all, registered last)
-    spa := server.NewSPAHandler("./static")
+    var spa *server.SPAHandler
+    if *dir != "" {
+        // Dev mode: serve from filesystem
+        spa = server.NewSPAHandler(*dir)
+    } else {
+        // Production: serve from embedded filesystem
+        spa = server.NewEmbeddedSPAHandler(staticFS, "public")
+    }
     mux.HandleFunc("/", spa.ServeHTTP)
-
-    http.ListenAndServe(":8080", mux)
 }
+```
+
+```bash
+# Development (hot reload)
+./server -dir public
+
+# Production (embedded)
+./server
 ```
 
 ### Directory Structure
 
 ```
-static/
+public/
 ├── index.html      # Entry point (served for all non-file routes)
 ├── main.wasm       # Compiled WASM
 ├── wasm_exec.js    # Go WASM runtime
+├── manifest.json   # PWA manifest
 ├── favicon.ico
 └── assets/
     ├── styles.css

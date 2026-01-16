@@ -231,7 +231,7 @@ See [API Generation](api-generation.md) for complete documentation.
 
 ## gux build
 
-Compiles the WASM module from the `app/` directory.
+Builds a production-ready binary with WASM and all static assets embedded.
 
 ```bash
 gux build [--tinygo]
@@ -241,44 +241,64 @@ gux build [--tinygo]
 
 | Flag | Description |
 |------|-------------|
-| `--tinygo` | Use TinyGo for smaller output (~500KB vs ~5MB) |
+| `--tinygo` | Use TinyGo for smaller WASM output (~500KB vs ~5MB) |
 
 ### Examples
 
 ```bash
-# Build with standard Go (~5MB)
+# Build with standard Go
 gux build
 
-# Build with TinyGo (~500KB)
+# Build with TinyGo (recommended for smaller WASM)
 gux build --tinygo
+
+# Run the production binary
+./server
 ```
 
 ### Build Process
 
-1. Compiles `./app` to WebAssembly
-2. Generates content hash for cache busting
-3. Creates versioned file: `main.<hash>.wasm`
-4. Updates `index.html` with new filename
-5. Removes old versioned WASM files
+1. Compiles `./cmd/app` to WebAssembly (`public/main.wasm`)
+2. Builds `./cmd/server` with all `public/` assets embedded
+3. Outputs single `./server` binary
 
 ### Output
 
 ```
 Building WASM module...
-Built main.a1b2c3d4.wasm (0.48 MB) with TinyGo
+Built public/main.wasm (0.48 MB) with TinyGo
+Building server binary with embedded assets...
+Built ./server (1.23 MB) with all assets embedded
+
+Run with: ./server
 ```
+
+### Single Binary Deployment
+
+The output binary contains everything:
+- `main.wasm` (your WASM frontend)
+- `wasm_exec.js` (Go/TinyGo WASM runtime)
+- `index.html`, `manifest.json`, etc.
+- Any CSS, JS, images, PDFs in `public/`
+
+Cache-busting is handled automatically at runtime—the server computes a hash of `main.wasm` and injects it into `index.html` when served.
 
 ### Requirements
 
-- Must run from project root (with `app/` directory)
+- Must run from project root (with `cmd/app/` and `cmd/server/` directories)
+- Run `gux setup` first to copy `wasm_exec.js`
 - TinyGo must be installed for `--tinygo` flag
 
 ### Build Size Comparison
 
-| Toolchain | Typical Size | Notes |
-|-----------|--------------|-------|
+| Toolchain | WASM Size | Notes |
+|-----------|-----------|-------|
 | Standard Go | ~5 MB | Full standard library support |
 | TinyGo | ~500 KB | Some stdlib limitations |
+
+### Large Assets
+
+For large files (videos, large images), consider using a CDN instead of embedding them in the binary.
 
 ---
 
@@ -312,25 +332,32 @@ gux dev --tinygo
 
 ### What It Does
 
-1. Checks for required files (`app/`, `server/`, `wasm_exec.js`)
-2. Builds the WASM module (same as `gux build`)
-3. Starts the Go server from `./server`
-4. Serves the application at `http://localhost:<port>`
+1. Checks for `wasm_exec.js` (run `gux setup` first)
+2. Builds the WASM module to `public/main.wasm`
+3. Starts the Go server from `./cmd/server` in dev mode
+4. Serves static files from filesystem (not embedded) for hot reload
 
 ### Requirements
 
-- `app/` directory with WASM frontend code
-- `server/` directory with Go server code
-- `wasm_exec.js` (run `gux setup` first)
+- `cmd/app/` directory with WASM frontend code
+- `cmd/server/` directory with Go server code
+- `public/wasm_exec.js` (run `gux setup` first)
 
 ### Output
 
 ```
 Building WASM module...
-Built main.a1b2c3d4.wasm (0.48 MB) with TinyGo
+Built public/main.wasm (0.48 MB) with TinyGo
 
 Starting dev server on http://localhost:8080
 ```
+
+### Dev Mode vs Production
+
+| Mode | Command | Static Files | Cache-busting |
+|------|---------|--------------|---------------|
+| Dev | `gux dev` | Filesystem (`public/`) | None (reload to update) |
+| Prod | `./server` | Embedded in binary | Runtime hash injection |
 
 ---
 
@@ -365,8 +392,9 @@ gux dev
 # After changing API interfaces
 gux gen
 
-# Production build
+# Production build (single binary with embedded assets)
 gux build --tinygo
+./server
 ```
 
 ### Adding New APIs
