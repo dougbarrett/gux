@@ -365,6 +365,117 @@ components.BottomDrawer(props)
 components.LeftDrawer(props)
 ```
 
+## Header Components
+
+### UserMenu
+
+User profile dropdown with avatar trigger:
+
+```go
+menu := components.NewUserMenu(components.UserMenuProps{
+    Name:       "John Doe",
+    Email:      "john@example.com",
+    AvatarSrc:  "/avatar.jpg", // Optional - falls back to initials
+    OnProfile:  func() { router.Navigate("/profile") },
+    OnSettings: func() { router.Navigate("/settings") },
+    OnLogout:   func() { handleLogout() },
+})
+
+// Add to header
+header.Call("appendChild", menu.Element())
+
+// Programmatic control
+menu.Open()
+menu.Close()
+menu.Destroy() // Clean up event listeners
+```
+
+**Props:**
+- `Name` - User's display name
+- `Email` - User's email address
+- `AvatarSrc` - Optional avatar image URL (falls back to initials)
+- `OnProfile` - Callback when Profile is clicked
+- `OnSettings` - Callback when Settings is clicked
+- `OnLogout` - Callback when Logout is clicked
+
+**Methods:**
+- `Element()` - Returns the DOM element
+- `Open()` - Opens the dropdown menu
+- `Close()` - Closes the dropdown menu
+- `Destroy()` - Cleans up event listeners
+
+**Note:** Uses Avatar component internally and extends Dropdown for the menu.
+
+### NotificationCenter
+
+Notification bell with dropdown list and unread badge:
+
+```go
+nc := components.NewNotificationCenter(components.NotificationCenterProps{
+    Notifications: []components.Notification{
+        {
+            ID:      "1",
+            Title:   "New message",
+            Message: "You have a new message from Alice",
+            Time:    "2 min ago",
+            Read:    false,
+            Type:    "info", // "info", "success", "warning", "error"
+        },
+        {
+            ID:      "2",
+            Title:   "Task completed",
+            Message: "Build process finished successfully",
+            Time:    "1 hour ago",
+            Read:    true,
+            Type:    "success",
+        },
+    },
+    OnMarkRead:          func(id string) { markNotificationRead(id) },
+    OnMarkAllRead:       func() { markAllRead() },
+    OnClear:             func() { clearNotifications() },
+    OnNotificationClick: func(id string) { openNotification(id) },
+})
+
+// Add to header
+header.Call("appendChild", nc.Element())
+
+// Update notifications dynamically
+nc.SetNotifications(newNotifications)
+
+// Get unread count
+count := nc.UnreadCount()
+
+// Programmatic control
+nc.Open()
+nc.Close()
+nc.Destroy()
+```
+
+**Notification struct:**
+- `ID` - Unique identifier
+- `Title` - Notification title
+- `Message` - Notification body text
+- `Time` - Time string (e.g., "2 min ago")
+- `Read` - Whether the notification has been read
+- `Type` - Type indicator: `"info"`, `"success"`, `"warning"`, `"error"`
+
+**Props:**
+- `Notifications` - Initial list of notifications
+- `OnMarkRead` - Callback when a notification is marked as read
+- `OnMarkAllRead` - Callback when "Mark all read" is clicked
+- `OnClear` - Callback when "Clear all" is clicked
+- `OnNotificationClick` - Callback when a notification is clicked
+
+**Methods:**
+- `Element()` - Returns the DOM element
+- `SetNotifications([]Notification)` - Updates the notification list
+- `UnreadCount()` - Returns number of unread notifications
+- `Open()` - Opens the dropdown
+- `Close()` - Closes the dropdown
+- `Destroy()` - Cleans up event listeners
+
+**Note:** Shows unread badge count on the bell icon. Notification list is scrollable.
+
 ## Data Display Components
 
 ### Table
@@ -651,6 +762,95 @@ stepper := components.Stepper(components.StepperProps{
     },
 })
 ```
+
+### CommandPalette
+
+Searchable command palette with Cmd/Ctrl+K keyboard shortcut:
+
+```go
+palette := components.NewCommandPalette(components.CommandPaletteProps{
+    Commands: []components.Command{
+        {
+            ID:          "new-post",
+            Label:       "Create New Post",
+            Description: "Start writing a new blog post",
+            Icon:        "📝",
+            Category:    "Actions",
+            Shortcut:    "Ctrl+N",
+            OnExecute:   func() { createNewPost() },
+        },
+        {
+            ID:          "go-dashboard",
+            Label:       "Go to Dashboard",
+            Description: "Navigate to main dashboard",
+            Icon:        "🏠",
+            Category:    "Navigation",
+            OnExecute:   func() { router.Navigate("/") },
+        },
+        {
+            ID:          "toggle-theme",
+            Label:       "Toggle Dark Mode",
+            Icon:        "🌙",
+            Category:    "Settings",
+            OnExecute:   func() { toggleTheme() },
+        },
+    },
+    Placeholder:  "Search commands...",
+    EmptyMessage: "No commands found",
+    OnClose:      func() { /* optional close callback */ },
+})
+
+// Mount the overlay element
+document.Get("body").Call("appendChild", palette.Element())
+
+// Register global keyboard shortcut (Cmd/Ctrl+K)
+palette.RegisterKeyboardShortcut()
+
+// Programmatic control
+palette.Open()
+palette.Close()
+palette.IsOpen()
+
+// Update commands dynamically
+palette.SetCommands(newCommands)
+
+// Cleanup
+palette.UnregisterKeyboardShortcut()
+palette.Destroy()
+```
+
+**Command struct:**
+- `ID` - Unique identifier
+- `Label` - Display text
+- `Description` - Optional subtitle
+- `Icon` - Optional emoji or icon
+- `Category` - For grouping (e.g., "Navigation", "Actions")
+- `OnExecute` - Function called when command is executed
+- `Shortcut` - Optional keyboard hint (e.g., "Ctrl+B")
+
+**Props:**
+- `Commands` - List of available commands
+- `Placeholder` - Search input placeholder (default: "Search commands...")
+- `EmptyMessage` - Message when no results (default: "No commands found")
+- `OnClose` - Optional callback when palette closes
+
+**Methods:**
+- `Element()` - Returns the overlay DOM element
+- `Open()` - Shows the command palette
+- `Close()` - Hides the command palette
+- `IsOpen()` - Returns whether palette is currently open
+- `SetCommands([]Command)` - Updates available commands
+- `RegisterKeyboardShortcut()` - Registers global Cmd/Ctrl+K listener
+- `UnregisterKeyboardShortcut()` - Removes global keyboard listener
+- `Destroy()` - Cleans up all resources
+
+**Keyboard shortcuts:**
+- `Cmd/Ctrl+K` - Toggle command palette
+- `↑↓` - Navigate through commands
+- `Enter` - Execute selected command
+- `Esc` - Close palette
+
+**Note:** Commands are automatically grouped by category. Uses FocusTrap for modal focus management.
 
 ## Chart Components
 
