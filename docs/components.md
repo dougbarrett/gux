@@ -1162,6 +1162,95 @@ components.BarSparkline([]float64{10, 25, 15, 30, 20, 35})
 components.TrendSparkline([]float64{10, 15, 12, 18, 25})
 ```
 
+## Icon Component
+
+Heroicons-based SVG icon component with multiple sizes and variants.
+
+### Basic Usage
+
+```go
+// Create an icon element
+icon := components.Icon(components.IconProps{
+    Name: "home",
+    Size: components.IconMD,
+})
+
+// With variant (outline or solid)
+icon := components.Icon(components.IconProps{
+    Name:    "check",
+    Variant: components.IconSolid,
+    Size:    components.IconLG,
+})
+
+// With additional CSS classes
+icon := components.Icon(components.IconProps{
+    Name:      "user",
+    ClassName: "text-blue-500",
+})
+```
+
+### Getting SVG String
+
+For innerHTML use (e.g., in buttons):
+
+```go
+// Get raw SVG string
+svg := components.IconSVG("settings", components.IconOutline)
+
+// Use in button
+btn := document.Call("createElement", "button")
+btn.Set("innerHTML", svg + " Settings")
+```
+
+### Available Icons
+
+**Navigation:** `home`, `menu`, `x-mark`, `chevron-left`, `chevron-right`, `chevron-up`, `chevron-down`, `arrow-left`, `arrow-right`, `arrow-up`, `arrow-down`
+
+**Actions:** `plus`, `minus`, `check`, `x`, `pencil`, `trash`, `search`, `cog`, `settings`
+
+**User & Account:** `user`, `users`, `user-plus`, `user-circle`
+
+**Communication:** `envelope`, `chat-bubble-left`, `bell`, `phone`
+
+**Files:** `document`, `document-text`, `folder`, `folder-open`, `clipboard`
+
+**Media:** `photo`, `camera`, `video-camera`, `musical-note`
+
+**Status:** `check-circle`, `x-circle`, `exclamation-circle`, `information-circle`, `exclamation-triangle`
+
+**Data:** `chart-bar`, `chart-pie`, `presentation-chart-line`, `table-cells`
+
+**General:** `heart`, `star`, `bookmark`, `flag`, `tag`, `clock`, `calendar`, `map-pin`, `globe-alt`, `link`, `eye`, `eye-slash`, `lock-closed`, `lock-open`, `key`, `shield-check`, `finger-print`, `credit-card`, `currency-dollar`, `gift`, `shopping-cart`, `building-office`, `home-modern`, `academic-cap`, `beaker`, `bolt`, `fire`, `sun`, `moon`, `cloud`, `cpu-chip`, `server`, `wifi`, `signal`, `device-phone-mobile`, `computer-desktop`, `printer`, `qr-code`, `adjustments-horizontal`, `funnel`, `magnifying-glass-plus`, `magnifying-glass-minus`, `arrows-pointing-out`, `arrows-pointing-in`, `arrow-path`, `arrow-up-tray`, `arrow-down-tray`, `share`, `paper-airplane`, `inbox`, `archive-box`, `trash`, `clipboard-document`, `clipboard-document-check`, `document-duplicate`, `pencil-square`, `wrench-screwdriver`, `puzzle-piece`, `light-bulb`, `rocket-launch`, `sparkles`, `hand-thumb-up`, `hand-thumb-down`, `face-smile`, `face-frown`, `lifebuoy`, `question-mark-circle`, `info` (info circle)
+
+**Sizes:**
+- `IconXS` - 12px (w-3 h-3)
+- `IconSM` - 16px (w-4 h-4)
+- `IconMD` - 20px (w-5 h-5) - default
+- `IconLG` - 24px (w-6 h-6)
+- `IconXL` - 32px (w-8 h-8)
+
+**Variants:**
+- `IconOutline` - Stroke-based icons (default)
+- `IconSolid` - Filled icons
+
+### Using Icons in Sidebar
+
+```go
+layout := components.NewLayout(components.LayoutProps{
+    Sidebar: components.SidebarProps{
+        Title: "My App",
+        Items: []components.NavItem{
+            {Label: "Dashboard", Path: "/", Icon: "home"},
+            {Label: "Users", Path: "/users", Icon: "users"},
+            {Label: "Settings", Path: "/settings", Icon: "cog"},
+            {Label: "Help", Path: "/help", Icon: "question-mark-circle"},
+        },
+    },
+})
+```
+
+**Note:** Icons are automatically sized to 20px in sidebar navigation with proper flex shrinking.
+
 ## Utility Components
 
 ### Theme
