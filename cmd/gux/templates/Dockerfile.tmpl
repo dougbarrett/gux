@@ -10,9 +10,10 @@ WORKDIR /app
 COPY go.mod go.sum* ./
 RUN go mod download || true
 
-# Install gux CLI to /usr/local/bin
-ENV GOBIN=/usr/local/bin
-RUN go install {{.GuxModule}}/cmd/gux@{{.GuxVersion}}
+# Install gux CLI
+ENV GOBIN=/app/bin
+ENV PATH="/app/bin:${PATH}"
+RUN mkdir -p /app/bin && go install {{.GuxModule}}/cmd/gux@{{.GuxVersion}}
 
 # Copy source code
 COPY . .
