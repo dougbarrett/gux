@@ -14,7 +14,7 @@ RUN go mod download || true
 COPY . .
 
 # Build WASM module and version it with content hash
-RUN tinygo build -o main.wasm -target wasm -no-debug ./cmd/app && \
+RUN tinygo build -o main.wasm -target wasm -no-debug -buildvcs=false ./cmd/app && \
     HASH=$(sha256sum main.wasm | cut -c1-8) && \
     mv main.wasm main.${HASH}.wasm && \
     sed -i "s/fetch(\"\\\/main\\.[^\"]*\\.wasm\"/fetch(\"\\\/main.${HASH}.wasm\"/g" public/index.html && \
