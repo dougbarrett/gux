@@ -12,14 +12,14 @@
     <meta name="description" content="{{.AppName}} - Built with Gux">
 
     <!-- PWA Manifest -->
-    <link rel="manifest" href="manifest.json">
+    <link rel="manifest" href="/manifest.json">
 </head>
 <body>
     <div id="app">Loading...</div>
     <script src="/wasm_exec.js"></script>
     <script>
         const go = new Go();
-        WebAssembly.instantiateStreaming(fetch("main.wasm"), go.importObject)
+        WebAssembly.instantiateStreaming(fetch("/main.wasm"), go.importObject)
             .then(result => go.run(result.instance));
     </script>
     <script>

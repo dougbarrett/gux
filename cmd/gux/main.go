@@ -67,6 +67,9 @@ func main() {
 
 		runSetup(*tinygo)
 
+	case "claude":
+		runClaude()
+
 	case "version", "-v", "--version":
 		fmt.Printf("gux version %s\n", getVersion())
 
@@ -89,6 +92,7 @@ Usage:
     gux gen [--dir <api-dir>]                     Generate API client code
     gux build [--tinygo]                          Build WASM module
     gux dev [--port <port>] [--tinygo]            Build and run dev server
+    gux claude                                     Install Claude Code skill
     gux version                                    Show version
     gux help                                       Show this help
 
@@ -99,6 +103,7 @@ Examples:
     gux build --tinygo       # Build with TinyGo (~500KB)
     gux dev                  # Run dev server on :8080
     gux dev --port 3000      # Run on custom port
+    gux claude               # Install Claude Code skill for AI assistance
 
 The init command creates a new directory with your app name and generates
 a minimal Gux application scaffold including:
@@ -114,5 +119,6 @@ a minimal Gux application scaffold including:
 After scaffolding, run:
     cd <appname>
     gux setup     # Copy wasm_exec.js from Go installation
+    gux claude    # Install Claude Code skill (optional)
     gux dev       # Build and run dev server`)
 }

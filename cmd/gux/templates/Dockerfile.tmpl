@@ -17,8 +17,8 @@ COPY . .
 RUN tinygo build -o main.wasm -target wasm -no-debug ./app && \
     HASH=$(sha256sum main.wasm | cut -c1-8) && \
     mv main.wasm main.${HASH}.wasm && \
-    sed -i "s/fetch(\"main\.[^\"]*\.wasm\"/fetch(\"main.${HASH}.wasm\"/g" index.html && \
-    sed -i "s/fetch(\"main\.wasm\"/fetch(\"main.${HASH}.wasm\"/g" index.html
+    sed -i "s/fetch(\"\\/main\.[^\"]*\.wasm\"/fetch(\"\\/main.${HASH}.wasm\"/g" index.html && \
+    sed -i "s/fetch(\"\\/main\.wasm\"/fetch(\"\\/main.${HASH}.wasm\"/g" index.html
 
 # Stage 2: Build Go server
 FROM golang:1.24-alpine AS server-builder
