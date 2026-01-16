@@ -4,8 +4,8 @@ import (
 	"context"
 	"sync"
 
-	gqapi "github.com/dougbarrett/guxapi"
-	"github.com/dougbarrett/guxexample/api"
+	gqapi "github.com/dougbarrett/gux/api"
+	"github.com/dougbarrett/gux/example/api"
 )
 
 // PostsService implements api.PostsAPI

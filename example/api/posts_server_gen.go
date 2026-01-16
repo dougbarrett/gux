@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	gqapi "github.com/dougbarrett/guxapi"
+	gqapi "github.com/dougbarrett/gux/api"
 )
 
 // PostsAPIHandler wraps a PostsAPI implementation with HTTP handlers

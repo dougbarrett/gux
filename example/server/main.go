@@ -6,8 +6,8 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/dougbarrett/guxexample/api"
-	server "github.com/dougbarrett/guxserver"
+	"github.com/dougbarrett/gux/example/api"
+	server "github.com/dougbarrett/gux/server"
 )
 
 func main() {

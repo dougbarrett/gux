@@ -3,7 +3,7 @@
 package api
 
 import (
-	ws "github.com/dougbarrett/guxws"
+	ws "github.com/dougbarrett/gux/ws"
 )
 
 // PostEvent represents a real-time event from the posts WebSocket

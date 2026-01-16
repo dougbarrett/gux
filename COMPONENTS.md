@@ -65,7 +65,7 @@
 A customizable button component.
 
 ```go
-import "github.com/dougbarrett/guxcomponents"
+import "github.com/dougbarrett/gux/components"
 
 btn := components.Button(components.ButtonProps{
     Text:      "Click Me",
@@ -779,7 +779,7 @@ skipLinks := components.NewSkipLinks([]components.SkipLinkTarget{
 A generic reactive state container.
 
 ```go
-import "github.com/dougbarrett/guxstate"
+import "github.com/dougbarrett/gux/state"
 
 // Create a store
 type AppState struct {
@@ -816,7 +816,7 @@ countStore := state.Derived(store, func(s AppState) int {
 SWR-like data fetching with caching.
 
 ```go
-import "github.com/dougbarrett/guxstate"
+import "github.com/dougbarrett/gux/state"
 
 // Use the global cache
 result := state.UseQuery("users", func() (any, error) {
@@ -854,7 +854,7 @@ cache.Prefetch("posts", fetchPosts)
 localStorage and sessionStorage helpers.
 
 ```go
-import "github.com/dougbarrett/guxstate"
+import "github.com/dougbarrett/gux/state"
 
 // Persistent store (localStorage)
 userStore := state.NewPersistentStore("user", User{Name: "Guest"})
@@ -873,7 +873,7 @@ state.RemoveItem("key")
 WebSocket support for real-time communication.
 
 ```go
-import "github.com/dougbarrett/guxstate"
+import "github.com/dougbarrett/gux/state"
 
 // Basic WebSocket
 ws := state.NewWebSocket(state.WebSocketConfig{

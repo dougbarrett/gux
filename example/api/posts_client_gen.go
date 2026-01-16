@@ -7,7 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	fetch "github.com/dougbarrett/guxfetch"
+	fetch "github.com/dougbarrett/gux/fetch"
 )
 
 // ClientOption configures a client

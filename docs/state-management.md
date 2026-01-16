@@ -9,7 +9,7 @@ The core `Store[T]` type provides generic reactive state management.
 ### Creating a Store
 
 ```go
-import "github.com/dougbarrett/guxstate"
+import "github.com/dougbarrett/gux/state"
 
 // Create with initial value
 type AppState struct {

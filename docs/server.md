@@ -15,7 +15,7 @@ type Middleware func(http.Handler) http.Handler
 ### Composing Middleware
 
 ```go
-import "github.com/dougbarrett/guxserver"
+import "github.com/dougbarrett/gux/server"
 
 // Chain multiple middleware
 handler := server.Chain(
@@ -164,7 +164,7 @@ static/
 ### Error Types
 
 ```go
-import "github.com/dougbarrett/guxapi"
+import "github.com/dougbarrett/gux/api"
 
 // Not Found (404)
 return nil, api.NotFound("resource not found")
@@ -308,7 +308,7 @@ import (
     "net/http"
 
     "yourapp/api"
-    "github.com/dougbarrett/guxserver"
+    "github.com/dougbarrett/gux/server"
 )
 
 func main() {

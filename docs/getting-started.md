@@ -164,8 +164,8 @@ package main
 import (
     "fmt"
     "myapp/api"
-    "github.com/dougbarrett/guxcomponents"
-    "github.com/dougbarrett/guxstate"
+    "github.com/dougbarrett/gux/components"
+    "github.com/dougbarrett/gux/state"
 )
 
 func main() {
@@ -277,8 +277,8 @@ import (
     "sync"
 
     "myapp/api"
-    "github.com/dougbarrett/guxserver"
-    gqapi "github.com/dougbarrett/guxapi"
+    "github.com/dougbarrett/gux/server"
+    gqapi "github.com/dougbarrett/gux/api"
 )
 
 // PostsService implements api.PostsAPI

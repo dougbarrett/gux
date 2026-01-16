@@ -111,7 +111,7 @@ For full control over WebSocket communication:
 ### Creating a Client
 
 ```go
-import "github.com/dougbarrett/guxws"
+import "github.com/dougbarrett/gux/ws"
 
 client := ws.NewClient("ws://localhost:8080/ws",
     ws.WithOnOpen(func() {
@@ -438,7 +438,7 @@ func (s *PostsService) Create(ctx context.Context, req api.CreatePostRequest) (*
 Use `WebSocketStore` for integrated state management:
 
 ```go
-import "github.com/dougbarrett/guxstate"
+import "github.com/dougbarrett/gux/state"
 
 wsStore := state.NewWebSocketStore(state.WebSocketConfig{
     URL: "ws://localhost:8080/ws",

@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"sync"
 
-	"github.com/dougbarrett/guxexample/api"
+	"github.com/dougbarrett/gux/example/api"
 	"github.com/gorilla/websocket"
 )
 

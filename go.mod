@@ -1,4 +1,4 @@
-module github.com/dougbarrett/gux
+module github.com/dougbarrett/gux/
 
 go 1.24.3
 
