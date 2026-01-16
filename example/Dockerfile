@@ -14,7 +14,7 @@ RUN go mod download || true
 COPY . .
 
 # Build WASM module (output to /app which is writable)
-RUN tinygo build -o main.wasm -target wasm -no-debug -buildvcs=false ./example/app
+RUN GOFLAGS=-buildvcs=false tinygo build -o main.wasm -target wasm -no-debug ./example/app
 
 # Stage 2: Build Go server
 FROM golang:1.24-alpine AS server-builder
