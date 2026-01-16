@@ -4,7 +4,7 @@
 
 A full-stack Go framework for building modern web applications with WebAssembly. Write your entire application in Go — from type-safe API clients to reactive UI components.
 
-[![Go Version](https://img.shields.io/badge/Go-1.21+-00ADD8?logo=go)](https://golang.org)
+[![Go Version](https://img.shields.io/badge/Go-1.25+-00ADD8?logo=go)](https://golang.org)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 ## Features
