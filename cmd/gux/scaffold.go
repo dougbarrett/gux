@@ -103,14 +103,14 @@ func runInit(appName, modulePath string) {
 		destPath string
 	}{
 		{"templates/go.mod.tmpl", "go.mod"},
-		{"templates/app/main.go.tmpl", "app/main.go"},
-		{"templates/server/main.go.tmpl", "server/main.go"},
-		{"templates/api/types.go.tmpl", "api/types.go"},
-		{"templates/api/example.go.tmpl", "api/example.go"},
-		{"templates/index.html.tmpl", "index.html"},
-		{"templates/manifest.json.tmpl", "manifest.json"},
-		{"templates/offline.html.tmpl", "offline.html"},
-		{"templates/service-worker.js.tmpl", "service-worker.js"},
+		{"templates/cmd/app/main.go.tmpl", "cmd/app/main.go"},
+		{"templates/cmd/server/main.go.tmpl", "cmd/server/main.go"},
+		{"templates/internal/api/types.go.tmpl", "internal/api/types.go"},
+		{"templates/internal/api/example.go.tmpl", "internal/api/example.go"},
+		{"templates/public/index.html.tmpl", "public/index.html"},
+		{"templates/public/manifest.json.tmpl", "public/manifest.json"},
+		{"templates/public/offline.html.tmpl", "public/offline.html"},
+		{"templates/public/service-worker.js.tmpl", "public/service-worker.js"},
 		{"templates/Dockerfile.tmpl", "Dockerfile"},
 	}
 
@@ -190,14 +190,14 @@ func isValidAppName(name string) bool {
 func checkForConflicts(targetDir string) []string {
 	filesToCheck := []string{
 		"go.mod",
-		"app/main.go",
-		"server/main.go",
-		"api/types.go",
-		"api/example.go",
-		"index.html",
-		"manifest.json",
-		"offline.html",
-		"service-worker.js",
+		"cmd/app/main.go",
+		"cmd/server/main.go",
+		"internal/api/types.go",
+		"internal/api/example.go",
+		"public/index.html",
+		"public/manifest.json",
+		"public/offline.html",
+		"public/service-worker.js",
 		"Dockerfile",
 	}
 
@@ -217,7 +217,7 @@ func printNextStepsWithDir(appName string, initHere bool) {
 Created Gux application in current directory
 
 Next steps:
-  gux setup       # Copy wasm_exec.js for local development (optional)
+  gux setup       # Copy wasm_exec.js to public/ (optional for local dev)
   gux dev         # Build and run dev server
 
 Your app will be available at http://localhost:8080
@@ -230,7 +230,7 @@ Created Gux application in ./%s
 
 Next steps:
   cd %s
-  gux setup       # Copy wasm_exec.js for local development (optional)
+  gux setup       # Copy wasm_exec.js to public/ (optional for local dev)
   gux dev         # Build and run dev server
 
 Your app will be available at http://localhost:8080

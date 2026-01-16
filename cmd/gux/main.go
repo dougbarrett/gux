@@ -41,7 +41,7 @@ func main() {
 
 	case "gen", "generate":
 		genCmd := flag.NewFlagSet("gen", flag.ExitOnError)
-		apiDir := genCmd.String("dir", "api", "Directory containing API interface files")
+		apiDir := genCmd.String("dir", "internal/api", "Directory containing API interface files")
 		genCmd.Parse(os.Args[2:])
 
 		runGenerate(*apiDir)
@@ -90,9 +90,9 @@ func printUsage() {
 Usage:
     gux init [--module <module-path>] <appname>   Create a new Gux application
     gux init --module <module-path> .             Initialize in current directory
-    gux setup [--tinygo]                          Copy wasm_exec.js from Go/TinyGo
+    gux setup [--tinygo]                          Copy wasm_exec.js to public/
     gux gen [--dir <api-dir>]                     Generate API client code
-    gux build [--tinygo]                          Build WASM module
+    gux build [--tinygo]                          Build WASM module to public/
     gux dev [--port <port>] [--tinygo]            Build and run dev server
     gux claude                                     Install Claude Code skill
     gux version                                    Show version
@@ -101,25 +101,22 @@ Usage:
 Examples:
     gux init --module github.com/myuser/myapp myapp   # Create new directory
     gux init --module github.com/myuser/myapp .       # Use current directory
-    gux setup                # Copy wasm_exec.js from Go
-    gux setup --tinygo       # Copy wasm_exec.js from TinyGo
+    gux setup                # Copy wasm_exec.js from Go to public/
+    gux setup --tinygo       # Copy wasm_exec.js from TinyGo to public/
     gux build --tinygo       # Build with TinyGo (~500KB)
     gux dev                  # Run dev server on :8080
     gux dev --port 3000      # Run on custom port
     gux claude               # Install Claude Code skill for AI assistance
 
 The init command creates a Gux application scaffold including:
-    - app/main.go       - WASM frontend entry point
-    - server/main.go    - HTTP server
-    - api/              - Shared API definitions
-    - index.html        - PWA entry point
-    - Dockerfile        - Multi-stage Docker build
-    - manifest.json     - PWA manifest
-    - offline.html      - Offline fallback
-    - service-worker.js - PWA caching
+    - cmd/app/main.go       - WASM frontend entry point
+    - cmd/server/main.go    - HTTP server
+    - internal/api/         - Shared API definitions
+    - public/               - Static files (index.html, manifest.json, etc.)
+    - Dockerfile            - Multi-stage Docker build
 
 After scaffolding, run:
-    gux setup     # Copy wasm_exec.js from Go installation
+    gux setup     # Copy wasm_exec.js to public/
     gux claude    # Install Claude Code skill (optional)
     gux dev       # Build and run dev server`)
 }

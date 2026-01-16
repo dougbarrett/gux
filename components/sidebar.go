@@ -198,10 +198,19 @@ func (s *Sidebar) createNavItemWithLabel(document js.Value, item NavItem) (js.Va
 	link.Get("style").Set("position", "relative")
 
 	if item.Icon != "" {
-		icon := document.Call("createElement", "span")
-		icon.Set("textContent", item.Icon)
-		icon.Set("className", "flex-shrink-0")
-		link.Call("appendChild", icon)
+		// Use Icon component if the icon name is recognized, otherwise fall back to text
+		iconSVG := IconSVG(item.Icon, IconOutline)
+		if iconSVG != "" {
+			iconEl := Icon(IconProps{Name: item.Icon, Size: IconMD})
+			iconEl.Set("className", string(IconMD)+" flex-shrink-0")
+			link.Call("appendChild", iconEl)
+		} else {
+			// Fallback: render as text (for custom icons or emoji)
+			icon := document.Call("createElement", "span")
+			icon.Set("textContent", item.Icon)
+			icon.Set("className", "flex-shrink-0")
+			link.Call("appendChild", icon)
+		}
 	}
 
 	label := document.Call("createElement", "span")

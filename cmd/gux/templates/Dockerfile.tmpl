@@ -14,11 +14,11 @@ RUN go mod download || true
 COPY . .
 
 # Build WASM module and version it with content hash
-RUN tinygo build -o main.wasm -target wasm -no-debug ./app && \
+RUN tinygo build -o main.wasm -target wasm -no-debug ./cmd/app && \
     HASH=$(sha256sum main.wasm | cut -c1-8) && \
     mv main.wasm main.${HASH}.wasm && \
-    sed -i "s/fetch(\"\\/main\.[^\"]*\.wasm\"/fetch(\"\\/main.${HASH}.wasm\"/g" index.html && \
-    sed -i "s/fetch(\"\\/main\.wasm\"/fetch(\"\\/main.${HASH}.wasm\"/g" index.html
+    sed -i "s/fetch(\"\\\/main\\.[^\"]*\\.wasm\"/fetch(\"\\\/main.${HASH}.wasm\"/g" public/index.html && \
+    sed -i "s/fetch(\"\\\/main\\.wasm\"/fetch(\"\\\/main.${HASH}.wasm\"/g" public/index.html
 
 # Stage 2: Build Go server
 FROM golang:1.25-alpine AS server-builder
@@ -36,7 +36,7 @@ RUN go mod download || true
 COPY . .
 
 # Build server binary
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o server ./server
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o server ./cmd/server
 
 # Stage 3: Production image
 FROM alpine:3.21
@@ -49,17 +49,20 @@ RUN apk add --no-cache ca-certificates
 # Copy server binary
 COPY --from=server-builder /app/server .
 
-# Copy wasm_exec.js from TinyGo image (no need for local copy)
-COPY --from=wasm-builder /usr/local/tinygo/targets/wasm_exec.js .
+# Create public directory for static files
+RUN mkdir -p public
 
-# Copy static files
-COPY manifest.json .
-COPY offline.html .
-COPY service-worker.js .
+# Copy wasm_exec.js from TinyGo image (no need for local copy)
+COPY --from=wasm-builder /usr/local/tinygo/targets/wasm_exec.js ./public/
+
+# Copy static files to public directory
+COPY public/manifest.json ./public/
+COPY public/offline.html ./public/
+COPY public/service-worker.js ./public/
 
 # Copy index.html with updated WASM reference and versioned WASM from builder
-COPY --from=wasm-builder /app/index.html .
-COPY --from=wasm-builder /app/main.*.wasm ./
+COPY --from=wasm-builder /app/public/index.html ./public/
+COPY --from=wasm-builder /app/main.*.wasm ./public/
 
 # Expose port
 EXPOSE 8080
@@ -69,4 +72,4 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD wget --no-verbose --tries=1 --spider http://localhost:8080/ || exit 1
 
 # Run server
-CMD ["./server", "-port", "8080", "-dir", "."]
+CMD ["./server", "-port", "8080", "-dir", "public"]

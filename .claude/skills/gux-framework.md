@@ -23,7 +23,7 @@ go install github.com/dougbarrett/gux/cmd/gux@latest
 | Command | Description |
 |---------|-------------|
 | `gux init --module <path> <name>` | Create new Gux application |
-| `gux setup [--tinygo]` | Copy wasm_exec.js from Go/TinyGo installation |
+| `gux setup [--tinygo]` | Copy wasm_exec.js to public/ from Go/TinyGo |
 | `gux gen [--dir <api-dir>]` | Generate API client/server code from interfaces |
 | `gux build [--tinygo]` | Build WASM module |
 | `gux dev [--port <port>] [--tinygo]` | Build and run dev server |
@@ -50,19 +50,22 @@ gux dev
 
 ```
 myapp/
-├── app/
-│   └── main.go           # WASM frontend entry point
-├── server/
-│   └── main.go           # HTTP server
-├── api/
-│   ├── types.go          # Shared data types
-│   └── example.go        # Example API interface
-├── go.mod                # Go module file
-├── index.html            # PWA entry point
-├── manifest.json         # PWA manifest
-├── offline.html          # Offline fallback page
-├── service-worker.js     # PWA caching
-└── Dockerfile            # Multi-stage Docker build
+├── cmd/
+│   ├── app/
+│   │   └── main.go           # WASM frontend entry point
+│   └── server/
+│       └── main.go           # HTTP server
+├── internal/
+│   └── api/
+│       ├── types.go          # Shared data types
+│       └── example.go        # Example API interface
+├── public/
+│   ├── index.html            # PWA entry point
+│   ├── manifest.json         # PWA manifest
+│   ├── offline.html          # Offline fallback page
+│   └── service-worker.js     # PWA caching
+├── go.mod                    # Go module file
+└── Dockerfile                # Multi-stage Docker build
 ```
 
 ## API Code Generation
@@ -72,7 +75,7 @@ myapp/
 Use annotations to define type-safe APIs:
 
 ```go
-// api/posts.go
+// internal/api/posts.go
 package api
 
 import "context"
@@ -123,8 +126,8 @@ type PostsAPI interface {
 ### Generate Code
 
 ```bash
-gux gen                  # Scans ./api directory
-gux gen --dir src/api    # Custom directory
+gux gen                       # Scans ./internal/api directory
+gux gen --dir internal/api    # Explicit directory
 ```
 
 Generates:
