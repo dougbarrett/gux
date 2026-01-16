@@ -18,6 +18,9 @@ RUN mkdir -p /app/bin && go install {{.GuxModule}}/cmd/gux@{{.GuxVersion}}
 # Copy source code
 COPY . .
 
+# Ensure public directory is writable
+RUN mkdir -p public && chmod -R 755 public
+
 # Build everything: WASM + server binary with embedded assets
 RUN gux setup --tinygo && gux build --tinygo
 
