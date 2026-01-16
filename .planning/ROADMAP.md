@@ -9,10 +9,10 @@ Transform GoQuery from a functional database query tool into a polished, product
 - ~/.claude/skills/expertise/templ/SKILL.md
 - ~/.claude/skills/expertise/go/SKILL.md
 
-## Milestones
+## Completed Milestones
 
-- ✅ **v1.0 UX Polish** - Phases 1-6 (shipped 2026-01-15)
-- ✅ **v1.1 Accessibility** - Phases 7-11 (shipped 2026-01-16)
+- [v1.0 UX Polish](milestones/v1.0-ROADMAP.md) (Phases 1-6) - SHIPPED 2026-01-15
+- [v1.1 Accessibility](milestones/v1.1-ROADMAP.md) (Phases 7-11) - SHIPPED 2026-01-16
 
 ## Phases
 
@@ -20,170 +20,43 @@ Transform GoQuery from a functional database query tool into a polished, product
 - Integer phases (1, 2, 3): Planned milestone work
 - Decimal phases (2.1, 2.2): Urgent insertions (marked with INSERTED)
 
-- [x] **Phase 1: Header Components** - User Menu + Notification Center
-- [x] **Phase 2: Layout & Navigation** - Collapsible Sidebar + Command Palette
-- [x] **Phase 3: Table Enhancements** - Sorting, filtering, pagination, bulk actions
-- [x] **Phase 4: UX Polish** - Persistent Preferences + Keyboard Navigation + Confirmation Dialog
-- [x] **Phase 5: Data & States** - Data Export + Empty States
-- [x] **Phase 6: Progressive Enhancement** - Skeleton Loaders + Connection Status + Breadcrumbs + PWA
-- [x] **Phase 7: Accessibility Audit** - Review all components, document gaps, establish baseline
-- [x] **Phase 8: ARIA & Semantic Markup** - Screen reader support, labels, roles, live regions
-- [x] **Phase 9: Keyboard Navigation** - Comprehensive keyboard support for all components
-- [x] **Phase 10: Visual Accessibility** - Focus indicators, contrast, reduced motion
-- [x] **Phase 11: A11y Testing Infrastructure** - axe-core integration, testing patterns
-
 ## Phase Details
 
 <details>
-<summary>✅ v1.0 UX Polish (Phases 1-6) - SHIPPED 2026-01-15</summary>
+<summary>v1.0 UX Polish (Phases 1-6) - SHIPPED 2026-01-15</summary>
 
 **Milestone Goal:** Comprehensive UI/UX enhancements to bring the application to production-ready quality
 
-#### Phase 1: Header Components
+- [x] Phase 1: Header Components (2/2 plans) - UserMenu + NotificationCenter
+- [x] Phase 2: Layout & Navigation (2/2 plans) - Collapsible Sidebar + Command Palette
+- [x] Phase 3: Table Enhancements (4/4 plans) - Sorting, filtering, pagination, bulk actions
+- [x] Phase 4: UX Polish (3/3 plans) - Persistent Preferences + Keyboard Navigation
+- [x] Phase 5: Data & States (3/3 plans) - Data Export + Empty States
+- [x] Phase 6: Progressive Enhancement (3/3 plans) - Connection Status + PWA
 
-**Goal**: Add User Menu dropdown and Notification Center with real-time updates
-**Depends on**: Nothing (first phase)
-**Research**: Skipped (Level 0 - all patterns exist in codebase)
-**Plans**: 2 plans, 4 tasks
-
-Plans:
-- [x] 01-01: Core Header Components (UserMenu + NotificationCenter components)
-- [x] 01-02: Header Integration (extend Header, update example app)
-
-#### Phase 2: Layout & Navigation (Complete)
-
-**Goal**: Implement collapsible sidebar and Cmd+K command palette
-**Depends on**: Phase 1
-**Research**: Skipped (patterns existed in Modal + Combobox)
-**Plans**: 2 plans, 5 tasks
-
-Plans:
-- [x] 02-01: Collapsible Sidebar with Cmd/Ctrl+B shortcut
-- [x] 02-02: Command Palette with Cmd/Ctrl+K shortcut
-
-#### Phase 3: Table Enhancements
-
-**Goal**: Add sorting, filtering, pagination, and bulk selection with actions to tables
-**Depends on**: Phase 2
-**Research**: Skipped (Level 0 - all patterns exist: Checkbox, Pagination, Input)
-**Plans**: 4 plans, 9 tasks
-
-Plans:
-- [x] 03-01: Table Sorting (sortable columns, sort icons, client-side sort)
-- [x] 03-02: Table Filtering (search input, real-time filter, debounce)
-- [x] 03-03: Table Pagination (integrate Pagination component, page-aware rendering)
-- [x] 03-04: Bulk Selection & Actions (checkbox column, select-all, action bar)
-
-#### Phase 4: UX Polish (Complete)
-
-**Goal**: Implement persistent preferences, keyboard navigation, and confirmation dialogs
-**Depends on**: Phase 3
-**Research**: Skipped (localStorage patterns, focus management)
-**Plans**: 3 plans, 7 tasks
-
-Plans:
-- [x] 04-01: Sidebar localStorage Persistence
-- [x] 04-02: Dropdown Keyboard Navigation
-- [x] 04-03: ConfirmDialog Component
-
-#### Phase 5: Data & States (Complete)
-
-**Goal**: Add data export (CSV/JSON/PDF) and empty state illustrations
-**Depends on**: Phase 4
-**Research**: Likely (PDF generation)
-**Research topics**: PDF generation in Go/JS, file download patterns, CSV export
-**Plans**: 3 plans
-
-Plans:
-- [x] 05-01: Data Export (CSV/JSON with Table integration)
-- [x] 05-02: PDF Export (jsPDF with autoTable)
-- [x] 05-03: Empty States
-
-#### Phase 6: Progressive Enhancement
-
-**Goal**: Add connection status indicator and PWA support (skeleton loaders and breadcrumbs already exist)
-**Depends on**: Phase 5
-**Research**: Skipped (Level 0 - existing patterns for UI, standard PWA patterns)
-**Plans**: 3 plans, 7 tasks
-
-Plans:
-- [x] 06-01: Connection Status Component (visual indicator for WebSocket state)
-- [x] 06-02: PWA Foundation (manifest, service worker, asset caching)
-- [x] 06-03: PWA Install Experience (install prompt, offline fallback)
+Full details: [milestones/v1.0-ROADMAP.md](milestones/v1.0-ROADMAP.md)
 
 </details>
 
-### ✅ v1.1 Accessibility (Complete)
+<details>
+<summary>v1.1 Accessibility (Phases 7-11) - SHIPPED 2026-01-16</summary>
 
 **Milestone Goal:** Enterprise-ready accessibility compliance with WCAG 2.1 AA standards
 
-#### Phase 7: Accessibility Audit (Complete)
+- [x] Phase 7: Accessibility Audit (3/3 plans) - 114 gaps documented, prioritized, mapped
+- [x] Phase 8: ARIA & Semantic Markup (6/6 plans) - Screen reader support
+- [x] Phase 9: Keyboard Navigation (4/4 plans) - Comprehensive keyboard support
+- [x] Phase 10: Visual Accessibility (2/2 plans) - Focus indicators, contrast, motion
+- [x] Phase 11: A11y Testing Infrastructure (1/1 plans) - axe-core integration
 
-**Goal**: Review all components, document gaps, establish baseline
-**Depends on**: v1.0 complete
-**Research**: Completed during planning
-**Output**: 114 gaps documented across 25 components, prioritized P0-P3, mapped to Phases 8-11
-**Plans**: 3 plans, 3 tasks
+Full details: [milestones/v1.1-ROADMAP.md](milestones/v1.1-ROADMAP.md)
 
-Plans:
-- [x] 07-01: Interactive Components Audit (Modal, Dropdown, CommandPalette, ConfirmDialog, Combobox, Tabs, Accordion, Table)
-- [x] 07-02: Form & Navigation Audit (Input, Select, Checkbox, Toggle, TextArea, DatePicker, Form, FormBuilder, Sidebar, Breadcrumbs, Pagination, Link, Alert, Toast, Progress, Spinner, Skeleton)
-- [x] 07-03: Combined Findings & Remediation Plan
-
-#### Phase 8: ARIA & Semantic Markup (Complete)
-
-**Goal**: Add screen reader support with proper labels, roles, and live regions
-**Depends on**: Phase 7
-**Research**: Completed during planning
-**Plans**: 6 plans
-
-Plans:
-- [x] 08-01: ARIA Dialog Patterns (Modal, ConfirmDialog, CommandPalette)
-- [x] 08-02: ARIA Live Regions (Alert, Toast, Progress, Spinner)
-- [x] 08-03: Form Control Labels (Input, Select, TextArea, Checkbox, Form, FormBuilder)
-- [x] 08-04: Widget ARIA Patterns (Tabs, Combobox, Accordion)
-- [x] 08-05: Navigation ARIA Patterns (Dropdown, Sidebar, Breadcrumbs)
-- [x] 08-06: Complex Data ARIA Patterns (DatePicker, Table)
-
-#### Phase 9: Keyboard Navigation (Complete)
-
-**Goal**: Ensure comprehensive keyboard support for all interactive components
-**Depends on**: Phase 8
-**Research**: Skipped (Level 0 - patterns exist from v1.0: Dropdown 04-02, Command Palette 02-02)
-**Plans**: 4 plans, 9 tasks
-
-Plans:
-- [x] 09-01: Modal Focus Management (focus trap, focus restoration)
-- [x] 09-02: Tabs Keyboard Navigation (arrow keys, Home/End)
-- [x] 09-03: DatePicker Calendar Navigation (grid arrows, Enter, Escape)
-- [x] 09-04: Focus Polish (Dropdown, Sidebar, SkipLink)
-
-#### Phase 10: Visual Accessibility (Complete)
-
-**Goal**: Implement focus indicators, color contrast compliance, and reduced motion support
-**Depends on**: Phase 9
-**Research**: Likely (WCAG contrast ratios, focus-visible patterns)
-**Research topics**: Contrast ratio requirements, focus-visible patterns, prefers-reduced-motion
-**Plans**: 2 plans
-
-Plans:
-- [x] 10-01: Visible Focus Indicators (Toggle, Dropdown, Accordion, Tabs, DatePicker)
-- [x] 10-02: Motion Preferences & Color Contrast
-
-#### Phase 11: A11y Testing Infrastructure (Complete)
-
-**Goal**: Integrate axe-core for automated accessibility regression testing
-**Depends on**: Phase 10
-**Research**: Completed (Playwright + @axe-core/playwright standard pattern)
-**Plans**: 1 plan
-
-Plans:
-- [x] 11-01: axe-core Test Foundation (Playwright setup, baseline tests, Makefile integration)
+</details>
 
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 10 → 11
+Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10 -> 11
 
 | Phase | Milestone | Plans | Status | Completed |
 |-------|-----------|-------|--------|-----------|
