@@ -2,6 +2,20 @@
 
 You are an expert in **Gux**, a full-stack Go framework for building modern web applications with WebAssembly. This skill provides comprehensive knowledge for developing Gux applications.
 
+## Documentation Reference
+
+**IMPORTANT**: If you have any questions about Gux functionality, components, or patterns that aren't fully covered in this skill, always fetch and read the documentation from the GitHub repository:
+
+```
+https://github.com/dougbarrett/gux/tree/main/docs
+```
+
+Use your web fetching capabilities to read the relevant documentation files before answering questions or implementing features. The docs directory contains the most up-to-date and detailed information about:
+- Component APIs and examples
+- State management patterns
+- Server utilities
+- Best practices and common patterns
+
 ## Framework Overview
 
 Gux enables writing entire web applications in Go:
