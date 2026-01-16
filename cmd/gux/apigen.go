@@ -426,13 +426,15 @@ package api
 import (
 	"encoding/json"
 	"net/http"
+{{- if .NeedsStrconv}}
 	"strconv"
 	"strings"
+{{- end}}
 
 	gqapi "github.com/dougbarrett/gux/api"
 )
 
-{{range $iface := .}}
+{{range $iface := .Interfaces}}
 // {{$iface.Name}}Handler wraps a {{$iface.Name}} implementation with HTTP handlers
 type {{$iface.Name}}Handler struct {
 	service    {{$iface.Name}}
@@ -460,52 +462,22 @@ func (h *{{$iface.Name}}Handler) wrap(handler http.HandlerFunc) http.Handler {
 
 // RegisterRoutes registers all routes for {{$iface.Name}}
 func (h *{{$iface.Name}}Handler) RegisterRoutes(mux *http.ServeMux) {
-	mux.Handle("{{$iface.BasePath}}", h.wrap(h.handleRoot))
-	mux.Handle("{{$iface.BasePath}}/", h.wrap(h.handleWithID))
-}
-
-func (h *{{$iface.Name}}Handler) handleRoot(w http.ResponseWriter, r *http.Request) {
-	switch r.Method {
 {{- range $method := $iface.Methods}}
-{{- if eq $method.Path "/"}}
-	case http.Method{{$method.HTTPMethod | methodName}}:
-		h.handle{{$method.Name}}(w, r)
+	mux.Handle("{{$method.HTTPMethod}} {{$iface.BasePath}}{{$method.Path}}", h.wrap(h.handle{{$method.Name}}))
 {{- end}}
-{{- end}}
-	default:
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-	}
-}
-
-func (h *{{$iface.Name}}Handler) handleWithID(w http.ResponseWriter, r *http.Request) {
-	path := strings.TrimPrefix(r.URL.Path, "{{$iface.BasePath}}/")
-
-	// Handle trailing slash - delegate to root handler
-	if path == "" {
-		h.handleRoot(w, r)
-		return
-	}
-
-	id, err := strconv.Atoi(path)
-	if err != nil {
-		gqapi.WriteError(w, gqapi.BadRequest("invalid ID"))
-		return
-	}
-
-	switch r.Method {
-{{- range $method := $iface.Methods}}
-{{- if ne $method.Path "/"}}
-	case http.Method{{$method.HTTPMethod | methodName}}:
-		h.handle{{$method.Name}}(w, r, id)
-{{- end}}
-{{- end}}
-	default:
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-	}
 }
 
 {{range $method := $iface.Methods}}
-func (h *{{$iface.Name}}Handler) handle{{$method.Name}}(w http.ResponseWriter, r *http.Request{{if $method.PathParams}}, {{range $i, $p := $method.PathParams}}{{if $i}}, {{end}}{{$p}} int{{end}}{{end}}) {
+func (h *{{$iface.Name}}Handler) handle{{$method.Name}}(w http.ResponseWriter, r *http.Request) {
+{{- if $method.PathParams}}
+	// Extract path parameters
+	path := strings.TrimPrefix(r.URL.Path, "{{$iface.BasePath}}")
+	parts := strings.Split(strings.Trim(path, "/"), "/")
+	_ = parts // avoid unused variable if no params extracted
+{{- range $i, $p := $method.PathParams}}
+	{{$p}}, _ := strconv.Atoi(parts[{{pathParamIndex $method.Path $p}}])
+{{- end}}
+{{- end}}
 {{- if $method.HasBody}}
 	var req {{$method.BodyType}}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -531,16 +503,49 @@ func (h *{{$iface.Name}}Handler) handle{{$method.Name}}(w http.ResponseWriter, r
 {{end}}
 `
 
+	// Check if any interface has path parameters (needs strconv import)
+	needsStrconv := false
+	for _, iface := range interfaces {
+		for _, method := range iface.Methods {
+			if len(method.PathParams) > 0 {
+				needsStrconv = true
+				break
+			}
+		}
+		if needsStrconv {
+			break
+		}
+	}
+
 	funcMap := template.FuncMap{
 		"methodName": func(method string) string {
 			return strings.ToUpper(method[:1]) + strings.ToLower(method[1:])
+		},
+		"pathParamIndex": func(path, param string) int {
+			// Find the index of the parameter in the path parts
+			// e.g., "/{userId}/posts/{postId}" -> userId is at index 0, postId is at index 2
+			parts := strings.Split(strings.Trim(path, "/"), "/")
+			for i, part := range parts {
+				if part == "{"+param+"}" {
+					return i
+				}
+			}
+			return 0
 		},
 	}
 
 	t := template.Must(template.New("server").Funcs(funcMap).Parse(tmpl))
 
+	data := struct {
+		Interfaces   []InterfaceInfo
+		NeedsStrconv bool
+	}{
+		Interfaces:   interfaces,
+		NeedsStrconv: needsStrconv,
+	}
+
 	var buf bytes.Buffer
-	if err := t.Execute(&buf, interfaces); err != nil {
+	if err := t.Execute(&buf, data); err != nil {
 		return "", fmt.Errorf("execute template: %w", err)
 	}
 
