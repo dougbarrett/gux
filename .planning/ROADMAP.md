@@ -93,10 +93,10 @@ Plans:
 **Goal**: New documentation for contributors covering ARIA patterns, keyboard navigation, focus management
 **Depends on**: Phase 14
 **Research**: Unlikely (documenting existing patterns)
-**Plans**: TBD
+**Plans**: 1/1 complete
 
 Plans:
-- [ ] 15-01: TBD
+- [x] 15-01: Accessibility Guide (570 lines, ARIA patterns, FocusTrap API, testing guide)
 
 ## Progress
 
@@ -119,4 +119,4 @@ Phases execute in numeric order: 1 → 2 → ... → 11 → 12 → 13 → 14 →
 | 12. README Update | v1.2 | 1/1 | Complete | 2026-01-16 |
 | 13. Component Docs | v1.2 | 1/1 | Complete | 2026-01-16 |
 | 14. Keyboard Shortcuts | v1.2 | 1/1 | Complete | 2026-01-16 |
-| 15. Accessibility Guide | v1.2 | 0/? | Not started | - |
+| 15. Accessibility Guide | v1.2 | 1/1 | Complete | 2026-01-16 |
