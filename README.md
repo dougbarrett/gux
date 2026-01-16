@@ -9,6 +9,7 @@ A full-stack Go framework for building modern web applications with WebAssembly.
 
 - **Type-Safe API Generation** — Define Go interfaces, generate HTTP clients and server handlers automatically
 - **45+ UI Components** — Forms, layouts, data display, feedback, and charts with Tailwind CSS
+- **WCAG 2.1 AA Accessible** — Screen reader support, keyboard navigation, focus management
 - **Command Palette** — Quick actions with Cmd/Ctrl+K
 - **Data Export** — CSV, JSON, and PDF export for tables
 - **Reactive State Management** — Generic stores, persistence, async loading, and SWR-style query caching
@@ -443,6 +444,38 @@ func handleList(w http.ResponseWriter, r *http.Request) {
     json.NewEncoder(w).Encode(result)
 }
 ```
+
+## Accessibility
+
+Gux components are built with WCAG 2.1 AA compliance:
+
+- **Screen Reader Support** — All components have proper ARIA labels, roles, and live regions
+- **Keyboard Navigation** — Full keyboard access with visible focus indicators
+- **Reduced Motion** — Respects `prefers-reduced-motion` system setting
+- **Color Contrast** — Meets WCAG 2.1 AA contrast requirements (4.5:1 minimum)
+- **Focus Management** — Modal focus traps, focus restoration, skip links
+
+### Accessibility Testing
+
+Automated accessibility testing with axe-core and Playwright:
+
+```bash
+make test-a11y        # Run accessibility tests
+make test-a11y-debug  # Run with visible browser
+```
+
+## Keyboard Shortcuts
+
+| Shortcut | Action |
+|----------|--------|
+| `Cmd/Ctrl + K` | Open command palette |
+| `Cmd/Ctrl + B` | Toggle sidebar |
+| `Escape` | Close modal/dropdown/palette |
+| `Enter` | Confirm selection |
+| `Arrow Up/Down` | Navigate dropdown/menu items |
+| `Arrow Left/Right` | Switch tabs |
+| `Home/End` | Jump to first/last tab |
+| `Tab` | Move between focusable elements |
 
 ## Project Structure
 
