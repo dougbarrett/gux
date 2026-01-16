@@ -6,6 +6,7 @@
 - **Core Concepts**
   - [API Generation](api-generation.md)
   - [Components](components.md)
+  - [Templates](templates.md)
   - [State Management](state-management.md)
 
 - **Features**
