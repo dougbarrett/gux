@@ -131,7 +131,10 @@ type PostsAPI interface {
 
 - Use `{paramName}` syntax in paths
 - Parameter names must match function argument names exactly
-- Parameters must be `int` or `string` types
+- Parameters can be `int` or `string` types
+- The generator automatically detects the type from your function signature
+- `int` parameters are validated on the server and return 400 if invalid
+- `string` parameters are extracted directly without conversion
 
 ### Request Bodies
 
@@ -147,6 +150,7 @@ gux gen --dir internal/api    # Explicit directory
 ```
 
 Generates:
+- `client_shared_gen.go` - Shared client types and functions (generated once per directory)
 - `*_client_gen.go` - Type-safe HTTP client (WASM only, `//go:build js && wasm`)
 - `*_server_gen.go` - HTTP handler wrapper
 
@@ -161,6 +165,13 @@ client := api.NewPostsClient()
 client := api.NewPostsClient(
     api.WithBaseURL("https://api.example.com"),
     api.WithHeader("Authorization", "Bearer token"),
+)
+
+// With dynamic auth (token refreshed on each request)
+client := api.NewPostsClient(
+    api.WithAuthProvider(func() string {
+        return "Bearer " + auth.GetToken()
+    }),
 )
 
 // Make requests
@@ -367,6 +378,23 @@ menu := components.NewUserMenu(components.UserMenuProps{
     Email:      "john@example.com",
     AvatarSrc:  "/avatar.jpg",
     OnProfile:  func() { router.Navigate("/profile") },
+    OnSettings: func() { router.Navigate("/settings") },
+    OnLogout:   func() { handleLogout() },
+})
+
+// UserMenu with customized labels
+menu := components.NewUserMenu(components.UserMenuProps{
+    Name:          "John Doe",
+    Email:         "john@example.com",
+    ProfileLabel:  "Organizations",  // Custom label instead of "Profile"
+    SettingsLabel: "Preferences",    // Custom label instead of "Settings"
+    LogoutLabel:   "Sign Out",       // Custom label instead of "Logout"
+    HideProfile:   false,            // Set true to hide Profile item
+    HideSettings:  false,            // Set true to hide Settings item
+    ExtraItems: []components.UserMenuItem{
+        {Icon: "🏢", Label: "Switch Org", OnClick: func() { showOrgSwitcher() }},
+    },
+    OnProfile:  func() { showOrgs() },
     OnSettings: func() { router.Navigate("/settings") },
     OnLogout:   func() { handleLogout() },
 })

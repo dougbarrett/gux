@@ -25,6 +25,7 @@ gux gen
 ```
 
 This scans the `api/` directory and generates:
+- **Shared Client** (`client_shared_gen.go`) — Common types and functions used by all clients
 - **Client** (`posts_client_gen.go`) — Type-safe HTTP client for WASM
 - **Server** (`posts_server_gen.go`) — HTTP handler wrapper
 
@@ -87,11 +88,20 @@ GetByID(ctx context.Context, id int) (*Post, error)
 
 // @route GET /{userId}/posts/{postId}
 GetUserPost(ctx context.Context, userId int, postId int) (*Post, error)
+
+// @route GET /{token}
+GetByToken(ctx context.Context, token string) (*Token, error)
+
+// @route GET /user/{userId}/token/{token}
+GetUserToken(ctx context.Context, userId int, token string) (*Token, error)
 ```
 
 **Rules:**
 - Parameter names must match function argument names exactly
-- Parameters must be `int` or `string` types
+- Parameters can be `int` or `string` types
+- The generator automatically uses the correct type from your function signature
+- `int` parameters are validated and return a 400 error if not a valid integer
+- `string` parameters are extracted directly without conversion
 - Order in the path determines URL structure
 
 ## Request Bodies
@@ -165,6 +175,28 @@ api.WithBasePath(path string)
 
 // Add custom header
 api.WithHeader(key, value string)
+
+// Dynamic auth token injection (called on each request)
+api.WithAuthProvider(func() string { return "Bearer " + auth.GetToken() })
+```
+
+### Dynamic Authentication
+
+For applications with token refresh, use `WithAuthProvider` to inject auth headers dynamically:
+
+```go
+client := api.NewPostsClient(
+    api.WithAuthProvider(func() string {
+        token := auth.GetToken()
+        if token == "" {
+            return ""
+        }
+        return "Bearer " + token
+    }),
+)
+
+// Every request will now call the provider to get the current token
+posts, err := client.GetAll()
 ```
 
 ### Method Calls

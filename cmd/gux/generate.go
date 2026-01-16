@@ -39,6 +39,19 @@ func runGenerate(apiDir string) {
 
 	fmt.Printf("Generating API clients from %d file(s)...\n\n", len(files))
 
+	// Generate shared client code once
+	sharedCode, err := GenerateClientSharedCode()
+	if err != nil {
+		fmt.Printf("Error generating shared client code: %v\n", err)
+		os.Exit(1)
+	}
+	sharedPath := filepath.Join(apiDir, "client_shared_gen.go")
+	if err := os.WriteFile(sharedPath, []byte(sharedCode), 0644); err != nil {
+		fmt.Printf("Error writing shared client code: %v\n", err)
+		os.Exit(1)
+	}
+	fmt.Printf("  generated: %s\n\n", sharedPath)
+
 	for _, file := range files {
 		// Generate output filename: foo.go -> foo_client_gen.go
 		base := strings.TrimSuffix(filepath.Base(file), ".go")
@@ -52,7 +65,7 @@ func runGenerate(apiDir string) {
 		}
 	}
 
-	fmt.Printf("\nGenerated %d API file(s)\n", len(files))
+	fmt.Printf("\nGenerated %d API file(s) + shared client code\n", len(files))
 }
 
 // findAPIFiles finds all .go files in the directory that contain @client annotation

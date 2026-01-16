@@ -4,6 +4,14 @@ package components
 
 import "syscall/js"
 
+// UserMenuItem represents a custom menu item
+type UserMenuItem struct {
+	Icon    string // Emoji or icon character
+	Label   string
+	Danger  bool   // If true, shows in red (for destructive actions)
+	OnClick func()
+}
+
 // UserMenuProps configures a UserMenu component
 type UserMenuProps struct {
 	Name       string
@@ -12,6 +20,20 @@ type UserMenuProps struct {
 	OnProfile  func()
 	OnSettings func()
 	OnLogout   func()
+
+	// Customizable labels (optional - defaults to "Profile", "Settings", "Logout")
+	ProfileLabel  string
+	SettingsLabel string
+	LogoutLabel   string
+
+	// Custom menu items to add between standard items and logout
+	// If provided, these are shown after Profile and Settings
+	ExtraItems []UserMenuItem
+
+	// If true, hides the Profile menu item
+	HideProfile bool
+	// If true, hides the Settings menu item
+	HideSettings bool
 }
 
 // UserMenu creates a user profile dropdown with avatar trigger
@@ -79,13 +101,31 @@ func NewUserMenu(props UserMenuProps) *UserMenu {
 	menuItems := document.Call("createElement", "div")
 	menuItems.Set("className", "py-1")
 
-	// Profile item
-	profileItem := createMenuItem(document, "👤", "Profile", false, props.OnProfile)
-	menuItems.Call("appendChild", profileItem)
+	// Profile item (unless hidden)
+	if !props.HideProfile {
+		profileLabel := props.ProfileLabel
+		if profileLabel == "" {
+			profileLabel = "Profile"
+		}
+		profileItem := createMenuItem(document, "👤", profileLabel, false, props.OnProfile)
+		menuItems.Call("appendChild", profileItem)
+	}
 
-	// Settings item
-	settingsItem := createMenuItem(document, "⚙️", "Settings", false, props.OnSettings)
-	menuItems.Call("appendChild", settingsItem)
+	// Settings item (unless hidden)
+	if !props.HideSettings {
+		settingsLabel := props.SettingsLabel
+		if settingsLabel == "" {
+			settingsLabel = "Settings"
+		}
+		settingsItem := createMenuItem(document, "⚙️", settingsLabel, false, props.OnSettings)
+		menuItems.Call("appendChild", settingsItem)
+	}
+
+	// Extra custom items
+	for _, item := range props.ExtraItems {
+		extraItem := createMenuItem(document, item.Icon, item.Label, item.Danger, item.OnClick)
+		menuItems.Call("appendChild", extraItem)
+	}
 
 	content.Call("appendChild", menuItems)
 
@@ -98,7 +138,11 @@ func NewUserMenu(props UserMenuProps) *UserMenu {
 	logoutSection := document.Call("createElement", "div")
 	logoutSection.Set("className", "py-1")
 
-	logoutItem := createMenuItem(document, "🚪", "Logout", true, props.OnLogout)
+	logoutLabel := props.LogoutLabel
+	if logoutLabel == "" {
+		logoutLabel = "Logout"
+	}
+	logoutItem := createMenuItem(document, "🚪", logoutLabel, true, props.OnLogout)
 	logoutSection.Call("appendChild", logoutItem)
 
 	content.Call("appendChild", logoutSection)
