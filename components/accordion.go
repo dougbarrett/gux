@@ -38,7 +38,7 @@ func NewAccordion(props AccordionProps) *Accordion {
 	baseID := "accordion-" + uuid
 
 	container := document.Call("createElement", "div")
-	container.Set("className", "border border-gray-200 dark:border-gray-700 rounded-lg divide-y divide-gray-200 dark:divide-gray-700")
+	container.Set("className", "border border-subtle rounded-lg divide-y divide-gray-200 dark:divide-gray-700")
 
 	acc := &Accordion{
 		element: container,
@@ -69,7 +69,7 @@ func (a *Accordion) createPanel(item AccordionItem, index int, allowMultiple boo
 
 	// Header button
 	header := document.Call("createElement", "button")
-	header.Set("className", "w-full px-4 py-3 flex items-center justify-between text-left hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500 transition-colors cursor-pointer")
+	header.Set("className", "w-full px-4 py-3 flex items-center justify-between text-left hover:surface-raised focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500 transition-colors cursor-pointer")
 	header.Set("type", "button")
 
 	// ARIA attributes for trigger button
@@ -82,14 +82,14 @@ func (a *Accordion) createPanel(item AccordionItem, index int, allowMultiple boo
 	}
 
 	title := document.Call("createElement", "span")
-	title.Set("className", "font-medium text-gray-900 dark:text-gray-100")
+	title.Set("className", "font-medium text-primary")
 	title.Set("textContent", item.Title)
 	header.Call("appendChild", title)
 
 	// Chevron icon
 	chevron := document.Call("createElement", "span")
 	chevron.Set("className", "transform transition-transform duration-200")
-	chevron.Set("innerHTML", `<svg class="w-5 h-5 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>`)
+	chevron.Set("innerHTML", `<svg class="w-5 h-5 icon-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>`)
 	header.Call("appendChild", chevron)
 
 	panel.Call("appendChild", header)
@@ -104,7 +104,7 @@ func (a *Accordion) createPanel(item AccordionItem, index int, allowMultiple boo
 	content.Call("setAttribute", "aria-labelledby", triggerID)
 
 	contentInner := document.Call("createElement", "div")
-	contentInner.Set("className", "px-4 py-3 text-gray-600 dark:text-gray-300")
+	contentInner.Set("className", "px-4 py-3 text-secondary")
 	contentInner.Call("appendChild", item.Content)
 	content.Call("appendChild", contentInner)
 

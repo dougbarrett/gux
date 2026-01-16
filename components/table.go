@@ -109,7 +109,7 @@ func NewTable(props TableProps) *Table {
 	table := document.Call("createElement", "table")
 	tableClass := "min-w-full divide-y divide-gray-200 dark:divide-gray-700"
 	if props.Bordered {
-		tableClass += " border border-gray-200 dark:border-gray-700"
+		tableClass += " border border-subtle"
 	}
 	table.Set("className", tableClass)
 
@@ -120,12 +120,12 @@ func NewTable(props TableProps) *Table {
 
 	// Header
 	thead := document.Call("createElement", "thead")
-	thead.Set("className", "bg-gray-50 dark:bg-gray-800")
+	thead.Set("className", "surface-raised")
 	table.Call("appendChild", thead)
 
 	// Body
 	tbody := document.Call("createElement", "tbody")
-	tbodyClass := "bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700"
+	tbodyClass := "surface-base divide-y divide-gray-200 dark:divide-gray-700"
 	tbody.Set("className", tbodyClass)
 	table.Call("appendChild", tbody)
 
@@ -292,7 +292,7 @@ func (t *Table) createFilterInput(document js.Value) js.Value {
 
 	// Search icon
 	iconSpan := document.Call("createElement", "span")
-	iconSpan.Set("className", "absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none")
+	iconSpan.Set("className", "absolute left-3 top-1/2 -translate-y-1/2 icon-muted pointer-events-none")
 	iconSpan.Set("textContent", "🔍")
 	filterContainer.Call("appendChild", iconSpan)
 
@@ -304,7 +304,7 @@ func (t *Table) createFilterInput(document js.Value) js.Value {
 		placeholder = "Search..."
 	}
 	input.Set("placeholder", placeholder)
-	input.Set("className", "w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 placeholder-gray-500 dark:placeholder-gray-400")
+	input.Set("className", "w-full pl-10 pr-4 py-2 border border-default surface-base text-primary rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 placeholder:text-tertiary")
 
 	// Debounced input handler
 	input.Call("addEventListener", "input", js.FuncOf(func(this js.Value, args []js.Value) any {
@@ -366,7 +366,7 @@ func (t *Table) createBulkActionBar(document js.Value) js.Value {
 		case "danger":
 			btnClass += "bg-red-600 hover:bg-red-700 text-white"
 		default: // secondary
-			btnClass += "bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600"
+			btnClass += "surface-base border border-default text-secondary hover:surface-raised"
 		}
 		btn.Set("className", btnClass)
 
@@ -447,14 +447,14 @@ func (t *Table) renderHeaders() {
 			thClass = "px-2 py-2 w-10"
 		}
 		if t.props.Bordered {
-			thClass += " border-b border-gray-200 dark:border-gray-700"
+			thClass += " border-b border-subtle"
 		}
 		th.Set("className", thClass)
 
 		// Create select-all checkbox with accessible label
 		checkbox := document.Call("createElement", "input")
 		checkbox.Set("type", "checkbox")
-		checkbox.Set("className", "h-4 w-4 text-blue-600 border-gray-300 dark:border-gray-600 rounded focus:ring-blue-500 dark:bg-gray-700 cursor-pointer")
+		checkbox.Set("className", "h-4 w-4 text-blue-600 border-default rounded focus:ring-blue-500 surface-base cursor-pointer")
 		checkbox.Call("setAttribute", "aria-label", "Select all rows")
 
 		// Set initial state based on current selection
@@ -473,15 +473,15 @@ func (t *Table) renderHeaders() {
 
 	for _, col := range t.columns {
 		th := document.Call("createElement", "th")
-		thClass := "px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
+		thClass := "px-6 py-3 text-left text-xs font-medium text-tertiary uppercase tracking-wider"
 		if t.props.Compact {
-			thClass = "px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
+			thClass = "px-4 py-2 text-left text-xs font-medium text-tertiary uppercase tracking-wider"
 		}
 		if t.props.Bordered {
-			thClass += " border-b border-gray-200 dark:border-gray-700"
+			thClass += " border-b border-subtle"
 		}
 		if col.Sortable {
-			thClass += " cursor-pointer select-none hover:bg-gray-100 dark:hover:bg-gray-700"
+			thClass += " cursor-pointer select-none hover:surface-overlay"
 		}
 		if col.Width != "" {
 			th.Get("style").Set("width", col.Width)
@@ -722,10 +722,10 @@ func (t *Table) renderData() {
 			// Selected row highlight
 			rowClass = "bg-blue-50 dark:bg-blue-900/30"
 		} else if t.props.Striped && i%2 == 1 {
-			rowClass = "bg-gray-50 dark:bg-gray-800"
+			rowClass = "surface-raised"
 		}
 		if t.props.Hoverable {
-			rowClass += " hover:bg-gray-100 dark:hover:bg-gray-800"
+			rowClass += " hover:surface-overlay"
 		}
 		if t.props.OnRowClick != nil {
 			rowClass += " cursor-pointer"
@@ -753,13 +753,13 @@ func (t *Table) renderData() {
 				tdClass = "px-2 py-2 w-10"
 			}
 			if t.props.Bordered {
-				tdClass += " border-b border-gray-200 dark:border-gray-700"
+				tdClass += " border-b border-subtle"
 			}
 			td.Set("className", tdClass)
 
 			checkbox := document.Call("createElement", "input")
 			checkbox.Set("type", "checkbox")
-			checkbox.Set("className", "h-4 w-4 text-blue-600 border-gray-300 dark:border-gray-600 rounded focus:ring-blue-500 dark:bg-gray-700 cursor-pointer")
+			checkbox.Set("className", "h-4 w-4 text-blue-600 border-default rounded focus:ring-blue-500 surface-base cursor-pointer")
 			checkbox.Set("checked", isSelected)
 
 			// ARIA: label for row checkbox
@@ -792,12 +792,12 @@ func (t *Table) renderData() {
 
 		for _, col := range t.columns {
 			td := document.Call("createElement", "td")
-			tdClass := "px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100"
+			tdClass := "px-6 py-4 whitespace-nowrap text-sm text-primary"
 			if t.props.Compact {
-				tdClass = "px-4 py-2 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100"
+				tdClass = "px-4 py-2 whitespace-nowrap text-sm text-primary"
 			}
 			if t.props.Bordered {
-				tdClass += " border-b border-gray-200 dark:border-gray-700"
+				tdClass += " border-b border-subtle"
 			}
 			if col.ClassName != "" {
 				tdClass = col.ClassName

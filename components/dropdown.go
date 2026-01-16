@@ -75,7 +75,7 @@ func NewDropdown(props DropdownProps) *Dropdown {
 		alignClass = "right-0"
 	}
 
-	className := "absolute " + alignClass + " mt-2 bg-white dark:bg-gray-800 rounded-md shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-50 hidden"
+	className := "absolute " + alignClass + " mt-2 surface-base rounded-md shadow-lg border border-subtle py-1 z-50 hidden"
 	if props.ClassName != "" {
 		className += " " + props.ClassName
 	}
@@ -96,7 +96,7 @@ func NewDropdown(props DropdownProps) *Dropdown {
 	for _, item := range props.Items {
 		if item.Divider {
 			divider := document.Call("createElement", "div")
-			divider.Set("className", "border-t border-gray-200 dark:border-gray-700 my-1")
+			divider.Set("className", "border-t border-subtle my-1")
 			menu.Call("appendChild", divider)
 			continue
 		}
@@ -104,9 +104,9 @@ func NewDropdown(props DropdownProps) *Dropdown {
 		menuItem := document.Call("createElement", "button")
 		itemClass := "w-full text-left px-4 py-2 text-sm flex items-center gap-2"
 		if item.Disabled {
-			itemClass += " text-gray-400 dark:text-gray-500 cursor-not-allowed"
+			itemClass += " text-disabled cursor-not-allowed"
 		} else {
-			itemClass += " text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer"
+			itemClass += " text-secondary hover:surface-overlay cursor-pointer"
 		}
 		menuItem.Set("className", itemClass)
 		menuItem.Set("disabled", item.Disabled)
@@ -258,9 +258,9 @@ func (d *Dropdown) Close() {
 
 // updateHighlightStyles updates highlight visually without re-rendering DOM
 func (d *Dropdown) updateHighlightStyles() {
-	baseClass := "w-full text-left px-4 py-2 text-sm flex items-center gap-2 text-gray-700 dark:text-gray-200 cursor-pointer"
-	highlightClass := baseClass + " bg-gray-100 dark:bg-gray-700"
-	normalClass := baseClass + " hover:bg-gray-100 dark:hover:bg-gray-700"
+	baseClass := "w-full text-left px-4 py-2 text-sm flex items-center gap-2 text-secondary cursor-pointer"
+	highlightClass := baseClass + " surface-overlay"
+	normalClass := baseClass + " hover:surface-overlay"
 
 	for i, item := range d.menuItems {
 		if item.Get("disabled").Bool() {
@@ -363,7 +363,7 @@ func ActionDropdown(buttonText string, items []DropdownItem) *Dropdown {
 func IconDropdown(icon string, items []DropdownItem) *Dropdown {
 	document := js.Global().Get("document")
 	trigger := document.Call("createElement", "button")
-	trigger.Set("className", "p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full text-gray-600 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500")
+	trigger.Set("className", "p-2 hover:surface-overlay rounded-full text-secondary focus:outline-none focus:ring-2 focus:ring-blue-500")
 	trigger.Set("textContent", icon)
 	trigger.Call("setAttribute", "aria-label", "More actions")
 

@@ -38,7 +38,7 @@ func NewCheckbox(props CheckboxProps) *Checkbox {
 	input := document.Call("createElement", "input")
 	input.Set("type", "checkbox")
 	input.Set("id", checkboxID)
-	className := "h-4 w-4 text-blue-600 border-gray-300 dark:border-gray-600 rounded focus:ring-blue-500 dark:bg-gray-700"
+	className := "h-4 w-4 text-blue-600 border-default rounded focus:ring-blue-500 surface-base"
 	if props.Disabled {
 		className += " cursor-not-allowed"
 	}
@@ -65,9 +65,9 @@ func NewCheckbox(props CheckboxProps) *Checkbox {
 	// Label
 	if props.Label != "" {
 		label := document.Call("createElement", "label")
-		labelClass := "ml-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer"
+		labelClass := "ml-2 text-sm text-secondary cursor-pointer"
 		if props.Disabled {
-			labelClass += " text-gray-400 dark:text-gray-500"
+			labelClass += " text-disabled"
 		}
 		label.Set("className", labelClass)
 		label.Set("textContent", props.Label)

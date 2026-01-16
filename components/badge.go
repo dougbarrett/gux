@@ -17,7 +17,7 @@ const (
 )
 
 var badgeStyles = map[BadgeVariant]string{
-	BadgeDefault: "bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200",
+	BadgeDefault: "surface-overlay text-primary",
 	BadgePrimary: "bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200",
 	BadgeSuccess: "bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200",
 	BadgeWarning: "bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200",

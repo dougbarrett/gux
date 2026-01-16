@@ -51,30 +51,30 @@ func NewFileUpload(props FileUploadProps) *FileUpload {
 	// Label
 	if props.Label != "" {
 		label := document.Call("createElement", "label")
-		label.Set("className", "block text-sm font-medium text-gray-700")
+		label.Set("className", "block text-sm font-medium text-secondary")
 		label.Set("textContent", props.Label)
 		container.Call("appendChild", label)
 	}
 
 	// Dropzone
 	dropzone := document.Call("createElement", "div")
-	dropzone.Set("className", "border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-blue-400 transition-colors cursor-pointer")
+	dropzone.Set("className", "border-2 border-dashed border-default rounded-lg p-6 text-center hover:border-blue-400 transition-colors cursor-pointer")
 
 	// Icon
 	icon := document.Call("createElement", "div")
-	icon.Set("className", "text-4xl text-gray-500 mb-2")
+	icon.Set("className", "text-4xl icon-muted mb-2")
 	icon.Set("textContent", "📁")
 	dropzone.Call("appendChild", icon)
 
 	// Text
 	text := document.Call("createElement", "div")
-	text.Set("className", "text-sm text-gray-600")
+	text.Set("className", "text-sm text-secondary")
 	text.Set("innerHTML", "<span class='text-blue-500 font-medium'>Click to upload</span> or drag and drop")
 	dropzone.Call("appendChild", text)
 
 	// Hint
 	hint := document.Call("createElement", "div")
-	hint.Set("className", "text-xs text-gray-500 mt-1")
+	hint.Set("className", "text-xs text-tertiary mt-1")
 	hintText := ""
 	if props.Accept != "" {
 		hintText = props.Accept
@@ -135,13 +135,13 @@ func NewFileUpload(props FileUploadProps) *FileUpload {
 
 	dropzone.Call("addEventListener", "dragleave", js.FuncOf(func(this js.Value, args []js.Value) any {
 		args[0].Call("preventDefault")
-		dropzone.Set("className", "border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-blue-400 transition-colors cursor-pointer")
+		dropzone.Set("className", "border-2 border-dashed border-default rounded-lg p-6 text-center hover:border-blue-400 transition-colors cursor-pointer")
 		return nil
 	}))
 
 	dropzone.Call("addEventListener", "drop", js.FuncOf(func(this js.Value, args []js.Value) any {
 		args[0].Call("preventDefault")
-		dropzone.Set("className", "border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-blue-400 transition-colors cursor-pointer")
+		dropzone.Set("className", "border-2 border-dashed border-default rounded-lg p-6 text-center hover:border-blue-400 transition-colors cursor-pointer")
 		files := args[0].Get("dataTransfer").Get("files")
 		f.handleFiles(files)
 		return nil
@@ -242,23 +242,23 @@ func (f *FileUpload) createFilePreview(info FileInfo) {
 	document := js.Global().Get("document")
 
 	card := document.Call("createElement", "div")
-	card.Set("className", "relative bg-gray-100 rounded p-3")
+	card.Set("className", "relative surface-overlay rounded p-3")
 
 	// File icon
 	icon := document.Call("createElement", "div")
-	icon.Set("className", "text-2xl text-gray-500 text-center")
+	icon.Set("className", "text-2xl icon-muted text-center")
 	icon.Set("textContent", getFileIcon(info.Type))
 	card.Call("appendChild", icon)
 
 	// File name
 	name := document.Call("createElement", "div")
-	name.Set("className", "text-xs text-gray-700 truncate mt-1")
+	name.Set("className", "text-xs text-secondary truncate mt-1")
 	name.Set("textContent", info.Name)
 	card.Call("appendChild", name)
 
 	// File size
 	size := document.Call("createElement", "div")
-	size.Set("className", "text-xs text-gray-500")
+	size.Set("className", "text-xs text-tertiary")
 	size.Set("textContent", formatFileSize(info.Size))
 	card.Call("appendChild", size)
 

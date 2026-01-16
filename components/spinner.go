@@ -60,7 +60,7 @@ func Spinner(props SpinnerProps) js.Value {
 
 	// Visual spinner (decorative - aria-hidden since container has label)
 	spinner := document.Call("createElement", "div")
-	spinner.Set("className", sizeClass+" border-gray-200 border-t-"+color+" rounded-full animate-spin")
+	spinner.Set("className", sizeClass+" border-subtle border-t-"+color+" rounded-full animate-spin")
 	spinner.Call("setAttribute", "aria-hidden", "true")
 	container.Call("appendChild", spinner)
 
@@ -69,7 +69,7 @@ func Spinner(props SpinnerProps) js.Value {
 
 	if props.Label != "" {
 		label := document.Call("createElement", "p")
-		label.Set("className", "mt-2 text-sm text-gray-600")
+		label.Set("className", "mt-2 text-sm text-secondary")
 		label.Set("textContent", props.Label)
 		container.Call("appendChild", label)
 	}
@@ -94,7 +94,7 @@ func SpinnerInline(size SpinnerSize, color string) js.Value {
 	}
 
 	spinner := document.Call("createElement", "div")
-	spinner.Set("className", sizeClass+" border-gray-200 border-t-"+color+" rounded-full animate-spin inline-block")
+	spinner.Set("className", sizeClass+" border-subtle border-t-"+color+" rounded-full animate-spin inline-block")
 	// Inline spinner has role and label directly on the element
 	spinner.Call("setAttribute", "role", "status")
 	spinner.Call("setAttribute", "aria-label", "Loading")

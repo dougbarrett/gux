@@ -61,7 +61,7 @@ func NewInput(props InputProps) *Input {
 	// Label
 	if props.Label != "" {
 		label := document.Call("createElement", "label")
-		label.Set("className", "block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1")
+		label.Set("className", "block text-sm font-medium text-secondary mb-1")
 		label.Set("textContent", props.Label)
 		label.Set("htmlFor", inputID)
 		container.Call("appendChild", label)
@@ -70,9 +70,9 @@ func NewInput(props InputProps) *Input {
 
 	// Input field
 	input := document.Call("createElement", "input")
-	className := "w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 placeholder-gray-500 dark:placeholder-gray-400"
+	className := "w-full px-3 py-2 border border-default surface-base text-primary rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 placeholder:text-tertiary"
 	if props.Disabled {
-		className += " bg-gray-100 dark:bg-gray-800 cursor-not-allowed"
+		className += " surface-overlay cursor-not-allowed"
 	}
 	if props.ClassName != "" {
 		className = props.ClassName
@@ -145,7 +145,7 @@ func (i *Input) SetError(message string) {
 	document := js.Global().Get("document")
 	crypto := js.Global().Get("crypto")
 
-	i.input.Set("className", "w-full px-3 py-2 border border-red-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500")
+	i.input.Set("className", "w-full px-3 py-2 border border-red-500 surface-base text-primary rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500")
 	i.input.Call("setAttribute", "aria-invalid", "true")
 
 	// Generate error ID if not already set
@@ -170,7 +170,7 @@ func (i *Input) SetError(message string) {
 
 // ClearError removes error styling and ARIA error attributes
 func (i *Input) ClearError() {
-	i.input.Set("className", "w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500")
+	i.input.Set("className", "w-full px-3 py-2 border border-default surface-base text-primary rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500")
 	i.input.Call("removeAttribute", "aria-invalid")
 	i.input.Call("removeAttribute", "aria-describedby")
 

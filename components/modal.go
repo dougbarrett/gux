@@ -51,7 +51,7 @@ func NewModal(props ModalProps) *Modal {
 	}
 
 	modal := document.Call("createElement", "div")
-	modal.Set("className", "bg-white dark:bg-gray-800 rounded-lg shadow-xl "+widthClass+" w-full mx-4 max-h-[90vh] flex flex-col")
+	modal.Set("className", "surface-base rounded-lg shadow-xl "+widthClass+" w-full mx-4 max-h-[90vh] flex flex-col")
 
 	// Generate unique ID for ARIA labelledby
 	titleID := ""
@@ -78,16 +78,16 @@ func NewModal(props ModalProps) *Modal {
 	// Header
 	if props.Title != "" {
 		header := document.Call("createElement", "div")
-		header.Set("className", "flex justify-between items-center px-6 py-4 border-b border-gray-200 dark:border-gray-700")
+		header.Set("className", "flex justify-between items-center px-6 py-4 border-b border-subtle")
 
 		title := document.Call("createElement", "h3")
-		title.Set("className", "text-lg font-semibold text-gray-900 dark:text-gray-100")
+		title.Set("className", "text-lg font-semibold text-primary")
 		title.Set("textContent", props.Title)
 		title.Set("id", m.titleID) // ARIA: referenced by aria-labelledby
 		header.Call("appendChild", title)
 
 		closeBtn := document.Call("createElement", "button")
-		closeBtn.Set("className", "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 text-2xl leading-none cursor-pointer")
+		closeBtn.Set("className", "text-secondary hover:text-primary text-2xl leading-none cursor-pointer")
 		closeBtn.Set("innerHTML", "&times;")
 		closeBtn.Call("setAttribute", "aria-label", "Close") // ARIA: accessible name for close button
 		closeBtn.Call("addEventListener", "click", js.FuncOf(func(this js.Value, args []js.Value) any {
@@ -111,7 +111,7 @@ func NewModal(props ModalProps) *Modal {
 	// Footer
 	if !props.Footer.IsUndefined() && !props.Footer.IsNull() {
 		footer := document.Call("createElement", "div")
-		footer.Set("className", "px-6 py-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 rounded-b-lg")
+		footer.Set("className", "px-6 py-4 border-t border-subtle surface-raised rounded-b-lg")
 		footer.Call("appendChild", props.Footer)
 		modal.Call("appendChild", footer)
 	}

@@ -66,7 +66,7 @@ func NewDatePicker(props DatePickerProps) *DatePicker {
 	// Label
 	if props.Label != "" {
 		label := document.Call("createElement", "label")
-		label.Set("className", "block text-sm font-medium text-gray-700 mb-1")
+		label.Set("className", "block text-sm font-medium text-secondary mb-1")
 		label.Set("textContent", props.Label)
 		label.Call("setAttribute", "for", inputID)
 		container.Call("appendChild", label)
@@ -80,7 +80,7 @@ func NewDatePicker(props DatePickerProps) *DatePicker {
 	input.Set("type", "text")
 	input.Set("id", inputID)
 	input.Set("readOnly", true)
-	input.Set("className", "w-full px-3 py-2 pr-10 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 cursor-pointer")
+	input.Set("className", "w-full px-3 py-2 pr-10 border border-default rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 cursor-pointer")
 
 	placeholder := props.Placeholder
 	if placeholder == "" {
@@ -104,7 +104,7 @@ func NewDatePicker(props DatePickerProps) *DatePicker {
 
 	// Calendar icon
 	icon := document.Call("createElement", "div")
-	icon.Set("className", "absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-500")
+	icon.Set("className", "absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none icon-muted")
 	icon.Set("innerHTML", `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>`)
 
 	inputWrapper.Call("appendChild", input)
@@ -116,7 +116,7 @@ func NewDatePicker(props DatePickerProps) *DatePicker {
 	// Calendar dropdown with dialog role
 	calendar := document.Call("createElement", "div")
 	calendar.Set("id", calendarID)
-	calendar.Set("className", "absolute z-50 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-4 hidden")
+	calendar.Set("className", "absolute z-50 mt-1 surface-base border border-subtle rounded-lg shadow-lg p-4 hidden")
 	calendar.Call("setAttribute", "role", "dialog")
 	calendar.Call("setAttribute", "aria-modal", "false")
 	calendar.Call("setAttribute", "aria-label", "Choose date")
@@ -153,7 +153,7 @@ func (dp *DatePicker) renderCalendar() {
 
 	prevBtn := document.Call("createElement", "button")
 	prevBtn.Set("type", "button")
-	prevBtn.Set("className", "p-1 hover:bg-gray-100 rounded cursor-pointer")
+	prevBtn.Set("className", "p-1 hover:surface-overlay rounded cursor-pointer")
 	prevBtn.Call("setAttribute", "aria-label", "Previous month")
 	prevBtn.Set("innerHTML", `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>`)
 	prevBtn.Call("addEventListener", "click", js.FuncOf(func(this js.Value, args []js.Value) any {
@@ -164,14 +164,14 @@ func (dp *DatePicker) renderCalendar() {
 	}))
 
 	monthYear := document.Call("createElement", "span")
-	monthYear.Set("className", "font-semibold text-gray-800")
+	monthYear.Set("className", "font-semibold text-primary")
 	monthYear.Set("textContent", fmt.Sprintf("%s %d", monthNames[dp.displayed.Month()-1], dp.displayed.Year()))
 	monthYear.Call("setAttribute", "aria-live", "polite")
 	monthYear.Call("setAttribute", "aria-atomic", "true")
 
 	nextBtn := document.Call("createElement", "button")
 	nextBtn.Set("type", "button")
-	nextBtn.Set("className", "p-1 hover:bg-gray-100 rounded cursor-pointer")
+	nextBtn.Set("className", "p-1 hover:surface-overlay rounded cursor-pointer")
 	nextBtn.Call("setAttribute", "aria-label", "Next month")
 	nextBtn.Set("innerHTML", `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>`)
 	nextBtn.Call("addEventListener", "click", js.FuncOf(func(this js.Value, args []js.Value) any {
@@ -198,7 +198,7 @@ func (dp *DatePicker) renderCalendar() {
 	dayNamesRow.Call("setAttribute", "role", "row")
 	for _, day := range dayNames {
 		th := document.Call("createElement", "th")
-		th.Set("className", "text-center text-xs text-gray-500 font-medium py-1 w-8")
+		th.Set("className", "text-center text-xs text-tertiary font-medium py-1 w-8")
 		th.Set("textContent", day)
 		th.Call("setAttribute", "role", "columnheader")
 		th.Call("setAttribute", "abbr", day)
@@ -265,7 +265,7 @@ func (dp *DatePicker) renderCalendar() {
 		dayBtn := document.Call("createElement", "button")
 		dayBtn.Set("type", "button")
 
-		className := "w-8 h-8 rounded-full text-sm hover:bg-gray-100 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset"
+		className := "w-8 h-8 rounded-full text-sm hover:surface-overlay cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset"
 
 		// Determine states
 		isSelected := !dp.selected.IsZero() && dp.selected.Year() == dayDate.Year() && dp.selected.Month() == dayDate.Month() && dp.selected.Day() == dayDate.Day()
@@ -286,7 +286,7 @@ func (dp *DatePicker) renderCalendar() {
 			className = "w-8 h-8 rounded-full text-sm border border-blue-500 text-blue-500 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset"
 		}
 		if disabled {
-			className = "w-8 h-8 rounded-full text-sm text-gray-300 cursor-not-allowed focus:outline-none"
+			className = "w-8 h-8 rounded-full text-sm text-disabled cursor-not-allowed focus:outline-none"
 		}
 
 		dayBtn.Set("className", className)

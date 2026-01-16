@@ -195,7 +195,7 @@ func statCard(label, value string, variant components.BadgeVariant) js.Value {
 			components.Text(label),
 			components.Badge(components.BadgeProps{Text: value, Variant: variant, Rounded: true}),
 		),
-		components.HeadingWithClass(3, value, "text-3xl font-bold text-gray-800 mt-2"),
+		components.HeadingWithClass(3, value, "text-3xl font-bold text-primary mt-2"),
 	)
 }
 
@@ -438,11 +438,11 @@ func dataDemo() js.Value {
 			components.Div("grid grid-cols-1 md:grid-cols-2 gap-4 mt-3",
 				components.Div("",
 					components.Text("Default empty state:"),
-					components.Div("mt-2 border border-gray-200 dark:border-gray-700 rounded-lg", emptyTable.Element()),
+					components.Div("mt-2 border border-subtle rounded-lg", emptyTable.Element()),
 				),
 				components.Div("",
 					components.Text("Custom empty state:"),
-					components.Div("mt-2 border border-gray-200 dark:border-gray-700 rounded-lg", customEmptyTable.Element()),
+					components.Div("mt-2 border border-subtle rounded-lg", customEmptyTable.Element()),
 				),
 			),
 		),
@@ -628,17 +628,17 @@ func utilitiesDemo() js.Value {
 
 	// WebSocket Echo Demo (raw WebSocket)
 	wsStatusText := document.Call("createElement", "span")
-	wsStatusText.Set("className", "text-gray-500")
+	wsStatusText.Set("className", "text-secondary")
 	wsStatusText.Set("textContent", "Disconnected")
 
 	wsMessageLog := document.Call("createElement", "div")
-	wsMessageLog.Set("className", "h-32 overflow-y-auto bg-gray-100 dark:bg-gray-800 rounded p-2 text-sm font-mono text-gray-800 dark:text-gray-200 border border-gray-200 dark:border-gray-700")
+	wsMessageLog.Set("className", "h-32 overflow-y-auto surface-overlay rounded p-2 text-sm font-mono text-primary border border-subtle")
 	wsMessageLog.Set("textContent", "No messages yet...")
 
 	wsInput := document.Call("createElement", "input")
 	wsInput.Set("type", "text")
 	wsInput.Set("placeholder", "Type a message to echo...")
-	wsInput.Set("className", "flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500")
+	wsInput.Set("className", "flex-1 px-3 py-2 border border-default surface-base text-primary rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500")
 
 	var wsStore *state.WebSocketStore
 
@@ -661,7 +661,7 @@ func utilitiesDemo() js.Value {
 				appendEchoMessage("[System] Connected to echo server")
 			},
 			OnClose: func(code int, reason string) {
-				wsStatusText.Set("className", "text-gray-500")
+				wsStatusText.Set("className", "text-secondary")
 				wsStatusText.Set("textContent", "Disconnected")
 				appendEchoMessage("[System] Disconnected")
 			},
@@ -703,11 +703,11 @@ func utilitiesDemo() js.Value {
 
 	// Posts Subscribe Demo - First-party API (mirrors HTTP client pattern)
 	subStatusText := document.Call("createElement", "span")
-	subStatusText.Set("className", "text-gray-500")
+	subStatusText.Set("className", "text-secondary")
 	subStatusText.Set("textContent", "Not subscribed")
 
 	subLog := document.Call("createElement", "div")
-	subLog.Set("className", "h-32 overflow-y-auto bg-gray-100 dark:bg-gray-800 rounded p-2 text-sm font-mono text-gray-800 dark:text-gray-200 border border-gray-200 dark:border-gray-700")
+	subLog.Set("className", "h-32 overflow-y-auto surface-overlay rounded p-2 text-sm font-mono text-primary border border-subtle")
 	subLog.Set("textContent", "No events yet...")
 
 	var postsSub *api.Subscription
@@ -752,7 +752,7 @@ func utilitiesDemo() js.Value {
 		if postsSub != nil {
 			postsSub.Close()
 			postsSub = nil
-			subStatusText.Set("className", "text-gray-500")
+			subStatusText.Set("className", "text-secondary")
 			subStatusText.Set("textContent", "Not subscribed")
 			appendSubEvent("[System] Unsubscribed")
 		}
@@ -816,7 +816,7 @@ func utilitiesDemo() js.Value {
 						components.Flash(animBox, 3)
 					}}),
 				),
-				components.Div("p-4 bg-gray-100 rounded-lg inline-block", animBox),
+				components.Div("p-4 surface-overlay rounded-lg inline-block", animBox),
 			),
 		),
 		components.Section("Form Builder",
