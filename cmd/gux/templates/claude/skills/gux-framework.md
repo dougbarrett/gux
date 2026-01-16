@@ -79,8 +79,7 @@ myapp/
 ├── public/
 │   ├── index.html            # PWA entry point
 │   ├── manifest.json         # PWA manifest
-│   ├── offline.html          # Offline fallback page
-│   └── service-worker.js     # PWA caching
+│   └── service-worker.js     # PWA offline fallback
 ├── go.mod                    # Go module file
 └── Dockerfile                # Multi-stage Docker build
 ```

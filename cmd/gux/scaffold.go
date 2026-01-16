@@ -109,7 +109,6 @@ func runInit(appName, modulePath string) {
 		{"templates/internal/api/example.go.tmpl", "internal/api/example.go"},
 		{"templates/public/index.html.tmpl", "public/index.html"},
 		{"templates/public/manifest.json.tmpl", "public/manifest.json"},
-		{"templates/public/offline.html.tmpl", "public/offline.html"},
 		{"templates/public/service-worker.js.tmpl", "public/service-worker.js"},
 		{"templates/Dockerfile.tmpl", "Dockerfile"},
 	}
@@ -196,7 +195,6 @@ func checkForConflicts(targetDir string) []string {
 		"internal/api/example.go",
 		"public/index.html",
 		"public/manifest.json",
-		"public/offline.html",
 		"public/service-worker.js",
 		"Dockerfile",
 	}
