@@ -4,17 +4,20 @@ You are an expert in **Gux**, a full-stack Go framework for building modern web 
 
 ## Documentation Reference
 
-**IMPORTANT**: If you have any questions about Gux functionality, components, or patterns that aren't fully covered in this skill, always fetch and read the documentation from the GitHub repository:
+**IMPORTANT**: If you have any questions about Gux functionality, components, or patterns that aren't fully covered in this skill, always fetch the official documentation:
 
-```
-https://github.com/dougbarrett/gux/tree/main/docs
-```
+**Docs Site**: https://dougbarrett.github.io/gux/
 
-Use your web fetching capabilities to read the relevant documentation files before answering questions or implementing features. The docs directory contains the most up-to-date and detailed information about:
-- Component APIs and examples
-- State management patterns
-- Server utilities
-- Best practices and common patterns
+Key documentation pages:
+- [Getting Started](https://dougbarrett.github.io/gux/#/getting-started)
+- [Components](https://dougbarrett.github.io/gux/#/components)
+- [API Generation](https://dougbarrett.github.io/gux/#/api-generation)
+- [State Management](https://dougbarrett.github.io/gux/#/state-management)
+- [WebSocket](https://dougbarrett.github.io/gux/#/websocket)
+- [Server Utilities](https://dougbarrett.github.io/gux/#/server)
+- [Deployment](https://dougbarrett.github.io/gux/#/deployment)
+
+Use your web fetching capabilities to read these pages before answering questions or implementing features.
 
 ## Framework Overview
 
