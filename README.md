@@ -9,8 +9,11 @@ A full-stack Go framework for building modern web applications with WebAssembly.
 
 - **Type-Safe API Generation** — Define Go interfaces, generate HTTP clients and server handlers automatically
 - **45+ UI Components** — Forms, layouts, data display, feedback, and charts with Tailwind CSS
+- **Command Palette** — Quick actions with Cmd/Ctrl+K
+- **Data Export** — CSV, JSON, and PDF export for tables
 - **Reactive State Management** — Generic stores, persistence, async loading, and SWR-style query caching
 - **WebSocket Support** — Type-safe real-time communication with automatic reconnection
+- **PWA Ready** — Installable with offline support
 - **Server Utilities** — Middleware composition, SPA handler, CORS, logging, and error handling
 - **Go-Powered Frontend** — Compile to WebAssembly, run natively in the browser
 
@@ -252,15 +255,62 @@ modal := components.Modal(components.ModalProps{
 modal.Open()
 ```
 
+### Header Components
+```go
+// UserMenu with avatar and dropdown
+userMenu := components.UserMenu(components.UserMenuProps{
+    Name:      "John Doe",
+    Email:     "john@example.com",
+    AvatarURL: "/avatar.png",
+    OnLogout:  func() { /* handle logout */ },
+})
+
+// NotificationCenter with real-time updates
+notifications := components.NotificationCenter(components.NotificationCenterProps{
+    Notifications: notificationList,
+    OnMarkRead:    func(id string) { /* mark read */ },
+    OnClear:       func() { /* clear all */ },
+})
+
+// Connection status indicator for WebSocket state
+status := components.ConnectionStatus(components.ConnectionStatusProps{
+    Connected: wsClient.IsConnected(),
+    Variant:   components.StatusDot,  // or StatusBanner
+})
+```
+
+### Command Palette
+```go
+// Command Palette (Cmd/Ctrl+K)
+palette := components.CommandPalette(components.CommandPaletteProps{
+    Commands: []components.CommandItem{
+        {ID: "new", Label: "Create New Post", Category: "Actions", Action: handleNew},
+        {ID: "search", Label: "Search", Category: "Navigation", Action: openSearch},
+    },
+})
+```
+
+### Data Export
+```go
+// Export table data to CSV, JSON, or PDF
+exporter := components.DataExport(components.DataExportProps{
+    Data:     tableData,
+    Columns:  []string{"Name", "Email", "Status"},
+    Filename: "users",
+    Formats:  []string{"csv", "json", "pdf"},
+})
+```
+
 ### Full Component List
 
 | Category | Components |
 |----------|------------|
 | **Forms** | Button, Input, TextArea, Select, Checkbox, Toggle, DatePicker, Combobox, FileUpload, FormBuilder |
 | **Layout** | Layout, Sidebar, Header, Card, Tabs, Accordion, Drawer |
-| **Data** | Table, Badge, Avatar, Breadcrumbs, Pagination, VirtualList |
-| **Feedback** | Modal, Toast, Alert, Progress, Spinner, Skeleton, Tooltip |
-| **Navigation** | Router, Link, Stepper |
+| **Header** | UserMenu, NotificationCenter, ConnectionStatus |
+| **Navigation** | Router, Link, Stepper, CommandPalette |
+| **Data** | Table, Badge, Avatar, Breadcrumbs, Pagination, VirtualList, DataExport |
+| **Feedback** | Modal, Toast, Alert, Progress, Spinner, Skeleton, Tooltip, EmptyState |
 | **Charts** | BarChart, LineChart, PieChart, DonutChart, Sparkline |
 | **Utilities** | Theme, Animation, Clipboard, FocusTrap, SkipLinks, Inspector |
 
@@ -430,6 +480,25 @@ The Dockerfile uses multi-stage builds:
 3. **Alpine** — Minimal production image (~20MB)
 
 See [Deployment Guide](docs/deployment.md) for Kubernetes, fly.io, and other platforms.
+
+## PWA Support
+
+Gux applications can be installed as Progressive Web Apps:
+
+- **Installable** — Add to home screen on mobile and desktop
+- **Offline Support** — Service worker caches static assets
+- **Asset Caching** — Cache-first strategy for optimal performance
+
+The example application includes:
+- `manifest.json` — App metadata, icons, theme colors
+- `sw.js` — Service worker with intelligent caching
+- Install prompt component with 7-day dismissal cooldown
+
+```bash
+# PWA files are in example/server/static/
+example/server/static/manifest.json
+example/server/static/sw.js
+```
 
 ## Contributing
 
