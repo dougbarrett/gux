@@ -231,8 +231,6 @@ func runDev(port int, tinygo bool) {
 	// Build WASM only (not the full binary - we'll use go run for dev)
 	buildWasm(tinygo)
 
-	fmt.Printf("\nStarting dev server on http://localhost:%d\n", port)
-
 	// Check if cmd/server/ exists
 	serverDir := "cmd/server"
 	if _, err := os.Stat(serverDir); os.IsNotExist(err) {
@@ -240,7 +238,18 @@ func runDev(port int, tinygo bool) {
 		os.Exit(1)
 	}
 
-	// Run the server
+	// Copy public/ to cmd/server/public/ for go:embed to compile
+	// (even though dev mode uses -dir flag, the embed directive must resolve)
+	serverPublic := filepath.Join("cmd", "server", "public")
+	if err := copyDir("public", serverPublic); err != nil {
+		fmt.Printf("Error copying public directory: %v\n", err)
+		os.Exit(1)
+	}
+	defer os.RemoveAll(serverPublic) // Clean up when server stops
+
+	fmt.Printf("\nStarting dev server on http://localhost:%d\n", port)
+
+	// Run the server with -dir flag (serves from filesystem for hot reload)
 	cmd := exec.Command("go", "run", "./cmd/server", "-port", fmt.Sprintf("%d", port), "-dir", "public")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
