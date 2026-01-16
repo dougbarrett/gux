@@ -63,10 +63,10 @@ Full details: [milestones/v1.1-ROADMAP.md](milestones/v1.1-ROADMAP.md)
 **Goal**: Comprehensive README.md update with features, keyboard shortcuts, and new capabilities
 **Depends on**: Phase 11 (previous milestone complete)
 **Research**: Unlikely (internal documentation)
-**Plans**: TBD
+**Plans**: 1/1 complete
 
 Plans:
-- [ ] 12-01: TBD (run /gsd:plan-phase 12 to break down)
+- [x] 12-01: README Update (v1.0 + v1.1 features, accessibility, keyboard shortcuts)
 
 #### Phase 13: Component Docs
 
@@ -116,7 +116,7 @@ Phases execute in numeric order: 1 → 2 → ... → 11 → 12 → 13 → 14 →
 | 9. Keyboard Navigation | v1.1 | 4/4 | Complete | 2026-01-15 |
 | 10. Visual Accessibility | v1.1 | 2/2 | Complete | 2026-01-15 |
 | 11. A11y Testing Infrastructure | v1.1 | 1/1 | Complete | 2026-01-16 |
-| 12. README Update | v1.2 | 0/? | Not started | - |
+| 12. README Update | v1.2 | 1/1 | Complete | 2026-01-16 |
 | 13. Component Docs | v1.2 | 0/? | Not started | - |
 | 14. Keyboard Shortcuts | v1.2 | 0/? | Not started | - |
 | 15. Accessibility Guide | v1.2 | 0/? | Not started | - |
