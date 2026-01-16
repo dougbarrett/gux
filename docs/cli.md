@@ -1,0 +1,424 @@
+# CLI Reference
+
+The `gux` command-line tool provides scaffolding, code generation, building, and development utilities for Gux applications.
+
+## Installation
+
+```bash
+go install github.com/dougbarrett/gux/cmd/gux@latest
+```
+
+Verify installation:
+
+```bash
+gux version
+```
+
+## Commands
+
+| Command | Description |
+|---------|-------------|
+| `gux init` | Create a new Gux application |
+| `gux setup` | Copy wasm_exec.js from Go/TinyGo |
+| `gux gen` | Generate API client and server code |
+| `gux build` | Build the WASM module |
+| `gux dev` | Build and run development server |
+| `gux version` | Show version |
+| `gux help` | Show help |
+
+---
+
+## gux init
+
+Creates a new Gux application with a complete project structure.
+
+```bash
+gux init [--module <module-path>] <appname>
+```
+
+### Options
+
+| Flag | Description |
+|------|-------------|
+| `--module` | Go module path (e.g., `github.com/user/myapp`) |
+
+### Examples
+
+```bash
+# Basic (uses appname as module path)
+gux init myapp
+
+# With full module path (recommended)
+gux init --module github.com/myuser/myapp myapp
+```
+
+### Generated Structure
+
+```
+myapp/
+├── app/
+│   └── main.go           # WASM frontend entry point
+├── server/
+│   └── main.go           # HTTP server
+├── api/
+│   ├── types.go          # Shared data types
+│   └── example.go        # Example API interface
+├── go.mod                # Go module file
+├── index.html            # PWA entry point
+├── manifest.json         # PWA manifest
+├── offline.html          # Offline fallback page
+├── service-worker.js     # PWA service worker
+└── Dockerfile            # Multi-stage Docker build
+```
+
+### App Name Rules
+
+- Lowercase letters only (`a-z`)
+- Numbers (`0-9`)
+- Hyphens (`-`) and underscores (`_`)
+- No spaces or special characters
+
+### After Initialization
+
+```bash
+cd myapp
+gux setup         # Copy wasm_exec.js
+go mod tidy       # Download dependencies
+gux dev           # Start development server
+```
+
+---
+
+## gux setup
+
+Copies the `wasm_exec.js` runtime file from your Go or TinyGo installation into the current directory.
+
+```bash
+gux setup [--tinygo]
+```
+
+### Options
+
+| Flag | Description |
+|------|-------------|
+| `--tinygo` | Copy from TinyGo instead of standard Go |
+
+### Examples
+
+```bash
+# Copy from standard Go installation
+gux setup
+
+# Copy from TinyGo installation
+gux setup --tinygo
+```
+
+### Notes
+
+- Run this command from your project root
+- The `wasm_exec.js` file is required to run Go WASM in the browser
+- Use `--tinygo` if you plan to build with TinyGo for smaller binaries
+- Must match your build toolchain (Go or TinyGo)
+
+---
+
+## gux gen
+
+Generates type-safe API client and server code from Go interface definitions.
+
+```bash
+gux gen [--dir <api-dir>]
+```
+
+### Options
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--dir` | `api` | Directory containing API interface files |
+
+### Examples
+
+```bash
+# Generate from default api/ directory
+gux gen
+
+# Generate from custom directory
+gux gen --dir ./internal/api
+```
+
+### How It Works
+
+1. Scans the specified directory for `.go` files
+2. Finds interfaces with the `@client` annotation
+3. Generates two files per interface:
+   - `*_client_gen.go` — WASM HTTP client
+   - `*_server_gen.go` — HTTP handler wrapper
+
+### Interface Annotations
+
+Your API interfaces must include annotations:
+
+```go
+// api/posts.go
+package api
+
+import "context"
+
+// @client PostsClient
+// @basepath /api/posts
+type PostsAPI interface {
+    // @route GET /
+    GetAll(ctx context.Context) ([]Post, error)
+
+    // @route GET /{id}
+    GetByID(ctx context.Context, id int) (*Post, error)
+
+    // @route POST /
+    Create(ctx context.Context, req CreatePostRequest) (*Post, error)
+
+    // @route PUT /{id}
+    Update(ctx context.Context, id int, req CreatePostRequest) (*Post, error)
+
+    // @route DELETE /{id}
+    Delete(ctx context.Context, id int) error
+}
+```
+
+### Annotation Reference
+
+| Annotation | Location | Description |
+|------------|----------|-------------|
+| `@client <Name>` | Interface comment | Names the generated client struct |
+| `@basepath <path>` | Interface comment | Base URL path for all routes |
+| `@route <METHOD> <path>` | Method comment | HTTP method and path |
+
+### Generated Output
+
+For `api/posts.go`:
+
+```
+api/
+├── posts.go              # Your interface (input)
+├── posts_client_gen.go   # Generated WASM client
+└── posts_server_gen.go   # Generated HTTP handlers
+```
+
+### Usage in Code
+
+**Client (WASM frontend):**
+
+```go
+client := api.NewPostsClient(
+    api.WithBaseURL("https://api.example.com"),
+    api.WithHeader("Authorization", "Bearer token"),
+)
+
+posts, err := client.GetAll()
+post, err := client.GetByID(123)
+```
+
+**Server (Go backend):**
+
+```go
+service := &MyPostsService{}
+handler := api.NewPostsAPIHandler(service)
+handler.RegisterRoutes(mux)
+```
+
+See [API Generation](api-generation.md) for complete documentation.
+
+---
+
+## gux build
+
+Compiles the WASM module from the `app/` directory.
+
+```bash
+gux build [--tinygo]
+```
+
+### Options
+
+| Flag | Description |
+|------|-------------|
+| `--tinygo` | Use TinyGo for smaller output (~500KB vs ~5MB) |
+
+### Examples
+
+```bash
+# Build with standard Go (~5MB)
+gux build
+
+# Build with TinyGo (~500KB)
+gux build --tinygo
+```
+
+### Build Process
+
+1. Compiles `./app` to WebAssembly
+2. Generates content hash for cache busting
+3. Creates versioned file: `main.<hash>.wasm`
+4. Updates `index.html` with new filename
+5. Removes old versioned WASM files
+
+### Output
+
+```
+Building WASM module...
+Built main.a1b2c3d4.wasm (0.48 MB) with TinyGo
+```
+
+### Requirements
+
+- Must run from project root (with `app/` directory)
+- TinyGo must be installed for `--tinygo` flag
+
+### Build Size Comparison
+
+| Toolchain | Typical Size | Notes |
+|-----------|--------------|-------|
+| Standard Go | ~5 MB | Full standard library support |
+| TinyGo | ~500 KB | Some stdlib limitations |
+
+---
+
+## gux dev
+
+Builds the WASM module and starts a development server.
+
+```bash
+gux dev [--port <port>] [--tinygo]
+```
+
+### Options
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--port` | `8080` | Port to run the server on |
+| `--tinygo` | `false` | Use TinyGo for building |
+
+### Examples
+
+```bash
+# Run on default port 8080
+gux dev
+
+# Run on custom port
+gux dev --port 3000
+
+# Build with TinyGo and run
+gux dev --tinygo
+```
+
+### What It Does
+
+1. Checks for required files (`app/`, `server/`, `wasm_exec.js`)
+2. Builds the WASM module (same as `gux build`)
+3. Starts the Go server from `./server`
+4. Serves the application at `http://localhost:<port>`
+
+### Requirements
+
+- `app/` directory with WASM frontend code
+- `server/` directory with Go server code
+- `wasm_exec.js` (run `gux setup` first)
+
+### Output
+
+```
+Building WASM module...
+Built main.a1b2c3d4.wasm (0.48 MB) with TinyGo
+
+Starting dev server on http://localhost:8080
+```
+
+---
+
+## Workflow
+
+### New Project
+
+```bash
+# 1. Create project
+gux init --module github.com/myuser/myapp myapp
+cd myapp
+
+# 2. Setup runtime
+gux setup              # or: gux setup --tinygo
+
+# 3. Install dependencies
+go mod tidy
+
+# 4. Generate API code (if you've defined interfaces)
+gux gen
+
+# 5. Start developing
+gux dev
+```
+
+### Daily Development
+
+```bash
+# Start dev server (rebuilds WASM automatically)
+gux dev
+
+# After changing API interfaces
+gux gen
+
+# Production build
+gux build --tinygo
+```
+
+### Adding New APIs
+
+1. Create interface in `api/` with annotations
+2. Run `gux gen`
+3. Implement the interface in `server/`
+4. Use the generated client in `app/`
+
+---
+
+## Troubleshooting
+
+### "wasm_exec.js not found"
+
+Run `gux setup` to copy the file from your Go installation:
+
+```bash
+gux setup          # For standard Go
+gux setup --tinygo # For TinyGo
+```
+
+### "no app/ directory found"
+
+You're not in a Gux project root. Either:
+- `cd` to your project directory
+- Run `gux init` to create a new project
+
+### "TinyGo not found"
+
+Install TinyGo:
+
+```bash
+# macOS
+brew install tinygo
+
+# Linux
+wget https://github.com/tinygo-org/tinygo/releases/download/v0.30.0/tinygo_0.30.0_amd64.deb
+sudo dpkg -i tinygo_0.30.0_amd64.deb
+```
+
+### "No API interface files found"
+
+Ensure your interface files have the `@client` annotation:
+
+```go
+// @client MyClient
+type MyAPI interface { ... }
+```
+
+### Build errors with TinyGo
+
+Some standard library features aren't supported. Either:
+- Use `gux build` (without `--tinygo`) for full compatibility
+- Check [TinyGo compatibility](https://tinygo.org/docs/reference/lang-support/)

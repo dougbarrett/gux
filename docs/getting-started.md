@@ -25,72 +25,58 @@ This guide walks you through setting up Gux and building your first application.
 
 ## Installation
 
-```bash
-go get github.com/yourusername/gux
-```
-
-## Project Setup
-
-### 1. Create Project Structure
+Install the Gux CLI tool:
 
 ```bash
-mkdir myapp && cd myapp
-go mod init myapp
-
-mkdir -p app api server static
+go install github.com/dougbarrett/gux/cmd/gux@latest
 ```
 
-Your project structure should look like:
+Verify installation:
+
+```bash
+gux version
+```
+
+## Quick Start
+
+Create a new Gux application with a single command:
+
+```bash
+# Create new project
+gux init --module github.com/myuser/myapp myapp
+cd myapp
+
+# Setup WASM runtime
+gux setup              # or: gux setup --tinygo
+
+# Install dependencies
+go mod tidy
+
+# Start development server
+gux dev
+```
+
+Your app is now running at http://localhost:8080
+
+## Project Structure
+
+The `gux init` command creates a complete project structure:
 
 ```
 myapp/
-├── app/           # WASM frontend
-│   └── main.go
-├── api/           # API definitions
-│   ├── posts.go
-│   └── types.go
-├── server/        # Go backend
-│   └── main.go
-├── static/        # Static files
-│   └── index.html
-├── go.mod
-└── Makefile
-```
-
-### 2. Copy WASM Runtime
-
-Gux requires the Go WASM runtime file:
-
-```bash
-# For standard Go
-cp "$(go env GOROOT)/misc/wasm/wasm_exec.js" static/
-
-# For TinyGo (recommended)
-cp "$(tinygo env TINYGOROOT)/targets/wasm_exec.js" static/
-```
-
-### 3. Create HTML Entry Point
-
-```html
-<!-- static/index.html -->
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My Gux App</title>
-</head>
-<body>
-    <div id="app"></div>
-
-    <script src="/wasm_exec.js"></script>
-    <script>
-        const go = new Go();
-        WebAssembly.instantiateStreaming(fetch("/main.wasm"), go.importObject)
-            .then(result => go.run(result.instance));
-    </script>
-</body>
-</html>
+├── app/
+│   └── main.go           # WASM frontend entry point
+├── server/
+│   └── main.go           # HTTP server
+├── api/
+│   ├── types.go          # Shared data types
+│   └── example.go        # Example API interface
+├── go.mod                # Go module file
+├── index.html            # PWA entry point
+├── manifest.json         # PWA manifest
+├── offline.html          # Offline fallback page
+├── service-worker.js     # PWA service worker
+└── Dockerfile            # Multi-stage Docker build
 ```
 
 ## Building Your First App
@@ -123,8 +109,6 @@ package api
 
 import "context"
 
-//go:generate go run gux/cmd/apigen -source=posts.go -output=posts_client_gen.go
-
 // @client PostsClient
 // @basepath /api/posts
 type PostsAPI interface {
@@ -148,10 +132,12 @@ type PostsAPI interface {
 ### Step 3: Generate Client Code
 
 ```bash
-go generate ./api/...
+gux gen
 ```
 
-This creates `api/posts_client_gen.go` with a type-safe HTTP client.
+This scans `api/` for interfaces with `@client` annotations and generates:
+- `api/posts_client_gen.go` — Type-safe HTTP client for WASM
+- `api/posts_server_gen.go` — HTTP handler wrapper for the server
 
 ### Step 4: Build Your Frontend
 
@@ -390,43 +376,28 @@ func main() {
 }
 ```
 
-### Step 6: Create Makefile
-
-```makefile
-# Makefile
-.PHONY: build dev clean generate setup
-
-setup:
-	cp "$$(tinygo env TINYGOROOT)/targets/wasm_exec.js" static/
-
-generate:
-	go generate ./api/...
-
-build:
-	tinygo build -o static/main.wasm -target wasm -no-debug ./app
-
-dev: build
-	go run ./server -port 8080 -dir ./static
-
-clean:
-	rm -f static/main.wasm
-```
-
-### Step 7: Build and Run
+### Step 6: Build and Run
 
 ```bash
-# First time setup
-make setup
-make generate
+# Generate API client/server code
+gux gen
 
-# Build and run
-make dev
+# Build and start dev server
+gux dev
 
 # Open http://localhost:8080
 ```
 
+For production builds:
+
+```bash
+# Build with TinyGo for smaller output
+gux build --tinygo
+```
+
 ## Next Steps
 
+- [CLI Reference](cli.md) — Full command-line tool documentation
 - [API Generation](api-generation.md) — Learn about all annotation options
 - [Components](components.md) — Explore the full component library
 - [State Management](state-management.md) — Master reactive state patterns
@@ -437,7 +408,7 @@ make dev
 
 ### WASM file not loading
 
-- Ensure `wasm_exec.js` is copied to your static directory
+- Run `gux setup` to copy `wasm_exec.js` to your project
 - Check browser console for errors
 - Verify MIME type is set correctly (should be `application/wasm`)
 
@@ -445,10 +416,19 @@ make dev
 
 - Some standard library features aren't supported in TinyGo
 - Check [TinyGo compatibility](https://tinygo.org/docs/reference/lang-support/)
-- Use `GOOS=js GOARCH=wasm go build` for full compatibility
+- Use `gux build` (without `--tinygo`) for full compatibility
 
 ### API client errors
 
-- Ensure you've run `go generate ./api/...` after changing interfaces
+- Run `gux gen` after changing API interfaces
 - Check that your server is running and accessible
 - Verify CORS is enabled if running on different ports
+
+### "wasm_exec.js not found"
+
+Run `gux setup` to copy the runtime file:
+
+```bash
+gux setup          # For standard Go
+gux setup --tinygo # For TinyGo
+```

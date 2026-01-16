@@ -1,6 +1,6 @@
 # API Generation
 
-Gux's code generator (`apigen`) creates type-safe HTTP clients and server handlers from Go interface definitions. This eliminates boilerplate while ensuring compile-time type safety.
+The `gux gen` command creates type-safe HTTP clients and server handlers from Go interface definitions. This eliminates boilerplate while ensuring compile-time type safety.
 
 ## Overview
 
@@ -21,12 +21,18 @@ type PostsAPI interface {
 Generate both client and server code:
 
 ```bash
-go run gux/cmd/apigen -source=posts.go -output=posts_client_gen.go
+gux gen
 ```
 
-This generates:
+This scans the `api/` directory and generates:
 - **Client** (`posts_client_gen.go`) — Type-safe HTTP client for WASM
 - **Server** (`posts_server_gen.go`) — HTTP handler wrapper
+
+To use a different directory:
+
+```bash
+gux gen --dir ./internal/api
+```
 
 ## Annotations
 
@@ -297,8 +303,6 @@ package api
 
 import "context"
 
-//go:generate go run gux/cmd/apigen -source=users.go -output=users_client_gen.go
-
 // @client UsersClient
 // @basepath /api/users
 type UsersAPI interface {
@@ -423,3 +427,9 @@ func main() {
 5. **Always include context** — Even if unused, for future middleware
 6. **Use meaningful error messages** — Include IDs and context
 7. **Group related types** — Keep request/response types near the interface
+
+## See Also
+
+- [CLI Reference](cli.md) — Full `gux gen` command documentation
+- [Getting Started](getting-started.md) — Project setup walkthrough
+- [Server](server.md) — Server utilities and middleware
