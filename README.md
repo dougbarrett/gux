@@ -181,6 +181,8 @@ func main() {
 | [State Management](docs/state-management.md) | Stores, persistence, and async data |
 | [WebSocket](docs/websocket.md) | Real-time communication patterns |
 | [Server Utilities](docs/server.md) | Middleware and backend helpers |
+| [Keyboard Shortcuts](docs/keyboard-shortcuts.md) | Complete keyboard navigation reference |
+| [Accessibility](docs/accessibility.md) | ARIA patterns and a11y guidelines |
 | [Deployment](docs/deployment.md) | Docker and production setup |
 
 ## Component Library
