@@ -100,6 +100,202 @@ postsHandler.Use(
 postsHandler.RegisterRoutes(mux)
 ```
 
+### JWT Authentication
+
+Validates JWT tokens and injects user claims into the request context:
+
+```go
+handler := server.JWT(server.JWTOptions{
+    Secret: []byte("your-secret-key"),
+})(yourHandler)
+```
+
+#### JWT Options
+
+```go
+server.JWTOptions{
+    // Required: HMAC secret key for HS256 tokens
+    Secret: []byte("your-256-bit-secret"),
+
+    // Skip authentication for certain paths
+    SkipPaths: []string{
+        "/health",
+        "/api/auth/login",
+        "/api/auth/signup",
+        "/api/public/*",  // Wildcard prefix match
+    },
+
+    // Skip authentication for certain methods (e.g., CORS preflight)
+    SkipMethods: []string{"OPTIONS"},
+
+    // Where to find the token (default: "header:Authorization")
+    TokenLookup: "header:Authorization",  // or "query:token", "cookie:jwt"
+
+    // Auth scheme in header (default: "Bearer")
+    AuthScheme: "Bearer",
+
+    // Require tokens to have an expiry claim
+    RequireExpiry: true,
+
+    // Custom error handling
+    ErrorHandler: func(w http.ResponseWriter, r *http.Request, err error) {
+        // Custom error response
+    },
+
+    // Called after successful authentication
+    SuccessHandler: func(r *http.Request, claims *server.Claims) {
+        log.Printf("User %s authenticated", claims.UserID)
+    },
+}
+```
+
+#### Claims Structure
+
+The JWT middleware extracts these claims:
+
+```go
+type Claims struct {
+    // Standard JWT claims
+    Subject   string   // "sub"
+    Issuer    string   // "iss"
+    Audience  string   // "aud"
+    ExpiresAt int64    // "exp"
+    IssuedAt  int64    // "iat"
+    NotBefore int64    // "nbf"
+    JWTID     string   // "jti"
+
+    // Common custom claims
+    UserID   string   // "user_id"
+    Email    string   // "email"
+    Name     string   // "name"
+    Roles    []string // "roles"
+    OrgID    string   // "org_id"
+    TenantID string   // "tenant_id"
+
+    // Access any claim
+    Raw map[string]any
+}
+```
+
+#### Accessing Claims in Handlers
+
+```go
+func (s *Service) GetProfile(ctx context.Context) (*User, error) {
+    // Get full claims
+    claims := server.GetClaims(ctx)
+    if claims == nil {
+        return nil, api.Unauthorized("not authenticated")
+    }
+
+    // Or use convenience functions
+    userID := server.GetUserID(ctx)
+    email := server.GetUserEmail(ctx)
+    roles := server.GetUserRoles(ctx)
+    orgID := server.GetOrgID(ctx)
+
+    return s.db.GetUser(userID)
+}
+```
+
+#### Role-Based Access Control
+
+```go
+// Require specific roles for a handler
+adminHandler := server.Chain(
+    server.JWT(jwtOpts),
+    server.RequireRoles("admin"),
+)(adminOnlyHandler)
+
+// Check roles in service methods
+func (s *Service) DeleteUser(ctx context.Context, id int) error {
+    claims := server.GetClaims(ctx)
+    if !claims.HasRole("admin") {
+        return api.Forbidden("admin access required")
+    }
+    return s.db.DeleteUser(id)
+}
+
+// Check any of multiple roles
+if claims.HasAnyRole("admin", "moderator") {
+    // Allow moderation actions
+}
+```
+
+#### Complete JWT Example
+
+```go
+func main() {
+    mux := http.NewServeMux()
+
+    // JWT configuration
+    jwtOpts := server.JWTOptions{
+        Secret: []byte(os.Getenv("JWT_SECRET")),
+        SkipPaths: []string{
+            "/health",
+            "/api/auth/login",
+            "/api/auth/signup",
+            "/api/auth/refresh",
+        },
+        SkipMethods: []string{"OPTIONS"},
+        RequireExpiry: true,
+    }
+
+    // Public auth endpoints (no JWT required)
+    authHandler := api.NewAuthAPIHandler(authService)
+    authHandler.Use(
+        server.Logger(),
+        server.CORS(server.CORSOptions{}),
+    )
+    authHandler.RegisterRoutes(mux)
+
+    // Protected API endpoints
+    postsHandler := api.NewPostsAPIHandler(postsService)
+    postsHandler.Use(
+        server.Logger(),
+        server.CORS(server.CORSOptions{}),
+        server.JWT(jwtOpts),
+        server.Recover(),
+    )
+    postsHandler.RegisterRoutes(mux)
+
+    // Admin-only endpoints
+    adminHandler := api.NewAdminAPIHandler(adminService)
+    adminHandler.Use(
+        server.Logger(),
+        server.CORS(server.CORSOptions{}),
+        server.JWT(jwtOpts),
+        server.RequireRoles("admin"),
+        server.Recover(),
+    )
+    adminHandler.RegisterRoutes(mux)
+
+    http.ListenAndServe(":8080", mux)
+}
+```
+
+#### Generating Tokens
+
+For testing or simple use cases, use the built-in token generator:
+
+```go
+// Create claims
+claims := server.NewClaims(
+    "user-123",           // userID
+    "user@example.com",   // email
+    []string{"user"},     // roles
+    24*time.Hour,         // expires in
+)
+
+// Add custom claims
+claims.OrgID = "org-456"
+claims.Name = "John Doe"
+
+// Generate token
+token, err := server.GenerateToken(claims, []byte("your-secret"))
+```
+
+For production, consider using a dedicated JWT library like `golang-jwt/jwt`.
+
 ## SPA Handler
 
 Serves static files with fallback to `index.html` for client-side routing:

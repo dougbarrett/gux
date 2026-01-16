@@ -406,3 +406,68 @@ if auth.HasRole("admin") {
 // Always enforce permissions server-side too!
 // The client can be manipulated - never trust it for security
 ```
+
+## Server-Side Authentication
+
+The client-side `auth` package handles token storage and UI state. For server-side JWT validation, use the `server.JWT` middleware.
+
+### JWT Middleware
+
+```go
+import "github.com/dougbarrett/gux/server"
+
+// Configure JWT middleware
+jwtOpts := server.JWTOptions{
+    Secret: []byte(os.Getenv("JWT_SECRET")),
+    SkipPaths: []string{
+        "/api/auth/login",
+        "/api/auth/signup",
+        "/api/auth/refresh",
+    },
+}
+
+// Apply to protected handlers
+postsHandler.Use(
+    server.JWT(jwtOpts),
+)
+```
+
+### Accessing User in Service Methods
+
+```go
+func (s *PostsService) Create(ctx context.Context, req CreatePostRequest) (*Post, error) {
+    // Get user from JWT claims
+    userID := server.GetUserID(ctx)
+    if userID == "" {
+        return nil, api.Unauthorized("not authenticated")
+    }
+
+    // Create post with user info
+    post := &Post{
+        Title:    req.Title,
+        Body:     req.Body,
+        AuthorID: userID,
+    }
+    return s.db.CreatePost(post)
+}
+```
+
+### Role-Based Authorization
+
+```go
+func (s *AdminService) DeleteUser(ctx context.Context, id int) error {
+    claims := server.GetClaims(ctx)
+    if !claims.HasRole("admin") {
+        return api.Forbidden("admin access required")
+    }
+    return s.db.DeleteUser(id)
+}
+```
+
+For complete server-side JWT documentation, see [Server Utilities](server.md#jwt-authentication).
+
+## See Also
+
+- [Server Utilities](server.md) — JWT middleware, CORS, and other middleware
+- [API Generation](api-generation.md) — Generate type-safe API clients
+- [State Management](state-management.md) — Reactive state stores
