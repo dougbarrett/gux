@@ -105,15 +105,26 @@ func BarChart(props BarChartProps) js.Value {
 			container.Call("appendChild", row)
 		}
 	} else {
-		// Vertical bars
+		// Vertical bars - use flexbox with proper height structure
 		container.Get("style").Set("display", "flex")
-		container.Get("style").Set("alignItems", "flex-end")
-		container.Get("style").Set("gap", "4px")
-		container.Get("style").Set("paddingTop", "20px")
+		container.Get("style").Set("flexDirection", "column")
+
+		// Create a bar area that will hold the actual bars
+		barArea := document.Call("createElement", "div")
+		barArea.Set("className", "flex items-end gap-1")
+		barArea.Get("style").Set("flex", "1")
+		barArea.Get("style").Set("minHeight", "0") // Allow flex to shrink
+
+		// Create labels area if needed
+		var labelsArea js.Value
+		if props.ShowLabels {
+			labelsArea = document.Call("createElement", "div")
+			labelsArea.Set("className", "flex gap-1 mt-1")
+		}
 
 		for _, d := range props.Data {
 			col := document.Call("createElement", "div")
-			col.Set("className", "flex-1 flex flex-col items-center")
+			col.Set("className", "flex-1 flex flex-col items-center justify-end h-full")
 
 			if props.ShowValues {
 				value := document.Call("createElement", "div")
@@ -129,19 +140,25 @@ func BarChart(props BarChartProps) js.Value {
 				color = props.BarColor
 			}
 			bar.Get("style").Set("backgroundColor", color)
+			// Use flex-basis with a percentage of the column height for bar sizing
 			percentage := (d.Value / maxVal) * 100
 			bar.Get("style").Set("height", fmt.Sprintf("%.1f%%", percentage))
 			bar.Get("style").Set("minHeight", "4px")
 			col.Call("appendChild", bar)
 
-			if props.ShowLabels {
-				label := document.Call("createElement", "div")
-				label.Set("className", "text-xs text-gray-600 mt-1 truncate w-full text-center")
-				label.Set("textContent", d.Label)
-				col.Call("appendChild", label)
-			}
+			barArea.Call("appendChild", col)
 
-			container.Call("appendChild", col)
+			if props.ShowLabels {
+				labelCol := document.Call("createElement", "div")
+				labelCol.Set("className", "flex-1 text-xs text-gray-600 truncate text-center")
+				labelCol.Set("textContent", d.Label)
+				labelsArea.Call("appendChild", labelCol)
+			}
+		}
+
+		container.Call("appendChild", barArea)
+		if props.ShowLabels {
+			container.Call("appendChild", labelsArea)
 		}
 	}
 
