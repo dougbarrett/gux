@@ -2,6 +2,8 @@
 
 This guide walks you through setting up Gux and building your first application.
 
+**[See Gux in action](https://gux-demo.production.app.dbb1.dev/)** — Explore the live demo before getting started.
+
 ## Prerequisites
 
 ### Required

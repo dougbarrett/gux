@@ -39,6 +39,7 @@ gux dev
 
 ## Links
 
+- [Live Demo](https://gux-demo.production.app.dbb1.dev/) — Try Gux in your browser
 - [GitHub Repository](https://github.com/dougbarrett/gux)
 - [Getting Started Guide](getting-started.md)
 - [Component Library](components.md)

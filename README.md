@@ -7,6 +7,8 @@ A full-stack Go framework for building modern web applications with WebAssembly.
 [![Go Version](https://img.shields.io/badge/Go-1.25+-00ADD8?logo=go)](https://golang.org)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
+**[Live Demo](https://gux-demo.production.app.dbb1.dev/)** — Try Gux in your browser
+
 ## Features
 
 - **Type-Safe API Generation** — Define Go interfaces, generate HTTP clients and server handlers automatically
