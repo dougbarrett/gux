@@ -5,8 +5,10 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"strings"
+	"syscall"
 )
 
 func runSetup(tinygo bool) {
@@ -247,7 +249,16 @@ func runDev(port int, tinygo bool) {
 		fmt.Printf("Error copying public directory: %v\n", err)
 		os.Exit(1)
 	}
-	defer os.RemoveAll(serverPublic) // Clean up when server stops
+
+	// Cleanup function for dev artifacts
+	cleanup := func() {
+		os.RemoveAll(serverPublic)
+		os.Remove("public/main.wasm")
+	}
+
+	// Handle Ctrl+C and other termination signals
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 
 	fmt.Printf("\nStarting dev server on http://localhost:%d\n", port)
 
@@ -257,8 +268,30 @@ func runDev(port int, tinygo bool) {
 	cmd.Stderr = os.Stderr
 	cmd.Dir = filepath.Dir(".")
 
-	if err := cmd.Run(); err != nil {
-		fmt.Printf("Server failed: %v\n", err)
+	// Start server in background so we can handle signals
+	if err := cmd.Start(); err != nil {
+		fmt.Printf("Server failed to start: %v\n", err)
+		cleanup()
 		os.Exit(1)
+	}
+
+	// Wait for either server to exit or signal
+	done := make(chan error, 1)
+	go func() {
+		done <- cmd.Wait()
+	}()
+
+	select {
+	case <-sigChan:
+		fmt.Println("\nShutting down...")
+		cmd.Process.Signal(os.Interrupt)
+		<-done // Wait for process to exit
+		cleanup()
+	case err := <-done:
+		cleanup()
+		if err != nil {
+			fmt.Printf("Server exited with error: %v\n", err)
+			os.Exit(1)
+		}
 	}
 }
