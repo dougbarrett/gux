@@ -148,6 +148,8 @@ func runBuild(tinygo bool) {
 	cmd := exec.Command("go", "build", "-ldflags=-s -w", "-o", "server", "./cmd/server")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
+	// Set CGO_ENABLED=0 for static linking (works on Alpine/musl-based images)
+	cmd.Env = append(os.Environ(), "CGO_ENABLED=0")
 
 	if err := cmd.Run(); err != nil {
 		fmt.Printf("Server build failed: %v\n", err)

@@ -283,6 +283,10 @@ The output binary contains everything:
 
 Cache-busting is handled automatically at runtime—the server computes a hash of `main.wasm` and injects it into `index.html` when served.
 
+### Static Linking
+
+The server binary is built with `CGO_ENABLED=0` by default, producing a statically linked binary that works on any Linux distribution including Alpine (musl-based) containers. No glibc dependency required.
+
 ### Requirements
 
 - Must run from project root (with `cmd/app/` and `cmd/server/` directories)
