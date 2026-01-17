@@ -45,7 +45,7 @@ func InitToasts() *ToastManager {
 
 	container := document.Call("createElement", "div")
 	container.Set("id", "toast-container")
-	container.Set("className", "fixed top-4 right-4 z-50 flex flex-col gap-2")
+	container.Set("className", "fixed top-4 right-4 z-[9999] flex flex-col gap-2")
 	// ARIA live region for toast notifications
 	container.Call("setAttribute", "role", "status")
 	container.Call("setAttribute", "aria-live", "polite")
