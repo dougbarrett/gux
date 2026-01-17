@@ -66,6 +66,9 @@ func runGenerate(apiDir string) {
 	}
 
 	fmt.Printf("\nGenerated %d API file(s) + shared client code\n", len(files))
+
+	// Check for updates
+	checkForUpdates()
 }
 
 // findAPIFiles finds all .go files in the directory that contain @client annotation

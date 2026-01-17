@@ -71,6 +71,13 @@ func main() {
 	case "claude":
 		runClaude()
 
+	case "update":
+		updateCmd := flag.NewFlagSet("update", flag.ExitOnError)
+		checkOnly := updateCmd.Bool("check", false, "Only check for updates, don't install")
+		updateCmd.Parse(os.Args[2:])
+
+		runUpdate(*checkOnly)
+
 	case "version", "-v", "--version":
 		fmt.Printf("gux version %s\n", getVersion())
 
@@ -95,6 +102,7 @@ Usage:
     gux build [--go]                              Build WASM and server binary
     gux dev [--port <port>] [--go]                Build and run dev server
     gux claude                                    Install Claude Code skill
+    gux update [--check]                          Update gux to latest version
     gux version                                   Show version
     gux help                                      Show this help
 
@@ -110,6 +118,8 @@ Examples:
     gux dev                  # Run dev server on :8080 (TinyGo)
     gux dev --port 3000      # Run on custom port
     gux claude               # Install Claude Code skill for AI assistance
+    gux update               # Update gux to latest release
+    gux update --check       # Check for updates without installing
 
 The init command creates a Gux application scaffold including:
     - cmd/app/main.go       - WASM frontend entry point

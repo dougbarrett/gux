@@ -486,6 +486,8 @@ import (
 	"net/http"
 {{- if .NeedsStrconv}}
 	"strconv"
+{{- end}}
+{{- if .HasPathParams}}
 	"strings"
 {{- end}}
 
@@ -569,22 +571,20 @@ func (h *{{$iface.Name}}Handler) handle{{$method.Name}}(w http.ResponseWriter, r
 {{end}}
 `
 
-	// Check if any interface has int path parameters (needs strconv import)
+	// Check if any interface has path parameters (needs strings import)
+	// and if any have int path parameters (needs strconv import)
 	needsStrconv := false
+	hasPathParams := false
 	for _, iface := range interfaces {
 		for _, method := range iface.Methods {
+			if len(method.PathParams) > 0 {
+				hasPathParams = true
+			}
 			for _, p := range method.PathParams {
 				if p.IsInt {
 					needsStrconv = true
-					break
 				}
 			}
-			if needsStrconv {
-				break
-			}
-		}
-		if needsStrconv {
-			break
 		}
 	}
 
@@ -616,11 +616,13 @@ func (h *{{$iface.Name}}Handler) handle{{$method.Name}}(w http.ResponseWriter, r
 	t := template.Must(template.New("server").Funcs(funcMap).Parse(tmpl))
 
 	data := struct {
-		Interfaces   []InterfaceInfo
-		NeedsStrconv bool
+		Interfaces    []InterfaceInfo
+		NeedsStrconv  bool
+		HasPathParams bool
 	}{
-		Interfaces:   interfaces,
-		NeedsStrconv: needsStrconv,
+		Interfaces:    interfaces,
+		NeedsStrconv:  needsStrconv,
+		HasPathParams: hasPathParams,
 	}
 
 	var buf bytes.Buffer

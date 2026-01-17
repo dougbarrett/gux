@@ -137,6 +137,9 @@ func runInit(appName, modulePath string) {
 	}
 
 	printNextStepsWithDir(appName, initHere)
+
+	// Check for updates
+	checkForUpdates()
 }
 
 func renderTemplate(targetDir, tmplPath, destPath string, data TemplateData) error {
