@@ -286,7 +286,8 @@ cb := components.Checkbox(components.CheckboxProps{
 
 toggle := components.Toggle(components.ToggleProps{
     Label:    "Enable notifications",
-    OnChange: func(enabled bool) { /* handle */ },
+    Checked:  false,  // Initial state
+    OnChange: func(checked bool) { /* handle */ },
 })
 
 // DatePicker
@@ -314,7 +315,7 @@ form := components.NewFormBuilder(components.FormBuilderProps{
          Rules: []components.ValidationRule{components.Required, components.MinLength(8)}},
     },
     SubmitText: "Create Account",
-    OnSubmit: func(values map[string]string) { /* handle */ },
+    OnSubmit: func(values map[string]any) error { /* handle */ return nil },
 })
 ```
 
@@ -332,8 +333,8 @@ layout := components.Layout(components.LayoutProps{
     },
     Header: components.HeaderProps{
         Title: "Dashboard",
-        Actions: []js.Value{
-            components.Button(components.ButtonProps{Text: "New"}),
+        Actions: []components.HeaderAction{
+            {Label: "New", OnClick: handleNew},
         },
     },
 })
@@ -341,9 +342,8 @@ layout.SetContent(myContent)
 layout.SetPageWithHeader("Posts", postsContent)
 
 // Card
-card := components.Card(components.CardProps{}, content...)
-card := components.TitledCard("Card Title", content...)
-card := components.SectionCard("Title", "Description", content...)
+card := components.Card(content...)  // Variadic children
+card := components.TitledCard("Card Title", "Description", content...)
 
 // Tabs
 tabs := components.Tabs(components.TabsProps{
@@ -362,10 +362,7 @@ accordion := components.Accordion(components.AccordionProps{
 })
 
 // Drawer (side panel)
-drawer := components.RightDrawer(components.DrawerProps{
-    Title:   "Details",
-    Content: detailsContent,
-})
+drawer := components.RightDrawer("Details", detailsContent)  // title, content
 drawer.Open()
 drawer.Close()
 ```
@@ -428,9 +425,9 @@ table := components.Table(components.TableProps{
     Columns: []components.TableColumn{
         {Header: "ID", Key: "id", Width: "w-16"},
         {Header: "Name", Key: "name"},
-        {Header: "Status", Key: "status", Render: func(row map[string]any) js.Value {
+        {Header: "Status", Key: "status", Render: func(row map[string]any, value any) js.Value {
             return components.Badge(components.BadgeProps{
-                Text:    row["status"].(string),
+                Text:    value.(string),
                 Variant: components.BadgeSuccess,
             })
         }},
@@ -438,14 +435,14 @@ table := components.Table(components.TableProps{
     Data:       tableData,
     Striped:    true,
     Hoverable:  true,
-    OnRowClick: func(row map[string]any) { /* handle */ },
+    OnRowClick: func(row map[string]any, index int) { /* handle */ },
 })
 table.UpdateData(newData)
 
 // Badge
 badge := components.Badge(components.BadgeProps{
     Text:    "Active",
-    Variant: components.BadgeSuccess,  // Primary, Secondary, Success, Warning, Error, Info
+    Variant: components.BadgeSuccess,  // Default, Primary, Success, Warning, Error, Info
 })
 
 // Avatar
@@ -607,8 +604,8 @@ svg := components.IconSVG("settings", components.IconOutline)
 - Navigation: `home`, `menu`, `x-mark`, `chevron-left/right/up/down`, `arrow-left/right/up/down`
 - Actions: `plus`, `minus`, `check`, `x`, `pencil`, `trash`, `search`, `cog`, `settings`
 - Users: `user`, `users`, `user-plus`, `user-circle`
-- Status: `check-circle`, `x-circle`, `exclamation-circle`, `information-circle`, `exclamation-triangle`
-- Data: `chart-bar`, `chart-pie`, `table-cells`
+- Status: `check-circle`, `x-circle`, `exclamation-circle`, `information-circle`
+- Data: `chart-bar`
 - Files: `document`, `document-text`, `folder`, `folder-open`, `clipboard`
 - General: `heart`, `star`, `bookmark`, `clock`, `calendar`, `eye`, `lock-closed`, `key`, `bell`, `envelope`, `info`
 
@@ -894,16 +891,17 @@ func createPostForm(client *api.PostsClient) js.Value {
             {Name: "body", Type: components.BuilderFieldTextarea, Label: "Body"},
         },
         SubmitText: "Create Post",
-        OnSubmit: func(values map[string]string) {
+        OnSubmit: func(values map[string]any) error {
             _, err := client.Create(api.CreatePostRequest{
-                Title: values["title"],
-                Body:  values["body"],
+                Title: values["title"].(string),
+                Body:  values["body"].(string),
             })
             if err != nil {
                 components.Toast(err.Error(), components.ToastError)
-                return
+                return err
             }
             components.Toast("Post created!", components.ToastSuccess)
+            return nil
         },
     })
     return form.Element()
