@@ -226,8 +226,9 @@ form := components.NewFormBuilder(components.FormBuilderProps{
     SubmitText: "Create Account",
     ShowCancel: true,
     CancelText: "Back",
-    OnSubmit: func(values map[string]string) {
+    OnSubmit: func(values map[string]any) error {
         // values["email"], values["password"], values["role"]
+        return nil
     },
     OnCancel: func() { /* handle cancel */ },
 })
@@ -255,8 +256,8 @@ layout := components.Layout(components.LayoutProps{
     },
     Header: components.HeaderProps{
         Title: "Dashboard",
-        Actions: []js.Value{
-            components.Button(components.ButtonProps{Text: "New"}),
+        Actions: []components.HeaderAction{
+            {Label: "New", OnClick: handleNew},
         },
     },
 })
@@ -292,9 +293,8 @@ sidebar.SetActive("/users")
 ```go
 header := components.Header(components.HeaderProps{
     Title: "Dashboard",
-    Actions: []js.Value{
-        components.Button(components.ButtonProps{Text: "New Post"}),
-        components.ThemeToggle(),
+    Actions: []components.HeaderAction{
+        {Label: "New Post", OnClick: handleNewPost},
     },
 })
 
@@ -304,20 +304,14 @@ header.SetTitle("New Title")
 ### Card
 
 ```go
-// Basic card
-card := components.Card(components.CardProps{
-    ClassName: "max-w-md",
-}, content...)
+// Basic card (variadic children)
+card := components.Card(content...)
 
-// Titled card
-card := components.TitledCard("Card Title", content...)
+// Card with custom class
+card := components.CardWithClass("max-w-md", content...)
 
-// Section card
-card := components.SectionCard(
-    "Section Title",
-    "Optional description",
-    content...,
-)
+// Titled card (title, description, children)
+card := components.TitledCard("Card Title", "Optional description", content...)
 ```
 
 ### Tabs
@@ -350,19 +344,19 @@ accordion := components.Accordion(components.AccordionProps{
 Side panel that slides in:
 
 ```go
-drawer := components.RightDrawer(components.DrawerProps{
-    Title:   "Details",
-    Content: detailsContent,
-})
+// Simple drawer (title, content)
+drawer := components.RightDrawer("Details", detailsContent)
 
 // Open/close
 drawer.Open()
 drawer.Close()
 
-// Other positions
-components.TopDrawer(props)
-components.BottomDrawer(props)
-components.LeftDrawer(props)
+// Other positions (use NewDrawer for full control)
+drawer := components.NewDrawer(components.DrawerProps{
+    Title:    "Details",
+    Position: components.DrawerRight,  // DrawerLeft, DrawerTop, DrawerBottom
+    Content:  detailsContent,
+})
 ```
 
 ## Header Components
@@ -485,8 +479,8 @@ table := components.Table(components.TableProps{
     Columns: []components.TableColumn{
         {Header: "ID", Key: "id", Width: "w-16"},
         {Header: "Name", Key: "name"},
-        {Header: "Status", Key: "status", Render: func(row map[string]any) js.Value {
-            status := row["status"].(string)
+        {Header: "Status", Key: "status", Render: func(row map[string]any, value any) js.Value {
+            status := value.(string)
             variant := components.BadgeInfo
             if status == "active" {
                 variant = components.BadgeSuccess
@@ -496,7 +490,7 @@ table := components.Table(components.TableProps{
                 Variant: variant,
             })
         }},
-        {Header: "Actions", Key: "actions", Render: func(row map[string]any) js.Value {
+        {Header: "Actions", Key: "actions", Render: func(row map[string]any, value any) js.Value {
             return components.Button(components.ButtonProps{
                 Text:    "Edit",
                 Size:    components.ButtonSM,
@@ -512,7 +506,7 @@ table := components.Table(components.TableProps{
     Hoverable:  true,
     Bordered:   false,
     Compact:    false,
-    OnRowClick: func(row map[string]any) { /* handle click */ },
+    OnRowClick: func(row map[string]any, index int) { /* handle click */ },
 })
 
 // Update data
@@ -535,7 +529,7 @@ components.BadgeWarningText("Warning")
 components.BadgeErrorText("Error")
 ```
 
-**Variants:** `BadgePrimary`, `BadgeSecondary`, `BadgeSuccess`, `BadgeWarning`, `BadgeError`, `BadgeInfo`
+**Variants:** `BadgeDefault`, `BadgePrimary`, `BadgeSuccess`, `BadgeWarning`, `BadgeError`, `BadgeInfo`
 
 ### Avatar
 
