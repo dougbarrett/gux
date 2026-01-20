@@ -24,6 +24,8 @@ const (
 	BuilderFieldFile     BuilderFieldType = "file"
 	BuilderFieldHidden   BuilderFieldType = "hidden"
 	BuilderFieldCustom   BuilderFieldType = "custom"
+	BuilderFieldRichText BuilderFieldType = "richtext"
+	BuilderFieldCode     BuilderFieldType = "code"
 )
 
 // BuilderField defines a single form field configuration
@@ -45,6 +47,13 @@ type BuilderField struct {
 	Max          string // For number/date
 	Step         string // For number
 	CustomRender func(field BuilderField, value any, onChange func(any)) js.Value
+
+	// RichText editor options
+	RichTextToolbar ToolbarPreset // For richtext fields (minimal, standard, full)
+
+	// Code editor options
+	CodeLanguage CodeLanguage // For code fields (go, javascript, etc.)
+	CodeTheme    CodeTheme    // For code fields (light, dark, auto)
 }
 
 // BuilderSection groups fields together
@@ -276,6 +285,10 @@ func (fb *FormBuilder) renderField(field BuilderField) js.Value {
 		input = fb.renderCheckbox(field)
 	case BuilderFieldRadio:
 		input = fb.renderRadioGroup(field)
+	case BuilderFieldRichText:
+		input = fb.renderRichText(field)
+	case BuilderFieldCode:
+		input = fb.renderCode(field)
 	default:
 		input = fb.renderInput(field)
 	}
@@ -542,6 +555,64 @@ func (fb *FormBuilder) renderRadioGroup(field BuilderField) js.Value {
 	}
 
 	return container
+}
+
+func (fb *FormBuilder) renderRichText(field BuilderField) js.Value {
+	toolbar := field.RichTextToolbar
+	if toolbar == "" {
+		toolbar = ToolbarStandard
+	}
+
+	initialValue := ""
+	if val, ok := fb.values[field.Name]; ok {
+		initialValue = fmt.Sprintf("%v", val)
+	}
+
+	fieldName := field.Name
+	rte := NewRichTextEditor(RichTextEditorProps{
+		Value:       initialValue,
+		Placeholder: field.Placeholder,
+		Toolbar:     toolbar,
+		Disabled:    field.Disabled,
+		ReadOnly:    field.ReadOnly,
+		Height:      "200px",
+		OnChange: func(html string) {
+			fb.setValue(fieldName, html)
+		},
+	})
+
+	return rte.Element()
+}
+
+func (fb *FormBuilder) renderCode(field BuilderField) js.Value {
+	lang := field.CodeLanguage
+	if lang == "" {
+		lang = LangJavaScript
+	}
+
+	theme := field.CodeTheme
+	if theme == "" {
+		theme = CodeThemeAuto
+	}
+
+	initialValue := ""
+	if val, ok := fb.values[field.Name]; ok {
+		initialValue = fmt.Sprintf("%v", val)
+	}
+
+	fieldName := field.Name
+	ce := NewCodeEditor(CodeEditorProps{
+		Value:    initialValue,
+		Language: lang,
+		Theme:    theme,
+		ReadOnly: field.ReadOnly || field.Disabled,
+		Height:   "200px",
+		OnChange: func(value string) {
+			fb.setValue(fieldName, value)
+		},
+	})
+
+	return ce.Element()
 }
 
 func (fb *FormBuilder) setValue(name string, value any) {

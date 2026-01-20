@@ -44,7 +44,10 @@ func main() {
 		fmt.Printf("{{.AppName}} running at http://localhost:%d\n", *port)
 		fmt.Println("Serving static files from embedded filesystem")
 	}
-	mux.HandleFunc("/", spaHandler.ServeHTTP)
+
+	// Wrap SPA handler with gzip compression for faster WASM/JS/CSS delivery
+	compressedSPA := server.Gzip()(spaHandler)
+	mux.Handle("/", compressedSPA)
 
 	addr := fmt.Sprintf(":%d", *port)
 	if err := http.ListenAndServe(addr, mux); err != nil {

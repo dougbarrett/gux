@@ -45,9 +45,10 @@ func main() {
 		},
 	)
 
-	// SPA handler for static files
+	// SPA handler for static files with gzip compression
 	spaHandler := server.NewSPAHandler(*dir)
-	mux.HandleFunc("/", spaHandler.ServeHTTP)
+	compressedSPA := server.Gzip()(spaHandler)
+	mux.Handle("/", compressedSPA)
 
 	addr := fmt.Sprintf(":%d", *port)
 	fmt.Printf("Server running at http://localhost%s\n", addr)

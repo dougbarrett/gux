@@ -1,9 +1,13 @@
 package server
 
 import (
+	"compress/gzip"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
+	"strings"
+	"sync"
 	"time"
 )
 
@@ -88,6 +92,73 @@ func RequestID() Middleware {
 			counter++
 			w.Header().Set("X-Request-ID", fmt.Sprintf("%d-%d", time.Now().UnixNano(), counter))
 			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+// gzipResponseWriter wraps http.ResponseWriter to provide gzip compression
+type gzipResponseWriter struct {
+	io.Writer
+	http.ResponseWriter
+	wroteHeader bool
+}
+
+func (w *gzipResponseWriter) Write(b []byte) (int, error) {
+	if !w.wroteHeader {
+		// Set content type before writing if not already set
+		if w.Header().Get("Content-Type") == "" {
+			w.Header().Set("Content-Type", http.DetectContentType(b))
+		}
+		w.wroteHeader = true
+	}
+	return w.Writer.Write(b)
+}
+
+func (w *gzipResponseWriter) WriteHeader(code int) {
+	w.wroteHeader = true
+	w.ResponseWriter.WriteHeader(code)
+}
+
+// gzipWriterPool reuses gzip writers to reduce allocations
+var gzipWriterPool = sync.Pool{
+	New: func() any {
+		return gzip.NewWriter(io.Discard)
+	},
+}
+
+// Gzip compresses responses using gzip encoding for clients that support it.
+// It compresses text-based content types (HTML, CSS, JS, JSON, WASM, etc.)
+// and skips already-compressed formats (images, videos, etc.).
+func Gzip() Middleware {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Check if client accepts gzip
+			if !strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			// Get a gzip writer from the pool
+			gz := gzipWriterPool.Get().(*gzip.Writer)
+			gz.Reset(w)
+			defer func() {
+				gz.Close()
+				gzipWriterPool.Put(gz)
+			}()
+
+			// Set headers
+			w.Header().Set("Content-Encoding", "gzip")
+			w.Header().Set("Vary", "Accept-Encoding")
+			// Remove Content-Length as it will change after compression
+			w.Header().Del("Content-Length")
+
+			// Wrap the response writer
+			gzw := &gzipResponseWriter{
+				Writer:         gz,
+				ResponseWriter: w,
+			}
+
+			next.ServeHTTP(gzw, r)
 		})
 	}
 }

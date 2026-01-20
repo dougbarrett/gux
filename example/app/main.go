@@ -3,6 +3,7 @@
 package main
 
 import (
+	"strings"
 	"syscall/js"
 	"time"
 
@@ -28,6 +29,9 @@ var (
 func main() {
 	// Initialize app (loads Tailwind, clears #app)
 	app = components.NewApp("app")
+
+	// Note: Quill.js and CodeMirror are pre-loaded in index.html
+	// They must be loaded before WASM starts to avoid blocking issues
 
 	// Initialize toast notifications
 	components.InitToasts()
@@ -216,6 +220,7 @@ func showComponents() {
 			{Label: "Feedback", Content: feedbackDemo()},
 			{Label: "Data", Content: dataDemo()},
 			{Label: "New", Content: newComponentsDemo()},
+			{Label: "Editors", Content: editorsDemo()},
 			{Label: "Advanced", Content: advancedDemo()},
 			{Label: "Charts", Content: chartsDemo()},
 			{Label: "Utilities", Content: utilitiesDemo()},
@@ -878,6 +883,122 @@ func utilitiesDemo() js.Value {
 						inspector.Open()
 					}
 				}),
+			),
+		),
+	)
+}
+
+func editorsDemo() js.Value {
+	// Rich Text Editor demos
+	richTextEditor := components.NewRichTextEditor(components.RichTextEditorProps{
+		Label:       "Rich Text Editor",
+		Placeholder: "Write something beautiful...",
+		Toolbar:     components.ToolbarStandard,
+		Height:      "200px",
+		OnChange: func(html string) {
+			// Content changed
+		},
+	})
+
+	minimalRichText := components.MinimalRichTextEditor("Quick note...")
+
+	fullRichText := components.FullRichTextEditor("Full Editor", "Create rich content with all formatting options...")
+
+	// Code Editor demos
+	goEditor := components.NewCodeEditor(components.CodeEditorProps{
+		Label:    "Go Code",
+		Language: components.LangGo,
+		Value: `package main
+
+import "fmt"
+
+func main() {
+	fmt.Println("Hello, Gux!")
+}`,
+		Height: "200px",
+		OnChange: func(value string) {
+			// Code changed
+		},
+	})
+
+	jsonEditor := components.JSONEditor("JSON Editor")
+	jsonEditor.SetValue(`{
+  "name": "Gux",
+  "version": "1.0.0",
+  "features": ["components", "routing", "state"]
+}`)
+
+	sqlEditor := components.SQLEditor("SQL Query")
+	sqlEditor.SetValue(`SELECT id, name, email
+FROM users
+WHERE status = 'active'
+ORDER BY created_at DESC
+LIMIT 10;`)
+
+	return components.Div("space-y-6",
+		components.Section("Rich Text Editor (Quill.js)",
+			components.Div("space-y-4",
+				components.Text("WYSIWYG editor with configurable toolbar:"),
+				richTextEditor.Element(),
+				components.Div("flex gap-2 mt-2",
+					components.Button(components.ButtonProps{
+						Text: "Get HTML",
+						Size: components.ButtonSM,
+						OnClick: func() {
+							html := richTextEditor.GetHTML()
+							components.Toast("HTML length: "+string(rune(len(html)))+" chars", components.ToastInfo)
+						},
+					}),
+					components.Button(components.ButtonProps{
+						Text: "Get Text",
+						Size: components.ButtonSM,
+						OnClick: func() {
+							text := richTextEditor.GetText()
+							components.Toast("Text: "+text[:min(50, len(text))]+"...", components.ToastInfo)
+						},
+					}),
+				),
+			),
+		),
+		components.Section("Minimal Rich Text",
+			components.Div("space-y-2",
+				components.Text("Simple toolbar for basic formatting:"),
+				minimalRichText.Element(),
+			),
+		),
+		components.Section("Full Rich Text",
+			components.Div("space-y-2",
+				components.Text("All formatting options including headers, colors, and media:"),
+				fullRichText.Element(),
+			),
+		),
+		components.Section("Code Editor (CodeMirror 6)",
+			components.Div("space-y-4",
+				components.Text("Syntax-highlighted code editor with language support:"),
+				goEditor.Element(),
+				components.Div("flex gap-2 mt-2",
+					components.Button(components.ButtonProps{
+						Text: "Get Code",
+						Size: components.ButtonSM,
+						OnClick: func() {
+							code := goEditor.Value()
+							lines := len(code) - len(strings.ReplaceAll(code, "\n", "")) + 1
+							components.Toast("Code has "+string(rune(lines+'0'))+" lines", components.ToastInfo)
+						},
+					}),
+				),
+			),
+		),
+		components.Section("JSON Editor",
+			components.Div("space-y-2",
+				components.Text("JSON with syntax highlighting:"),
+				jsonEditor.Element(),
+			),
+		),
+		components.Section("SQL Editor",
+			components.Div("space-y-2",
+				components.Text("SQL query editor:"),
+				sqlEditor.Element(),
 			),
 		),
 	)
