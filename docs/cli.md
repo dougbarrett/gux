@@ -19,9 +19,8 @@ gux version
 | Command | Description |
 |---------|-------------|
 | `gux init` | Create a new Gux application |
-| `gux setup` | Copy wasm_exec.js from Go/TinyGo |
 | `gux gen` | Generate API client and server code |
-| `gux build` | Build the WASM module |
+| `gux build` | Build WASM and server binary with embedded assets |
 | `gux dev` | Build and run development server |
 | `gux version` | Show version |
 | `gux help` | Show help |
@@ -56,20 +55,20 @@ gux init --module github.com/myuser/myapp myapp
 
 ```
 myapp/
-├── app/
-│   └── main.go           # WASM frontend entry point
-├── server/
-│   └── main.go           # HTTP server
-├── api/
-│   ├── types.go          # Shared data types
-│   └── example.go        # Example API interface
-├── go.mod                # Go module file
-├── index.html            # PWA entry point
-├── manifest.json         # PWA manifest
-├── offline.html          # Offline fallback page
-├── service-worker.js     # PWA service worker
-└── Dockerfile            # Multi-stage Docker build
+├── cmd/
+│   ├── app/
+│   │   └── main.go           # WASM frontend entry point
+│   └── server/
+│       └── main.go           # HTTP server
+├── internal/
+│   └── api/
+│       ├── types.go          # Shared data types
+│       └── example.go        # Example API interface
+├── go.mod                    # Go module file
+└── Dockerfile                # Multi-stage Docker build
 ```
+
+Default files (index.html, manifest.json, service-worker.js, wasm_exec.js) are automatically injected at build time. To customize, create a `public/` directory with your own versions.
 
 ### App Name Rules
 
@@ -82,43 +81,8 @@ myapp/
 
 ```bash
 cd myapp
-gux setup         # Copy wasm_exec.js
-go mod tidy       # Download dependencies
 gux dev           # Start development server
 ```
-
----
-
-## gux setup
-
-Copies the `wasm_exec.js` runtime file from your TinyGo (default) or Go installation into the current directory.
-
-```bash
-gux setup [--go]
-```
-
-### Options
-
-| Flag | Description |
-|------|-------------|
-| `--go` | Copy from standard Go instead of TinyGo |
-
-### Examples
-
-```bash
-# Copy from TinyGo installation (default)
-gux setup
-
-# Copy from standard Go installation
-gux setup --go
-```
-
-### Notes
-
-- Run this command from your project root
-- The `wasm_exec.js` file is required to run Go WASM in the browser
-- TinyGo is the default (smaller WASM binaries ~500KB)
-- Must match your build toolchain (TinyGo or Go)
 
 ---
 
@@ -290,8 +254,7 @@ The server binary is built with `CGO_ENABLED=0` by default, producing a statical
 ### Requirements
 
 - Must run from project root (with `cmd/app/` and `cmd/server/` directories)
-- Run `gux setup` first to copy `wasm_exec.js`
-- TinyGo must be installed for `--tinygo` flag
+- TinyGo must be installed (or use `--go` flag for standard Go)
 
 ### Build Size Comparison
 
@@ -336,16 +299,17 @@ gux dev --go
 
 ### What It Does
 
-1. Checks for `wasm_exec.js` (run `gux setup` first)
-2. Builds the WASM module to `public/main.wasm`
-3. Starts the Go server from `./cmd/server` in dev mode
-4. Serves static files from filesystem (not embedded) for hot reload
+1. Prepares default files (index.html, manifest.json, service-worker.js, wasm_exec.js)
+2. Overlays any user files from `public/` directory (if present)
+3. Builds the WASM module
+4. Starts the Go server from `./cmd/server` in dev mode
+5. Serves static files from filesystem for hot reload
 
 ### Requirements
 
 - `cmd/app/` directory with WASM frontend code
 - `cmd/server/` directory with Go server code
-- `public/wasm_exec.js` (run `gux setup` first)
+- TinyGo installed (or use `--go` flag)
 
 ### Output
 
@@ -374,16 +338,10 @@ Starting dev server on http://localhost:8080
 gux init --module github.com/myuser/myapp myapp
 cd myapp
 
-# 2. Setup runtime
-gux setup              # or: gux setup --tinygo
-
-# 3. Install dependencies
-go mod tidy
-
-# 4. Generate API code (if you've defined interfaces)
+# 2. Generate API code (if you've defined interfaces)
 gux gen
 
-# 5. Start developing
+# 3. Start developing
 gux dev
 ```
 
@@ -412,16 +370,7 @@ gux build
 
 ## Troubleshooting
 
-### "wasm_exec.js not found"
-
-Run `gux setup` to copy the file from your TinyGo installation:
-
-```bash
-gux setup       # For TinyGo (default)
-gux setup --go  # For standard Go
-```
-
-### "no app/ directory found"
+### "no cmd/app/ directory found"
 
 You're not in a Gux project root. Either:
 - `cd` to your project directory
@@ -429,9 +378,14 @@ You're not in a Gux project root. Either:
 
 ### "TinyGo not found"
 
-Install TinyGo:
+Install TinyGo or use the `--go` flag:
 
 ```bash
+# Use standard Go instead
+gux dev --go
+gux build --go
+
+# Or install TinyGo:
 # macOS
 brew install tinygo
 

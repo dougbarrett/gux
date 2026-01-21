@@ -48,17 +48,13 @@ Create a new Gux application with a single command:
 gux init --module github.com/myuser/myapp myapp
 cd myapp
 
-# Setup WASM runtime
-gux setup              # or: gux setup --tinygo
-
-# Install dependencies
-go mod tidy
-
 # Start development server
 gux dev
 ```
 
 Your app is now running at http://localhost:8080
+
+> **Note:** Default files (index.html, manifest.json, service-worker.js, wasm_exec.js) are automatically injected at build time. To customize the HTML shell, create a `public/` directory with your own files.
 
 ## Project Structure
 
@@ -66,20 +62,20 @@ The `gux init` command creates a complete project structure:
 
 ```
 myapp/
-├── app/
-│   └── main.go           # WASM frontend entry point
-├── server/
-│   └── main.go           # HTTP server
-├── api/
-│   ├── types.go          # Shared data types
-│   └── example.go        # Example API interface
-├── go.mod                # Go module file
-├── index.html            # PWA entry point
-├── manifest.json         # PWA manifest
-├── offline.html          # Offline fallback page
-├── service-worker.js     # PWA service worker
-└── Dockerfile            # Multi-stage Docker build
+├── cmd/
+│   ├── app/
+│   │   └── main.go           # WASM frontend entry point
+│   └── server/
+│       └── main.go           # HTTP server
+├── internal/
+│   └── api/
+│       ├── types.go          # Shared data types
+│       └── example.go        # Example API interface
+├── go.mod                    # Go module file
+└── Dockerfile                # Multi-stage Docker build
 ```
+
+Default files (index.html, manifest.json, service-worker.js, wasm_exec.js) are injected automatically at build time. To override any of these, create a `public/` directory with your own versions.
 
 ## Building Your First App
 
@@ -410,15 +406,15 @@ gux build --tinygo
 
 ### WASM file not loading
 
-- Run `gux setup` to copy `wasm_exec.js` to your project
 - Check browser console for errors
 - Verify MIME type is set correctly (should be `application/wasm`)
+- Ensure TinyGo is installed if using the default build (or use `--go` flag)
 
 ### Build errors with TinyGo
 
 - Some standard library features aren't supported in TinyGo
 - Check [TinyGo compatibility](https://tinygo.org/docs/reference/lang-support/)
-- Use `gux build` (without `--tinygo`) for full compatibility
+- Use `gux build --go` or `gux dev --go` for full Go compatibility
 
 ### API client errors
 
@@ -426,11 +422,11 @@ gux build --tinygo
 - Check that your server is running and accessible
 - Verify CORS is enabled if running on different ports
 
-### "wasm_exec.js not found"
+### TinyGo not found
 
-Run `gux setup` to copy the runtime file:
+Install TinyGo or use the `--go` flag for standard Go builds:
 
 ```bash
-gux setup          # For standard Go
-gux setup --tinygo # For TinyGo
+gux dev --go      # Use standard Go instead of TinyGo
+gux build --go    # Build with standard Go
 ```

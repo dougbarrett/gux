@@ -9,76 +9,79 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
+
+	"github.com/dougbarrett/gux/cmd/gux/defaults"
 )
 
-func runSetup(tinygo bool) {
-	// Get the source path for wasm_exec.js
-	var srcPath string
-	var err error
+// preparePublicDir creates cmd/server/public/ with default files, wasm_exec.js,
+// and any user overrides from public/. Returns the path for cleanup.
+func preparePublicDir(tinygo bool) (string, error) {
+	serverPublic := filepath.Join("cmd", "server", "public")
 
+	// Create the directory
+	if err := os.MkdirAll(serverPublic, 0755); err != nil {
+		return "", fmt.Errorf("create server public dir: %w", err)
+	}
+
+	// Write embedded default files
+	defaultFiles := []string{"index.html", "manifest.json", "service-worker.js"}
+	for _, name := range defaultFiles {
+		content, err := defaults.Files.ReadFile(name)
+		if err != nil {
+			return "", fmt.Errorf("read embedded %s: %w", name, err)
+		}
+		destPath := filepath.Join(serverPublic, name)
+		if err := os.WriteFile(destPath, content, 0644); err != nil {
+			return "", fmt.Errorf("write %s: %w", name, err)
+		}
+	}
+
+	// Copy wasm_exec.js from TinyGo or Go installation
+	var wasmExecSrc string
 	if tinygo {
-		// TinyGo: use tinygo env TINYGOROOT
 		cmd := exec.Command("tinygo", "env", "TINYGOROOT")
 		out, err := cmd.Output()
 		if err != nil {
-			fmt.Println("Error: TinyGo not found. Install TinyGo or use 'gux setup' without --tinygo.")
-			os.Exit(1)
+			return "", fmt.Errorf("TinyGo not found - install TinyGo or use --go flag: %w", err)
 		}
-		tinygoRoot := string(out[:len(out)-1]) // trim newline
-		srcPath = filepath.Join(tinygoRoot, "targets", "wasm_exec.js")
+		tinygoRoot := strings.TrimSpace(string(out))
+		wasmExecSrc = filepath.Join(tinygoRoot, "targets", "wasm_exec.js")
 	} else {
-		// Standard Go: use go env GOROOT
 		cmd := exec.Command("go", "env", "GOROOT")
 		out, err := cmd.Output()
 		if err != nil {
-			fmt.Println("Error: Go not found")
-			os.Exit(1)
+			return "", fmt.Errorf("Go not found: %w", err)
 		}
-		goRoot := string(out[:len(out)-1]) // trim newline
-		srcPath = filepath.Join(goRoot, "lib", "wasm", "wasm_exec.js")
+		goRoot := strings.TrimSpace(string(out))
+		wasmExecSrc = filepath.Join(goRoot, "lib", "wasm", "wasm_exec.js")
 	}
 
-	// Check source exists
-	if _, err = os.Stat(srcPath); os.IsNotExist(err) {
-		fmt.Printf("Error: wasm_exec.js not found at %s\n", srcPath)
-		os.Exit(1)
+	// Check wasm_exec.js exists
+	if _, err := os.Stat(wasmExecSrc); os.IsNotExist(err) {
+		return "", fmt.Errorf("wasm_exec.js not found at %s", wasmExecSrc)
 	}
 
-	// Ensure public directory exists
-	if err = os.MkdirAll("public", 0755); err != nil {
-		fmt.Printf("Error creating public directory: %v\n", err)
-		os.Exit(1)
-	}
-
-	// Copy the file
-	src, err := os.Open(srcPath)
+	// Copy wasm_exec.js
+	wasmExecContent, err := os.ReadFile(wasmExecSrc)
 	if err != nil {
-		fmt.Printf("Error opening source: %v\n", err)
-		os.Exit(1)
+		return "", fmt.Errorf("read wasm_exec.js: %w", err)
 	}
-	defer src.Close()
-
-	dst, err := os.Create("public/wasm_exec.js")
-	if err != nil {
-		fmt.Printf("Error creating destination: %v\n", err)
-		os.Exit(1)
-	}
-	defer dst.Close()
-
-	if _, err = io.Copy(dst, src); err != nil {
-		fmt.Printf("Error copying file: %v\n", err)
-		os.Exit(1)
+	if err := os.WriteFile(filepath.Join(serverPublic, "wasm_exec.js"), wasmExecContent, 0644); err != nil {
+		return "", fmt.Errorf("write wasm_exec.js: %w", err)
 	}
 
-	compiler := "Go"
-	if tinygo {
-		compiler = "TinyGo"
+	// If user has a public/ directory, overlay its contents (allowing overrides)
+	if _, err := os.Stat("public"); err == nil {
+		if err := copyDir("public", serverPublic); err != nil {
+			return "", fmt.Errorf("copy user public/: %w", err)
+		}
 	}
-	fmt.Printf("Copied wasm_exec.js to public/ from %s installation\n", compiler)
+
+	return serverPublic, nil
 }
 
-// buildWasm builds the WASM module only (used by dev mode)
-func buildWasm(tinygo bool) {
+// buildWasm builds the WASM module to the specified output directory
+func buildWasm(tinygo bool, outputDir string) {
 	// Check we're in a gux project (has cmd/app/ directory)
 	if _, err := os.Stat("cmd/app"); os.IsNotExist(err) {
 		fmt.Println("Error: no cmd/app/ directory found")
@@ -88,13 +91,15 @@ func buildWasm(tinygo bool) {
 
 	fmt.Println("Building WASM module...")
 
+	wasmOutput := filepath.Join(outputDir, "main.wasm")
+
 	var cmd *exec.Cmd
 	if tinygo {
 		// TinyGo build (smaller output ~500KB)
-		cmd = exec.Command("tinygo", "build", "-o", "public/main.wasm", "-target", "wasm", "-no-debug", "./cmd/app")
+		cmd = exec.Command("tinygo", "build", "-o", wasmOutput, "-target", "wasm", "-no-debug", "./cmd/app")
 	} else {
 		// Standard Go build (~5MB)
-		cmd = exec.Command("go", "build", "-o", "public/main.wasm", "./cmd/app")
+		cmd = exec.Command("go", "build", "-o", wasmOutput, "./cmd/app")
 		cmd.Env = append(os.Environ(), "GOOS=js", "GOARCH=wasm")
 	}
 
@@ -107,45 +112,38 @@ func buildWasm(tinygo bool) {
 	}
 
 	// Get WASM file size for display
-	wasmInfo, err := os.Stat("public/main.wasm")
+	wasmInfo, err := os.Stat(wasmOutput)
 	if err != nil {
-		fmt.Printf("Error reading public/main.wasm: %v\n", err)
+		fmt.Printf("Error reading %s: %v\n", wasmOutput, err)
 		os.Exit(1)
 	}
 
 	// Clean up any old versioned files (from previous gux versions)
-	cleanOldWasmFiles("")
+	cleanOldWasmFiles(outputDir)
 
 	wasmSize := float64(wasmInfo.Size()) / 1024 / 1024
 	compiler := "Go"
 	if tinygo {
 		compiler = "TinyGo"
 	}
-	fmt.Printf("Built public/main.wasm (%.2f MB) with %s\n", wasmSize, compiler)
+	fmt.Printf("Built %s (%.2f MB) with %s\n", wasmOutput, wasmSize, compiler)
 }
 
 // runBuild builds the WASM and then the server binary with all assets embedded
 func runBuild(tinygo bool) {
-	// Check for wasm_exec.js
-	if _, err := os.Stat("public/wasm_exec.js"); os.IsNotExist(err) {
-		fmt.Println("Error: public/wasm_exec.js not found")
-		fmt.Println("Run 'gux setup' first to copy wasm_exec.js from your Go/TinyGo installation.")
-		os.Exit(1)
-	}
-
-	// Build the WASM first
-	buildWasm(tinygo)
-
-	// Copy public/ to cmd/server/public/ for embedding
-	// (go:embed paths are relative to the source file)
-	fmt.Println("Building server binary with embedded assets...")
-
-	serverPublic := filepath.Join("cmd", "server", "public")
-	if err := copyDir("public", serverPublic); err != nil {
-		fmt.Printf("Error copying public directory: %v\n", err)
+	// Prepare public directory with defaults, wasm_exec.js, and user overrides
+	serverPublic, err := preparePublicDir(tinygo)
+	if err != nil {
+		fmt.Printf("Error preparing public directory: %v\n", err)
 		os.Exit(1)
 	}
 	defer os.RemoveAll(serverPublic) // Clean up after build
+
+	// Build the WASM into the prepared directory
+	buildWasm(tinygo, serverPublic)
+
+	// Build server binary with embedded assets
+	fmt.Println("Building server binary with embedded assets...")
 
 	cmd := exec.Command("go", "build", "-ldflags=-s -w", "-o", "server", "./cmd/server")
 	cmd.Stdout = os.Stdout
@@ -207,9 +205,9 @@ func copyDir(src, dst string) error {
 }
 
 // cleanOldWasmFiles removes old versioned wasm files from previous gux versions.
-// These are files matching main.<hash>.wasm pattern.
-func cleanOldWasmFiles(keepFile string) {
-	entries, err := os.ReadDir("public")
+// These are files matching main.<hash>.wasm pattern in the specified directory.
+func cleanOldWasmFiles(dir string) {
+	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return
 	}
@@ -218,23 +216,13 @@ func cleanOldWasmFiles(keepFile string) {
 		name := entry.Name()
 		// Match main.<hash>.wasm pattern (not main.wasm)
 		// Versioned files have format: main.XXXXXXXX.wasm (8 char hash)
-		if name != "main.wasm" && strings.HasPrefix(name, "main.") && strings.HasSuffix(name, ".wasm") && name != keepFile {
-			os.Remove(filepath.Join("public", name))
+		if name != "main.wasm" && strings.HasPrefix(name, "main.") && strings.HasSuffix(name, ".wasm") {
+			os.Remove(filepath.Join(dir, name))
 		}
 	}
 }
 
 func runDev(port int, tinygo bool) {
-	// Check for wasm_exec.js
-	if _, err := os.Stat("public/wasm_exec.js"); os.IsNotExist(err) {
-		fmt.Println("Error: public/wasm_exec.js not found")
-		fmt.Println("Run 'gux setup' first to copy wasm_exec.js from your Go installation.")
-		os.Exit(1)
-	}
-
-	// Build WASM only (not the full binary - we'll use go run for dev)
-	buildWasm(tinygo)
-
 	// Check if cmd/server/ exists
 	serverDir := "cmd/server"
 	if _, err := os.Stat(serverDir); os.IsNotExist(err) {
@@ -242,18 +230,19 @@ func runDev(port int, tinygo bool) {
 		os.Exit(1)
 	}
 
-	// Copy public/ to cmd/server/public/ for go:embed to compile
-	// (even though dev mode uses -dir flag, the embed directive must resolve)
-	serverPublic := filepath.Join("cmd", "server", "public")
-	if err := copyDir("public", serverPublic); err != nil {
-		fmt.Printf("Error copying public directory: %v\n", err)
+	// Prepare public directory with defaults, wasm_exec.js, and user overrides
+	serverPublic, err := preparePublicDir(tinygo)
+	if err != nil {
+		fmt.Printf("Error preparing public directory: %v\n", err)
 		os.Exit(1)
 	}
+
+	// Build WASM into the prepared directory
+	buildWasm(tinygo, serverPublic)
 
 	// Cleanup function for dev artifacts
 	cleanup := func() {
 		os.RemoveAll(serverPublic)
-		os.Remove("public/main.wasm")
 	}
 
 	// Handle Ctrl+C and other termination signals
@@ -263,7 +252,7 @@ func runDev(port int, tinygo bool) {
 	fmt.Printf("\nStarting dev server on http://localhost:%d\n", port)
 
 	// Run the server with -dir flag (serves from filesystem for hot reload)
-	cmd := exec.Command("go", "run", "./cmd/server", "-port", fmt.Sprintf("%d", port), "-dir", "public")
+	cmd := exec.Command("go", "run", "./cmd/server", "-port", fmt.Sprintf("%d", port), "-dir", serverPublic)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.Dir = filepath.Dir(".")

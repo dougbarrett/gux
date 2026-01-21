@@ -1,4 +1,4 @@
-// {{.AppName}} Service Worker
+// Gux Service Worker
 // Minimal service worker for PWA compliance and offline fallback
 
 // Install: skip waiting to activate immediately

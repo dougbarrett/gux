@@ -42,19 +42,18 @@ go install github.com/dougbarrett/gux/cmd/gux@latest
 # Scaffold a new application
 gux init --module github.com/youruser/myapp myapp
 
-# Setup and run
+# Run development server
 cd myapp
-make setup    # Copy wasm_exec.js from Go installation
-go mod tidy   # Download dependencies
-make dev      # Build and run at http://localhost:8080
+gux dev       # Build and run at http://localhost:8080
 ```
 
 This creates a minimal Gux application with:
-- `app/main.go` — WASM frontend with router and layout
-- `server/main.go` — HTTP server with SPA handler
-- `api/` — Example API interface for code generation
-- `Makefile` — Build commands (setup, build, dev, clean)
-- PWA files — manifest.json, service-worker.js, offline.html
+- `cmd/app/main.go` — WASM frontend with router and layout
+- `cmd/server/main.go` — HTTP server with SPA handler
+- `internal/api/` — Example API interface for code generation
+- `Dockerfile` — Multi-stage Docker build
+
+Default files (index.html, manifest.json, service-worker.js, wasm_exec.js) are automatically injected at build time. To customize the HTML shell, create a `public/` directory with your own files.
 
 ### Generate API Code
 
@@ -70,7 +69,6 @@ This finds all `.go` files with `@client` annotations and generates type-safe HT
 
 ```bash
 cd example
-make setup-tinygo   # First time: copy wasm_exec.js
 make dev-tinygo     # Build and start server
 
 # Open http://localhost:8093

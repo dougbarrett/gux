@@ -98,6 +98,9 @@ func runInit(appName, modulePath string) {
 	}
 
 	// Define files to create from templates
+	// Note: public/ files (index.html, manifest.json, service-worker.js) are NOT created here.
+	// They are embedded in gux and injected at build time. Users can override by creating
+	// their own public/ directory with custom files.
 	filesToCreate := []struct {
 		tmplPath string
 		destPath string
@@ -107,9 +110,6 @@ func runInit(appName, modulePath string) {
 		{"templates/cmd/server/main.go.tmpl", "cmd/server/main.go"},
 		{"templates/internal/api/types.go.tmpl", "internal/api/types.go"},
 		{"templates/internal/api/example.go.tmpl", "internal/api/example.go"},
-		{"templates/public/index.html.tmpl", "public/index.html"},
-		{"templates/public/manifest.json.tmpl", "public/manifest.json"},
-		{"templates/public/service-worker.js.tmpl", "public/service-worker.js"},
 		{"templates/Dockerfile.tmpl", "Dockerfile"},
 	}
 
@@ -196,9 +196,6 @@ func checkForConflicts(targetDir string) []string {
 		"cmd/server/main.go",
 		"internal/api/types.go",
 		"internal/api/example.go",
-		"public/index.html",
-		"public/manifest.json",
-		"public/service-worker.js",
 		"Dockerfile",
 	}
 
@@ -218,12 +215,11 @@ func printNextStepsWithDir(appName string, initHere bool) {
 Created Gux application in current directory
 
 Next steps:
-  gux setup       # Copy wasm_exec.js to public/ (optional for local dev)
   gux dev         # Build and run dev server
 
 Your app will be available at http://localhost:8080
 
-Note: Docker builds don't require wasm_exec.js locally - it's copied from the TinyGo image.
+To customize the HTML shell, create public/index.html (it will override the default).
 `)
 	} else {
 		fmt.Printf(`
@@ -231,12 +227,11 @@ Created Gux application in ./%s
 
 Next steps:
   cd %s
-  gux setup       # Copy wasm_exec.js to public/ (optional for local dev)
   gux dev         # Build and run dev server
 
 Your app will be available at http://localhost:8080
 
-Note: Docker builds don't require wasm_exec.js locally - it's copied from the TinyGo image.
+To customize the HTML shell, create public/index.html (it will override the default).
 `, appName, appName)
 	}
 }

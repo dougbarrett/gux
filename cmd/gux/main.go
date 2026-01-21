@@ -61,13 +61,6 @@ func main() {
 
 		runDev(*port, !*useGo) // TinyGo is default
 
-	case "setup":
-		setupCmd := flag.NewFlagSet("setup", flag.ExitOnError)
-		useGo := setupCmd.Bool("go", false, "Copy wasm_exec.js from standard Go instead of TinyGo")
-		setupCmd.Parse(os.Args[2:])
-
-		runSetup(!*useGo) // TinyGo is default
-
 	case "claude":
 		runClaude()
 
@@ -97,7 +90,6 @@ func printUsage() {
 Usage:
     gux init [--module <module-path>] <appname>   Create a new Gux application
     gux init --module <module-path> .             Initialize in current directory
-    gux setup [--go]                              Copy wasm_exec.js to public/
     gux gen [--dir <api-dir>]                     Generate API client code
     gux build [--go]                              Build WASM and server binary
     gux dev [--port <port>] [--go]                Build and run dev server
@@ -111,8 +103,6 @@ TinyGo is the default compiler (~500KB WASM). Use --go for standard Go (~5MB).
 Examples:
     gux init --module github.com/myuser/myapp myapp   # Create new directory
     gux init --module github.com/myuser/myapp .       # Use current directory
-    gux setup                # Copy wasm_exec.js from TinyGo to public/
-    gux setup --go           # Copy wasm_exec.js from standard Go to public/
     gux build                # Build with TinyGo (~500KB WASM)
     gux build --go           # Build with standard Go (~5MB WASM)
     gux dev                  # Run dev server on :8080 (TinyGo)
@@ -125,11 +115,10 @@ The init command creates a Gux application scaffold including:
     - cmd/app/main.go       - WASM frontend entry point
     - cmd/server/main.go    - HTTP server
     - internal/api/         - Shared API definitions
-    - public/               - Static files (index.html, manifest.json, etc.)
     - Dockerfile            - Multi-stage Docker build
 
 After scaffolding, run:
-    gux setup     # Copy wasm_exec.js to public/
-    gux claude    # Install Claude Code skill (optional)
-    gux dev       # Build and run dev server`)
+    gux dev       # Build and run dev server
+
+To customize the HTML shell, create public/index.html (it will override the default).`)
 }
