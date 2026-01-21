@@ -1161,7 +1161,9 @@ components.TrendSparkline([]float64{10, 15, 12, 18, 25})
 
 ## Icon Component
 
-Heroicons-based SVG icon component with multiple sizes and variants.
+SVG icon component based on [Tabler Icons](https://tabler.io/icons) with 5,900+ icons available. Supports multiple sizes and variants.
+
+> **Backwards Compatibility:** All previous Heroicon names continue to work via automatic aliasing.
 
 ### Basic Usage
 
@@ -1211,27 +1213,13 @@ btn.Set("innerHTML", svg + " Settings")
 
 ### Available Icons
 
-**Navigation:** `home`, `menu`, `x-mark`, `chevron-left`, `chevron-right`, `chevron-up`, `chevron-down`, `arrow-left`, `arrow-right`, `arrow-up`, `arrow-down`
+Gux includes **249 outline icons** and **27 filled icons** from Tabler Icons. Browse the full collection at [tabler.io/icons](https://tabler.io/icons).
 
-**Actions:** `plus`, `minus`, `check`, `x`, `pencil`, `pencil-square`, `trash`, `search`, `cog`, `settings`
+**Common icons:** `home`, `user`, `users`, `settings`, `search`, `menu`, `x`, `check`, `plus`, `minus`, `edit`, `trash`, `mail`, `bell`, `calendar`, `clock`, `file`, `folder`, `download`, `upload`, `refresh`, `eye`, `lock`, `star`, `heart`, `bookmark`, `code`, `terminal`, `server`, `database`, `cloud`, `world`, `link`, `share`, `filter`, `sort-ascending`, `chart-bar`, `chart-line`, `chart-pie`...
 
-**User & Account:** `user`, `users`, `user-plus`, `user-circle`, `user-group`
+**Brands:** `brand-github`, `brand-google`, `brand-facebook`, `brand-twitter`, `brand-linkedin`, `brand-instagram`, `brand-youtube`, `brand-apple`, `brand-android`, `brand-windows`...
 
-**Communication:** `envelope`, `chat-bubble-left`, `chat-bubble-left-right`, `megaphone`, `paper-airplane`, `bell`, `phone`
-
-**Files & Documents:** `document`, `document-text`, `folder`, `folder-open`, `clipboard`
-
-**Media:** `photo`, `camera`, `video-camera`, `play`, `pause`, `stop`
-
-**Status & Feedback:** `check-circle`, `x-circle`, `exclamation-circle`, `information-circle`, `question-mark-circle`, `info`
-
-**Buildings & Places:** `building-office`, `building-office-2`, `building-storefront`, `building-library`, `home-modern`
-
-**Education & Work:** `academic-cap`, `briefcase`
-
-**Devices:** `device-phone-mobile`, `device-tablet`, `computer-desktop`
-
-**Misc:** `calendar`, `clock`, `globe`, `link`, `lock-closed`, `lock-open`, `key`, `star`, `heart`, `bookmark`, `tag`, `shield-check`, `fire`, `bolt`, `sparkles`, `light-bulb`, `cube`, `chart-bar`, `presentation-chart-line`, `code-bracket`, `command-line`, `server`, `database`, `cloud`, `arrow-download`, `arrow-upload`, `share`, `arrow-path`, `adjustments-horizontal`, `filter`, `funnel`, `bars-3`, `ellipsis-horizontal`, `ellipsis-vertical`, `eye`, `eye-slash`, `logout`, `login`
+> **Note:** Previous Heroicon names (e.g., `envelope`, `pencil-square`, `check-circle`, `cog`) are automatically aliased to their Tabler equivalents.
 
 **Sizes:**
 | Size | CSS Class | Pixels |
@@ -1243,8 +1231,8 @@ btn.Set("innerHTML", svg + " Settings")
 | `IconXL` | w-8 h-8 | 32px |
 
 **Variants:**
-- `IconOutline` - Stroke-based icons (default)
-- `IconSolid` - Filled icons (available for: `home`, `user`, `check-circle`, `x-circle`, `exclamation-circle`, `information-circle`, `star`, `heart`, `bell`, `cog`, `info`)
+- `IconOutline` - Stroke-based icons (default) - 249 icons
+- `IconSolid` / `IconFilled` - Filled icons - 27 icons
 
 ### Using Icons in Sidebar
 

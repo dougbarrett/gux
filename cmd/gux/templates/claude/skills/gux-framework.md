@@ -585,28 +585,25 @@ components.BarSparkline([]float64{10, 25, 15, 30})
 
 ### Icon Component
 
-Heroicons-based SVG icons with multiple sizes and variants:
+[Tabler Icons](https://tabler.io/icons) based SVG icons with 5,900+ icons available:
 
 ```go
 // Create an icon element
 icon := components.Icon(components.IconProps{
     Name:    "home",
     Size:    components.IconMD,      // IconXS(12px), IconSM(16px), IconMD(20px), IconLG(24px), IconXL(32px)
-    Variant: components.IconOutline, // IconOutline (default) or IconSolid
+    Variant: components.IconOutline, // IconOutline (default) or IconSolid/IconFilled
 })
 
 // Get raw SVG string (for innerHTML)
 svg := components.IconSVG("settings", components.IconOutline)
 ```
 
-**Available icons:**
-- Navigation: `home`, `menu`, `x-mark`, `chevron-left/right/up/down`, `arrow-left/right/up/down`
-- Actions: `plus`, `minus`, `check`, `x`, `pencil`, `trash`, `search`, `cog`, `settings`
-- Users: `user`, `users`, `user-plus`, `user-circle`
-- Status: `check-circle`, `x-circle`, `exclamation-circle`, `information-circle`, `exclamation-triangle`
-- Data: `chart-bar`, `chart-pie`, `table-cells`
-- Files: `document`, `document-text`, `folder`, `folder-open`, `clipboard`
-- General: `heart`, `star`, `bookmark`, `clock`, `calendar`, `eye`, `lock-closed`, `key`, `bell`, `envelope`, `info`
+**Common icons:** `home`, `user`, `users`, `settings`, `search`, `menu`, `x`, `check`, `plus`, `minus`, `edit`, `trash`, `mail`, `bell`, `calendar`, `clock`, `file`, `folder`, `download`, `upload`, `eye`, `lock`, `star`, `heart`, `code`, `terminal`, `server`, `database`, `cloud`...
+
+**Brands:** `brand-github`, `brand-google`, `brand-facebook`, `brand-twitter`, `brand-linkedin`...
+
+> Previous Heroicon names (e.g., `envelope`, `cog`, `check-circle`) are automatically aliased.
 
 **Using icons in Sidebar:**
 ```go
