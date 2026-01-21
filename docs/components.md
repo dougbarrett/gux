@@ -974,6 +974,9 @@ router.Navigate("/posts")
 
 // Get current path
 currentPath := router.CurrentPath()
+
+// Get route parameters (for parameterized routes like /posts/:id)
+params := components.GetRouteParams() // map[string]string{"id": "123"}
 ```
 
 ### Link

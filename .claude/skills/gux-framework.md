@@ -547,6 +547,9 @@ router.Start()
 router.Navigate("/posts")
 currentPath := router.CurrentPath()
 
+// Get route parameters (for parameterized routes like /posts/:id)
+params := components.GetRouteParams() // map[string]string{"id": "123"}
+
 // Link
 link := components.Link(components.LinkProps{
     Path: "/posts",
