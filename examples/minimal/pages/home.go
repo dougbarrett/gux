@@ -8,17 +8,17 @@ import (
 
 //gux:page /
 func (r *Router) Home() func() Node {
-	// Loader code would go here (runs on server)
-	// For this example, no server data needed
+	// Loader (runs on server)
+	message := "Hello World"
 
 	// Component (reactive, runs on client)
 	return func() Node {
-		count := r.State("count", 0)
+		count := r.StateInt("count", 0)
 
 		return Div(Class("min-h-screen bg-gray-100 flex items-center justify-center"),
 			Div(Class("bg-white rounded-lg shadow-lg p-8 text-center"),
 				H1(Class("text-3xl font-bold mb-6"),
-					Text("Hello World"),
+					Text(message),
 				),
 				Div(Class("flex items-center justify-center gap-4"),
 					Span(Class("text-4xl font-mono"),

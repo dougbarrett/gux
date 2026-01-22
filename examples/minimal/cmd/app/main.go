@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/dougbarrett/gux/core"
 	"github.com/dougbarrett/gux/examples/minimal/pages"
 )
 
@@ -18,24 +17,21 @@ var wasmExecJS []byte
 func main() {
 	mux := http.NewServeMux()
 
+	// Serve WASM binary
 	mux.HandleFunc("/app.wasm", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/wasm")
 		w.Write(wasmBinary)
 	})
 
+	// Serve wasm_exec.js
 	mux.HandleFunc("/wasm_exec.js", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/javascript")
 		w.Write(wasmExecJS)
 	})
 
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		// SSR: router with no rerender (static)
-		router := pages.NewRouter(nil)
-		component := router.Home()
-		html := component().Render(core.HTML()).HTML()
-
-		w.Header().Set("Content-Type", "text/html")
-		fmt.Fprintf(w, `<!DOCTYPE html>
+	// Register page routes using generated code
+	pages.RegisterRoutes(mux, func(content string) string {
+		return fmt.Sprintf(`<!DOCTYPE html>
 <html>
 <head>
     <title>Gux</title>
@@ -50,7 +46,7 @@ func main() {
             .then(result => go.run(result.instance));
     </script>
 </body>
-</html>`, html)
+</html>`, content)
 	})
 
 	fmt.Println("http://localhost:8081")

@@ -46,6 +46,13 @@ func main() {
 
 		runGenerate(*apiDir)
 
+	case "pages":
+		pagesCmd := flag.NewFlagSet("pages", flag.ExitOnError)
+		pagesDir := pagesCmd.String("dir", "pages", "Directory containing page files")
+		pagesCmd.Parse(os.Args[2:])
+
+		runPages(*pagesDir)
+
 	case "build":
 		buildCmd := flag.NewFlagSet("build", flag.ExitOnError)
 		useGo := buildCmd.Bool("go", false, "Use standard Go instead of TinyGo (~5MB vs ~500KB)")
