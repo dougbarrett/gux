@@ -84,7 +84,11 @@ Full details: [milestones/v1.2-ROADMAP.md](milestones/v1.2-ROADMAP.md)
   - [x] 17-01-PLAN.md - Input and FormField components
   - [x] 17-02-PLAN.md - Textarea and Select components
   - [x] 17-03-PLAN.md - Checkbox, RadioGroup, and Switch components
-- [ ] Phase 18: Data Display Components - Table, DataTable[T], Badge, Avatar, Pagination
+- [ ] Phase 18: Data Display Components (3 plans) - Badge, Avatar, Table, List, Pagination, DataTable[T]
+  Plans:
+  - [ ] 18-01-PLAN.md - Badge and Avatar components
+  - [ ] 18-02-PLAN.md - Table compound and List components
+  - [ ] 18-03-PLAN.md - Pagination and DataTable[T] generic component
 - [ ] Phase 19: Interactive Components - Modal, Dropdown, Tabs, Toast, Tooltip
 - [ ] Phase 20: Auth Example - Login, Register, Password Reset, Verification
 - [ ] Phase 21: Marketing Example - Home, Features, Pricing, About, Contact
@@ -119,7 +123,7 @@ Phases execute in numeric order: 1 -> 2 -> ... -> 15 -> 16 -> ... -> 23
 | 15. Accessibility Guide | v1.2 | 1/1 | Complete | 2026-01-15 |
 | 16. Component Foundation | v2.0 | 3/3 | Complete | 2026-01-22 |
 | 17. Form Components | v2.0 | 3/3 | Complete | 2026-01-22 |
-| 18. Data Display Components | v2.0 | - | Pending | - |
+| 18. Data Display Components | v2.0 | 3 | Planned | - |
 | 19. Interactive Components | v2.0 | - | Pending | - |
 | 20. Auth Example | v2.0 | - | Pending | - |
 | 21. Marketing Example | v2.0 | - | Pending | - |
