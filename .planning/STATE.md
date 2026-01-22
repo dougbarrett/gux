@@ -3,11 +3,11 @@
 ## Current Position
 
 Phase: 17 — Form Components
-Plan: 2/3 complete
-Status: In progress
-Last activity: 2026-01-22 — Completed 17-02-PLAN.md (Textarea and Select)
+Plan: 3/3 complete
+Status: Complete
+Last activity: 2026-01-22 — Completed 17-03-PLAN.md (Checkbox, RadioGroup, Switch)
 
-Progress: ████████░░ ~85% of Phase 17
+Progress: ██████████ 100% of Phase 17
 
 ## Project Reference
 
@@ -22,7 +22,7 @@ See: .planning/PROJECT.md (updated 2026-01-22)
 
 **Phases:**
 - [x] Phase 16: Component Foundation — utilities, Button, Card, layout primitives (Complete 2026-01-22)
-- [ ] Phase 17: Form Components — Input, Textarea, Select, Checkbox, Radio
+- [x] Phase 17: Form Components — Input, Textarea, Select, Checkbox, Radio (Complete 2026-01-22)
 - [ ] Phase 18: Data Display — Table, DataTable[T], Badge, Avatar, Pagination
 - [ ] Phase 19: Interactive — Modal, Dropdown, Tabs, Toast, Tooltip
 - [ ] Phase 20: Auth Example — Login, Register, Password Reset
@@ -65,6 +65,10 @@ Full decision log preserved in milestone archives:
 - Textarea value renders as child text node (not value attr) for SSR
 - Select placeholder is disabled option at index 0, selected when Value is empty
 - Select uses appearance-none + pr-10 for custom dropdown styling
+- Boolean attributes use presence-based pattern (checked="checked" only when true)
+- Switch uses hidden checkbox + visual spans for form submission and accessibility
+- RadioGroup uses role="radiogroup" wrapper with individual radio inputs
+- All boolean controls share disabled styling pattern (opacity-50, cursor-not-allowed)
 
 ### Research Findings
 
@@ -93,9 +97,9 @@ None
 ## Session Continuity
 
 Last session: 2026-01-22
-Stopped at: Completed 17-02-PLAN.md (Textarea and Select components)
+Stopped at: Phase 17 complete, ready for Phase 18
 Resume file: None
 
 ---
 
-*Last updated: 2026-01-22 after 17-02 execution*
+*Last updated: 2026-01-22 after 17-03 execution*
