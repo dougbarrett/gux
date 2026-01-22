@@ -3,11 +3,11 @@
 ## Current Position
 
 Phase: 20 — Auth Example (IN PROGRESS)
-Plan: 2/5 complete
+Plan: 4/5 complete
 Status: In progress
-Last activity: 2026-01-22 — Completed 20-02-PLAN.md (Auth example foundation)
+Last activity: 2026-01-22 — Completed 20-04-PLAN.md (Password reset flow)
 
-Progress: ██░░░░░░░░ 40% of Phase 20
+Progress: ████████░░ 80% of Phase 20
 
 ## Project Reference
 
@@ -137,6 +137,13 @@ Full decision log preserved in milestone archives:
 - AuthLayout: centered full-height container with max-w-md card area
 - PageLayout: Nav header with max-w-7xl content area
 
+**Phase 20 decisions (20-04):**
+- Security message: "If an account exists for..." to not reveal if email exists
+- Demo mode with direct link to reset page for testing
+- Token validation in OnLoad before render
+- 8 character minimum password length
+- Demo tokens "expired" and "invalid" for testing error states
+
 ### Research Findings
 
 Research completed 2026-01-22. Key findings:
@@ -164,9 +171,9 @@ None
 ## Session Continuity
 
 Last session: 2026-01-22
-Stopped at: Completed 20-02-PLAN.md (Auth example foundation)
+Stopped at: Completed 20-04-PLAN.md (Password reset flow)
 Resume file: None
 
 ---
 
-*Last updated: 2026-01-22 after 20-02 execution*
+*Last updated: 2026-01-22 after 20-04 execution*
