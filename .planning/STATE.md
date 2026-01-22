@@ -137,6 +137,11 @@ Full decision log preserved in milestone archives:
 - AuthLayout: centered full-height container with max-w-md card area
 - PageLayout: Nav header with max-w-7xl content area
 
+**Phase 20 decisions (20-03):**
+- Checkbox toggle uses wrapper div OnClick since core.Attrs.OnChange is string-based
+- Field-level error state for each form field for inline validation display
+- featureCard helper function for DRY feature grid in Home page
+
 **Phase 20 decisions (20-04):**
 - Security message: "If an account exists for..." to not reveal if email exists
 - Demo mode with direct link to reset page for testing
