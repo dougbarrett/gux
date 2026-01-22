@@ -53,6 +53,75 @@ type PageRoute struct {
 	IsHybrid bool
 }
 
+// CRUDModel represents a registered CRUD model
+type CRUDModel struct {
+	Name       string // e.g., "Counter"
+	PluralName string // e.g., "Counters"
+	Path       string // e.g., "counters"
+}
+
+// parseCRUDModels parses the main app file to find CRUD model registrations
+func parseCRUDModels(filename string) ([]CRUDModel, string, error) {
+	fset := token.NewFileSet()
+	node, err := parser.ParseFile(fset, filename, nil, parser.ParseComments)
+	if err != nil {
+		return nil, "", fmt.Errorf("parse %s: %w", filename, err)
+	}
+
+	var models []CRUDModel
+	var modelsImport string
+
+	// Find models import
+	for _, imp := range node.Imports {
+		path := strings.Trim(imp.Path.Value, `"`)
+		if strings.HasSuffix(path, "/models") || strings.Contains(path, "/models") {
+			modelsImport = path
+			break
+		}
+	}
+
+	// Find app.CRUD() calls
+	ast.Inspect(node, func(n ast.Node) bool {
+		call, ok := n.(*ast.CallExpr)
+		if !ok {
+			return true
+		}
+
+		// Look for .CRUD( calls
+		sel, ok := call.Fun.(*ast.SelectorExpr)
+		if !ok || sel.Sel.Name != "CRUD" {
+			return true
+		}
+
+		if len(call.Args) >= 1 {
+			// Get model name from first argument: models.Counter{}
+			switch arg := call.Args[0].(type) {
+			case *ast.CompositeLit:
+				// models.Counter{}
+				if sel, ok := arg.Type.(*ast.SelectorExpr); ok {
+					name := sel.Sel.Name
+					models = append(models, CRUDModel{
+						Name:       name,
+						PluralName: name + "s",
+						Path:       strings.ToLower(name) + "s",
+					})
+				}
+			case *ast.SelectorExpr:
+				// models.Counter
+				name := arg.Sel.Name
+				models = append(models, CRUDModel{
+					Name:       name,
+					PluralName: name + "s",
+					Path:       strings.ToLower(name) + "s",
+				})
+			}
+		}
+		return true
+	})
+
+	return models, modelsImport, nil
+}
+
 // parseRoutes parses the main app file to find Hybrid routes
 func parseRoutes(filename string) ([]PageRoute, string, error) {
 	fset := token.NewFileSet()
@@ -160,11 +229,50 @@ func generateWasmEntryPoint(modulePath, pagesImport string, routes []PageRoute) 
 package main
 
 import (
+	"encoding/json"
 	"syscall/js"
 
 	"github.com/dougbarrett/gux/core"
 	"%s"
 )
+
+// fetchLoader fetches page state from loader endpoint
+func fetchLoader(path string, callback func(map[string]any)) {
+	loaderPath := "/__gux_api/pages" + path
+	if path == "/" {
+		loaderPath = "/__gux_api/pages/index"
+	}
+
+	promise := js.Global().Call("fetch", loaderPath)
+	promise.Call("then", js.FuncOf(func(this js.Value, args []js.Value) any {
+		resp := args[0]
+		if resp.Get("ok").Bool() {
+			resp.Call("json").Call("then", js.FuncOf(func(this js.Value, args []js.Value) any {
+				// Convert JS object to Go map
+				state := make(map[string]any)
+				jsObj := args[0]
+				keys := js.Global().Get("Object").Call("keys", jsObj)
+				for i := 0; i < keys.Get("length").Int(); i++ {
+					key := keys.Index(i).String()
+					val := jsObj.Get(key)
+					switch val.Type() {
+					case js.TypeNumber:
+						state[key] = val.Float()
+					case js.TypeBoolean:
+						state[key] = val.Bool()
+					case js.TypeString:
+						state[key] = val.String()
+					}
+				}
+				callback(state)
+				return nil
+			}))
+		} else {
+			callback(nil)
+		}
+		return nil
+	}))
+}
 
 func main() {
 	document := js.Global().Get("document")
@@ -202,14 +310,29 @@ func main() {
 		}
 	}
 
-	// Navigate function updates URL and re-renders
+	// Navigate fetches page data then renders
 	navigate := func(path string) {
 		window.Get("history").Call("pushState", nil, "", path)
-		render()
+		fetchLoader(path, func(state map[string]any) {
+			if state != nil {
+				router.Hydrate(state)
+			}
+			render()
+		})
 	}
 
 	router = core.NewRouter(render)
 	router.SetNavigate(navigate)
+
+	// Hydrate state from SSR
+	stateEl := document.Call("getElementById", "__gux_state")
+	if !stateEl.IsNull() && !stateEl.IsUndefined() {
+		stateJSON := stateEl.Get("textContent").String()
+		var state map[string]any
+		if err := json.Unmarshal([]byte(stateJSON), &state); err == nil {
+			router.Hydrate(state)
+		}
+	}
 
 	// Handle browser back/forward
 	window.Call("addEventListener", "popstate", js.FuncOf(func(this js.Value, args []js.Value) any {
@@ -224,6 +347,387 @@ func main() {
 `, pagesImport, routeCode.String())
 
 	return os.WriteFile(".gux/wasm/main.go", []byte(code), 0644)
+}
+
+// generateAPIClient generates .gux/api/client.go with WASM-compatible DTOs
+func generateAPIClient(modelsImport string, models []CRUDModel) error {
+	if len(models) == 0 {
+		return nil // No CRUD models, skip API client generation
+	}
+
+	if err := os.MkdirAll(".gux/api", 0755); err != nil {
+		return err
+	}
+
+	// Generate DTO structs (WASM-compatible, no gorm dependency)
+	var dtoCode strings.Builder
+	for _, m := range models {
+		dtoCode.WriteString(fmt.Sprintf(`
+// %s is a WASM-compatible DTO for %s.
+type %s struct {
+	ID        uint   `+"`json:\"ID\"`"+`
+	CreatedAt string `+"`json:\"CreatedAt,omitempty\"`"+`
+	UpdatedAt string `+"`json:\"UpdatedAt,omitempty\"`"+`
+	Name      string `+"`json:\"name,omitempty\"`"+`
+	Value     int    `+"`json:\"value\"`"+`
+}
+`, m.Name, m.Name, m.Name))
+	}
+
+	// Generate model-specific API code
+	var modelCode strings.Builder
+	for _, m := range models {
+		modelCode.WriteString(fmt.Sprintf(`
+// %sAPI provides CRUD operations for %s.
+type %sAPI struct {
+	baseURL string
+}
+
+// %s is the API client for %s operations.
+var %s = &%sAPI{baseURL: "/__gux_api/crud/%s"}
+
+// List returns all %s records.
+func (a *%sAPI) List(callback func([]%s, error)) {
+	go func() {
+		resp, err := fetch("GET", a.baseURL, nil)
+		if err != nil {
+			callback(nil, err)
+			return
+		}
+		var items []%s
+		if err := json.Unmarshal(resp, &items); err != nil {
+			callback(nil, err)
+			return
+		}
+		callback(items, nil)
+	}()
+}
+
+// Get returns a single %s by ID.
+func (a *%sAPI) Get(id uint, callback func(*%s, error)) {
+	go func() {
+		resp, err := fetch("GET", fmt.Sprintf("%%s/%%d", a.baseURL, id), nil)
+		if err != nil {
+			callback(nil, err)
+			return
+		}
+		var item %s
+		if err := json.Unmarshal(resp, &item); err != nil {
+			callback(nil, err)
+			return
+		}
+		callback(&item, nil)
+	}()
+}
+
+// Create creates a new %s.
+func (a *%sAPI) Create(item *%s, callback func(*%s, error)) {
+	go func() {
+		body, _ := json.Marshal(item)
+		resp, err := fetch("POST", a.baseURL, body)
+		if err != nil {
+			callback(nil, err)
+			return
+		}
+		var result %s
+		if err := json.Unmarshal(resp, &result); err != nil {
+			callback(nil, err)
+			return
+		}
+		callback(&result, nil)
+	}()
+}
+
+// Update updates an existing %s.
+func (a *%sAPI) Update(item *%s, callback func(*%s, error)) {
+	go func() {
+		body, _ := json.Marshal(item)
+		resp, err := fetch("PUT", fmt.Sprintf("%%s/%%d", a.baseURL, item.ID), body)
+		if err != nil {
+			callback(nil, err)
+			return
+		}
+		var result %s
+		if err := json.Unmarshal(resp, &result); err != nil {
+			callback(nil, err)
+			return
+		}
+		callback(&result, nil)
+	}()
+}
+
+// Delete deletes a %s by ID.
+func (a *%sAPI) Delete(id uint, callback func(error)) {
+	go func() {
+		_, err := fetch("DELETE", fmt.Sprintf("%%s/%%d", a.baseURL, id), nil)
+		callback(err)
+	}()
+}
+`,
+			m.PluralName, m.Name,               // type comment
+			m.PluralName,                       // type name
+			m.PluralName, m.Name,               // var comment
+			m.PluralName, m.PluralName, m.Path, // var declaration
+			m.Name,                             // List comment
+			m.PluralName, m.Name,               // List signature
+			m.Name,                             // List body
+			m.Name,                             // Get comment
+			m.PluralName, m.Name,               // Get signature
+			m.Name,                             // Get body
+			m.Name,                             // Create comment
+			m.PluralName, m.Name, m.Name,       // Create signature
+			m.Name,                             // Create body
+			m.Name,                             // Update comment
+			m.PluralName, m.Name, m.Name,       // Update signature
+			m.Name,                             // Update body
+			m.Name,                             // Delete comment
+			m.PluralName,                       // Delete signature
+		))
+	}
+
+	// Note: modelsImport is unused since we generate our own DTOs
+	_ = modelsImport
+
+	code := fmt.Sprintf(`//go:build js && wasm
+
+// Code generated by gux; DO NOT EDIT.
+package api
+
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"syscall/js"
+)
+
+// Init is a no-op in WASM (database not available).
+func Init(db interface{}) {}
+
+// fetch makes an HTTP request and returns the response body.
+func fetch(method, url string, body []byte) ([]byte, error) {
+	done := make(chan struct{})
+	var result []byte
+	var fetchErr error
+
+	// Create JS object for headers
+	jsOpts := js.Global().Get("Object").New()
+	jsOpts.Set("method", method)
+	headers := js.Global().Get("Object").New()
+	headers.Set("Content-Type", "application/json")
+	jsOpts.Set("headers", headers)
+	if body != nil {
+		jsOpts.Set("body", string(body))
+	}
+
+	// Call fetch
+	promise := js.Global().Call("fetch", url, jsOpts)
+
+	// Handle response
+	var thenFunc, catchFunc js.Func
+	thenFunc = js.FuncOf(func(this js.Value, args []js.Value) interface{} {
+		resp := args[0]
+		if !resp.Get("ok").Bool() {
+			fetchErr = errors.New("request failed: " + resp.Get("statusText").String())
+			close(done)
+			return nil
+		}
+		// Get response text
+		resp.Call("text").Call("then", js.FuncOf(func(this js.Value, args []js.Value) interface{} {
+			result = []byte(args[0].String())
+			close(done)
+			return nil
+		}))
+		return nil
+	})
+	catchFunc = js.FuncOf(func(this js.Value, args []js.Value) interface{} {
+		fetchErr = errors.New("fetch error: " + args[0].Get("message").String())
+		close(done)
+		return nil
+	})
+
+	promise.Call("then", thenFunc).Call("catch", catchFunc)
+
+	<-done
+	return result, fetchErr
+}
+%s%s
+`, dtoCode.String(), modelCode.String())
+
+	if err := os.WriteFile(".gux/api/client.go", []byte(code), 0644); err != nil {
+		return err
+	}
+
+	// Generate server-side implementation (real DB queries)
+	var stubDtoCode strings.Builder
+	for _, m := range models {
+		stubDtoCode.WriteString(fmt.Sprintf(`
+// %s is the API DTO for %s.
+type %s struct {
+	ID        uint   `+"`json:\"ID\"`"+`
+	CreatedAt string `+"`json:\"CreatedAt,omitempty\"`"+`
+	UpdatedAt string `+"`json:\"UpdatedAt,omitempty\"`"+`
+	Name      string `+"`json:\"name,omitempty\"`"+`
+	Value     int    `+"`json:\"value\"`"+`
+}
+`, m.Name, m.Name, m.Name))
+	}
+
+	var stubCode strings.Builder
+	for _, m := range models {
+		stubCode.WriteString(fmt.Sprintf(`
+// %sAPI provides CRUD operations for %s.
+type %sAPI struct{}
+
+// %s is the API client for %s operations.
+var %s = &%sAPI{}
+
+// List returns all %s records.
+func (a *%sAPI) List(callback func([]%s, error)) {
+	if db == nil {
+		callback(nil, nil)
+		return
+	}
+	var items []models.%s
+	if err := db.Find(&items).Error; err != nil {
+		callback(nil, err)
+		return
+	}
+	// Convert to DTOs
+	result := make([]%s, len(items))
+	for i, item := range items {
+		result[i] = %s{
+			ID:    item.ID,
+			Name:  item.Name,
+			Value: item.Value,
+		}
+	}
+	callback(result, nil)
+}
+
+// Get returns a single %s by ID.
+func (a *%sAPI) Get(id uint, callback func(*%s, error)) {
+	if db == nil {
+		callback(nil, nil)
+		return
+	}
+	var item models.%s
+	if err := db.First(&item, id).Error; err != nil {
+		callback(nil, err)
+		return
+	}
+	result := &%s{
+		ID:    item.ID,
+		Name:  item.Name,
+		Value: item.Value,
+	}
+	callback(result, nil)
+}
+
+// Create creates a new %s.
+func (a *%sAPI) Create(item *%s, callback func(*%s, error)) {
+	if db == nil {
+		callback(nil, nil)
+		return
+	}
+	model := models.%s{
+		Name:  item.Name,
+		Value: item.Value,
+	}
+	if err := db.Create(&model).Error; err != nil {
+		callback(nil, err)
+		return
+	}
+	result := &%s{
+		ID:    model.ID,
+		Name:  model.Name,
+		Value: model.Value,
+	}
+	callback(result, nil)
+}
+
+// Update updates an existing %s.
+func (a *%sAPI) Update(item *%s, callback func(*%s, error)) {
+	if db == nil {
+		callback(nil, nil)
+		return
+	}
+	var model models.%s
+	if err := db.First(&model, item.ID).Error; err != nil {
+		callback(nil, err)
+		return
+	}
+	model.Name = item.Name
+	model.Value = item.Value
+	if err := db.Save(&model).Error; err != nil {
+		callback(nil, err)
+		return
+	}
+	result := &%s{
+		ID:    model.ID,
+		Name:  model.Name,
+		Value: model.Value,
+	}
+	callback(result, nil)
+}
+
+// Delete deletes a %s by ID.
+func (a *%sAPI) Delete(id uint, callback func(error)) {
+	if db == nil {
+		callback(nil)
+		return
+	}
+	callback(db.Delete(&models.%s{}, id).Error)
+}
+`,
+			m.PluralName, m.Name,       // type comment
+			m.PluralName,               // type name
+			m.PluralName, m.Name,       // var comment
+			m.PluralName, m.PluralName, // var declaration
+			m.Name,                     // List comment
+			m.PluralName, m.Name,       // List signature
+			m.Name,                     // List query
+			m.Name, m.Name,             // List convert
+			m.Name,                     // Get comment
+			m.PluralName, m.Name,       // Get signature
+			m.Name,                     // Get query
+			m.Name,                     // Get result
+			m.Name,                     // Create comment
+			m.PluralName, m.Name, m.Name, // Create signature
+			m.Name,                     // Create model
+			m.Name,                     // Create result
+			m.Name,                     // Update comment
+			m.PluralName, m.Name, m.Name, // Update signature
+			m.Name,                     // Update query
+			m.Name,                     // Update result
+			m.Name,                     // Delete comment
+			m.PluralName,               // Delete signature
+			m.Name,                     // Delete model
+		))
+	}
+
+	stubFile := fmt.Sprintf(`//go:build !js || !wasm
+
+// Code generated by gux; DO NOT EDIT.
+// Server-side implementation - queries database directly.
+package api
+
+import (
+	"gorm.io/gorm"
+
+	"%s"
+)
+
+var db *gorm.DB
+
+// Init initializes the API with a database connection.
+// Called automatically by the gux framework.
+func Init(database *gorm.DB) {
+	db = database
+}
+%s%s
+`, modelsImport, stubDtoCode.String(), stubCode.String())
+
+	return os.WriteFile(".gux/api/client_server.go", []byte(stubFile), 0644)
 }
 
 // generateAssetsFile generates assets_gen.go
@@ -243,8 +747,11 @@ var wasmBinary []byte
 //go:embed .gux/dist/wasm_exec.js
 var wasmExecJS []byte
 
+//go:embed .gux/dist/styles.css
+var stylesCSS []byte
+
 func init() {
-	core.SetDefaultAssets(wasmBinary, wasmExecJS)
+	core.SetDefaultAssets(wasmBinary, wasmExecJS, stylesCSS)
 }
 `)
 	return os.WriteFile("assets_gen.go", []byte(code), 0644)
@@ -319,6 +826,70 @@ func copyWasmExec(tinygo bool) error {
 	return os.WriteFile(".gux/dist/wasm_exec.js", data, 0644)
 }
 
+// generateTailwindConfig generates Tailwind config files in .gux/
+func generateTailwindConfig() error {
+	if err := os.MkdirAll(".gux/styles", 0755); err != nil {
+		return err
+	}
+
+	// Generate input.css for Tailwind v4+
+	// Uses @source directive to scan Go files for class names
+	inputCSS := `@import "tailwindcss";
+
+/* Scan Go files for Tailwind classes */
+@source "./pages/**/*.go";
+@source "./components/**/*.go";
+@source "./*.go";
+`
+	return os.WriteFile(".gux/styles/input.css", []byte(inputCSS), 0644)
+}
+
+// buildTailwind builds Tailwind CSS using the CLI
+func buildTailwind() error {
+	fmt.Println("Building Tailwind CSS...")
+
+	// Generate config files
+	if err := generateTailwindConfig(); err != nil {
+		return fmt.Errorf("failed to generate Tailwind config: %w", err)
+	}
+
+	if err := os.MkdirAll(".gux/dist", 0755); err != nil {
+		return err
+	}
+
+	// Try npx first, fall back to global tailwindcss
+	// Tailwind v4 doesn't need -c config flag, uses CSS directives
+	cmd := exec.Command("npx", "tailwindcss",
+		"-i", ".gux/styles/input.css",
+		"-o", ".gux/dist/styles.css",
+		"--minify")
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	if err := cmd.Run(); err != nil {
+		// Try global tailwindcss
+		cmd = exec.Command("tailwindcss",
+			"-i", ".gux/styles/input.css",
+			"-o", ".gux/dist/styles.css",
+			"--minify")
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		if err := cmd.Run(); err != nil {
+			return fmt.Errorf("Tailwind CSS build failed (install with: npm install -D tailwindcss): %w", err)
+		}
+	}
+
+	// Get size for display
+	info, err := os.Stat(".gux/dist/styles.css")
+	if err != nil {
+		return err
+	}
+	sizeKB := float64(info.Size()) / 1024
+	fmt.Printf("Built .gux/dist/styles.css (%.2f KB)\n", sizeKB)
+
+	return nil
+}
+
 // buildBinary builds the final server binary
 func buildBinary() error {
 	fmt.Println("Building binary...")
@@ -378,6 +949,32 @@ func runBuildNew(tinygo bool) {
 		pagesImport = pkgPath + "/pages"
 	}
 
+	// Parse CRUD models from app file
+	crudModels, modelsImport, err := parseCRUDModels(appFile)
+	if err != nil {
+		fmt.Printf("Error parsing CRUD models: %v\n", err)
+		os.Exit(1)
+	}
+
+	// If no models import found, construct it from current package path
+	if modelsImport == "" && len(crudModels) > 0 {
+		pkgPath, err := getCurrentPackagePath()
+		if err != nil {
+			fmt.Printf("Error getting package path: %v\n", err)
+			os.Exit(1)
+		}
+		modelsImport = pkgPath + "/models"
+	}
+
+	// Generate API client if there are CRUD models
+	if len(crudModels) > 0 {
+		fmt.Println("Generating API client...")
+		if err := generateAPIClient(modelsImport, crudModels); err != nil {
+			fmt.Printf("Error generating API client: %v\n", err)
+			os.Exit(1)
+		}
+	}
+
 	// Generate WASM entry point
 	fmt.Println("Generating WASM entry point...")
 	if err := generateWasmEntryPoint(modulePath, pagesImport, routes); err != nil {
@@ -393,6 +990,12 @@ func runBuildNew(tinygo bool) {
 
 	// Build WASM
 	if err := buildWasmNew(tinygo); err != nil {
+		fmt.Printf("Error: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Build Tailwind CSS
+	if err := buildTailwind(); err != nil {
 		fmt.Printf("Error: %v\n", err)
 		os.Exit(1)
 	}

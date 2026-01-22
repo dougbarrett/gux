@@ -1,6 +1,7 @@
 package core
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 )
@@ -23,18 +24,23 @@ type App struct {
 	apiPrefix  string
 	wasmBinary []byte
 	wasmExecJS []byte
+	stylesCSS  []byte
 	title      string
+	db         interface{}   // Database connection (e.g., *gorm.DB)
+	crudModels []CRUDModel   // Registered CRUD models
 }
 
 // Default assets (set by generated code)
 var defaultWasmBinary []byte
 var defaultWasmExecJS []byte
+var defaultStylesCSS []byte
 
-// SetDefaultAssets sets the default WASM assets.
+// SetDefaultAssets sets the default WASM and CSS assets.
 // Called by generated assets_gen.go in init().
-func SetDefaultAssets(wasmBinary, wasmExecJS []byte) {
+func SetDefaultAssets(wasmBinary, wasmExecJS, stylesCSS []byte) {
 	defaultWasmBinary = wasmBinary
 	defaultWasmExecJS = wasmExecJS
+	defaultStylesCSS = stylesCSS
 }
 
 // New creates a new App instance.
@@ -44,6 +50,7 @@ func New() *App {
 		title:      "Gux App",
 		wasmBinary: defaultWasmBinary,
 		wasmExecJS: defaultWasmExecJS,
+		stylesCSS:  defaultStylesCSS,
 	}
 }
 
@@ -106,6 +113,9 @@ func (rb *RouteBuilder) Hybrid(path string, handler PageFunc) *RouteBuilder {
 func (a *App) Run(addr string) error {
 	mux := http.NewServeMux()
 
+	// Register CRUD handlers
+	a.registerCRUDHandlers(mux)
+
 	// Serve WASM binary (if assets are set)
 	if len(a.wasmBinary) > 0 {
 		mux.HandleFunc("/app.wasm", func(w http.ResponseWriter, r *http.Request) {
@@ -122,27 +132,57 @@ func (a *App) Run(addr string) error {
 		})
 	}
 
+	// Serve styles.css (if assets are set)
+	if len(a.stylesCSS) > 0 {
+		mux.HandleFunc("/styles.css", func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "text/css")
+			w.Write(a.stylesCSS)
+		})
+	}
+
+	// Register page loader endpoints (for client-side navigation)
+	for _, route := range a.routes {
+		if route.Hybrid {
+			handler := route.Handler
+			loaderPath := a.apiPrefix + "/pages" + route.Path
+			if route.Path == "/" {
+				loaderPath = a.apiPrefix + "/pages/index"
+			}
+			mux.HandleFunc(loaderPath, func(w http.ResponseWriter, r *http.Request) {
+				router := NewRouterWithDB(a.db)
+				component := handler(router) // Run loader
+				component()                  // Run component to populate state
+				w.Header().Set("Content-Type", "application/json")
+				json.NewEncoder(w).Encode(router.state)
+			})
+		}
+	}
+
 	// Register page routes
 	for _, route := range a.routes {
 		handler := route.Handler
 		hybrid := route.Hybrid
 		mux.HandleFunc(route.Path, func(w http.ResponseWriter, r *http.Request) {
-			router := NewRouter(nil)
+			router := NewRouterWithDB(a.db)
 			component := handler(router)
 			html := component().Render(HTML()).HTML()
 
 			w.Header().Set("Content-Type", "text/html")
 
 			if hybrid && len(a.wasmBinary) > 0 {
+				// Serialize state for hydration
+				stateJSON, _ := json.Marshal(router.state)
+
 				// Include WASM loader for hydration
 				fmt.Fprintf(w, `<!DOCTYPE html>
 <html>
 <head>
     <title>%s</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
     <div id="app">%s</div>
+    <script id="__gux_state" type="application/json">%s</script>
     <script src="/wasm_exec.js"></script>
     <script>
         const go = new Go();
@@ -150,14 +190,14 @@ func (a *App) Run(addr string) error {
             .then(result => go.run(result.instance));
     </script>
 </body>
-</html>`, a.title, html)
+</html>`, a.title, html, stateJSON)
 			} else {
 				// SSR only, no WASM
 				fmt.Fprintf(w, `<!DOCTYPE html>
 <html>
 <head>
     <title>%s</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
     <div id="app">%s</div>
@@ -176,6 +216,8 @@ type Router struct {
 	state    map[string]any
 	rerender func()
 	navigate func(path string)
+	db       interface{} // Database connection (server-side only)
+	hydrated bool        // True if state was hydrated from server
 }
 
 // NewRouter creates a new router instance.
@@ -184,6 +226,20 @@ func NewRouter(rerender func()) *Router {
 		state:    make(map[string]any),
 		rerender: rerender,
 	}
+}
+
+// NewRouterWithDB creates a router with database access (server-side).
+func NewRouterWithDB(db interface{}) *Router {
+	return &Router{
+		state: make(map[string]any),
+		db:    db,
+	}
+}
+
+// DB returns the database connection for server-side queries.
+// Returns nil in WASM - use api package for client-side data fetching.
+func (r *Router) DB() interface{} {
+	return r.db
 }
 
 // SetNavigate sets the navigation callback (called by WASM runtime).
@@ -199,6 +255,46 @@ func (r *Router) Navigate(path string) {
 	}
 }
 
+// Hydrate restores state from SSR.
+// Called by WASM runtime during hydration.
+func (r *Router) Hydrate(state map[string]any) {
+	for k, v := range state {
+		r.state[k] = v
+	}
+	r.hydrated = true
+}
+
+// IsHydrated returns true if state was hydrated from server.
+// Use this in loaders to skip data fetching when state is already available.
+func (r *Router) IsHydrated() bool {
+	return r.hydrated
+}
+
+// ClearHydrated resets the hydrated flag.
+// Called after render to allow future navigations to fetch fresh data.
+func (r *Router) ClearHydrated() {
+	r.hydrated = false
+}
+
+// OnLoad runs the loader function only if state was NOT hydrated from server.
+// Use this to wrap data loading logic - it will automatically be skipped
+// when the client already has the data from SSR or client-side navigation.
+//
+// Usage:
+//
+//	r.OnLoad(func() {
+//	    api.Counters.Get(1, func(c *api.Counter, err error) {
+//	        if c != nil {
+//	            initialCount = c.Value
+//	        }
+//	    })
+//	})
+func (r *Router) OnLoad(loader func()) {
+	if !r.hydrated {
+		loader()
+	}
+}
+
 // State represents a reactive state value.
 type State[T any] struct {
 	key    string
@@ -208,7 +304,22 @@ type State[T any] struct {
 // Get returns the current state value.
 func (s *State[T]) Get() T {
 	if val, ok := s.router.state[s.key]; ok {
-		return val.(T)
+		// Handle JSON unmarshaling: numbers come as float64
+		if result, ok := val.(T); ok {
+			return result
+		}
+		// Try converting float64 to int (common case from JSON)
+		if f, ok := val.(float64); ok {
+			var zero T
+			switch any(zero).(type) {
+			case int:
+				return any(int(f)).(T)
+			case int64:
+				return any(int64(f)).(T)
+			case uint:
+				return any(uint(f)).(T)
+			}
+		}
 	}
 	var zero T
 	return zero

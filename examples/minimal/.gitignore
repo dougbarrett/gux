@@ -1,3 +1,4 @@
 bin/
 .gux/
 assets_gen.go
+abb.db

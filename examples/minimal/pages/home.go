@@ -4,16 +4,27 @@ import (
 	"strconv"
 
 	"github.com/dougbarrett/gux/core"
+	"github.com/dougbarrett/gux/examples/minimal/.gux/api"
 )
 
 // Home is a page handler.
 func Home(r *core.Router) func() core.Node {
-	// Loader (runs on server)
+	// Loader (runs on server, also via /__gux_api/pages/index for client navigation)
 	message := "Hello World"
+	initialCount := 0
 
-	// Component (reactive, runs on client)
+	// OnLoad runs only when not hydrated (server or fresh navigation)
+	r.OnLoad(func() {
+		api.Counters.Get(1, func(counter *api.Counter, err error) {
+			if err == nil && counter != nil {
+				initialCount = counter.Value
+			}
+		})
+	})
+
+	// Component (reactive)
 	return func() core.Node {
-		count := r.StateInt("count", 0)
+		count := r.StateInt("count", initialCount)
 
 		return core.Div(core.Class("min-h-screen bg-gray-100"),
 			Nav(),
@@ -30,7 +41,16 @@ func Home(r *core.Router) func() core.Node {
 							core.Attrs{
 								Class: "px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition",
 								OnClick: func() {
-									count.Set(count.Get() + 1)
+									newValue := count.Get() + 1
+									count.Set(newValue)
+									// Persist to database via API
+									api.Counters.Update(&api.Counter{
+										ID:    1,
+										Name:  "default",
+										Value: newValue,
+									}, func(updated *api.Counter, err error) {
+										// Update handled
+									})
 								},
 							},
 							core.Text("Increment"),
