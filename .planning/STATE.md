@@ -2,12 +2,12 @@
 
 ## Current Position
 
-Phase: 17 — Form Components
-Plan: 3/3 complete
-Status: Complete
-Last activity: 2026-01-22 — Phase 17 executed and verified (13/13 must-haves)
+Phase: 18 — Data Display Components
+Plan: 1/? in progress
+Status: In progress
+Last activity: 2026-01-22 — Completed 18-01-PLAN.md (Badge, Avatar)
 
-Progress: ██████████ 100% of Phase 17
+Progress: █░░░░░░░░░ 10% of Phase 18
 
 ## Project Reference
 
@@ -70,6 +70,12 @@ Full decision log preserved in milestone archives:
 - RadioGroup uses role="radiogroup" wrapper with individual radio inputs
 - All boolean controls share disabled styling pattern (opacity-50, cursor-not-allowed)
 
+**Phase 18 decisions (18-01):**
+- Badge uses span element for inline display semantics
+- Avatar fallback decided at render time (props.Src empty = initials), no JS onerror
+- getInitials returns "?" for empty/whitespace-only names
+- Avatar image takes precedence when both Src and Name provided
+
 ### Research Findings
 
 Research completed 2026-01-22. Key findings:
@@ -97,9 +103,9 @@ None
 ## Session Continuity
 
 Last session: 2026-01-22
-Stopped at: Phase 17 complete, ready for Phase 18
+Stopped at: Completed 18-01-PLAN.md (Badge, Avatar)
 Resume file: None
 
 ---
 
-*Last updated: 2026-01-22 after Phase 17 execution and verification*
+*Last updated: 2026-01-22 after 18-01-PLAN.md execution*
