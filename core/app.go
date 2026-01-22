@@ -19,85 +19,111 @@ type Route struct {
 
 // App is the main application container.
 type App struct {
-	Routes      []Route
-	APIPrefix   string
-	wasmBinary  []byte
-	wasmExecJS  []byte
-	title       string
+	routes     []Route
+	apiPrefix  string
+	wasmBinary []byte
+	wasmExecJS []byte
+	title      string
+}
+
+// Default assets (set by generated code)
+var defaultWasmBinary []byte
+var defaultWasmExecJS []byte
+
+// SetDefaultAssets sets the default WASM assets.
+// Called by generated assets_gen.go in init().
+func SetDefaultAssets(wasmBinary, wasmExecJS []byte) {
+	defaultWasmBinary = wasmBinary
+	defaultWasmExecJS = wasmExecJS
 }
 
 // New creates a new App instance.
 func New() *App {
 	return &App{
-		APIPrefix: "/__gux_api",
-		title:     "Gux App",
+		apiPrefix:  "/__gux_api",
+		title:      "Gux App",
+		wasmBinary: defaultWasmBinary,
+		wasmExecJS: defaultWasmExecJS,
 	}
 }
 
 // SetAssets sets the WASM binary and wasm_exec.js.
-func (a *App) SetAssets(wasmBinary, wasmExecJS []byte) *App {
+// This is called by generated code, not by the developer.
+func (a *App) SetAssets(wasmBinary, wasmExecJS []byte) {
 	a.wasmBinary = wasmBinary
 	a.wasmExecJS = wasmExecJS
-	return a
 }
 
 // SetTitle sets the page title.
-func (a *App) SetTitle(title string) *App {
+func (a *App) SetTitle(title string) {
 	a.title = title
-	return a
 }
 
-// GET registers a GET route (SSR only by default).
-func (a *App) GET(path string, handler PageFunc) *App {
-	a.Routes = append(a.Routes, Route{
+// RouteBuilder provides methods for registering routes.
+type RouteBuilder struct {
+	app *App
+}
+
+// Routes returns a RouteBuilder for registering routes.
+func (a *App) Routes() *RouteBuilder {
+	return &RouteBuilder{app: a}
+}
+
+// GET registers a GET route (SSR only).
+func (rb *RouteBuilder) GET(path string, handler PageFunc) *RouteBuilder {
+	rb.app.routes = append(rb.app.routes, Route{
 		Method:  "GET",
 		Path:    path,
 		Handler: handler,
 		Hybrid:  false,
 	})
-	return a
+	return rb
 }
 
 // POST registers a POST route.
-func (a *App) POST(path string, handler PageFunc) *App {
-	a.Routes = append(a.Routes, Route{
+func (rb *RouteBuilder) POST(path string, handler PageFunc) *RouteBuilder {
+	rb.app.routes = append(rb.app.routes, Route{
 		Method:  "POST",
 		Path:    path,
 		Handler: handler,
 		Hybrid:  false,
 	})
-	return a
+	return rb
 }
 
 // Hybrid registers a route with SSR + WASM hydration.
-func (a *App) Hybrid(path string, handler PageFunc) *App {
-	a.Routes = append(a.Routes, Route{
+func (rb *RouteBuilder) Hybrid(path string, handler PageFunc) *RouteBuilder {
+	rb.app.routes = append(rb.app.routes, Route{
 		Method:  "GET",
 		Path:    path,
 		Handler: handler,
 		Hybrid:  true,
 	})
-	return a
+	return rb
 }
 
 // Run starts the HTTP server on the given address.
 func (a *App) Run(addr string) error {
 	mux := http.NewServeMux()
 
-	// Serve WASM binary
-	mux.HandleFunc("/app.wasm", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/wasm")
-		w.Write(a.wasmBinary)
-	})
+	// Serve WASM binary (if assets are set)
+	if len(a.wasmBinary) > 0 {
+		mux.HandleFunc("/app.wasm", func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/wasm")
+			w.Write(a.wasmBinary)
+		})
+	}
 
-	// Serve wasm_exec.js
-	mux.HandleFunc("/wasm_exec.js", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/javascript")
-		w.Write(a.wasmExecJS)
-	})
+	// Serve wasm_exec.js (if assets are set)
+	if len(a.wasmExecJS) > 0 {
+		mux.HandleFunc("/wasm_exec.js", func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/javascript")
+			w.Write(a.wasmExecJS)
+		})
+	}
 
 	// Register page routes
-	for _, route := range a.Routes {
+	for _, route := range a.routes {
 		handler := route.Handler
 		hybrid := route.Hybrid
 		mux.HandleFunc(route.Path, func(w http.ResponseWriter, r *http.Request) {
@@ -107,7 +133,7 @@ func (a *App) Run(addr string) error {
 
 			w.Header().Set("Content-Type", "text/html")
 
-			if hybrid {
+			if hybrid && len(a.wasmBinary) > 0 {
 				// Include WASM loader for hydration
 				fmt.Fprintf(w, `<!DOCTYPE html>
 <html>
