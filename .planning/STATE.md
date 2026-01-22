@@ -3,11 +3,11 @@
 ## Current Position
 
 Phase: 19 — Interactive Components (IN PROGRESS)
-Plan: 3/5 complete
+Plan: 4/5 complete
 Status: In progress
-Last activity: 2026-01-22 — Completed 19-03-PLAN.md (Tabs component)
+Last activity: 2026-01-22 — Completed 19-04-PLAN.md (Dropdown component)
 
-Progress: ██████░░░░ 60% of Phase 19
+Progress: ████████░░ 80% of Phase 19
 
 ## Project Reference
 
@@ -111,6 +111,12 @@ Full decision log preserved in milestone archives:
 - TabPanel uses hidden class for inactive panels (CSS visibility)
 - Disabled tabs have both disabled attribute and aria-disabled=true
 
+**Phase 19 decisions (19-04):**
+- Invisible backdrop div for outside click handling (avoids global event listeners)
+- DropdownBottomLeft as default position (most common pattern)
+- Destructive prop for red styling on dangerous actions (delete/remove)
+- Reuse boolToAttr from switch.go (avoid duplication)
+
 ### Research Findings
 
 Research completed 2026-01-22. Key findings:
@@ -138,9 +144,9 @@ None
 ## Session Continuity
 
 Last session: 2026-01-22
-Stopped at: Completed 19-03-PLAN.md (Tabs component)
+Stopped at: Completed 19-04-PLAN.md (Dropdown component)
 Resume file: None
 
 ---
 
-*Last updated: 2026-01-22 after 19-03 Tabs component completion*
+*Last updated: 2026-01-22 after 19-04 Dropdown component completion*
