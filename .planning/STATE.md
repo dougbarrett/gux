@@ -2,12 +2,12 @@
 
 ## Current Position
 
-Phase: 16 — Component Foundation
-Plan: 3/3 complete
-Status: Complete
-Last activity: 2026-01-22 — Phase 16 executed and verified
+Phase: 17 — Form Components
+Plan: 1/? in progress
+Status: In progress
+Last activity: 2026-01-22 — Completed 17-01-PLAN.md (Input and FormField)
 
-Progress: ██████████ 100%
+Progress: ████████░░ ~80% of Phase 17
 
 ## Project Reference
 
@@ -58,6 +58,11 @@ Full decision log preserved in milestone archives:
 - Shared StackProps struct for VStack and HStack consistency
 - Container defaults to max-w-7xl, Gap defaults to "4", Cols defaults to "3"
 
+**Phase 17 decisions:**
+- InputSize and input styling constants defined in input.go as canonical location
+- Error takes precedence over description in FormField
+- Required asterisk only shown when label is present
+
 ### Research Findings
 
 Research completed 2026-01-22. Key findings:
@@ -85,9 +90,9 @@ None
 ## Session Continuity
 
 Last session: 2026-01-22
-Stopped at: Phase 16 complete, ready to plan Phase 17
+Stopped at: Completed 17-01-PLAN.md (Input and FormField components)
 Resume file: None
 
 ---
 
-*Last updated: 2026-01-22 after Phase 16 execution and verification*
+*Last updated: 2026-01-22 after 17-01 execution*
