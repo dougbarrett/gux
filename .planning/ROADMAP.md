@@ -96,7 +96,12 @@ Full details: [milestones/v1.2-ROADMAP.md](milestones/v1.2-ROADMAP.md)
   - [x] 19-03-PLAN.md - Tabs compound components (Tabs, TabList, Tab, TabPanel)
   - [x] 19-04-PLAN.md - Dropdown compound components with menu semantics
   - [x] 19-05-PLAN.md - Toast notification system with variants
-- [ ] Phase 20: Auth Example - Login, Register, Password Reset, Verification
+- [ ] Phase 20: Auth Example (4 plans) - Login, Register, Password Reset, Verification
+  Plans:
+  - [ ] 20-01-PLAN.md - Alert component for inline feedback
+  - [ ] 20-02-PLAN.md - Auth app foundation (models, routes, layout)
+  - [ ] 20-03-PLAN.md - Login and Register pages
+  - [ ] 20-04-PLAN.md - Forgot, Reset, and Verify pages
 - [ ] Phase 21: Marketing Example - Home, Features, Pricing, About, Contact
 - [ ] Phase 22: SaaS Dashboard Example - Dashboard, CRUD, Settings, Profile
 - [ ] Phase 23: Admin Panel Example - User Management, Activity Logs, Settings
@@ -131,7 +136,7 @@ Phases execute in numeric order: 1 -> 2 -> ... -> 15 -> 16 -> ... -> 23
 | 17. Form Components | v2.0 | 3/3 | Complete | 2026-01-22 |
 | 18. Data Display Components | v2.0 | 3/3 | Complete | 2026-01-22 |
 | 19. Interactive Components | v2.0 | 5/5 | Complete | 2026-01-22 |
-| 20. Auth Example | v2.0 | - | Pending | - |
+| 20. Auth Example | v2.0 | 4 | Planned | - |
 | 21. Marketing Example | v2.0 | - | Pending | - |
 | 22. SaaS Dashboard Example | v2.0 | - | Pending | - |
 | 23. Admin Panel Example | v2.0 | - | Pending | - |
