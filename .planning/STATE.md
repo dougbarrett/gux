@@ -3,11 +3,11 @@
 ## Current Position
 
 Phase: 16 — Component Foundation
-Plan: 01 of 4
+Plan: 02 of 4
 Status: In progress
-Last activity: 2026-01-22 — Completed 16-01-PLAN.md (UI Utilities)
+Last activity: 2026-01-22 — Completed 16-02-PLAN.md (Button Component)
 
-Progress: █░░░░░░░░░ 5%
+Progress: ██░░░░░░░░ 10%
 
 ## Project Reference
 
@@ -23,7 +23,7 @@ See: .planning/PROJECT.md (updated 2026-01-22)
 **Phases:**
 - [ ] Phase 16: Component Foundation — utilities, Button, Card, layout primitives
   - [x] Plan 01: UI Utilities (MergeClasses, ConditionalClass)
-  - [ ] Plan 02: Button component
+  - [x] Plan 02: Button component
   - [ ] Plan 03: Card component
   - [ ] Plan 04: Layout primitives
 - [ ] Phase 17: Form Components — Input, Textarea, Select, Checkbox, Radio
@@ -55,6 +55,9 @@ Full decision log preserved in milestone archives:
 - Exported function names (MergeClasses, ConditionalClass) for public API
 - Whitespace trimming in MergeClasses for robustness
 - Table-driven tests with t.Run for comprehensive coverage
+- ButtonVariant/ButtonSize as string types with named constants
+- Default variant=primary, size=md, type=button for Button
+- Disabled adds both attribute and visual styling
 
 ### Research Findings
 
@@ -83,9 +86,9 @@ None
 ## Session Continuity
 
 Last session: 2026-01-22
-Stopped at: Completed 16-01-PLAN.md
+Stopped at: Completed 16-02-PLAN.md
 Resume file: None
 
 ---
 
-*Last updated: 2026-01-22 after completing 16-01-PLAN.md*
+*Last updated: 2026-01-22 after completing 16-02-PLAN.md*
