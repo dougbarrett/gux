@@ -3,11 +3,11 @@
 ## Current Position
 
 Phase: 19 — Interactive Components (IN PROGRESS)
-Plan: 1/5 complete
+Plan: 2/5 complete
 Status: In progress
-Last activity: 2026-01-22 — Completed 19-01-PLAN.md (Modal component)
+Last activity: 2026-01-22 — Completed 19-02-PLAN.md (Tooltip component)
 
-Progress: ██░░░░░░░░ 20% of Phase 19
+Progress: ████░░░░░░ 40% of Phase 19
 
 ## Project Reference
 
@@ -99,6 +99,12 @@ Full decision log preserved in milestone archives:
 - Backdrop OnClick calls OnClose (standard click-outside-to-close)
 - ModalFull uses max-w-4xl (not 100vw) for generous but not excessive width
 
+**Phase 19 decisions (19-02):**
+- CSS-only visibility via group-hover and group-focus-within (no JS state needed)
+- TooltipTop as default position
+- Tooltip element renders after children (trigger first in DOM)
+- pointer-events-none on tooltip to prevent hover interference
+
 ### Research Findings
 
 Research completed 2026-01-22. Key findings:
@@ -126,9 +132,9 @@ None
 ## Session Continuity
 
 Last session: 2026-01-22
-Stopped at: Completed 19-01-PLAN.md (Modal component)
+Stopped at: Completed 19-02-PLAN.md (Tooltip component)
 Resume file: None
 
 ---
 
-*Last updated: 2026-01-22 after 19-01 Modal component completion*
+*Last updated: 2026-01-22 after 19-02 Tooltip component completion*
