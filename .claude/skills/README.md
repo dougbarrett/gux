@@ -7,10 +7,22 @@ This directory contains Claude Code skills for developing with the Gux framework
 ### gux-framework
 
 Comprehensive guide for Gux development including:
+
+**Core Framework (`core/` package)**:
+- Universal rendering system (SSR + WASM hydration)
+- Node-based component architecture
+- Element helpers (Div, Button, Input, etc.)
+- Reactive state management
+- Hybrid routing with bundle support
+- CRUD API generation with DTOs and hooks
+
+**Components Library**:
+- 45+ production-ready UI components
+- Tailwind CSS integration
+
+**Development**:
 - CLI commands (`gux init`, `gux gen`, `gux dev`, etc.)
-- Application scaffolding
 - API code generation with annotations
-- Component library usage (45+ components)
 - State management patterns
 - Server utilities
 - Build and deployment

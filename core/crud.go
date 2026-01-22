@@ -345,7 +345,7 @@ func (a *App) convertSingleToDTO(model interface{}, dtoType reflect.Type) interf
 		return mapper.FromModel(model)
 	}
 
-	// Auto-map matching fields by name and type
+	// Auto-map matching fields by name and type, or by gux tag
 	modelVal := reflect.ValueOf(model)
 	if modelVal.Kind() == reflect.Ptr {
 		modelVal = modelVal.Elem()
@@ -354,10 +354,42 @@ func (a *App) convertSingleToDTO(model interface{}, dtoType reflect.Type) interf
 
 	for i := 0; i < dtoType.NumField(); i++ {
 		dtoField := dtoType.Field(i)
-		modelField := modelVal.FieldByName(dtoField.Name)
 
-		if modelField.IsValid() && modelField.Type().AssignableTo(dtoField.Type) {
-			dtoVal.Field(i).Set(modelField)
+		// Check for gux tag to map from a different field name
+		// Format: gux:"ModelName.FieldName" or gux:"FieldName"
+		var modelFieldName string
+		if guxTag := dtoField.Tag.Get("gux"); guxTag != "" {
+			// Extract field name after the dot (e.g., "Post.User" -> "User")
+			if dotIdx := strings.LastIndex(guxTag, "."); dotIdx >= 0 {
+				modelFieldName = guxTag[dotIdx+1:]
+			} else {
+				modelFieldName = guxTag
+			}
+		} else {
+			modelFieldName = dtoField.Name
+		}
+
+		modelField := modelVal.FieldByName(modelFieldName)
+
+		if modelField.IsValid() {
+			// Handle pointer fields - dereference if model field is pointer
+			srcVal := modelField
+			if srcVal.Kind() == reflect.Ptr && !srcVal.IsNil() {
+				srcVal = srcVal.Elem()
+			}
+
+			// First check if types are directly assignable (handles time.Time, etc.)
+			if modelField.Type().AssignableTo(dtoField.Type) {
+				dtoVal.Field(i).Set(modelField)
+			} else if srcVal.Kind() == reflect.Struct && dtoField.Type.Kind() == reflect.Struct {
+				// Only recursively convert if the types are different (custom structs)
+				// Skip standard library types like time.Time which have unexported fields
+				srcType := srcVal.Type()
+				if srcType.PkgPath() != "" && !strings.HasPrefix(srcType.PkgPath(), "time") {
+					nestedDTO := a.convertSingleToDTO(srcVal.Interface(), dtoField.Type)
+					dtoVal.Field(i).Set(reflect.ValueOf(nestedDTO))
+				}
+			}
 		}
 	}
 

@@ -26,6 +26,298 @@ Gux enables writing entire web applications in Go:
 - **Backend**: Standard Go HTTP server with generated handlers
 - **API**: Type-safe clients and servers generated from Go interfaces
 - **Components**: 45+ production-ready UI components with Tailwind CSS
+- **Core**: Universal rendering system for SSR + WASM hydration
+
+---
+
+## Core Framework (`core/` package)
+
+The `core` package provides the low-level universal rendering system. Components built with `core` work identically on server (SSR) and client (WASM).
+
+### Architecture
+
+The key insight: components return **Nodes**, not DOM elements or HTML strings. Nodes are an intermediate representation rendered to either target.
+
+```
+Component -> Node Tree -> Renderer -> HTML (server) or DOM (client)
+```
+
+### Node System
+
+```go
+// Node is the universal currency - components produce Nodes
+type Node interface {
+    Render(r Renderer) RenderResult
+}
+
+// Available node types:
+TextNode{Content: "Hello"}
+Element{Tag: "div", Attrs: Attrs{}, Children: []Node{}}
+Fragment{Children: []Node{}}
+```
+
+### Element Helpers
+
+```go
+import "github.com/dougbarrett/gux/core"
+
+// Create elements with attributes and children
+core.Div(core.Class("flex gap-4"),
+    core.H1(core.Attrs{Class: "text-2xl"}, core.Text("Title")),
+    core.P(core.Attrs{}, core.Text("Content")),
+)
+
+// Available helpers:
+core.Div, core.Span, core.P, core.H1, core.H2, core.H3
+core.A, core.Button, core.Input, core.Form, core.Label
+core.Ul, core.Li, core.Nav, core.Header, core.Footer
+core.Main, core.Section, core.Article, core.Img
+core.Table, core.Thead, core.Tbody, core.Tr, core.Th, core.Td
+core.Select, core.Option, core.Textarea
+
+// Generic element
+core.El("custom-tag", core.Attrs{}, children...)
+
+// Fragment (multiple nodes without wrapper)
+core.Frag(node1, node2, node3)
+
+// Conditional rendering
+core.If(condition, node)
+
+// Shorthand for class-only attrs
+core.Class("my-class") // equivalent to core.Attrs{Class: "my-class"}
+```
+
+### Attrs (Attributes)
+
+```go
+core.Attrs{
+    ID:    "my-id",
+    Class: "flex items-center",
+    Href:  "/path",           // For <a> elements
+    Src:   "/image.png",      // For <img> elements
+    Alt:   "Description",
+    Type:  "text",            // For <input> elements
+    Name:  "field-name",
+    Value: "initial-value",
+
+    // External links (bypass client-side navigation)
+    External: true,
+
+    // Data attributes (rendered as data-*)
+    Data: map[string]string{"id": "123"},
+
+    // Event handlers (WASM only, ignored in SSR)
+    OnClick:  func() { /* handle click */ },
+    OnSubmit: func() { /* handle form submit */ },
+    OnChange: func(value string) { /* handle input change */ },
+    OnEnter:  func() { /* handle Enter key */ },
+
+    // Additional attributes
+    Extra: map[string]string{"aria-label": "Label"},
+}
+```
+
+### Page Functions
+
+Pages follow a loader + component pattern:
+
+```go
+func MyPage(r *core.Router) func() core.Node {
+    // LOADER: Runs on server (SSR) and via API for client navigation
+    var items []Item
+
+    // OnLoad only runs when NOT hydrated (server-side or fresh navigation)
+    r.OnLoad(func() {
+        api.Items.List(func(result []Item, err error) {
+            if err == nil {
+                items = result
+            }
+        })
+    })
+
+    // COMPONENT: Returns the UI, re-runs on state changes
+    return func() core.Node {
+        // Store data in state for hydration
+        itemsState := r.StateString("items", serializeItems(items))
+
+        return core.Div(core.Class("container"),
+            core.H1(core.Attrs{}, core.Text("Items")),
+            renderItemList(parseItems(itemsState.Get())),
+        )
+    }
+}
+```
+
+### State Management
+
+```go
+// Typed state helpers
+count := r.StateInt("count", 0)        // *State[int]
+name := r.StateString("name", "")      // *State[string]
+active := r.StateBool("active", false) // *State[bool]
+
+// Generic state for any type
+user := core.UseState(r, "user", User{Name: "Guest"}) // *State[User]
+
+// Read state
+current := count.Get()
+
+// Update state (triggers re-render)
+count.Set(current + 1)
+
+// Update without re-render (for input tracking)
+name.SetQuiet("new value")
+```
+
+### Routing
+
+```go
+app := core.New()
+app.SetTitle("My App")
+app.SetDB(db) // Set database for CRUD
+
+// Simple routes (SSR only)
+app.Routes().
+    GET("/", pages.Home).
+    POST("/submit", pages.Submit)
+
+// Hybrid routes (SSR + WASM hydration)
+app.Routes().
+    Hybrid("/", pages.Home).
+    Hybrid("/about", pages.About)
+
+// Route groups with separate WASM bundles
+app.RouteGroup("/admin", core.WithBundle("admin")).
+    Hybrid("/", admin.Dashboard).
+    Hybrid("/users", admin.Users).
+    Hybrid("/users/:id", admin.UserDetail)
+
+// Route parameters
+func UserDetail(r *core.Router) func() core.Node {
+    params := r.GetRouteParams() // {"id": "123"}
+    userID := params["id"]
+    // ...
+}
+
+// External links (cross-bundle navigation)
+core.A(core.Attrs{Href: "/admin", External: true}, core.Text("Admin"))
+
+// Start server
+app.Run(":8080")
+```
+
+### CRUD API Generation
+
+Automatically generate REST endpoints for GORM models:
+
+```go
+// Basic CRUD - creates endpoints:
+// GET/POST    /__gux_api/crud/counters
+// GET/PUT/DEL /__gux_api/crud/counters/:id
+app.CRUD(models.Counter{})
+
+// With DTOs (control what's exposed)
+app.CRUD(models.User{},
+    core.WithListDTO(dto.UserList{}),                    // For list responses
+    core.WithDetailDTO(dto.UserDetail{}, "Posts"),       // For single item, with preload
+    core.WithDTO(dto.User{}),                            // Same DTO for both
+)
+
+// With create/update hooks (custom logic)
+app.CRUD(models.User{},
+    core.WithCreateHook(func(data map[string]interface{}) (interface{}, error) {
+        user := &models.User{}
+        user.Email = data["email"].(string)
+        user.Name = data["name"].(string)
+        // Hash password before storing
+        if password, ok := data["password"].(string); ok {
+            user.SetPassword(password)
+        }
+        return user, nil
+    }),
+    core.WithUpdateHook(func(existing interface{}, data map[string]interface{}) (interface{}, error) {
+        user := existing.(*models.User)
+        if email, ok := data["email"].(string); ok {
+            user.Email = email
+        }
+        // Only update password if provided
+        if password, ok := data["password"].(string); ok && password != "" {
+            user.SetPassword(password)
+        }
+        return user, nil
+    }),
+)
+```
+
+### DTO Mapping
+
+DTOs use `gux` tags for automatic field mapping:
+
+```go
+// Model (has sensitive fields)
+type User struct {
+    gorm.Model
+    Email        string
+    Name         string
+    PasswordHash string // Should NOT be exposed
+    Posts        []Post `gorm:"foreignKey:UserID"`
+}
+
+// DTO (safe for API responses)
+type UserList struct {
+    ID    uint   `json:"id" gux:"User.ID"`
+    Email string `json:"email" gux:"User.Email"`
+    Name  string `json:"name" gux:"User.Name"`
+}
+
+// DTO with nested relationship
+type UserDetail struct {
+    ID    uint        `json:"id" gux:"User.ID"`
+    Email string      `json:"email" gux:"User.Email"`
+    Name  string      `json:"name" gux:"User.Name"`
+    Posts []PostBrief `json:"posts" gux:"User.Posts"`
+}
+
+type PostBrief struct {
+    ID    uint   `json:"id" gux:"Post.ID"`
+    Title string `json:"title" gux:"Post.Title"`
+}
+```
+
+### Database Access
+
+```go
+// Server-side only - r.DB() returns the GORM connection
+func LoadData(r *core.Router) func() core.Node {
+    var users []models.User
+
+    if db := r.DB(); db != nil {
+        // Direct GORM queries (server-side)
+        db.(*gorm.DB).Preload("Posts").Find(&users)
+    }
+
+    return func() core.Node { /* ... */ }
+}
+
+// Client-side - use generated API client
+r.OnLoad(func() {
+    api.Users.List(func(users []dto.UserList, err error) {
+        // Handle response
+    })
+})
+```
+
+### Hydration Flow
+
+1. **Server renders HTML** with initial state
+2. **State serialized** to `<script id="__gux_state">`
+3. **WASM loads** and calls `r.Hydrate(state)`
+4. **r.IsHydrated()** returns true, `r.OnLoad()` skips data fetching
+5. **Component re-renders** with hydrated state
+6. **r.ClearHydrated()** allows future navigations to fetch fresh data
+
+---
 
 ## CLI Reference
 
@@ -831,7 +1123,118 @@ All components are WCAG 2.1 AA compliant:
 | `Arrow Up/Down` | Navigate menus |
 | `Tab` | Move focus |
 
+## Examples/Minimal Reference
+
+The `examples/minimal/` directory provides a complete reference implementation:
+
+### Structure
+
+```
+examples/minimal/
+├── app.go              # Main entry, routes, CRUD registration
+├── models/
+│   ├── counter.go      # Simple counter model
+│   ├── user.go         # User with password hashing
+│   └── post.go         # Post with User relationship
+├── dto/
+│   ├── user.go         # UserList, UserDetail (excludes PasswordHash)
+│   └── post.go         # PostList, PostDetail (includes Author)
+├── pages/
+│   ├── home.go         # Counter page with API persistence
+│   ├── about.go        # Static page
+│   └── nav.go          # Shared navigation
+├── admin/
+│   ├── dashboard.go    # Admin overview
+│   ├── users.go        # User list
+│   ├── user_detail.go  # User detail view
+│   ├── user_edit.go    # User edit form
+│   ├── user_new.go     # Create user form
+│   ├── posts.go        # Post management
+│   └── nav.go          # Admin navigation
+└── .gux/
+    ├── api/            # Generated API client
+    └── wasm/           # WASM entry points
+```
+
+### Key Patterns Demonstrated
+
+**Route Groups with Bundles**:
+```go
+// Public routes use default "app" bundle
+app.Routes().
+    Hybrid("/", pages.Home).
+    Hybrid("/about", pages.About)
+
+// Admin routes use separate "admin" bundle
+app.RouteGroup("/admin", core.WithBundle("admin")).
+    Hybrid("/", admin.Dashboard).
+    Hybrid("/users", admin.Users)
+```
+
+**CRUD with Security Hooks**:
+```go
+app.CRUD(models.User{},
+    core.WithListDTO(dto.UserList{}),           // Hides PasswordHash
+    core.WithDetailDTO(dto.UserDetail{}, "Posts"),
+    core.WithCreateHook(func(data map[string]interface{}) (interface{}, error) {
+        user := &models.User{}
+        user.Email = data["email"].(string)
+        if pw, ok := data["password"].(string); ok {
+            user.SetPassword(pw) // bcrypt hash
+        }
+        return user, nil
+    }),
+)
+```
+
+**State Serialization for Lists**:
+```go
+func Posts(r *core.Router) func() core.Node {
+    var posts []dto.PostList
+
+    r.OnLoad(func() {
+        api.Posts.List(func(result []dto.PostList, err error) {
+            if err == nil {
+                posts = result
+            }
+        })
+    })
+
+    return func() core.Node {
+        // Serialize to state for hydration
+        postsJSON, _ := json.Marshal(posts)
+        postsState := r.StateString("posts", string(postsJSON))
+
+        // Parse from state (works on server and client)
+        var displayPosts []dto.PostList
+        json.Unmarshal([]byte(postsState.Get()), &displayPosts)
+
+        return renderPostTable(displayPosts)
+    }
+}
+```
+
+**Cross-Bundle Navigation**:
+```go
+// From admin back to public (different WASM bundle)
+core.A(core.Attrs{Href: "/", External: true, Class: "..."},
+    core.Text("Back to Home"),
+)
+```
+
 ## Best Practices
+
+### Core Framework
+
+1. **Use `r.OnLoad()` for data fetching** - automatically skipped when hydrated
+2. **Serialize complex state** - use JSON for lists/objects in state
+3. **Keep loaders simple** - move complex logic to separate functions
+4. **Use DTOs to hide sensitive data** - never expose password hashes, internal IDs
+5. **Use hooks for validation** - create/update hooks for business logic
+6. **Mark cross-bundle links as External** - prevents WASM from handling them
+7. **Use `SetQuiet()` for input tracking** - avoids unnecessary re-renders
+
+### Components Library
 
 1. **Always use `gux gen`** after modifying API interfaces
 2. **Keep state normalized** - flat collections, not nested

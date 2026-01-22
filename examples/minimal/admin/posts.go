@@ -78,10 +78,14 @@ func postRowsNode(posts []dto.PostList) core.Node {
 
 	var rows []core.Node
 	for _, post := range posts {
+		authorName := post.Author.Name
+		if authorName == "" {
+			authorName = fmt.Sprintf("User #%d", post.UserID)
+		}
 		rows = append(rows, core.Tr(core.Class("border-t border-gray-700 hover:bg-gray-750"),
 			tableCell(fmt.Sprintf("%d", post.ID)),
 			tableCellLink(post.Title, fmt.Sprintf("/admin/posts/%d", post.ID)),
-			tableCellLink(fmt.Sprintf("User #%d", post.UserID), fmt.Sprintf("/admin/users/%d", post.UserID)),
+			tableCellLink(authorName, fmt.Sprintf("/admin/users/%d", post.UserID)),
 			tableCell(formatTime(post.CreatedAt)),
 			postActionsCell(post.ID),
 		))

@@ -1233,9 +1233,11 @@ func generateServerDTOCode(m CRUDModel) string {
 
 	// Generate field mapping for list DTO
 	listFieldMapping := generateFieldMapping(m.ListDTOInfo, "item")
+	listNestedMapping := generateNestedDTOMapping(m.ListDTOInfo, "result[i]", "item", true)
 
 	// Generate field mapping for detail DTO
 	detailFieldMapping := generateFieldMapping(m.DetailDTOInfo, "item")
+	detailNestedMapping := generateNestedDTOMapping(m.DetailDTOInfo, "result", "item", false)
 
 	// Check if detail DTO has preloads (relationships) - if so, try FromModel pattern
 	hasRelationships := m.DetailDTOInfo != nil && len(m.DetailDTOInfo.Preloads) > 0
@@ -1268,10 +1270,10 @@ func (a *%sAPI) Get(id uint, callback func(*dto.%s, error)) {
 	// Fallback to basic mapping
 	result := &dto.%s{
 %s	}
-	callback(result, nil)
+%s	callback(result, nil)
 }`,
 			m.Name, m.PluralName, detailDTO, modelName, detailPreloads,
-			detailDTO, detailDTO, detailDTO, detailFieldMapping)
+			detailDTO, detailDTO, detailDTO, detailFieldMapping, detailNestedMapping)
 	} else {
 		// Use simple field mapping for DTOs without relationships
 		getMethodBody = fmt.Sprintf(`// Get returns a single %s by ID.
@@ -1287,9 +1289,9 @@ func (a *%sAPI) Get(id uint, callback func(*dto.%s, error)) {
 	}
 	result := &dto.%s{
 %s	}
-	callback(result, nil)
+%s	callback(result, nil)
 }`,
-			m.Name, m.PluralName, detailDTO, modelName, detailPreloads, detailDTO, detailFieldMapping)
+			m.Name, m.PluralName, detailDTO, modelName, detailPreloads, detailDTO, detailFieldMapping, detailNestedMapping)
 	}
 
 	sb.WriteString(fmt.Sprintf(`
@@ -1315,7 +1317,7 @@ func (a *%sAPI) List(callback func([]dto.%s, error)) {
 	for i, item := range items {
 		result[i] = dto.%s{
 %s		}
-	}
+%s	}
 	callback(result, nil)
 }
 
@@ -1351,6 +1353,7 @@ func (a *%sAPI) Delete(id uint, callback func(error)) {
 		listDTO,                                 // List result make
 		listDTO,                                 // List DTO type
 		listFieldMapping,                        // List field mapping
+		listNestedMapping,                       // List nested DTO mapping
 		getMethodBody,                           // Get method (generated above)
 		m.Name,                                  // Create comment
 		m.PluralName, detailDTO,                 // Create signature
@@ -1379,13 +1382,64 @@ func generateFieldMapping(info *DTOInfo, varName string) string {
 			continue
 		}
 		if f.IsNestedDTO {
-			// For nested DTO fields, we need to map the nested object
-			sb.WriteString(fmt.Sprintf("\t\t\t// %s mapped from %s.%s (nested DTO: %s)\n",
-				f.DTOField, info.ModelName, f.ModelField, f.DTOType))
-			// Skip nested DTO mapping in simple generation - requires nested conversion
+			// Skip nested DTOs here - they are handled by generateNestedDTOMapping
 			continue
 		}
 		sb.WriteString(fmt.Sprintf("\t\t\t%s: %s.%s,\n", f.DTOField, varName, f.ModelField))
+	}
+	return sb.String()
+}
+
+// generateNestedDTOMapping generates code to map nested DTO fields after the main struct literal
+// Returns empty string if no nested DTOs, otherwise returns the mapping code
+func generateNestedDTOMapping(info *DTOInfo, resultVar, itemVar string, forList bool) string {
+	if info == nil {
+		return ""
+	}
+
+	var sb strings.Builder
+	for _, f := range info.Fields {
+		if !f.IsNestedDTO {
+			continue
+		}
+
+		// Parse nested DTO type to get field mappings (e.g., UserBrief -> ID, Name)
+		nestedInfo, err := parseDTOFile("dto", f.DTOType)
+		if err != nil {
+			// Fall back to simple assignment if we can't parse nested DTO
+			continue
+		}
+
+		// Generate null check and nested mapping
+		if forList {
+			// For list: result[i].Author = dto.UserBrief{...}
+			sb.WriteString(fmt.Sprintf("\t\tif %s.%s != nil {\n", itemVar, f.ModelField))
+			sb.WriteString(fmt.Sprintf("\t\t\t%s.%s = dto.%s{\n", resultVar, f.DTOField, f.DTOType))
+		} else {
+			// For single: result.Author = dto.UserBrief{...}
+			sb.WriteString(fmt.Sprintf("\tif %s.%s != nil {\n", itemVar, f.ModelField))
+			sb.WriteString(fmt.Sprintf("\t\t%s.%s = dto.%s{\n", resultVar, f.DTOField, f.DTOType))
+		}
+
+		// Add nested field mappings
+		for _, nf := range nestedInfo.Fields {
+			if nf.IsSlice || nf.IsNestedDTO {
+				continue // Skip complex nested fields for now
+			}
+			if forList {
+				sb.WriteString(fmt.Sprintf("\t\t\t\t%s: %s.%s.%s,\n", nf.DTOField, itemVar, f.ModelField, nf.ModelField))
+			} else {
+				sb.WriteString(fmt.Sprintf("\t\t\t%s: %s.%s.%s,\n", nf.DTOField, itemVar, f.ModelField, nf.ModelField))
+			}
+		}
+
+		if forList {
+			sb.WriteString("\t\t\t}\n")
+			sb.WriteString("\t\t}\n")
+		} else {
+			sb.WriteString("\t\t}\n")
+			sb.WriteString("\t}\n")
+		}
 	}
 	return sb.String()
 }

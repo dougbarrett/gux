@@ -10,6 +10,7 @@ type PostList struct {
 	Title     string    `json:"title" gux:"Post.Title"`
 	Content   string    `json:"content" gux:"Post.Content"`
 	UserID    uint      `json:"user_id" gux:"Post.UserID"`
+	Author    UserBrief `json:"author" gux:"Post.User" preload:"User"`
 	CreatedAt time.Time `json:"created_at" gux:"Post.CreatedAt"`
 }
 

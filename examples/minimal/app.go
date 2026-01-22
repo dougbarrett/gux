@@ -115,7 +115,7 @@ func main() {
 
 	// Register CRUD for Post with DTOs
 	app.CRUD(models.Post{},
-		core.WithListDTO(dto.PostList{}),
+		core.WithListDTO(dto.PostList{}, "User"),
 		core.WithDetailDTO(dto.PostDetail{}, "User"),
 	)
 
