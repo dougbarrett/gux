@@ -74,11 +74,11 @@ Full details: [milestones/v1.2-ROADMAP.md](milestones/v1.2-ROADMAP.md)
 
 **Milestone Goal:** Build a fresh component library on core's Node system with four example applications
 
-- [ ] Phase 16: Component Foundation (3 plans) - Utilities, Button, Card, layout primitives
+- [x] Phase 16: Component Foundation (3/3 plans) - Utilities, Button, Card, layout primitives
   Plans:
-  - [ ] 16-01-PLAN.md - Utility functions (MergeClasses, ConditionalClass)
-  - [ ] 16-02-PLAN.md - Button component with variants and sizes
-  - [ ] 16-03-PLAN.md - Card compound components and layout primitives
+  - [x] 16-01-PLAN.md - Utility functions (MergeClasses, ConditionalClass)
+  - [x] 16-02-PLAN.md - Button component with variants and sizes
+  - [x] 16-03-PLAN.md - Card compound components and layout primitives
 - [ ] Phase 17: Form Components - Input, Textarea, Select, Checkbox, Radio, Form
 - [ ] Phase 18: Data Display Components - Table, DataTable[T], Badge, Avatar, Pagination
 - [ ] Phase 19: Interactive Components - Modal, Dropdown, Tabs, Toast, Tooltip
@@ -113,7 +113,7 @@ Phases execute in numeric order: 1 -> 2 -> ... -> 15 -> 16 -> ... -> 23
 | 13. Component Docs | v1.2 | 1/1 | Complete | 2026-01-15 |
 | 14. Keyboard Shortcuts | v1.2 | 1/1 | Complete | 2026-01-15 |
 | 15. Accessibility Guide | v1.2 | 1/1 | Complete | 2026-01-15 |
-| 16. Component Foundation | v2.0 | 3 | Planned | - |
+| 16. Component Foundation | v2.0 | 3/3 | Complete | 2026-01-22 |
 | 17. Form Components | v2.0 | - | Pending | - |
 | 18. Data Display Components | v2.0 | - | Pending | - |
 | 19. Interactive Components | v2.0 | - | Pending | - |
