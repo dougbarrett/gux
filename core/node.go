@@ -37,6 +37,10 @@ type Attrs struct {
 	Name  string
 	Value string
 
+	// External marks a link to bypass client-side navigation.
+	// Use this for links that cross bundle boundaries (e.g., admin -> public).
+	External bool
+
 	// Data attributes (rendered as data-*)
 	Data map[string]string
 

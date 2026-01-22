@@ -41,6 +41,11 @@ func (r *HTMLRenderer) RenderElement(tag string, attrs Attrs, children []Node) R
 	writeAttr("name", attrs.Name)
 	writeAttr("value", attrs.Value)
 
+	// External link marker (bypass client-side navigation)
+	if attrs.External {
+		writeAttr("data-gux-external", "true")
+	}
+
 	// Data attributes
 	for k, v := range attrs.Data {
 		writeAttr("data-"+k, v)

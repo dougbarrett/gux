@@ -23,7 +23,7 @@ func Nav() core.Node {
 					),
 				),
 				core.A(
-					core.Attrs{Href: "/", Class: "text-gray-400 hover:text-white transition text-sm"},
+					core.Attrs{Href: "/", Class: "text-gray-400 hover:text-white transition text-sm", External: true},
 					core.Text("← Back to Site"),
 				),
 			),

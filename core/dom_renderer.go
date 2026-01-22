@@ -41,6 +41,11 @@ func (r *DOMRenderer) RenderElement(tag string, attrs Attrs, children []Node) Re
 	setAttr("name", attrs.Name)
 	setAttr("value", attrs.Value)
 
+	// External link marker (bypass client-side navigation)
+	if attrs.External {
+		setAttr("data-gux-external", "true")
+	}
+
 	// Data attributes
 	for k, v := range attrs.Data {
 		setAttr("data-"+k, v)

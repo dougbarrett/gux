@@ -490,6 +490,11 @@ func main() {
 			href := link.Get("href").String()
 			origin := window.Get("location").Get("origin").String()
 
+			// Skip external links (marked with data-gux-external)
+			if link.Call("getAttribute", "data-gux-external").String() == "true" {
+				continue
+			}
+
 			// Only intercept internal links
 			if len(href) >= len(origin) && href[:len(origin)] == origin {
 				link.Call("addEventListener", "click", js.FuncOf(func(this js.Value, args []js.Value) any {
@@ -668,6 +673,11 @@ func main() {
 			link := links.Call("item", i)
 			href := link.Get("href").String()
 			origin := window.Get("location").Get("origin").String()
+
+			// Skip external links (marked with data-gux-external)
+			if link.Call("getAttribute", "data-gux-external").String() == "true" {
+				continue
+			}
 
 			// Only intercept internal links
 			if len(href) >= len(origin) && href[:len(origin)] == origin {
@@ -1297,25 +1307,26 @@ func buildTailwind() error {
 		return err
 	}
 
-	// Try npx first, fall back to global tailwindcss
+	// Try global tailwindcss first (works with npm global, ruby gem, standalone binary)
+	// Then fall back to npx if global not found
 	// Tailwind v4 doesn't need -c config flag, uses CSS directives
-	cmd := exec.Command("npx", "tailwindcss",
+	args := []string{
 		"-i", ".gux/styles/input.css",
 		"-o", ".gux/dist/styles.css",
-		"--minify")
+		"--minify",
+	}
+
+	cmd := exec.Command("tailwindcss", args...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
 	if err := cmd.Run(); err != nil {
-		// Try global tailwindcss
-		cmd = exec.Command("tailwindcss",
-			"-i", ".gux/styles/input.css",
-			"-o", ".gux/dist/styles.css",
-			"--minify")
+		// Try npx as fallback (for local npm installs)
+		cmd = exec.Command("npx", append([]string{"tailwindcss"}, args...)...)
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		if err := cmd.Run(); err != nil {
-			return fmt.Errorf("Tailwind CSS build failed (install with: npm install -D tailwindcss): %w", err)
+			return fmt.Errorf("Tailwind CSS build failed (install with: npm install -D tailwindcss or gem install tailwindcss-ruby): %w", err)
 		}
 	}
 
