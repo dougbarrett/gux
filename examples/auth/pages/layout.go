@@ -71,39 +71,6 @@ func Register(r *core.Router) func() core.Node {
 	}
 }
 
-// Forgot page stub - will be replaced in Plan 04.
-func Forgot(r *core.Router) func() core.Node {
-	return func() core.Node {
-		return AuthLayout(
-			ui.Card(ui.CardProps{Children: []core.Node{
-				core.H1(core.Class("text-xl font-bold text-center p-6"), core.Text("Forgot Password - Coming Soon")),
-			}}),
-		)
-	}
-}
-
-// Reset page stub - will be replaced in Plan 04.
-func Reset(r *core.Router) func() core.Node {
-	return func() core.Node {
-		return AuthLayout(
-			ui.Card(ui.CardProps{Children: []core.Node{
-				core.H1(core.Class("text-xl font-bold text-center p-6"), core.Text("Reset Password - Coming Soon")),
-			}}),
-		)
-	}
-}
-
-// Verify page stub - will be replaced in Plan 04.
-func Verify(r *core.Router) func() core.Node {
-	return func() core.Node {
-		return AuthLayout(
-			ui.Card(ui.CardProps{Children: []core.Node{
-				core.H1(core.Class("text-xl font-bold text-center p-6"), core.Text("Verify Email - Coming Soon")),
-			}}),
-		)
-	}
-}
-
 // Dashboard page stub - shown after successful login.
 func Dashboard(r *core.Router) func() core.Node {
 	return func() core.Node {
