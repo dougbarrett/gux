@@ -21,9 +21,6 @@ go install github.com/dougbarrett/gux/cmd/gux@latest
 gux init --module github.com/youruser/myapp myapp
 cd myapp
 
-# Setup WASM runtime
-gux setup --tinygo
-
 # Run development server
 gux dev
 ```

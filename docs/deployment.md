@@ -10,7 +10,6 @@ Gux applications compile to a **single binary** with all static assets embedded.
 
 ```bash
 # Build the production binary (TinyGo is the default)
-gux setup
 gux build
 
 # Run locally
@@ -61,7 +60,7 @@ ENV GOBIN=/app/bin
 ENV PATH="/app/bin:${PATH}"
 RUN mkdir -p /app/bin && go install github.com/dougbarrett/gux/cmd/gux@latest
 COPY --chown=tinygo:tinygo . .
-RUN gux setup && gux build  # TinyGo is the default
+RUN gux build  # TinyGo is the default, wasm_exec.js injected automatically
 
 # Stage 2: Minimal production image
 FROM alpine:3.21

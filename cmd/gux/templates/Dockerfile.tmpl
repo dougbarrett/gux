@@ -19,8 +19,8 @@ RUN mkdir -p /app/bin && go install {{.GuxModule}}/cmd/gux@{{.GuxVersion}}
 COPY --chown=tinygo:tinygo . .
 
 # Build everything: WASM + server binary with embedded assets
-# TinyGo is the default compiler (no flags needed)
-RUN gux setup && gux build
+# TinyGo is the default compiler, wasm_exec.js injected automatically
+RUN gux build
 
 # Stage 2: Minimal production image
 FROM alpine:3.21

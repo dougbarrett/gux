@@ -40,10 +40,9 @@ go install github.com/dougbarrett/gux/cmd/gux@latest
 | Command | Description |
 |---------|-------------|
 | `gux init --module <path> <name>` | Create new Gux application |
-| `gux setup [--tinygo]` | Copy wasm_exec.js to public/ from Go/TinyGo |
 | `gux gen [--dir <api-dir>]` | Generate API client/server code from interfaces |
-| `gux build [--tinygo]` | Build WASM module |
-| `gux dev [--port <port>] [--tinygo]` | Build and run dev server |
+| `gux build [--go]` | Build WASM and server binary with embedded assets |
+| `gux dev [--port <port>] [--go]` | Build and run dev server |
 | `gux version` | Show version |
 | `gux help` | Show help |
 
@@ -54,14 +53,11 @@ go install github.com/dougbarrett/gux/cmd/gux@latest
 gux init --module github.com/youruser/myapp myapp
 cd myapp
 
-# Setup WASM runtime
-gux setup              # Standard Go (~5MB WASM)
-gux setup --tinygo     # TinyGo (~500KB WASM)
-
-# Install dependencies and run
-go mod tidy
+# Start development server
 gux dev
 ```
+
+Default files (index.html, manifest.json, service-worker.js, wasm_exec.js) are automatically injected at build time. To customize, create a `public/` directory with your own versions.
 
 #### Generated Project Structure
 
@@ -76,14 +72,11 @@ myapp/
 │   └── api/
 │       ├── types.go          # Shared data types
 │       └── example.go        # Example API interface
-├── public/
-│   ├── index.html            # PWA entry point
-│   ├── manifest.json         # PWA manifest
-│   ├── offline.html          # Offline fallback page
-│   └── service-worker.js     # PWA caching
 ├── go.mod                    # Go module file
 └── Dockerfile                # Multi-stage Docker build
 ```
+
+Default files (index.html, manifest.json, service-worker.js, wasm_exec.js) are injected automatically at build time. To customize, create a `public/` directory with your own versions.
 
 ## API Code Generation
 
