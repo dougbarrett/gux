@@ -1,9 +1,6 @@
 package pages
 
-import (
-	"github.com/dougbarrett/gux/core"
-	"github.com/dougbarrett/gux/ui"
-)
+import "github.com/dougbarrett/gux/core"
 
 // AuthLayout provides centered card layout for auth pages.
 func AuthLayout(children ...core.Node) core.Node {
@@ -56,17 +53,6 @@ func Home(r *core.Router) func() core.Node {
 				core.Text("Welcome to Auth Example")),
 			core.P(core.Class("mt-4 text-gray-600 dark:text-gray-300"),
 				core.Text("This example demonstrates authentication patterns in Gux.")),
-		)
-	}
-}
-
-// Register page stub - will be replaced in Plan 03.
-func Register(r *core.Router) func() core.Node {
-	return func() core.Node {
-		return AuthLayout(
-			ui.Card(ui.CardProps{Children: []core.Node{
-				core.H1(core.Class("text-xl font-bold text-center p-6"), core.Text("Register - Coming Soon")),
-			}}),
 		)
 	}
 }
