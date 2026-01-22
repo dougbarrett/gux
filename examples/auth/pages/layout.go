@@ -43,28 +43,3 @@ func PageLayout(children ...core.Node) core.Node {
 	)
 }
 
-// --- Stub pages - will be replaced in subsequent plans ---
-
-// Home is the landing page for the auth example.
-func Home(r *core.Router) func() core.Node {
-	return func() core.Node {
-		return PageLayout(
-			core.H1(core.Class("text-2xl font-bold text-gray-900 dark:text-white"),
-				core.Text("Welcome to Auth Example")),
-			core.P(core.Class("mt-4 text-gray-600 dark:text-gray-300"),
-				core.Text("This example demonstrates authentication patterns in Gux.")),
-		)
-	}
-}
-
-// Dashboard page stub - shown after successful login.
-func Dashboard(r *core.Router) func() core.Node {
-	return func() core.Node {
-		return PageLayout(
-			core.H1(core.Class("text-2xl font-bold text-gray-900 dark:text-white"),
-				core.Text("Dashboard")),
-			core.P(core.Class("mt-4 text-gray-600 dark:text-gray-300"),
-				core.Text("You are logged in!")),
-		)
-	}
-}
