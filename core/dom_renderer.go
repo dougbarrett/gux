@@ -77,13 +77,17 @@ func (r *DOMRenderer) RenderElement(tag string, attrs Attrs, children []Node) Re
 	if attrs.OnChange != nil {
 		cb := js.FuncOf(func(this js.Value, args []js.Value) any {
 			value := args[0].Get("target").Get("value").String()
+			// Suppress re-renders during change events.
+			// This allows button clicks to work - the state is updated but
+			// the DOM isn't replaced, so the click event completes normally.
+			// The re-render will happen after the click handler's side effects
+			// (like navigation or showing success messages).
+			SetInChangeEvent(true)
 			attrs.OnChange(value)
+			SetInChangeEvent(false)
 			return nil
 		})
 		// Only listen to "change" event which fires on blur.
-		// State updates happen when user leaves the field, not on every keystroke.
-		// Combined with deferred re-renders (via ScheduleRerender), this prevents
-		// focus loss and allows button clicks to work properly.
 		el.Call("addEventListener", "change", cb)
 	}
 
