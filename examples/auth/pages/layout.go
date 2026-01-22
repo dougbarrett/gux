@@ -60,17 +60,6 @@ func Home(r *core.Router) func() core.Node {
 	}
 }
 
-// Login page stub - will be replaced in Plan 03.
-func Login(r *core.Router) func() core.Node {
-	return func() core.Node {
-		return AuthLayout(
-			ui.Card(ui.CardProps{Children: []core.Node{
-				core.H1(core.Class("text-xl font-bold text-center p-6"), core.Text("Login - Coming Soon")),
-			}}),
-		)
-	}
-}
-
 // Register page stub - will be replaced in Plan 03.
 func Register(r *core.Router) func() core.Node {
 	return func() core.Node {
