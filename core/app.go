@@ -175,6 +175,7 @@ func (a *App) Run(addr string) error {
 type Router struct {
 	state    map[string]any
 	rerender func()
+	navigate func(path string)
 }
 
 // NewRouter creates a new router instance.
@@ -182,6 +183,19 @@ func NewRouter(rerender func()) *Router {
 	return &Router{
 		state:    make(map[string]any),
 		rerender: rerender,
+	}
+}
+
+// SetNavigate sets the navigation callback (called by WASM runtime).
+func (r *Router) SetNavigate(fn func(path string)) {
+	r.navigate = fn
+}
+
+// Navigate programmatically navigates to a path.
+// Only works in WASM - on server this is a no-op.
+func (r *Router) Navigate(path string) {
+	if r.navigate != nil {
+		r.navigate(path)
 	}
 }
 
@@ -208,26 +222,27 @@ func (s *State[T]) Set(val T) {
 	}
 }
 
-// StateInt creates an integer state.
-func (r *Router) StateInt(key string, initial int) *State[int] {
+// UseState creates a reactive state for any type.
+// Usage: count := core.UseState(r, "count", 0)
+//        user := core.UseState(r, "user", User{Name: "John"})
+func UseState[T any](r *Router, key string, initial T) *State[T] {
 	if _, ok := r.state[key]; !ok {
 		r.state[key] = initial
 	}
-	return &State[int]{key: key, router: r}
+	return &State[T]{key: key, router: r}
+}
+
+// StateInt creates an integer state.
+func (r *Router) StateInt(key string, initial int) *State[int] {
+	return UseState(r, key, initial)
 }
 
 // StateBool creates a boolean state.
 func (r *Router) StateBool(key string, initial bool) *State[bool] {
-	if _, ok := r.state[key]; !ok {
-		r.state[key] = initial
-	}
-	return &State[bool]{key: key, router: r}
+	return UseState(r, key, initial)
 }
 
 // StateString creates a string state.
 func (r *Router) StateString(key string, initial string) *State[string] {
-	if _, ok := r.state[key]; !ok {
-		r.state[key] = initial
-	}
-	return &State[string]{key: key, router: r}
+	return UseState(r, key, initial)
 }

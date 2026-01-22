@@ -58,15 +58,17 @@ func main() {
 		useGo := buildCmd.Bool("go", false, "Use standard Go instead of TinyGo (~5MB vs ~500KB)")
 		buildCmd.Parse(os.Args[2:])
 
-		runBuild(!*useGo) // TinyGo is default
+		runBuildNew(!*useGo) // TinyGo is default
 
 	case "dev":
 		devCmd := flag.NewFlagSet("dev", flag.ExitOnError)
-		port := devCmd.Int("port", 8080, "Port to run dev server on")
 		useGo := devCmd.Bool("go", false, "Use standard Go instead of TinyGo")
 		devCmd.Parse(os.Args[2:])
 
-		runDev(*port, !*useGo) // TinyGo is default
+		runDevNew(!*useGo) // TinyGo is default
+
+	case "clean":
+		runClean()
 
 	case "claude":
 		runClaude()
@@ -92,40 +94,39 @@ func main() {
 }
 
 func printUsage() {
-	fmt.Println(`gux - Gux application scaffolding tool
+	fmt.Println(`gux - Gux application tool
 
 Usage:
     gux init [--module <module-path>] <appname>   Create a new Gux application
     gux init --module <module-path> .             Initialize in current directory
-    gux gen [--dir <api-dir>]                     Generate API client code
     gux build [--go]                              Build WASM and server binary
-    gux dev [--port <port>] [--go]                Build and run dev server
+    gux dev [--go]                                Build, run, clean up on exit
+    gux clean                                     Remove generated files
+    gux gen [--dir <api-dir>]                     Generate API client code
     gux claude                                    Install Claude Code skill
     gux update [--check]                          Update gux to latest version
     gux version                                   Show version
     gux help                                      Show this help
 
-TinyGo is the default compiler (~500KB WASM). Use --go for standard Go (~5MB).
+TinyGo is the default compiler (~1MB WASM). Use --go for standard Go (~5MB).
 
 Examples:
     gux init --module github.com/myuser/myapp myapp   # Create new directory
     gux init --module github.com/myuser/myapp .       # Use current directory
-    gux build                # Build with TinyGo (~500KB WASM)
-    gux build --go           # Build with standard Go (~5MB WASM)
-    gux dev                  # Run dev server on :8080 (TinyGo)
-    gux dev --port 3000      # Run on custom port
-    gux claude               # Install Claude Code skill for AI assistance
+    gux build                # Build with TinyGo
+    gux build --go           # Build with standard Go
+    gux dev                  # Build, run, clean on exit
+    gux clean                # Remove bin/, .gux/, assets_gen.go
+    gux claude               # Install Claude Code skill
     gux update               # Update gux to latest release
-    gux update --check       # Check for updates without installing
 
-The init command creates a Gux application scaffold including:
-    - cmd/app/main.go       - WASM frontend entry point
-    - cmd/server/main.go    - HTTP server
-    - internal/api/         - Shared API definitions
-    - Dockerfile            - Multi-stage Docker build
+Project structure:
+    app.go                   - Your application entry point
+    pages/                   - Your page components
+    .gux/                    - Generated files (gitignored)
+    assets_gen.go            - Asset embedding (gitignored)
+    bin/                     - Built binary (gitignored)
 
 After scaffolding, run:
-    gux dev       # Build and run dev server
-
-To customize the HTML shell, create public/index.html (it will override the default).`)
+    gux dev       # Build, run, and auto-clean on exit`)
 }

@@ -11,7 +11,8 @@ func main() {
 	app.SetTitle("Gux Counter")
 
 	app.Routes().
-		Hybrid("/", pages.Home)
+		Hybrid("/", pages.Home).
+		Hybrid("/about", pages.About)
 
 	app.Run(":8081")
 }
