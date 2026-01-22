@@ -3,11 +3,11 @@
 ## Current Position
 
 Phase: 16 — Component Foundation
-Plan: —
-Status: Ready to plan Phase 16
-Last activity: 2026-01-22 — Roadmap created
+Plan: 01 of 4
+Status: In progress
+Last activity: 2026-01-22 — Completed 16-01-PLAN.md (UI Utilities)
 
-Progress: ░░░░░░░░░░ 0%
+Progress: █░░░░░░░░░ 5%
 
 ## Project Reference
 
@@ -22,6 +22,10 @@ See: .planning/PROJECT.md (updated 2026-01-22)
 
 **Phases:**
 - [ ] Phase 16: Component Foundation — utilities, Button, Card, layout primitives
+  - [x] Plan 01: UI Utilities (MergeClasses, ConditionalClass)
+  - [ ] Plan 02: Button component
+  - [ ] Plan 03: Card component
+  - [ ] Plan 04: Layout primitives
 - [ ] Phase 17: Form Components — Input, Textarea, Select, Checkbox, Radio
 - [ ] Phase 18: Data Display — Table, DataTable[T], Badge, Avatar, Pagination
 - [ ] Phase 19: Interactive — Modal, Dropdown, Tabs, Toast, Tooltip
@@ -46,6 +50,11 @@ Full decision log preserved in milestone archives:
 - Core auth flows only (no OAuth)
 - No new stack additions needed
 - 8 phases: 4 component phases + 4 example apps
+
+**Phase 16 decisions:**
+- Exported function names (MergeClasses, ConditionalClass) for public API
+- Whitespace trimming in MergeClasses for robustness
+- Table-driven tests with t.Run for comprehensive coverage
 
 ### Research Findings
 
@@ -74,9 +83,9 @@ None
 ## Session Continuity
 
 Last session: 2026-01-22
-Stopped at: Roadmap complete, ready to plan Phase 16
+Stopped at: Completed 16-01-PLAN.md
 Resume file: None
 
 ---
 
-*Last updated: 2026-01-22 after roadmap creation*
+*Last updated: 2026-01-22 after completing 16-01-PLAN.md*
