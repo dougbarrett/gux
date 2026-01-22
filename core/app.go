@@ -16,22 +16,25 @@ type Route struct {
 	Path    string   // /posts, /posts/:id
 	Handler PageFunc // The page function
 	Hybrid  bool     // If true, SSR + WASM hydration
+	Bundle  string   // Bundle name (empty = default "app" bundle)
 }
 
 // App is the main application container.
 type App struct {
-	routes     []Route
-	apiPrefix  string
-	wasmBinary []byte
-	wasmExecJS []byte
-	stylesCSS  []byte
-	title      string
-	db         interface{}   // Database connection (e.g., *gorm.DB)
-	crudModels []CRUDModel   // Registered CRUD models
+	routes      []Route
+	apiPrefix   string
+	wasmBinary  []byte            // Default bundle (backward compatibility)
+	wasmBundles map[string][]byte // Named bundles: "admin" -> admin.wasm bytes
+	wasmExecJS  []byte
+	stylesCSS   []byte
+	title       string
+	db          interface{}   // Database connection (e.g., *gorm.DB)
+	crudModels  []CRUDModel   // Registered CRUD models
 }
 
 // Default assets (set by generated code)
 var defaultWasmBinary []byte
+var defaultWasmBundles = make(map[string][]byte)
 var defaultWasmExecJS []byte
 var defaultStylesCSS []byte
 
@@ -43,14 +46,27 @@ func SetDefaultAssets(wasmBinary, wasmExecJS, stylesCSS []byte) {
 	defaultStylesCSS = stylesCSS
 }
 
+// SetDefaultBundle registers a named WASM bundle.
+// Called by generated assets_gen.go for each bundle.
+func SetDefaultBundle(name string, wasmBinary []byte) {
+	defaultWasmBundles[name] = wasmBinary
+}
+
 // New creates a new App instance.
 func New() *App {
+	// Copy default bundles
+	bundles := make(map[string][]byte)
+	for k, v := range defaultWasmBundles {
+		bundles[k] = v
+	}
+
 	return &App{
-		apiPrefix:  "/__gux_api",
-		title:      "Gux App",
-		wasmBinary: defaultWasmBinary,
-		wasmExecJS: defaultWasmExecJS,
-		stylesCSS:  defaultStylesCSS,
+		apiPrefix:   "/__gux_api",
+		title:       "Gux App",
+		wasmBinary:  defaultWasmBinary,
+		wasmBundles: bundles,
+		wasmExecJS:  defaultWasmExecJS,
+		stylesCSS:   defaultStylesCSS,
 	}
 }
 
@@ -109,6 +125,82 @@ func (rb *RouteBuilder) Hybrid(path string, handler PageFunc) *RouteBuilder {
 	return rb
 }
 
+// RouteGroupOption configures a route group.
+type RouteGroupOption func(*RouteGroup)
+
+// WithBundle assigns routes in this group to a separate WASM bundle.
+// Routes in different bundles are compiled into separate WASM files,
+// reducing initial download size for each section of your app.
+//
+// Usage:
+//
+//	app.RouteGroup("/admin", core.WithBundle("admin")).
+//	    Hybrid("/", admin.Dashboard).
+//	    Hybrid("/account", admin.Account)
+func WithBundle(name string) RouteGroupOption {
+	return func(rg *RouteGroup) {
+		rg.bundle = name
+	}
+}
+
+// RouteGroup represents a group of routes with a common prefix and options.
+type RouteGroup struct {
+	app    *App
+	prefix string
+	bundle string // WASM bundle name (empty = default)
+}
+
+// RouteGroup creates a new route group with the given prefix and options.
+// Use WithBundle() to assign the group to a separate WASM bundle.
+//
+// Usage:
+//
+//	app.RouteGroup("/admin", core.WithBundle("admin")).
+//	    Hybrid("/", admin.Dashboard).
+//	    Hybrid("/users", admin.Users)
+func (a *App) RouteGroup(prefix string, opts ...RouteGroupOption) *RouteGroup {
+	rg := &RouteGroup{
+		app:    a,
+		prefix: prefix,
+	}
+	for _, opt := range opts {
+		opt(rg)
+	}
+	return rg
+}
+
+// GET registers a GET route in the group (SSR only).
+func (rg *RouteGroup) GET(path string, handler PageFunc) *RouteGroup {
+	fullPath := rg.prefix + path
+	if path == "/" {
+		fullPath = rg.prefix
+	}
+	rg.app.routes = append(rg.app.routes, Route{
+		Method:  "GET",
+		Path:    fullPath,
+		Handler: handler,
+		Hybrid:  false,
+		Bundle:  rg.bundle,
+	})
+	return rg
+}
+
+// Hybrid registers a route with SSR + WASM hydration in the group.
+func (rg *RouteGroup) Hybrid(path string, handler PageFunc) *RouteGroup {
+	fullPath := rg.prefix + path
+	if path == "/" {
+		fullPath = rg.prefix
+	}
+	rg.app.routes = append(rg.app.routes, Route{
+		Method:  "GET",
+		Path:    fullPath,
+		Handler: handler,
+		Hybrid:  true,
+		Bundle:  rg.bundle,
+	})
+	return rg
+}
+
 // Run starts the HTTP server on the given address.
 func (a *App) Run(addr string) error {
 	mux := http.NewServeMux()
@@ -116,11 +208,20 @@ func (a *App) Run(addr string) error {
 	// Register CRUD handlers
 	a.registerCRUDHandlers(mux)
 
-	// Serve WASM binary (if assets are set)
+	// Serve default WASM binary (if assets are set)
 	if len(a.wasmBinary) > 0 {
 		mux.HandleFunc("/app.wasm", func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", "application/wasm")
 			w.Write(a.wasmBinary)
+		})
+	}
+
+	// Serve named WASM bundles (e.g., /admin.wasm)
+	for name, binary := range a.wasmBundles {
+		bundleBinary := binary // Capture for closure
+		mux.HandleFunc("/"+name+".wasm", func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/wasm")
+			w.Write(bundleBinary)
 		})
 	}
 
@@ -162,6 +263,7 @@ func (a *App) Run(addr string) error {
 	for _, route := range a.routes {
 		handler := route.Handler
 		hybrid := route.Hybrid
+		bundle := route.Bundle
 		mux.HandleFunc(route.Path, func(w http.ResponseWriter, r *http.Request) {
 			router := NewRouterWithDB(a.db)
 			component := handler(router)
@@ -169,7 +271,15 @@ func (a *App) Run(addr string) error {
 
 			w.Header().Set("Content-Type", "text/html")
 
-			if hybrid && len(a.wasmBinary) > 0 {
+			// Determine which WASM to use
+			wasmPath := "/app.wasm"
+			hasWasm := len(a.wasmBinary) > 0
+			if bundle != "" {
+				wasmPath = "/" + bundle + ".wasm"
+				_, hasWasm = a.wasmBundles[bundle]
+			}
+
+			if hybrid && hasWasm {
 				// Serialize state for hydration
 				stateJSON, _ := json.Marshal(router.state)
 
@@ -186,11 +296,11 @@ func (a *App) Run(addr string) error {
     <script src="/wasm_exec.js"></script>
     <script>
         const go = new Go();
-        WebAssembly.instantiateStreaming(fetch("/app.wasm"), go.importObject)
+        WebAssembly.instantiateStreaming(fetch("%s"), go.importObject)
             .then(result => go.run(result.instance));
     </script>
 </body>
-</html>`, a.title, html, stateJSON)
+</html>`, a.title, html, stateJSON, wasmPath)
 			} else {
 				// SSR only, no WASM
 				fmt.Fprintf(w, `<!DOCTYPE html>

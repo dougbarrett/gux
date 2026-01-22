@@ -5,6 +5,7 @@ import (
 
 	"github.com/dougbarrett/gux/core"
 	"github.com/dougbarrett/gux/examples/minimal/.gux/api"
+	"github.com/dougbarrett/gux/examples/minimal/admin"
 	"github.com/dougbarrett/gux/examples/minimal/models"
 	"github.com/dougbarrett/gux/examples/minimal/pages"
 	"gorm.io/driver/sqlite"
@@ -40,9 +41,15 @@ func main() {
 	//          GET/PUT/DELETE /__gux_api/crud/counters/:id
 	app.CRUD(models.Counter{})
 
+	// Public routes (default bundle)
 	app.Routes().
 		Hybrid("/", pages.Home).
 		Hybrid("/about", pages.About)
+
+	// Admin routes (separate "admin" bundle)
+	app.RouteGroup("/admin", core.WithBundle("admin")).
+		Hybrid("/", admin.Dashboard).
+		Hybrid("/account", admin.Account)
 
 	app.Run(":8081")
 }

@@ -51,6 +51,14 @@ type PageRoute struct {
 	Path     string
 	Handler  string // e.g., "pages.Home"
 	IsHybrid bool
+	Bundle   string // Bundle name (empty = default "app")
+}
+
+// BundleInfo represents a WASM bundle with its routes and imports
+type BundleInfo struct {
+	Name    string      // Bundle name (e.g., "admin")
+	Routes  []PageRoute // Routes in this bundle
+	Imports []string    // Package imports needed (e.g., "github.com/.../admin")
 }
 
 // CRUDModel represents a registered CRUD model
@@ -184,6 +192,190 @@ func parseRoutes(filename string) ([]PageRoute, string, error) {
 	})
 
 	return routes, pagesImport, nil
+}
+
+// parseRoutesAndBundles parses the main app file to find all routes and bundles
+func parseRoutesAndBundles(filename string) (map[string]*BundleInfo, map[string]string, error) {
+	fset := token.NewFileSet()
+	node, err := parser.ParseFile(fset, filename, nil, parser.ParseComments)
+	if err != nil {
+		return nil, nil, fmt.Errorf("parse %s: %w", filename, err)
+	}
+
+	// Bundle name -> BundleInfo
+	bundles := make(map[string]*BundleInfo)
+	bundles["app"] = &BundleInfo{Name: "app"} // Default bundle
+
+	// Package alias -> import path (e.g., "pages" -> "github.com/.../pages")
+	imports := make(map[string]string)
+
+	// Find all imports
+	for _, imp := range node.Imports {
+		path := strings.Trim(imp.Path.Value, `"`)
+		var alias string
+		if imp.Name != nil {
+			alias = imp.Name.Name
+		} else {
+			parts := strings.Split(path, "/")
+			alias = parts[len(parts)-1]
+		}
+		imports[alias] = path
+	}
+
+	// Helper to extract RouteGroup info from a call expression
+	extractRouteGroupInfo := func(call *ast.CallExpr) (prefix string, bundle string, found bool) {
+		sel, ok := call.Fun.(*ast.SelectorExpr)
+		if !ok || sel.Sel.Name != "RouteGroup" {
+			return "", "", false
+		}
+
+		// Get prefix (first argument)
+		if len(call.Args) >= 1 {
+			if lit, ok := call.Args[0].(*ast.BasicLit); ok {
+				prefix = strings.Trim(lit.Value, `"`)
+			}
+		}
+
+		// Check for WithBundle option in remaining arguments
+		for i := 1; i < len(call.Args); i++ {
+			if callArg, ok := call.Args[i].(*ast.CallExpr); ok {
+				if selArg, ok := callArg.Fun.(*ast.SelectorExpr); ok {
+					if selArg.Sel.Name == "WithBundle" && len(callArg.Args) >= 1 {
+						if lit, ok := callArg.Args[0].(*ast.BasicLit); ok {
+							bundle = strings.Trim(lit.Value, `"`)
+						}
+					}
+				}
+			}
+		}
+
+		return prefix, bundle, true
+	}
+
+	// Helper to walk up the call chain to find RouteGroup
+	findRouteGroupInChain := func(call *ast.CallExpr) (prefix string, bundle string, found bool) {
+		current := call
+		for {
+			sel, ok := current.Fun.(*ast.SelectorExpr)
+			if !ok {
+				return "", "", false
+			}
+
+			// Check if the receiver is a call expression
+			chainedCall, ok := sel.X.(*ast.CallExpr)
+			if !ok {
+				return "", "", false
+			}
+
+			// Check if this call is RouteGroup
+			if prefix, bundle, found := extractRouteGroupInfo(chainedCall); found {
+				return prefix, bundle, true
+			}
+
+			// Check if the chained call is a method call (Hybrid, GET, etc.)
+			chainedSel, ok := chainedCall.Fun.(*ast.SelectorExpr)
+			if !ok {
+				return "", "", false
+			}
+
+			// If it's another Hybrid/GET/etc., keep walking up
+			if chainedSel.Sel.Name == "Hybrid" || chainedSel.Sel.Name == "GET" || chainedSel.Sel.Name == "POST" {
+				current = chainedCall
+				continue
+			}
+
+			return "", "", false
+		}
+	}
+
+	// Find all Hybrid calls
+	ast.Inspect(node, func(n ast.Node) bool {
+		call, ok := n.(*ast.CallExpr)
+		if !ok {
+			return true
+		}
+
+		sel, ok := call.Fun.(*ast.SelectorExpr)
+		if !ok {
+			return true
+		}
+
+		// Only process Hybrid calls
+		if sel.Sel.Name != "Hybrid" || len(call.Args) < 2 {
+			return true
+		}
+
+		// Get path
+		path := ""
+		if lit, ok := call.Args[0].(*ast.BasicLit); ok {
+			path = strings.Trim(lit.Value, `"`)
+		}
+
+		// Get handler
+		handler := ""
+		pkgAlias := ""
+		switch h := call.Args[1].(type) {
+		case *ast.SelectorExpr:
+			if ident, ok := h.X.(*ast.Ident); ok {
+				pkgAlias = ident.Name
+				handler = ident.Name + "." + h.Sel.Name
+			}
+		case *ast.Ident:
+			handler = h.Name
+		}
+
+		if handler == "" {
+			return true
+		}
+
+		// Determine bundle by walking up the call chain
+		bundleName := "app"
+		prefix, bundle, found := findRouteGroupInChain(call)
+		if found {
+			if bundle != "" {
+				bundleName = bundle
+				// Ensure bundle exists
+				if _, exists := bundles[bundleName]; !exists {
+					bundles[bundleName] = &BundleInfo{Name: bundleName}
+				}
+			}
+			// Apply prefix to path
+			if path == "/" {
+				path = prefix
+			} else {
+				path = prefix + path
+			}
+		}
+
+		route := PageRoute{
+			Path:     path,
+			Handler:  handler,
+			IsHybrid: true,
+			Bundle:   bundleName,
+		}
+
+		bundles[bundleName].Routes = append(bundles[bundleName].Routes, route)
+
+		// Track import needed for this bundle
+		if pkgAlias != "" {
+			if importPath, ok := imports[pkgAlias]; ok {
+				found := false
+				for _, imp := range bundles[bundleName].Imports {
+					if imp == importPath {
+						found = true
+						break
+					}
+				}
+				if !found {
+					bundles[bundleName].Imports = append(bundles[bundleName].Imports, importPath)
+				}
+			}
+		}
+
+		return true
+	})
+
+	return bundles, imports, nil
 }
 
 // generateWasmEntryPoint generates .gux/wasm/main.go
@@ -347,6 +539,230 @@ func main() {
 `, pagesImport, routeCode.String())
 
 	return os.WriteFile(".gux/wasm/main.go", []byte(code), 0644)
+}
+
+// generateBundleWasmEntryPoint generates a WASM entry point for a specific bundle
+func generateBundleWasmEntryPoint(bundleName string, bundle *BundleInfo) error {
+	wasmDir := ".gux/wasm_" + bundleName
+	if bundleName == "app" {
+		wasmDir = ".gux/wasm"
+	}
+
+	if err := os.MkdirAll(wasmDir, 0755); err != nil {
+		return err
+	}
+
+	routes := bundle.Routes
+	imports := bundle.Imports
+
+	// Build the router/page matching code
+	var routeCode strings.Builder
+	if len(routes) == 1 {
+		// Single route - simple case
+		routeCode.WriteString(fmt.Sprintf("\t\tcomponent := %s(router)\n", routes[0].Handler))
+	} else {
+		// Multiple routes - add path matching
+		routeCode.WriteString("\t\tpath := js.Global().Get(\"location\").Get(\"pathname\").String()\n")
+		routeCode.WriteString("\t\tvar component func() core.Node\n")
+		routeCode.WriteString("\t\tswitch path {\n")
+		for _, route := range routes {
+			routeCode.WriteString(fmt.Sprintf("\t\tcase %q:\n", route.Path))
+			routeCode.WriteString(fmt.Sprintf("\t\t\tcomponent = %s(router)\n", route.Handler))
+		}
+		routeCode.WriteString("\t\tdefault:\n")
+		// Find a default handler (first route or "/" route)
+		defaultHandler := ""
+		for _, r := range routes {
+			if r.Path == "/" || strings.HasSuffix(r.Path, "/") {
+				defaultHandler = r.Handler
+				break
+			}
+		}
+		if defaultHandler == "" && len(routes) > 0 {
+			defaultHandler = routes[0].Handler
+		}
+		if defaultHandler != "" {
+			routeCode.WriteString(fmt.Sprintf("\t\t\tcomponent = %s(router)\n", defaultHandler))
+		}
+		routeCode.WriteString("\t\t}\n")
+	}
+
+	// Build imports section
+	var importSection strings.Builder
+	for _, imp := range imports {
+		parts := strings.Split(imp, "/")
+		alias := parts[len(parts)-1]
+		importSection.WriteString(fmt.Sprintf("\t\"%s\"\n", imp))
+		_ = alias // Alias inferred from path
+	}
+
+	code := fmt.Sprintf(`//go:build js && wasm
+
+package main
+
+import (
+	"encoding/json"
+	"syscall/js"
+
+	"github.com/dougbarrett/gux/core"
+%s)
+
+// fetchLoader fetches page state from loader endpoint
+func fetchLoader(path string, callback func(map[string]any)) {
+	loaderPath := "/__gux_api/pages" + path
+	if path == "/" {
+		loaderPath = "/__gux_api/pages/index"
+	}
+
+	promise := js.Global().Call("fetch", loaderPath)
+	promise.Call("then", js.FuncOf(func(this js.Value, args []js.Value) any {
+		resp := args[0]
+		if resp.Get("ok").Bool() {
+			resp.Call("json").Call("then", js.FuncOf(func(this js.Value, args []js.Value) any {
+				// Convert JS object to Go map
+				state := make(map[string]any)
+				jsObj := args[0]
+				keys := js.Global().Get("Object").Call("keys", jsObj)
+				for i := 0; i < keys.Get("length").Int(); i++ {
+					key := keys.Index(i).String()
+					val := jsObj.Get(key)
+					switch val.Type() {
+					case js.TypeNumber:
+						state[key] = val.Float()
+					case js.TypeBoolean:
+						state[key] = val.Bool()
+					case js.TypeString:
+						state[key] = val.String()
+					}
+				}
+				callback(state)
+				return nil
+			}))
+		} else {
+			callback(nil)
+		}
+		return nil
+	}))
+}
+
+func main() {
+	document := js.Global().Get("document")
+	window := js.Global()
+	container := document.Call("getElementById", "app")
+
+	var router *core.Router
+	var render func()
+
+	render = func() {
+		container.Set("innerHTML", "")
+%s
+		node := component()
+		result := node.Render(core.DOM())
+		if domVal := result.DOMValue(); domVal != nil {
+			container.Call("appendChild", domVal.(js.Value))
+		}
+
+		// Intercept link clicks for client-side navigation
+		links := document.Call("querySelectorAll", "a[href]")
+		for i := 0; i < links.Get("length").Int(); i++ {
+			link := links.Call("item", i)
+			href := link.Get("href").String()
+			origin := window.Get("location").Get("origin").String()
+
+			// Only intercept internal links
+			if len(href) >= len(origin) && href[:len(origin)] == origin {
+				link.Call("addEventListener", "click", js.FuncOf(func(this js.Value, args []js.Value) any {
+					args[0].Call("preventDefault")
+					path := this.Get("pathname").String()
+					router.Navigate(path)
+					return nil
+				}))
+			}
+		}
+	}
+
+	// Navigate fetches page data then renders
+	navigate := func(path string) {
+		window.Get("history").Call("pushState", nil, "", path)
+		fetchLoader(path, func(state map[string]any) {
+			if state != nil {
+				router.Hydrate(state)
+			}
+			render()
+		})
+	}
+
+	router = core.NewRouter(render)
+	router.SetNavigate(navigate)
+
+	// Hydrate state from SSR
+	stateEl := document.Call("getElementById", "__gux_state")
+	if !stateEl.IsNull() && !stateEl.IsUndefined() {
+		stateJSON := stateEl.Get("textContent").String()
+		var state map[string]any
+		if err := json.Unmarshal([]byte(stateJSON), &state); err == nil {
+			router.Hydrate(state)
+		}
+	}
+
+	// Handle browser back/forward
+	window.Call("addEventListener", "popstate", js.FuncOf(func(this js.Value, args []js.Value) any {
+		render()
+		return nil
+	}))
+
+	render()
+
+	select {}
+}
+`, importSection.String(), routeCode.String())
+
+	return os.WriteFile(wasmDir+"/main.go", []byte(code), 0644)
+}
+
+// buildWasmBundle builds a specific WASM bundle
+func buildWasmBundle(bundleName string, tinygo bool) error {
+	wasmDir := ".gux/wasm_" + bundleName
+	outputFile := ".gux/dist/" + bundleName + ".wasm"
+
+	if bundleName == "app" {
+		wasmDir = ".gux/wasm"
+		outputFile = ".gux/dist/app.wasm"
+	}
+
+	if err := os.MkdirAll(".gux/dist", 0755); err != nil {
+		return err
+	}
+
+	fmt.Printf("Building WASM bundle: %s...\n", bundleName)
+
+	var cmd *exec.Cmd
+	if tinygo {
+		cmd = exec.Command("tinygo", "build", "-o", outputFile, "-target", "wasm", "./"+wasmDir)
+	} else {
+		cmd = exec.Command("go", "build", "-o", outputFile, "./"+wasmDir)
+		cmd.Env = append(os.Environ(), "GOOS=js", "GOARCH=wasm")
+	}
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("WASM build failed for bundle %s: %w", bundleName, err)
+	}
+
+	// Get size for display
+	info, err := os.Stat(outputFile)
+	if err != nil {
+		return err
+	}
+	sizeMB := float64(info.Size()) / 1024 / 1024
+	compiler := "TinyGo"
+	if !tinygo {
+		compiler = "Go"
+	}
+	fmt.Printf("Built %s (%.2f MB) with %s\n", outputFile, sizeMB, compiler)
+
+	return nil
 }
 
 // generateAPIClient generates .gux/api/client.go with WASM-compatible DTOs
@@ -730,8 +1146,42 @@ func Init(database *gorm.DB) {
 	return os.WriteFile(".gux/api/client_server.go", []byte(stubFile), 0644)
 }
 
-// generateAssetsFile generates assets_gen.go
-func generateAssetsFile(modulePath string) error {
+// generateAssetsFile generates assets_gen.go with support for multiple bundles
+func generateAssetsFile(modulePath string, bundles []string) error {
+	var embedCode strings.Builder
+	var initCode strings.Builder
+
+	// Default bundle (app.wasm)
+	embedCode.WriteString(`//go:embed .gux/dist/app.wasm
+var wasmBinary []byte
+
+//go:embed .gux/dist/wasm_exec.js
+var wasmExecJS []byte
+
+//go:embed .gux/dist/styles.css
+var stylesCSS []byte
+`)
+
+	// Additional bundles
+	for _, bundle := range bundles {
+		if bundle != "app" {
+			embedCode.WriteString(fmt.Sprintf(`
+//go:embed .gux/dist/%s.wasm
+var wasm%s []byte
+`, bundle, strings.Title(bundle)))
+		}
+	}
+
+	// Init function
+	initCode.WriteString("\tfunc init() {\n")
+	initCode.WriteString("\t\tcore.SetDefaultAssets(wasmBinary, wasmExecJS, stylesCSS)\n")
+	for _, bundle := range bundles {
+		if bundle != "app" {
+			initCode.WriteString(fmt.Sprintf("\t\tcore.SetDefaultBundle(%q, wasm%s)\n", bundle, strings.Title(bundle)))
+		}
+	}
+	initCode.WriteString("\t}\n")
+
 	code := fmt.Sprintf(`// Code generated by gux; DO NOT EDIT.
 package main
 
@@ -741,19 +1191,9 @@ import (
 	"github.com/dougbarrett/gux/core"
 )
 
-//go:embed .gux/dist/app.wasm
-var wasmBinary []byte
+%s
+%s`, embedCode.String(), initCode.String())
 
-//go:embed .gux/dist/wasm_exec.js
-var wasmExecJS []byte
-
-//go:embed .gux/dist/styles.css
-var stylesCSS []byte
-
-func init() {
-	core.SetDefaultAssets(wasmBinary, wasmExecJS, stylesCSS)
-}
-`)
 	return os.WriteFile("assets_gen.go", []byte(code), 0644)
 }
 
@@ -928,25 +1368,26 @@ func runBuildNew(tinygo bool) {
 		os.Exit(1)
 	}
 
-	// Parse routes from app file
-	routes, pagesImport, err := parseRoutes(appFile)
+	// Parse routes and bundles from app file
+	bundles, imports, err := parseRoutesAndBundles(appFile)
 	if err != nil {
 		fmt.Printf("Error parsing routes: %v\n", err)
 		os.Exit(1)
 	}
 
-	if len(routes) == 0 {
+	// Count total routes
+	totalRoutes := 0
+	for _, bundle := range bundles {
+		totalRoutes += len(bundle.Routes)
+	}
+	if totalRoutes == 0 {
 		fmt.Println("Warning: no Hybrid routes found")
 	}
 
-	// If no pages import found, construct it from current package path
-	if pagesImport == "" {
-		pkgPath, err := getCurrentPackagePath()
-		if err != nil {
-			fmt.Printf("Error getting package path: %v\n", err)
-			os.Exit(1)
-		}
-		pagesImport = pkgPath + "/pages"
+	// Collect bundle names
+	bundleNames := make([]string, 0, len(bundles))
+	for name := range bundles {
+		bundleNames = append(bundleNames, name)
 	}
 
 	// Parse CRUD models from app file
@@ -975,11 +1416,17 @@ func runBuildNew(tinygo bool) {
 		}
 	}
 
-	// Generate WASM entry point
-	fmt.Println("Generating WASM entry point...")
-	if err := generateWasmEntryPoint(modulePath, pagesImport, routes); err != nil {
-		fmt.Printf("Error generating WASM entry: %v\n", err)
-		os.Exit(1)
+	// Generate WASM entry points for each bundle
+	fmt.Println("Generating WASM entry points...")
+	for name, bundle := range bundles {
+		if len(bundle.Routes) == 0 {
+			continue // Skip bundles with no routes
+		}
+		if err := generateBundleWasmEntryPoint(name, bundle); err != nil {
+			fmt.Printf("Error generating WASM entry for bundle %s: %v\n", name, err)
+			os.Exit(1)
+		}
+		fmt.Printf("  Generated entry point for bundle: %s (%d routes)\n", name, len(bundle.Routes))
 	}
 
 	// Copy wasm_exec.js
@@ -988,10 +1435,15 @@ func runBuildNew(tinygo bool) {
 		os.Exit(1)
 	}
 
-	// Build WASM
-	if err := buildWasmNew(tinygo); err != nil {
-		fmt.Printf("Error: %v\n", err)
-		os.Exit(1)
+	// Build WASM for each bundle
+	for name, bundle := range bundles {
+		if len(bundle.Routes) == 0 {
+			continue // Skip bundles with no routes
+		}
+		if err := buildWasmBundle(name, tinygo); err != nil {
+			fmt.Printf("Error: %v\n", err)
+			os.Exit(1)
+		}
 	}
 
 	// Build Tailwind CSS
@@ -1000,12 +1452,15 @@ func runBuildNew(tinygo bool) {
 		os.Exit(1)
 	}
 
-	// Generate assets_gen.go
+	// Generate assets_gen.go with all bundles
 	fmt.Println("Generating assets...")
-	if err := generateAssetsFile(modulePath); err != nil {
+	if err := generateAssetsFile(modulePath, bundleNames); err != nil {
 		fmt.Printf("Error generating assets: %v\n", err)
 		os.Exit(1)
 	}
+
+	// Silence unused variable warning for imports (used for debugging)
+	_ = imports
 
 	// Create bin directory
 	if err := os.MkdirAll("bin", 0755); err != nil {
