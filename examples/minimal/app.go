@@ -1,11 +1,13 @@
 package main
 
 import (
+	"errors"
 	"log"
 
 	"github.com/dougbarrett/gux/core"
 	"github.com/dougbarrett/gux/examples/minimal/.gux/api"
 	"github.com/dougbarrett/gux/examples/minimal/admin"
+	"github.com/dougbarrett/gux/examples/minimal/dto"
 	"github.com/dougbarrett/gux/examples/minimal/models"
 	"github.com/dougbarrett/gux/examples/minimal/pages"
 	"gorm.io/driver/sqlite"
@@ -20,13 +22,32 @@ func main() {
 	}
 
 	// Auto-migrate models
-	db.AutoMigrate(&models.Counter{})
+	db.AutoMigrate(&models.Counter{}, &models.User{}, &models.Post{})
 
 	// Create initial counter if none exists
 	var count int64
 	db.Model(&models.Counter{}).Count(&count)
 	if count == 0 {
 		db.Create(&models.Counter{Name: "default", Value: 0})
+	}
+
+	// Seed some users if none exist
+	var userCount int64
+	db.Model(&models.User{}).Count(&userCount)
+	if userCount == 0 {
+		// Create users with properly hashed passwords
+		admin := models.User{Email: "admin@example.com", Name: "Admin User", Role: "admin"}
+		admin.SetPassword("admin123")
+		db.Create(&admin)
+
+		user := models.User{Email: "user@example.com", Name: "Regular User", Role: "user"}
+		user.SetPassword("user123")
+		db.Create(&user)
+
+		// Create some posts for the users
+		db.Create(&models.Post{Title: "Getting Started with Gux", Content: "This tutorial covers the basics of building web apps with Gux framework.", UserID: admin.ID})
+		db.Create(&models.Post{Title: "Advanced CRUD Patterns", Content: "Learn how to implement custom hooks and DTOs for secure API design.", UserID: admin.ID})
+		db.Create(&models.Post{Title: "My First Post", Content: "Hello from a regular user!", UserID: user.ID})
 	}
 
 	// Initialize API with database for server-side queries
@@ -41,6 +62,63 @@ func main() {
 	//          GET/PUT/DELETE /__gux_api/crud/counters/:id
 	app.CRUD(models.Counter{})
 
+	// Register CRUD for User with DTOs and password hashing hooks
+	// List: returns UserList (no password hash)
+	// Detail: returns UserDetail (includes posts, no password hash)
+	app.CRUD(models.User{},
+		core.WithListDTO(dto.UserList{}),
+		core.WithDetailDTO(dto.UserDetail{}, "Posts"),
+		core.WithCreateHook(func(data map[string]interface{}) (interface{}, error) {
+			user := &models.User{}
+			if email, ok := data["email"].(string); ok {
+				user.Email = email
+			} else {
+				return nil, errors.New("email is required")
+			}
+			if name, ok := data["name"].(string); ok {
+				user.Name = name
+			}
+			if role, ok := data["role"].(string); ok {
+				user.Role = role
+			} else {
+				user.Role = "user" // default role
+			}
+			if password, ok := data["password"].(string); ok && password != "" {
+				if err := user.SetPassword(password); err != nil {
+					return nil, errors.New("failed to hash password")
+				}
+			} else {
+				return nil, errors.New("password is required")
+			}
+			return user, nil
+		}),
+		core.WithUpdateHook(func(existing interface{}, data map[string]interface{}) (interface{}, error) {
+			user := existing.(*models.User)
+			if email, ok := data["email"].(string); ok {
+				user.Email = email
+			}
+			if name, ok := data["name"].(string); ok {
+				user.Name = name
+			}
+			if role, ok := data["role"].(string); ok {
+				user.Role = role
+			}
+			// Only update password if provided
+			if password, ok := data["password"].(string); ok && password != "" {
+				if err := user.SetPassword(password); err != nil {
+					return nil, errors.New("failed to hash password")
+				}
+			}
+			return user, nil
+		}),
+	)
+
+	// Register CRUD for Post with DTOs
+	app.CRUD(models.Post{},
+		core.WithListDTO(dto.PostList{}),
+		core.WithDetailDTO(dto.PostDetail{}, "User"),
+	)
+
 	// Public routes (default bundle)
 	app.Routes().
 		Hybrid("/", pages.Home).
@@ -49,6 +127,14 @@ func main() {
 	// Admin routes (separate "admin" bundle)
 	app.RouteGroup("/admin", core.WithBundle("admin")).
 		Hybrid("/", admin.Dashboard).
+		Hybrid("/users", admin.Users).
+		Hybrid("/users/new", admin.UserNew).
+		Hybrid("/users/:id", admin.UserDetail).
+		Hybrid("/users/:id/edit", admin.UserEdit).
+		Hybrid("/users/:id/posts/new", admin.PostNew).
+		Hybrid("/posts", admin.Posts).
+		Hybrid("/posts/:id", admin.PostDetail).
+		Hybrid("/posts/:id/edit", admin.PostEdit).
 		Hybrid("/account", admin.Account)
 
 	app.Run(":8081")

@@ -80,7 +80,28 @@ func (r *DOMRenderer) RenderElement(tag string, attrs Attrs, children []Node) Re
 			attrs.OnChange(value)
 			return nil
 		})
+		// Only listen to "change" event which fires on blur.
+		// State updates happen when user leaves the field, not on every keystroke.
+		// Combined with deferred re-renders (via ScheduleRerender), this prevents
+		// focus loss and allows button clicks to work properly.
 		el.Call("addEventListener", "change", cb)
+	}
+
+	if attrs.OnEnter != nil {
+		cb := js.FuncOf(func(this js.Value, args []js.Value) any {
+			event := args[0]
+			if event.Get("key").String() == "Enter" {
+				event.Call("preventDefault")
+				// Get the current value and trigger change before calling OnEnter
+				value := event.Get("target").Get("value").String()
+				if attrs.OnChange != nil {
+					attrs.OnChange(value)
+				}
+				attrs.OnEnter()
+			}
+			return nil
+		})
+		el.Call("addEventListener", "keydown", cb)
 	}
 
 	// Render and append children

@@ -18,6 +18,14 @@ func Nav() core.Node {
 						core.Text("Dashboard"),
 					),
 					core.A(
+						core.Attrs{Href: "/admin/users", Class: "text-gray-300 hover:text-white transition"},
+						core.Text("Users"),
+					),
+					core.A(
+						core.Attrs{Href: "/admin/posts", Class: "text-gray-300 hover:text-white transition"},
+						core.Text("Posts"),
+					),
+					core.A(
 						core.Attrs{Href: "/admin/account", Class: "text-gray-300 hover:text-white transition"},
 						core.Text("Account"),
 					),

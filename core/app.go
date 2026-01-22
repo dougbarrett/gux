@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
+	"strings"
 )
 
 // PageFunc is a page handler that returns a component function.
@@ -37,6 +39,31 @@ var defaultWasmBinary []byte
 var defaultWasmBundles = make(map[string][]byte)
 var defaultWasmExecJS []byte
 var defaultStylesCSS []byte
+
+// matchRoute checks if a URL path matches a route pattern and extracts parameters.
+// Pattern "/users/:id" matches path "/users/123" and returns {"id": "123"}.
+func matchRoute(pattern, path string) (bool, map[string]string) {
+	patternParts := strings.Split(strings.Trim(pattern, "/"), "/")
+	pathParts := strings.Split(strings.Trim(path, "/"), "/")
+
+	if len(patternParts) != len(pathParts) {
+		return false, nil
+	}
+
+	params := make(map[string]string)
+	for i, part := range patternParts {
+		if strings.HasPrefix(part, ":") {
+			// Parameter segment
+			params[part[1:]] = pathParts[i]
+		} else if part != pathParts[i] {
+			// Static segment doesn't match
+			return false, nil
+		}
+	}
+
+	return true, params
+}
+
 
 // SetDefaultAssets sets the default WASM and CSS assets.
 // Called by generated assets_gen.go in init().
@@ -201,12 +228,23 @@ func (rg *RouteGroup) Hybrid(path string, handler PageFunc) *RouteGroup {
 	return rg
 }
 
+// buildTime is set when the server starts, used for hot reload detection
+var buildTime = fmt.Sprintf("%d", os.Getpid())
+
 // Run starts the HTTP server on the given address.
 func (a *App) Run(addr string) error {
 	mux := http.NewServeMux()
 
 	// Register CRUD handlers
 	a.registerCRUDHandlers(mux)
+
+	// Hot reload ping endpoint (only active when GUX_HOT_RELOAD=1)
+	if os.Getenv("GUX_HOT_RELOAD") == "1" {
+		mux.HandleFunc("/__gux_dev/ping", func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			fmt.Fprintf(w, `{"buildTime":"%s"}`, buildTime)
+		})
+	}
 
 	// Serve default WASM binary (if assets are set)
 	if len(a.wasmBinary) > 0 {
@@ -242,49 +280,102 @@ func (a *App) Run(addr string) error {
 	}
 
 	// Register page loader endpoints (for client-side navigation)
-	for _, route := range a.routes {
-		if route.Hybrid {
-			handler := route.Handler
-			loaderPath := a.apiPrefix + "/pages" + route.Path
-			if route.Path == "/" {
-				loaderPath = a.apiPrefix + "/pages/index"
+	// We need custom matching for parameterized routes
+	mux.HandleFunc(a.apiPrefix+"/pages/", func(w http.ResponseWriter, r *http.Request) {
+		// Extract the page path from the URL
+		pagePath := strings.TrimPrefix(r.URL.Path, a.apiPrefix+"/pages")
+		if pagePath == "/index" {
+			pagePath = "/"
+		}
+
+		// Find matching route
+		for _, route := range a.routes {
+			if !route.Hybrid {
+				continue
 			}
-			mux.HandleFunc(loaderPath, func(w http.ResponseWriter, r *http.Request) {
-				router := NewRouterWithDB(a.db)
-				component := handler(router) // Run loader
-				component()                  // Run component to populate state
+			if matches, params := matchRoute(route.Path, pagePath); matches {
+				router := NewRouterWithParams(a.db, params)
+				component := route.Handler(router)
+				component()
 				w.Header().Set("Content-Type", "application/json")
 				json.NewEncoder(w).Encode(router.state)
-			})
-		}
-	}
-
-	// Register page routes
-	for _, route := range a.routes {
-		handler := route.Handler
-		hybrid := route.Hybrid
-		bundle := route.Bundle
-		mux.HandleFunc(route.Path, func(w http.ResponseWriter, r *http.Request) {
-			router := NewRouterWithDB(a.db)
-			component := handler(router)
-			html := component().Render(HTML()).HTML()
-
-			w.Header().Set("Content-Type", "text/html")
-
-			// Determine which WASM to use
-			wasmPath := "/app.wasm"
-			hasWasm := len(a.wasmBinary) > 0
-			if bundle != "" {
-				wasmPath = "/" + bundle + ".wasm"
-				_, hasWasm = a.wasmBundles[bundle]
+				return
 			}
+		}
+		http.NotFound(w, r)
+	})
 
-			if hybrid && hasWasm {
-				// Serialize state for hydration
-				stateJSON, _ := json.Marshal(router.state)
+	// Register page routes with custom matching for parameterized routes
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		path := r.URL.Path
 
-				// Include WASM loader for hydration
-				fmt.Fprintf(w, `<!DOCTYPE html>
+		// Skip API and static asset routes
+		if strings.HasPrefix(path, a.apiPrefix) ||
+			path == "/app.wasm" ||
+			strings.HasSuffix(path, ".wasm") ||
+			path == "/wasm_exec.js" ||
+			path == "/styles.css" {
+			http.NotFound(w, r)
+			return
+		}
+
+		// Find matching route
+		for _, route := range a.routes {
+			if matches, params := matchRoute(route.Path, path); matches {
+				router := NewRouterWithParams(a.db, params)
+				component := route.Handler(router)
+				html := component().Render(HTML()).HTML()
+
+				w.Header().Set("Content-Type", "text/html")
+
+				// Determine which WASM to use
+				wasmPath := "/app.wasm"
+				hasWasm := len(a.wasmBinary) > 0
+				if route.Bundle != "" {
+					wasmPath = "/" + route.Bundle + ".wasm"
+					_, hasWasm = a.wasmBundles[route.Bundle]
+				}
+
+				// Check if hot reload is enabled (gux dev --watch)
+				hotReloadScript := ""
+				if os.Getenv("GUX_HOT_RELOAD") == "1" {
+					hotReloadScript = `
+    <script>
+        (function() {
+            let lastCheck = Date.now();
+            let checking = false;
+            async function checkServer() {
+                if (checking) return;
+                checking = true;
+                try {
+                    const res = await fetch('/__gux_dev/ping', {cache: 'no-store'});
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (data.buildTime && data.buildTime !== window.__guxBuildTime) {
+                            if (window.__guxBuildTime) {
+                                console.log('[gux] Reloading...');
+                                location.reload();
+                            }
+                            window.__guxBuildTime = data.buildTime;
+                        }
+                    }
+                } catch (e) {
+                    // Server down, will retry
+                }
+                checking = false;
+            }
+            setInterval(checkServer, 1000);
+            checkServer();
+        })();
+    </script>`
+				}
+
+				if route.Hybrid && hasWasm {
+					// Serialize state for hydration
+					stateJSON, _ := json.Marshal(router.state)
+
+					// Include WASM loader for hydration
+					fmt.Fprintf(w, `<!DOCTYPE html>
 <html>
 <head>
     <title>%s</title>
@@ -298,24 +389,27 @@ func (a *App) Run(addr string) error {
         const go = new Go();
         WebAssembly.instantiateStreaming(fetch("%s"), go.importObject)
             .then(result => go.run(result.instance));
-    </script>
+    </script>%s
 </body>
-</html>`, a.title, html, stateJSON, wasmPath)
-			} else {
-				// SSR only, no WASM
-				fmt.Fprintf(w, `<!DOCTYPE html>
+</html>`, a.title, html, stateJSON, wasmPath, hotReloadScript)
+				} else {
+					// SSR only, no WASM
+					fmt.Fprintf(w, `<!DOCTYPE html>
 <html>
 <head>
     <title>%s</title>
     <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
-    <div id="app">%s</div>
+    <div id="app">%s</div>%s
 </body>
-</html>`, a.title, html)
+</html>`, a.title, html, hotReloadScript)
+				}
+				return
 			}
-		})
-	}
+		}
+		http.NotFound(w, r)
+	})
 
 	fmt.Printf("http://localhost%s\n", addr)
 	return http.ListenAndServe(addr, mux)
@@ -323,27 +417,58 @@ func (a *App) Run(addr string) error {
 
 // Router provides page context and state management.
 type Router struct {
-	state    map[string]any
-	rerender func()
-	navigate func(path string)
-	db       interface{} // Database connection (server-side only)
-	hydrated bool        // True if state was hydrated from server
+	state          map[string]any
+	rerender       func()
+	navigate       func(path string)
+	db             interface{}       // Database connection (server-side only)
+	hydrated       bool              // True if state was hydrated from server
+	routeParams    map[string]string // Route parameters (e.g., :id -> "123")
+	suppressRender bool              // When true, Set() won't trigger re-render (for input events)
+}
+
+// SuppressRender temporarily suppresses re-renders during the callback.
+// Used by the DOM renderer for input events to avoid re-render on every keystroke.
+func (r *Router) SuppressRender(fn func()) {
+	r.suppressRender = true
+	fn()
+	r.suppressRender = false
 }
 
 // NewRouter creates a new router instance.
 func NewRouter(rerender func()) *Router {
 	return &Router{
-		state:    make(map[string]any),
-		rerender: rerender,
+		state:       make(map[string]any),
+		rerender:    rerender,
+		routeParams: make(map[string]string),
 	}
 }
 
 // NewRouterWithDB creates a router with database access (server-side).
 func NewRouterWithDB(db interface{}) *Router {
 	return &Router{
-		state: make(map[string]any),
-		db:    db,
+		state:       make(map[string]any),
+		db:          db,
+		routeParams: make(map[string]string),
 	}
+}
+
+// NewRouterWithParams creates a router with database access and route params.
+func NewRouterWithParams(db interface{}, params map[string]string) *Router {
+	return &Router{
+		state:       make(map[string]any),
+		db:          db,
+		routeParams: params,
+	}
+}
+
+// SetRouteParams sets the route parameters.
+func (r *Router) SetRouteParams(params map[string]string) {
+	r.routeParams = params
+}
+
+// GetRouteParams returns the current route parameters.
+func (r *Router) GetRouteParams() map[string]string {
+	return r.routeParams
 }
 
 // DB returns the database connection for server-side queries.
@@ -435,12 +560,22 @@ func (s *State[T]) Get() T {
 	return zero
 }
 
-// Set updates the state and triggers re-render.
+// Set updates the state and schedules a re-render.
+// If called during an input event (via SuppressRender), the re-render is skipped
+// to avoid losing focus on every keystroke. This is similar to how React and Vue
+// automatically batch state updates during input events.
 func (s *State[T]) Set(val T) {
 	s.router.state[s.key] = val
-	if s.router.rerender != nil {
-		s.router.rerender()
+	if !s.router.suppressRender {
+		ScheduleRerender(s.router)
 	}
+}
+
+// SetQuiet updates the state WITHOUT triggering a re-render.
+// Use this for input field updates where you want to track the value
+// but don't need to re-render the UI on every keystroke.
+func (s *State[T]) SetQuiet(val T) {
+	s.router.state[s.key] = val
 }
 
 // UseState creates a reactive state for any type.

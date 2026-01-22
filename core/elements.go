@@ -128,3 +128,23 @@ func Td(attrs Attrs, children ...Node) Node {
 func Class(class string) Attrs {
 	return Attrs{Class: class}
 }
+
+func Select(attrs Attrs, children ...Node) Node {
+	return El("select", attrs, children...)
+}
+
+func Option(attrs Attrs, children ...Node) Node {
+	return El("option", attrs, children...)
+}
+
+func Textarea(attrs Attrs, children ...Node) Node {
+	return El("textarea", attrs, children...)
+}
+
+// If conditionally renders a node based on a condition.
+func If(condition bool, node Node) Node {
+	if condition {
+		return node
+	}
+	return Frag() // Empty fragment
+}

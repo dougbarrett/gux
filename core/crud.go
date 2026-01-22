@@ -8,12 +8,89 @@ import (
 	"strings"
 )
 
+// DTOMapper is implemented by DTOs that can map from a model.
+type DTOMapper interface {
+	FromModel(model interface{}) interface{}
+}
+
+// CRUDOption configures a CRUD registration.
+type CRUDOption func(*CRUDModel)
+
+// CreateHook is called before creating a model, allowing transformation of input data.
+// The hook receives the decoded JSON as a map and returns the model to create.
+type CreateHook func(data map[string]interface{}) (interface{}, error)
+
+// UpdateHook is called before updating a model.
+// The hook receives the existing model and decoded JSON, returns the model to save.
+type UpdateHook func(existing interface{}, data map[string]interface{}) (interface{}, error)
+
 // CRUDModel represents a registered CRUD model
 type CRUDModel struct {
-	Name       string       // e.g., "Counter"
-	Path       string       // e.g., "counters"
-	ModelType  reflect.Type // The struct type
-	SliceType  reflect.Type // Slice of the struct type
+	Name           string       // e.g., "Counter"
+	Path           string       // e.g., "counters"
+	ModelType      reflect.Type // The struct type
+	SliceType      reflect.Type // Slice of the struct type
+	ListDTO        reflect.Type // Optional DTO for list responses
+	DetailDTO      reflect.Type // Optional DTO for single item responses
+	ListPreloads   []string     // Preloads for list queries
+	DetailPreloads []string     // Preloads for detail queries
+	OnCreate       CreateHook   // Optional hook for custom create logic
+	OnUpdate       UpdateHook   // Optional hook for custom update logic
+}
+
+// WithListDTO sets a DTO type for list responses.
+// The DTO must implement DTOMapper interface.
+func WithListDTO(dto interface{}, preloads ...string) CRUDOption {
+	return func(m *CRUDModel) {
+		t := reflect.TypeOf(dto)
+		if t.Kind() == reflect.Ptr {
+			t = t.Elem()
+		}
+		m.ListDTO = t
+		m.ListPreloads = preloads
+	}
+}
+
+// WithDetailDTO sets a DTO type for single item responses.
+// The DTO must implement DTOMapper interface.
+func WithDetailDTO(dto interface{}, preloads ...string) CRUDOption {
+	return func(m *CRUDModel) {
+		t := reflect.TypeOf(dto)
+		if t.Kind() == reflect.Ptr {
+			t = t.Elem()
+		}
+		m.DetailDTO = t
+		m.DetailPreloads = preloads
+	}
+}
+
+// WithDTO sets the same DTO type for both list and detail responses.
+func WithDTO(dto interface{}, preloads ...string) CRUDOption {
+	return func(m *CRUDModel) {
+		t := reflect.TypeOf(dto)
+		if t.Kind() == reflect.Ptr {
+			t = t.Elem()
+		}
+		m.ListDTO = t
+		m.DetailDTO = t
+		m.ListPreloads = preloads
+		m.DetailPreloads = preloads
+	}
+}
+
+// WithCreateHook sets a custom hook for create operations.
+// Use this for password hashing, validation, or other pre-processing.
+func WithCreateHook(hook CreateHook) CRUDOption {
+	return func(m *CRUDModel) {
+		m.OnCreate = hook
+	}
+}
+
+// WithUpdateHook sets a custom hook for update operations.
+func WithUpdateHook(hook UpdateHook) CRUDOption {
+	return func(m *CRUDModel) {
+		m.OnUpdate = hook
+	}
 }
 
 // DB interface for database operations (compatible with GORM)
@@ -44,8 +121,9 @@ func (a *App) GetDB() interface{} {
 
 // CRUD registers CRUD endpoints for a model.
 // Usage: app.CRUD(models.Counter{})
+// With DTOs: app.CRUD(models.User{}, core.WithListDTO(dto.UserList{}), core.WithDetailDTO(dto.UserDetail{}, "Posts"))
 // Creates: GET/POST /__gux_api/crud/counters, GET/PUT/DELETE /__gux_api/crud/counters/:id
-func (a *App) CRUD(model interface{}) *App {
+func (a *App) CRUD(model interface{}, opts ...CRUDOption) *App {
 	t := reflect.TypeOf(model)
 	if t.Kind() == reflect.Ptr {
 		t = t.Elem()
@@ -54,12 +132,19 @@ func (a *App) CRUD(model interface{}) *App {
 	name := t.Name()
 	path := strings.ToLower(name) + "s" // Simple pluralization
 
-	a.crudModels = append(a.crudModels, CRUDModel{
+	m := CRUDModel{
 		Name:      name,
 		Path:      path,
 		ModelType: t,
 		SliceType: reflect.SliceOf(t),
-	})
+	}
+
+	// Apply options
+	for _, opt := range opts {
+		opt(&m)
+	}
+
+	a.crudModels = append(a.crudModels, m)
 
 	return a
 }
@@ -134,8 +219,21 @@ func (a *App) handleList(w http.ResponseWriter, r *http.Request, model CRUDModel
 	// Create slice to hold results
 	results := reflect.New(model.SliceType).Interface()
 
-	// Use reflection to call db.Find(results)
+	// Start with the db value
 	dbVal := reflect.ValueOf(a.db)
+
+	// Apply preloads for list queries
+	for _, preload := range model.ListPreloads {
+		preloadMethod := dbVal.MethodByName("Preload")
+		if preloadMethod.IsValid() {
+			ret := preloadMethod.Call([]reflect.Value{reflect.ValueOf(preload)})
+			if len(ret) > 0 {
+				dbVal = ret[0]
+			}
+		}
+	}
+
+	// Use reflection to call db.Find(results)
 	findMethod := dbVal.MethodByName("Find")
 	if !findMethod.IsValid() {
 		http.Error(w, "Database does not support Find", http.StatusInternalServerError)
@@ -155,8 +253,14 @@ func (a *App) handleList(w http.ResponseWriter, r *http.Request, model CRUDModel
 		}
 	}
 
+	// Convert to DTO if configured
+	output := reflect.ValueOf(results).Elem().Interface()
+	if model.ListDTO != nil {
+		output = a.convertToDTO(output, model.ListDTO)
+	}
+
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(reflect.ValueOf(results).Elem().Interface())
+	json.NewEncoder(w).Encode(output)
 }
 
 func (a *App) handleGet(w http.ResponseWriter, r *http.Request, model CRUDModel, id uint) {
@@ -168,8 +272,21 @@ func (a *App) handleGet(w http.ResponseWriter, r *http.Request, model CRUDModel,
 	// Create instance to hold result
 	result := reflect.New(model.ModelType).Interface()
 
-	// Call db.First(result, id)
+	// Start with the db value
 	dbVal := reflect.ValueOf(a.db)
+
+	// Apply preloads for detail queries
+	for _, preload := range model.DetailPreloads {
+		preloadMethod := dbVal.MethodByName("Preload")
+		if preloadMethod.IsValid() {
+			ret := preloadMethod.Call([]reflect.Value{reflect.ValueOf(preload)})
+			if len(ret) > 0 {
+				dbVal = ret[0]
+			}
+		}
+	}
+
+	// Call db.First(result, id)
 	firstMethod := dbVal.MethodByName("First")
 	if !firstMethod.IsValid() {
 		http.Error(w, "Database does not support First", http.StatusInternalServerError)
@@ -188,8 +305,63 @@ func (a *App) handleGet(w http.ResponseWriter, r *http.Request, model CRUDModel,
 		}
 	}
 
+	// Convert to DTO if configured
+	output := reflect.ValueOf(result).Elem().Interface()
+	if model.DetailDTO != nil {
+		output = a.convertSingleToDTO(output, model.DetailDTO)
+	}
+
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(reflect.ValueOf(result).Elem().Interface())
+	json.NewEncoder(w).Encode(output)
+}
+
+// convertToDTO converts a slice of models to a slice of DTOs.
+func (a *App) convertToDTO(models interface{}, dtoType reflect.Type) interface{} {
+	modelsVal := reflect.ValueOf(models)
+	if modelsVal.Kind() != reflect.Slice {
+		return models
+	}
+
+	// Create slice of DTOs
+	dtoSlice := reflect.MakeSlice(reflect.SliceOf(dtoType), 0, modelsVal.Len())
+
+	for i := 0; i < modelsVal.Len(); i++ {
+		model := modelsVal.Index(i).Interface()
+		dto := a.convertSingleToDTO(model, dtoType)
+		dtoSlice = reflect.Append(dtoSlice, reflect.ValueOf(dto))
+	}
+
+	return dtoSlice.Interface()
+}
+
+// convertSingleToDTO converts a single model to a DTO.
+func (a *App) convertSingleToDTO(model interface{}, dtoType reflect.Type) interface{} {
+	// Create new DTO instance
+	dtoPtr := reflect.New(dtoType)
+	dto := dtoPtr.Interface()
+
+	// Check if DTO implements DTOMapper
+	if mapper, ok := dto.(DTOMapper); ok {
+		return mapper.FromModel(model)
+	}
+
+	// Auto-map matching fields by name and type
+	modelVal := reflect.ValueOf(model)
+	if modelVal.Kind() == reflect.Ptr {
+		modelVal = modelVal.Elem()
+	}
+	dtoVal := dtoPtr.Elem()
+
+	for i := 0; i < dtoType.NumField(); i++ {
+		dtoField := dtoType.Field(i)
+		modelField := modelVal.FieldByName(dtoField.Name)
+
+		if modelField.IsValid() && modelField.Type().AssignableTo(dtoField.Type) {
+			dtoVal.Field(i).Set(modelField)
+		}
+	}
+
+	return dtoVal.Interface()
 }
 
 func (a *App) handleCreate(w http.ResponseWriter, r *http.Request, model CRUDModel) {
@@ -198,11 +370,28 @@ func (a *App) handleCreate(w http.ResponseWriter, r *http.Request, model CRUDMod
 		return
 	}
 
-	// Create instance and decode JSON body
-	item := reflect.New(model.ModelType).Interface()
-	if err := json.NewDecoder(r.Body).Decode(item); err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
-		return
+	var item interface{}
+
+	if model.OnCreate != nil {
+		// Use custom hook - decode as map first
+		var data map[string]interface{}
+		if err := json.NewDecoder(r.Body).Decode(&data); err != nil {
+			http.Error(w, "Invalid JSON", http.StatusBadRequest)
+			return
+		}
+		var err error
+		item, err = model.OnCreate(data)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+	} else {
+		// Default behavior - decode directly into model
+		item = reflect.New(model.ModelType).Interface()
+		if err := json.NewDecoder(r.Body).Decode(item); err != nil {
+			http.Error(w, "Invalid JSON", http.StatusBadRequest)
+			return
+		}
 	}
 
 	// Call db.Create(item)
@@ -219,15 +408,27 @@ func (a *App) handleCreate(w http.ResponseWriter, r *http.Request, model CRUDMod
 		if errField.IsValid() {
 			errVal := errField.Call(nil)
 			if len(errVal) > 0 && !errVal[0].IsNil() {
-				http.Error(w, "Create failed", http.StatusInternalServerError)
+				// Get actual error message
+				errInterface := errVal[0].Interface()
+				if err, ok := errInterface.(error); ok {
+					http.Error(w, "Create failed: "+err.Error(), http.StatusInternalServerError)
+				} else {
+					http.Error(w, "Create failed", http.StatusInternalServerError)
+				}
 				return
 			}
 		}
 	}
 
+	// Convert response to DTO if configured
+	output := reflect.ValueOf(item).Elem().Interface()
+	if model.DetailDTO != nil {
+		output = a.convertSingleToDTO(output, model.DetailDTO)
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(reflect.ValueOf(item).Elem().Interface())
+	json.NewEncoder(w).Encode(output)
 }
 
 func (a *App) handleUpdate(w http.ResponseWriter, r *http.Request, model CRUDModel, id uint) {
@@ -236,22 +437,55 @@ func (a *App) handleUpdate(w http.ResponseWriter, r *http.Request, model CRUDMod
 		return
 	}
 
-	// Create instance and decode JSON body
-	item := reflect.New(model.ModelType).Interface()
-	if err := json.NewDecoder(r.Body).Decode(item); err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
-		return
-	}
+	var item interface{}
+	dbVal := reflect.ValueOf(a.db)
 
-	// Set ID on the item (assumes ID field exists)
-	itemVal := reflect.ValueOf(item).Elem()
-	idField := itemVal.FieldByName("ID")
-	if idField.IsValid() && idField.CanSet() {
-		idField.SetUint(uint64(id))
+	if model.OnUpdate != nil {
+		// Fetch existing model first
+		existing := reflect.New(model.ModelType).Interface()
+		firstMethod := dbVal.MethodByName("First")
+		if firstMethod.IsValid() {
+			ret := firstMethod.Call([]reflect.Value{reflect.ValueOf(existing), reflect.ValueOf(id)})
+			if len(ret) > 0 {
+				errField := ret[0].MethodByName("Error")
+				if errField.IsValid() {
+					errVal := errField.Call(nil)
+					if len(errVal) > 0 && !errVal[0].IsNil() {
+						http.Error(w, "Not found", http.StatusNotFound)
+						return
+					}
+				}
+			}
+		}
+
+		// Decode JSON as map and call hook
+		var data map[string]interface{}
+		if err := json.NewDecoder(r.Body).Decode(&data); err != nil {
+			http.Error(w, "Invalid JSON", http.StatusBadRequest)
+			return
+		}
+		var err error
+		item, err = model.OnUpdate(existing, data)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+	} else {
+		// Default behavior
+		item = reflect.New(model.ModelType).Interface()
+		if err := json.NewDecoder(r.Body).Decode(item); err != nil {
+			http.Error(w, "Invalid JSON", http.StatusBadRequest)
+			return
+		}
+		// Set ID on the item
+		itemVal := reflect.ValueOf(item).Elem()
+		idField := itemVal.FieldByName("ID")
+		if idField.IsValid() && idField.CanSet() {
+			idField.SetUint(uint64(id))
+		}
 	}
 
 	// Call db.Save(item)
-	dbVal := reflect.ValueOf(a.db)
 	saveMethod := dbVal.MethodByName("Save")
 	if !saveMethod.IsValid() {
 		http.Error(w, "Database does not support Save", http.StatusInternalServerError)
@@ -270,8 +504,14 @@ func (a *App) handleUpdate(w http.ResponseWriter, r *http.Request, model CRUDMod
 		}
 	}
 
+	// Convert response to DTO if configured
+	output := reflect.ValueOf(item).Elem().Interface()
+	if model.DetailDTO != nil {
+		output = a.convertSingleToDTO(output, model.DetailDTO)
+	}
+
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(reflect.ValueOf(item).Elem().Interface())
+	json.NewEncoder(w).Encode(output)
 }
 
 func (a *App) handleDelete(w http.ResponseWriter, r *http.Request, model CRUDModel, id uint) {

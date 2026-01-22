@@ -66,25 +66,244 @@ type CRUDModel struct {
 	Name       string // e.g., "Counter"
 	PluralName string // e.g., "Counters"
 	Path       string // e.g., "counters"
+	ListDTO    string // e.g., "UserList" - DTO type for list responses
+	DetailDTO  string // e.g., "UserDetail" - DTO type for detail responses
+	DTOPackage string // e.g., "dto" - package name for DTOs
+	ListDTOInfo   *DTOInfo // Parsed DTO info for list responses
+	DetailDTOInfo *DTOInfo // Parsed DTO info for detail responses
+}
+
+// DTOInfo holds parsed information about a DTO struct
+type DTOInfo struct {
+	Name      string            // e.g., "UserList"
+	ModelName string            // e.g., "User" (extracted from first field's gux tag)
+	Fields    []DTOFieldMapping // Field mappings
+	Preloads  []string          // Preload directives from tags
+}
+
+// DTOFieldMapping represents a single field mapping from DTO to model
+type DTOFieldMapping struct {
+	DTOField    string // Field name in DTO, e.g., "Email"
+	DTOType     string // Field type in DTO, e.g., "string"
+	ModelField  string // Field name in model, e.g., "Email" (from gux:"User.Email")
+	IsSlice     bool   // Whether this is a slice field (for relationships)
+	SliceDTO    string // For slice fields, the element DTO type, e.g., "PostBrief"
+	Preload     string // Preload directive if any
+	IsNestedDTO bool   // Whether this is a nested DTO type (e.g., UserBrief)
+}
+
+// isPrimitiveType checks if a type string represents a primitive Go type
+func isPrimitiveType(t string) bool {
+	primitives := map[string]bool{
+		"string": true, "int": true, "int8": true, "int16": true, "int32": true, "int64": true,
+		"uint": true, "uint8": true, "uint16": true, "uint32": true, "uint64": true,
+		"float32": true, "float64": true, "bool": true, "byte": true, "rune": true,
+		"time.Time": true, // Common type that should be treated as primitive
+	}
+	return primitives[t]
+}
+
+// splitParamRoute splits a parameterized route into prefix and suffix around the parameter.
+// "/admin/users/:id" -> ("/admin/users/", "")
+// "/admin/users/:id/posts/new" -> ("/admin/users/", "/posts/new")
+func splitParamRoute(route string) (prefix, suffix string) {
+	parts := strings.Split(route, "/")
+	var prefixParts, suffixParts []string
+	foundParam := false
+
+	for _, part := range parts {
+		if strings.HasPrefix(part, ":") {
+			foundParam = true
+			continue
+		}
+		if foundParam {
+			suffixParts = append(suffixParts, part)
+		} else {
+			prefixParts = append(prefixParts, part)
+		}
+	}
+
+	prefix = strings.Join(prefixParts, "/")
+	if !strings.HasSuffix(prefix, "/") {
+		prefix += "/"
+	}
+
+	if len(suffixParts) > 0 {
+		suffix = "/" + strings.Join(suffixParts, "/")
+	}
+
+	return prefix, suffix
+}
+
+// getParamName extracts the parameter name from a parameterized route.
+// "/admin/users/:id" -> "id"
+// "/admin/users/:userId/posts/:postId" -> "userId" (returns first param only)
+func getParamName(route string) string {
+	parts := strings.Split(route, "/")
+	for _, part := range parts {
+		if strings.HasPrefix(part, ":") {
+			return strings.TrimPrefix(part, ":")
+		}
+	}
+	return "id" // default fallback
+}
+
+// parseDTOFile parses a DTO file and extracts field mappings from gux tags
+func parseDTOFile(dtoDir string, dtoName string) (*DTOInfo, error) {
+	// Find and parse all .go files in the dto directory
+	entries, err := os.ReadDir(dtoDir)
+	if err != nil {
+		return nil, fmt.Errorf("read dto dir: %w", err)
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".go") {
+			continue
+		}
+
+		fset := token.NewFileSet()
+		filename := filepath.Join(dtoDir, entry.Name())
+		node, err := parser.ParseFile(fset, filename, nil, parser.ParseComments)
+		if err != nil {
+			continue
+		}
+
+		// Look for the target struct
+		for _, decl := range node.Decls {
+			genDecl, ok := decl.(*ast.GenDecl)
+			if !ok || genDecl.Tok != token.TYPE {
+				continue
+			}
+
+			for _, spec := range genDecl.Specs {
+				typeSpec, ok := spec.(*ast.TypeSpec)
+				if !ok || typeSpec.Name.Name != dtoName {
+					continue
+				}
+
+				structType, ok := typeSpec.Type.(*ast.StructType)
+				if !ok {
+					continue
+				}
+
+				info := &DTOInfo{
+					Name:   dtoName,
+					Fields: []DTOFieldMapping{},
+				}
+
+				// Parse each field
+				for _, field := range structType.Fields.List {
+					if len(field.Names) == 0 || field.Tag == nil {
+						continue
+					}
+
+					fieldName := field.Names[0].Name
+					tagValue := field.Tag.Value
+
+					// Parse the gux tag: `gux:"User.Email"`
+					guxTag := extractTag(tagValue, "gux")
+					if guxTag == "" {
+						continue
+					}
+
+					// Parse Model.Field format
+					parts := strings.SplitN(guxTag, ".", 2)
+					if len(parts) != 2 {
+						continue
+					}
+
+					modelName := parts[0]
+					modelField := parts[1]
+
+					// Set the model name from first field
+					if info.ModelName == "" {
+						info.ModelName = modelName
+					}
+
+					mapping := DTOFieldMapping{
+						DTOField:   fieldName,
+						DTOType:    formatType(field.Type),
+						ModelField: modelField,
+					}
+
+					// Check for preload tag
+					preloadTag := extractTag(tagValue, "preload")
+					if preloadTag != "" {
+						mapping.Preload = preloadTag
+						info.Preloads = append(info.Preloads, preloadTag)
+					}
+
+					// Check if it's a slice type (for relationships)
+					if arrayType, ok := field.Type.(*ast.ArrayType); ok {
+						mapping.IsSlice = true
+						mapping.SliceDTO = formatType(arrayType.Elt)
+					} else if !isPrimitiveType(mapping.DTOType) {
+						// Non-primitive, non-slice type is a nested DTO
+						mapping.IsNestedDTO = true
+					}
+
+					info.Fields = append(info.Fields, mapping)
+				}
+
+				return info, nil
+			}
+		}
+	}
+
+	return nil, fmt.Errorf("DTO %s not found in %s", dtoName, dtoDir)
+}
+
+// extractTag extracts a specific tag value from a struct tag string
+func extractTag(tagStr, tagName string) string {
+	// Remove backticks
+	tagStr = strings.Trim(tagStr, "`")
+
+	// Find the tag
+	for _, part := range strings.Split(tagStr, " ") {
+		if strings.HasPrefix(part, tagName+":") {
+			value := strings.TrimPrefix(part, tagName+":")
+			return strings.Trim(value, `"`)
+		}
+	}
+	return ""
+}
+
+// formatType converts an ast type expression to a string
+func formatType(expr ast.Expr) string {
+	switch t := expr.(type) {
+	case *ast.Ident:
+		return t.Name
+	case *ast.SelectorExpr:
+		return formatType(t.X) + "." + t.Sel.Name
+	case *ast.StarExpr:
+		return "*" + formatType(t.X)
+	case *ast.ArrayType:
+		return "[]" + formatType(t.Elt)
+	default:
+		return "interface{}"
+	}
 }
 
 // parseCRUDModels parses the main app file to find CRUD model registrations
-func parseCRUDModels(filename string) ([]CRUDModel, string, error) {
+func parseCRUDModels(filename string) ([]CRUDModel, string, string, error) {
 	fset := token.NewFileSet()
 	node, err := parser.ParseFile(fset, filename, nil, parser.ParseComments)
 	if err != nil {
-		return nil, "", fmt.Errorf("parse %s: %w", filename, err)
+		return nil, "", "", fmt.Errorf("parse %s: %w", filename, err)
 	}
 
 	var models []CRUDModel
 	var modelsImport string
+	var dtoImport string
 
-	// Find models import
+	// Find models and dto imports
 	for _, imp := range node.Imports {
 		path := strings.Trim(imp.Path.Value, `"`)
 		if strings.HasSuffix(path, "/models") || strings.Contains(path, "/models") {
 			modelsImport = path
-			break
+		}
+		if strings.HasSuffix(path, "/dto") || strings.Contains(path, "/dto") {
+			dtoImport = path
 		}
 	}
 
@@ -102,32 +321,75 @@ func parseCRUDModels(filename string) ([]CRUDModel, string, error) {
 		}
 
 		if len(call.Args) >= 1 {
+			var model CRUDModel
+
 			// Get model name from first argument: models.Counter{}
 			switch arg := call.Args[0].(type) {
 			case *ast.CompositeLit:
 				// models.Counter{}
 				if sel, ok := arg.Type.(*ast.SelectorExpr); ok {
-					name := sel.Sel.Name
-					models = append(models, CRUDModel{
-						Name:       name,
-						PluralName: name + "s",
-						Path:       strings.ToLower(name) + "s",
-					})
+					model.Name = sel.Sel.Name
 				}
 			case *ast.SelectorExpr:
 				// models.Counter
-				name := arg.Sel.Name
-				models = append(models, CRUDModel{
-					Name:       name,
-					PluralName: name + "s",
-					Path:       strings.ToLower(name) + "s",
-				})
+				model.Name = arg.Sel.Name
 			}
+
+			if model.Name == "" {
+				return true
+			}
+
+			model.PluralName = model.Name + "s"
+			model.Path = strings.ToLower(model.Name) + "s"
+
+			// Parse DTO options from remaining arguments
+			for i := 1; i < len(call.Args); i++ {
+				optCall, ok := call.Args[i].(*ast.CallExpr)
+				if !ok {
+					continue
+				}
+				// Look for core.WithListDTO or core.WithDetailDTO
+				optSel, ok := optCall.Fun.(*ast.SelectorExpr)
+				if !ok {
+					continue
+				}
+
+				dtoName := ""
+				if len(optCall.Args) >= 1 {
+					// Get DTO type name: dto.UserList{}
+					switch dtoArg := optCall.Args[0].(type) {
+					case *ast.CompositeLit:
+						if dtoSel, ok := dtoArg.Type.(*ast.SelectorExpr); ok {
+							dtoName = dtoSel.Sel.Name
+							if pkgIdent, ok := dtoSel.X.(*ast.Ident); ok {
+								model.DTOPackage = pkgIdent.Name
+							}
+						}
+					case *ast.SelectorExpr:
+						dtoName = dtoArg.Sel.Name
+						if pkgIdent, ok := dtoArg.X.(*ast.Ident); ok {
+							model.DTOPackage = pkgIdent.Name
+						}
+					}
+				}
+
+				switch optSel.Sel.Name {
+				case "WithListDTO":
+					model.ListDTO = dtoName
+				case "WithDetailDTO":
+					model.DetailDTO = dtoName
+				case "WithDTO":
+					model.ListDTO = dtoName
+					model.DetailDTO = dtoName
+				}
+			}
+
+			models = append(models, model)
 		}
 		return true
 	})
 
-	return models, modelsImport, nil
+	return models, modelsImport, dtoImport, nil
 }
 
 // parseRoutes parses the main app file to find Hybrid routes
@@ -384,22 +646,57 @@ func generateWasmEntryPoint(modulePath, pagesImport string, routes []PageRoute) 
 		return err
 	}
 
-	// Build the router/page matching code
+	// Build the router/page matching code (same logic as bundle version)
 	var routeCode strings.Builder
-	if len(routes) == 1 {
-		// Single route - simple case
+	if len(routes) == 1 && !strings.Contains(routes[0].Path, ":") {
+		// Single non-parameterized route - simple case
 		routeCode.WriteString(fmt.Sprintf("\t\tcomponent := %s(router)\n", routes[0].Handler))
 	} else {
-		// Multiple routes - add path matching
+		// Multiple routes or parameterized routes - need pattern matching
 		routeCode.WriteString("\t\tpath := js.Global().Get(\"location\").Get(\"pathname\").String()\n")
 		routeCode.WriteString("\t\tvar component func() core.Node\n")
-		routeCode.WriteString("\t\tswitch path {\n")
+
+		// Separate exact routes from parameterized routes
+		var exactRoutes, paramRoutes []PageRoute
 		for _, route := range routes {
-			routeCode.WriteString(fmt.Sprintf("\t\tcase %q:\n", route.Path))
-			routeCode.WriteString(fmt.Sprintf("\t\t\tcomponent = %s(router)\n", route.Handler))
+			if strings.Contains(route.Path, ":") {
+				paramRoutes = append(paramRoutes, route)
+			} else {
+				exactRoutes = append(exactRoutes, route)
+			}
 		}
-		routeCode.WriteString("\t\tdefault:\n")
-		// Find the "/" route for default, or use first route
+
+		// Generate switch for exact matches first
+		if len(exactRoutes) > 0 {
+			routeCode.WriteString("\t\tswitch path {\n")
+			for _, route := range exactRoutes {
+				routeCode.WriteString(fmt.Sprintf("\t\tcase %q:\n", route.Path))
+				routeCode.WriteString(fmt.Sprintf("\t\t\tcomponent = %s(router)\n", route.Handler))
+			}
+			routeCode.WriteString("\t\t}\n")
+		}
+
+		// Generate if-else for parameterized routes
+		if len(paramRoutes) > 0 {
+			routeCode.WriteString("\t\tif component == nil {\n")
+			for i, route := range paramRoutes {
+				prefix, suffix := splitParamRoute(route.Path)
+				paramName := getParamName(route.Path)
+				if i == 0 {
+					routeCode.WriteString(fmt.Sprintf("\t\t\tif matchRoute(path, %q, %q) {\n", prefix, suffix))
+				} else {
+					routeCode.WriteString(fmt.Sprintf("\t\t\t} else if matchRoute(path, %q, %q) {\n", prefix, suffix))
+				}
+				// Extract and set route params before rendering
+				routeCode.WriteString(fmt.Sprintf("\t\t\t\trouter.SetRouteParams(map[string]string{%q: extractRouteParam(path, %q, %q)})\n", paramName, prefix, suffix))
+				routeCode.WriteString(fmt.Sprintf("\t\t\t\tcomponent = %s(router)\n", route.Handler))
+			}
+			routeCode.WriteString("\t\t\t}\n")
+			routeCode.WriteString("\t\t}\n")
+		}
+
+		// Default fallback
+		routeCode.WriteString("\t\tif component == nil {\n")
 		defaultHandler := ""
 		for _, r := range routes {
 			if r.Path == "/" {
@@ -422,11 +719,37 @@ package main
 
 import (
 	"encoding/json"
+	"strings"
 	"syscall/js"
 
 	"github.com/dougbarrett/gux/core"
 	"%s"
 )
+
+// matchRoute checks if a path matches a parameterized route pattern.
+func matchRoute(path, prefix, suffix string) bool {
+	if !strings.HasPrefix(path, prefix) {
+		return false
+	}
+	rest := path[len(prefix):]
+	if suffix == "" {
+		return len(rest) > 0 && !strings.Contains(rest, "/")
+	}
+	if !strings.HasSuffix(rest, suffix) {
+		return false
+	}
+	paramValue := rest[:len(rest)-len(suffix)]
+	return len(paramValue) > 0 && !strings.Contains(paramValue, "/")
+}
+
+// extractRouteParam extracts the parameter value from a path given prefix and suffix.
+func extractRouteParam(path, prefix, suffix string) string {
+	rest := path[len(prefix):]
+	if suffix == "" {
+		return rest
+	}
+	return rest[:len(rest)-len(suffix)]
+}
 
 // fetchLoader fetches page state from loader endpoint
 func fetchLoader(path string, callback func(map[string]any)) {
@@ -475,6 +798,13 @@ func main() {
 	var render func()
 
 	render = func() {
+		// Save focus state before re-render
+		activeElement := document.Get("activeElement")
+		var focusName string
+		if !activeElement.IsNull() && !activeElement.IsUndefined() {
+			focusName = activeElement.Call("getAttribute", "name").String()
+		}
+
 		container.Set("innerHTML", "")
 %s
 		node := component()
@@ -503,6 +833,14 @@ func main() {
 					router.Navigate(path)
 					return nil
 				}))
+			}
+		}
+
+		// Restore focus after re-render
+		if focusName != "" {
+			newElement := document.Call("querySelector", "[name=\""+focusName+"\"]")
+			if !newElement.IsNull() && !newElement.IsUndefined() {
+				newElement.Call("focus")
 			}
 		}
 	}
@@ -562,20 +900,56 @@ func generateBundleWasmEntryPoint(bundleName string, bundle *BundleInfo) error {
 
 	// Build the router/page matching code
 	var routeCode strings.Builder
-	if len(routes) == 1 {
-		// Single route - simple case
+	if len(routes) == 1 && !strings.Contains(routes[0].Path, ":") {
+		// Single non-parameterized route - simple case
 		routeCode.WriteString(fmt.Sprintf("\t\tcomponent := %s(router)\n", routes[0].Handler))
 	} else {
-		// Multiple routes - add path matching
+		// Multiple routes or parameterized routes - need pattern matching
 		routeCode.WriteString("\t\tpath := js.Global().Get(\"location\").Get(\"pathname\").String()\n")
 		routeCode.WriteString("\t\tvar component func() core.Node\n")
-		routeCode.WriteString("\t\tswitch path {\n")
+
+		// Separate exact routes from parameterized routes
+		var exactRoutes, paramRoutes []PageRoute
 		for _, route := range routes {
-			routeCode.WriteString(fmt.Sprintf("\t\tcase %q:\n", route.Path))
-			routeCode.WriteString(fmt.Sprintf("\t\t\tcomponent = %s(router)\n", route.Handler))
+			if strings.Contains(route.Path, ":") {
+				paramRoutes = append(paramRoutes, route)
+			} else {
+				exactRoutes = append(exactRoutes, route)
+			}
 		}
-		routeCode.WriteString("\t\tdefault:\n")
-		// Find a default handler (first route or "/" route)
+
+		// Generate switch for exact matches first
+		if len(exactRoutes) > 0 {
+			routeCode.WriteString("\t\tswitch path {\n")
+			for _, route := range exactRoutes {
+				routeCode.WriteString(fmt.Sprintf("\t\tcase %q:\n", route.Path))
+				routeCode.WriteString(fmt.Sprintf("\t\t\tcomponent = %s(router)\n", route.Handler))
+			}
+			routeCode.WriteString("\t\t}\n")
+		}
+
+		// Generate if-else for parameterized routes
+		if len(paramRoutes) > 0 {
+			routeCode.WriteString("\t\tif component == nil {\n")
+			for i, route := range paramRoutes {
+				// Generate matching code for parameterized route
+				prefix, suffix := splitParamRoute(route.Path)
+				paramName := getParamName(route.Path)
+				if i == 0 {
+					routeCode.WriteString(fmt.Sprintf("\t\t\tif matchRoute(path, %q, %q) {\n", prefix, suffix))
+				} else {
+					routeCode.WriteString(fmt.Sprintf("\t\t\t} else if matchRoute(path, %q, %q) {\n", prefix, suffix))
+				}
+				// Extract and set route params before rendering
+				routeCode.WriteString(fmt.Sprintf("\t\t\t\trouter.SetRouteParams(map[string]string{%q: extractRouteParam(path, %q, %q)})\n", paramName, prefix, suffix))
+				routeCode.WriteString(fmt.Sprintf("\t\t\t\tcomponent = %s(router)\n", route.Handler))
+			}
+			routeCode.WriteString("\t\t\t}\n")
+			routeCode.WriteString("\t\t}\n")
+		}
+
+		// Default fallback
+		routeCode.WriteString("\t\tif component == nil {\n")
 		defaultHandler := ""
 		for _, r := range routes {
 			if r.Path == "/" || strings.HasSuffix(r.Path, "/") {
@@ -607,10 +981,44 @@ package main
 
 import (
 	"encoding/json"
+	"strings"
 	"syscall/js"
 
 	"github.com/dougbarrett/gux/core"
 %s)
+
+// matchRoute checks if a path matches a parameterized route pattern.
+// prefix is the part before the param, suffix is the part after.
+// e.g., matchRoute("/admin/users/123", "/admin/users/", "") returns true
+// e.g., matchRoute("/admin/users/123/posts/new", "/admin/users/", "/posts/new") returns true
+func matchRoute(path, prefix, suffix string) bool {
+	if !strings.HasPrefix(path, prefix) {
+		return false
+	}
+	rest := path[len(prefix):]
+	if suffix == "" {
+		// No suffix - just need something after the prefix (the param value)
+		return len(rest) > 0 && !strings.Contains(rest, "/")
+	}
+	// Has suffix - need to match suffix at the end
+	if !strings.HasSuffix(rest, suffix) {
+		return false
+	}
+	// Extract the param value (between prefix and suffix)
+	paramValue := rest[:len(rest)-len(suffix)]
+	return len(paramValue) > 0 && !strings.Contains(paramValue, "/")
+}
+
+// extractRouteParam extracts the parameter value from a path given prefix and suffix.
+// e.g., extractRouteParam("/admin/users/123", "/admin/users/", "") returns "123"
+// e.g., extractRouteParam("/admin/users/123/posts/new", "/admin/users/", "/posts/new") returns "123"
+func extractRouteParam(path, prefix, suffix string) string {
+	rest := path[len(prefix):]
+	if suffix == "" {
+		return rest
+	}
+	return rest[:len(rest)-len(suffix)]
+}
 
 // fetchLoader fetches page state from loader endpoint
 func fetchLoader(path string, callback func(map[string]any)) {
@@ -659,6 +1067,13 @@ func main() {
 	var render func()
 
 	render = func() {
+		// Save focus state before re-render
+		activeElement := document.Get("activeElement")
+		var focusName string
+		if !activeElement.IsNull() && !activeElement.IsUndefined() {
+			focusName = activeElement.Call("getAttribute", "name").String()
+		}
+
 		container.Set("innerHTML", "")
 %s
 		node := component()
@@ -687,6 +1102,14 @@ func main() {
 					router.Navigate(path)
 					return nil
 				}))
+			}
+		}
+
+		// Restore focus after re-render
+		if focusName != "" {
+			newElement := document.Call("querySelector", "[name=\""+focusName+"\"]")
+			if !newElement.IsNull() && !newElement.IsUndefined() {
+				newElement.Call("focus")
 			}
 		}
 	}
@@ -775,8 +1198,200 @@ func buildWasmBundle(bundleName string, tinygo bool) error {
 	return nil
 }
 
+// generateServerDTOCode generates server-side API code for models with parsed DTO info
+func generateServerDTOCode(m CRUDModel) string {
+	var sb strings.Builder
+
+	// Determine which DTO to use for list and detail
+	listDTO := m.ListDTO
+	detailDTO := m.DetailDTO
+	if detailDTO == "" {
+		detailDTO = listDTO
+	}
+
+	// Get the model name from the DTO info
+	modelName := m.Name
+	if m.ListDTOInfo != nil && m.ListDTOInfo.ModelName != "" {
+		modelName = m.ListDTOInfo.ModelName
+	}
+
+	// Build preload chain for list
+	listPreloads := ""
+	if m.ListDTOInfo != nil {
+		for _, p := range m.ListDTOInfo.Preloads {
+			listPreloads += fmt.Sprintf(".Preload(\"%s\")", p)
+		}
+	}
+
+	// Build preload chain for detail
+	detailPreloads := ""
+	if m.DetailDTOInfo != nil {
+		for _, p := range m.DetailDTOInfo.Preloads {
+			detailPreloads += fmt.Sprintf(".Preload(\"%s\")", p)
+		}
+	}
+
+	// Generate field mapping for list DTO
+	listFieldMapping := generateFieldMapping(m.ListDTOInfo, "item")
+
+	// Generate field mapping for detail DTO
+	detailFieldMapping := generateFieldMapping(m.DetailDTOInfo, "item")
+
+	// Check if detail DTO has preloads (relationships) - if so, try FromModel pattern
+	hasRelationships := m.DetailDTOInfo != nil && len(m.DetailDTOInfo.Preloads) > 0
+
+	// Generate the Get method body based on whether we have relationships
+	var getMethodBody string
+	if hasRelationships {
+		// Use FromModel pattern for DTOs with relationships (if implemented)
+		// Uses type assertion to check if FromModel exists at runtime
+		getMethodBody = fmt.Sprintf(`// Get returns a single %s by ID.
+func (a *%sAPI) Get(id uint, callback func(*dto.%s, error)) {
+	if db == nil {
+		callback(nil, nil)
+		return
+	}
+	var item models.%s
+	if err := db%s.First(&item, id).Error; err != nil {
+		callback(nil, err)
+		return
+	}
+	// Try DTOMapper.FromModel if implemented (for complex relationships)
+	empty := &dto.%s{}
+	if mapper, ok := interface{}(empty).(interface{ FromModel(interface{}) interface{} }); ok {
+		mapped := mapper.FromModel(item)
+		if result, ok := mapped.(dto.%s); ok {
+			callback(&result, nil)
+			return
+		}
+	}
+	// Fallback to basic mapping
+	result := &dto.%s{
+%s	}
+	callback(result, nil)
+}`,
+			m.Name, m.PluralName, detailDTO, modelName, detailPreloads,
+			detailDTO, detailDTO, detailDTO, detailFieldMapping)
+	} else {
+		// Use simple field mapping for DTOs without relationships
+		getMethodBody = fmt.Sprintf(`// Get returns a single %s by ID.
+func (a *%sAPI) Get(id uint, callback func(*dto.%s, error)) {
+	if db == nil {
+		callback(nil, nil)
+		return
+	}
+	var item models.%s
+	if err := db%s.First(&item, id).Error; err != nil {
+		callback(nil, err)
+		return
+	}
+	result := &dto.%s{
+%s	}
+	callback(result, nil)
+}`,
+			m.Name, m.PluralName, detailDTO, modelName, detailPreloads, detailDTO, detailFieldMapping)
+	}
+
+	sb.WriteString(fmt.Sprintf(`
+// %sAPI provides CRUD operations for %s.
+type %sAPI struct{}
+
+// %s is the API client for %s operations.
+var %s = &%sAPI{}
+
+// List returns all %s records.
+func (a *%sAPI) List(callback func([]dto.%s, error)) {
+	if db == nil {
+		callback(nil, nil)
+		return
+	}
+	var items []models.%s
+	if err := db%s.Find(&items).Error; err != nil {
+		callback(nil, err)
+		return
+	}
+	// Convert to DTOs using field mappings from gux tags
+	result := make([]dto.%s, len(items))
+	for i, item := range items {
+		result[i] = dto.%s{
+%s		}
+	}
+	callback(result, nil)
+}
+
+%s
+
+// Create creates a new %s (server-side stub - actual creation handled by CRUD endpoint).
+func (a *%sAPI) Create(data map[string]interface{}, callback func(*dto.%s, error)) {
+	// Server-side: this is typically not called directly
+	// The CRUD endpoint handles creation with hooks
+	callback(nil, nil)
+}
+
+// Update updates an existing %s (server-side stub).
+func (a *%sAPI) Update(id uint, data map[string]interface{}, callback func(*dto.%s, error)) {
+	// Server-side: this is typically not called directly
+	callback(nil, nil)
+}
+
+// Delete deletes a %s by ID (server-side stub).
+func (a *%sAPI) Delete(id uint, callback func(error)) {
+	// Server-side: this is typically not called directly
+	callback(nil)
+}
+`,
+		m.PluralName, m.Name,                    // type comment
+		m.PluralName,                            // type name
+		m.PluralName, m.Name,                    // var comment
+		m.PluralName, m.PluralName,              // var declaration
+		m.Name,                                  // List comment
+		m.PluralName, listDTO,                   // List signature
+		modelName,                               // List query model
+		listPreloads,                            // List preloads
+		listDTO,                                 // List result make
+		listDTO,                                 // List DTO type
+		listFieldMapping,                        // List field mapping
+		getMethodBody,                           // Get method (generated above)
+		m.Name,                                  // Create comment
+		m.PluralName, detailDTO,                 // Create signature
+		m.Name,                                  // Update comment
+		m.PluralName, detailDTO,                 // Update signature
+		m.Name,                                  // Delete comment
+		m.PluralName,                            // Delete signature
+	))
+
+	return sb.String()
+}
+
+// generateFieldMapping generates the field assignment code from parsed DTO info
+func generateFieldMapping(info *DTOInfo, varName string) string {
+	if info == nil {
+		return ""
+	}
+
+	var sb strings.Builder
+	for _, f := range info.Fields {
+		if f.IsSlice {
+			// For slice fields (relationships), we need to map each element
+			sb.WriteString(fmt.Sprintf("\t\t\t// %s mapped from %s.%s (slice)\n",
+				f.DTOField, info.ModelName, f.ModelField))
+			// Skip slice mapping in simple generation - requires nested loop
+			continue
+		}
+		if f.IsNestedDTO {
+			// For nested DTO fields, we need to map the nested object
+			sb.WriteString(fmt.Sprintf("\t\t\t// %s mapped from %s.%s (nested DTO: %s)\n",
+				f.DTOField, info.ModelName, f.ModelField, f.DTOType))
+			// Skip nested DTO mapping in simple generation - requires nested conversion
+			continue
+		}
+		sb.WriteString(fmt.Sprintf("\t\t\t%s: %s.%s,\n", f.DTOField, varName, f.ModelField))
+	}
+	return sb.String()
+}
+
 // generateAPIClient generates .gux/api/client.go with WASM-compatible DTOs
-func generateAPIClient(modelsImport string, models []CRUDModel) error {
+func generateAPIClient(modelsImport string, dtoImport string, models []CRUDModel) error {
 	if len(models) == 0 {
 		return nil // No CRUD models, skip API client generation
 	}
@@ -785,9 +1400,13 @@ func generateAPIClient(modelsImport string, models []CRUDModel) error {
 		return err
 	}
 
-	// Generate DTO structs (WASM-compatible, no gorm dependency)
+	// Generate DTO structs for models WITHOUT custom DTOs
 	var dtoCode strings.Builder
 	for _, m := range models {
+		// Skip models with custom DTOs
+		if m.ListDTO != "" || m.DetailDTO != "" {
+			continue
+		}
 		dtoCode.WriteString(fmt.Sprintf(`
 // %s is a WASM-compatible DTO for %s.
 type %s struct {
@@ -803,6 +1422,131 @@ type %s struct {
 	// Generate model-specific API code
 	var modelCode strings.Builder
 	for _, m := range models {
+		// Models with DTOs get specialized read-only API
+		if m.ListDTO != "" || m.DetailDTO != "" {
+			listType := m.ListDTO
+			if listType == "" {
+				listType = m.Name
+			}
+			detailType := m.DetailDTO
+			if detailType == "" {
+				detailType = m.Name
+			}
+			dtoPkg := m.DTOPackage
+			if dtoPkg == "" {
+				dtoPkg = "dto"
+			}
+
+			modelCode.WriteString(fmt.Sprintf(`
+// %sAPI provides read operations for %s with DTO responses.
+type %sAPI struct {
+	baseURL string
+}
+
+// %s is the API client for %s operations.
+var %s = &%sAPI{baseURL: "/__gux_api/crud/%s"}
+
+// List returns all %s records using %s DTO.
+func (a *%sAPI) List(callback func([]%s.%s, error)) {
+	go func() {
+		resp, err := fetch("GET", a.baseURL, nil)
+		if err != nil {
+			callback(nil, err)
+			return
+		}
+		var items []%s.%s
+		if err := json.Unmarshal(resp, &items); err != nil {
+			callback(nil, err)
+			return
+		}
+		callback(items, nil)
+	}()
+}
+
+// Get returns a single %s by ID using %s DTO.
+func (a *%sAPI) Get(id uint, callback func(*%s.%s, error)) {
+	go func() {
+		resp, err := fetch("GET", fmt.Sprintf("%%s/%%d", a.baseURL, id), nil)
+		if err != nil {
+			callback(nil, err)
+			return
+		}
+		var item %s.%s
+		if err := json.Unmarshal(resp, &item); err != nil {
+			callback(nil, err)
+			return
+		}
+		callback(&item, nil)
+	}()
+}
+
+// Create creates a new %s with the given data.
+func (a *%sAPI) Create(data map[string]interface{}, callback func(*%s.%s, error)) {
+	go func() {
+		body, _ := json.Marshal(data)
+		resp, err := fetch("POST", a.baseURL, body)
+		if err != nil {
+			callback(nil, err)
+			return
+		}
+		var item %s.%s
+		if err := json.Unmarshal(resp, &item); err != nil {
+			callback(nil, err)
+			return
+		}
+		callback(&item, nil)
+	}()
+}
+
+// Update updates an existing %s.
+func (a *%sAPI) Update(id uint, data map[string]interface{}, callback func(*%s.%s, error)) {
+	go func() {
+		body, _ := json.Marshal(data)
+		resp, err := fetch("PUT", fmt.Sprintf("%%s/%%d", a.baseURL, id), body)
+		if err != nil {
+			callback(nil, err)
+			return
+		}
+		var item %s.%s
+		if err := json.Unmarshal(resp, &item); err != nil {
+			callback(nil, err)
+			return
+		}
+		callback(&item, nil)
+	}()
+}
+
+// Delete deletes a %s by ID.
+func (a *%sAPI) Delete(id uint, callback func(error)) {
+	go func() {
+		_, err := fetch("DELETE", fmt.Sprintf("%%s/%%d", a.baseURL, id), nil)
+		callback(err)
+	}()
+}
+`,
+				m.PluralName, m.Name,               // type comment
+				m.PluralName,                       // type name
+				m.PluralName, m.Name,               // var comment
+				m.PluralName, m.PluralName, m.Path, // var declaration
+				m.Name, listType,                   // List comment
+				m.PluralName, dtoPkg, listType,     // List signature
+				dtoPkg, listType,                   // List body
+				m.Name, detailType,                 // Get comment
+				m.PluralName, dtoPkg, detailType,   // Get signature
+				dtoPkg, detailType,                 // Get body
+				m.Name,                             // Create comment
+				m.PluralName, dtoPkg, detailType,   // Create signature
+				dtoPkg, detailType,                 // Create body
+				m.Name,                             // Update comment
+				m.PluralName, dtoPkg, detailType,   // Update signature
+				dtoPkg, detailType,                 // Update body
+				m.Name,                             // Delete comment
+				m.PluralName,                       // Delete signature
+			))
+			continue
+		}
+
+		// Models without DTOs get full CRUD with inline DTO
 		modelCode.WriteString(fmt.Sprintf(`
 // %sAPI provides CRUD operations for %s.
 type %sAPI struct {
@@ -914,16 +1658,29 @@ func (a *%sAPI) Delete(id uint, callback func(error)) {
 	// Note: modelsImport is unused since we generate our own DTOs
 	_ = modelsImport
 
+	// Build imports list
+	imports := `"encoding/json"
+	"errors"
+	"fmt"
+	"syscall/js"`
+
+	// Add dto import if any model uses DTOs
+	if dtoImport != "" {
+		for _, m := range models {
+			if m.ListDTO != "" || m.DetailDTO != "" {
+				imports += fmt.Sprintf("\n\n\t\"%s\"", dtoImport)
+				break
+			}
+		}
+	}
+
 	code := fmt.Sprintf(`//go:build js && wasm
 
 // Code generated by gux; DO NOT EDIT.
 package api
 
 import (
-	"encoding/json"
-	"errors"
-	"fmt"
-	"syscall/js"
+	%s
 )
 
 // Init is a no-op in WASM (database not available).
@@ -977,7 +1734,7 @@ func fetch(method, url string, body []byte) ([]byte, error) {
 	return result, fetchErr
 }
 %s%s
-`, dtoCode.String(), modelCode.String())
+`, imports, dtoCode.String(), modelCode.String())
 
 	if err := os.WriteFile(".gux/api/client.go", []byte(code), 0644); err != nil {
 		return err
@@ -986,6 +1743,10 @@ func fetch(method, url string, body []byte) ([]byte, error) {
 	// Generate server-side implementation (real DB queries)
 	var stubDtoCode strings.Builder
 	for _, m := range models {
+		// Skip models with DTOs - they import from the dto package
+		if m.ListDTO != "" || m.DetailDTO != "" {
+			continue
+		}
 		stubDtoCode.WriteString(fmt.Sprintf(`
 // %s is the API DTO for %s.
 type %s struct {
@@ -1000,6 +1761,16 @@ type %s struct {
 
 	var stubCode strings.Builder
 	for _, m := range models {
+		// Models WITH parsed DTO info get field-mapped code
+		if m.ListDTOInfo != nil || m.DetailDTOInfo != nil {
+			stubCode.WriteString(generateServerDTOCode(m))
+			continue
+		}
+
+		// Models WITHOUT DTOs get hardcoded Counter-like code
+		if m.ListDTO != "" || m.DetailDTO != "" {
+			continue // Skip - no parsed info available
+		}
 		stubCode.WriteString(fmt.Sprintf(`
 // %sAPI provides CRUD operations for %s.
 type %sAPI struct{}
@@ -1131,6 +1902,21 @@ func (a *%sAPI) Delete(id uint, callback func(error)) {
 		))
 	}
 
+	// Build server-side imports
+	serverImports := fmt.Sprintf(`"gorm.io/gorm"
+
+	"%s"`, modelsImport)
+
+	// Add dto import if any models use DTOs with parsed info
+	for _, m := range models {
+		if m.ListDTOInfo != nil || m.DetailDTOInfo != nil {
+			serverImports += fmt.Sprintf(`
+
+	"%s"`, dtoImport)
+			break
+		}
+	}
+
 	stubFile := fmt.Sprintf(`//go:build !js || !wasm
 
 // Code generated by gux; DO NOT EDIT.
@@ -1138,9 +1924,7 @@ func (a *%sAPI) Delete(id uint, callback func(error)) {
 package api
 
 import (
-	"gorm.io/gorm"
-
-	"%s"
+	%s
 )
 
 var db *gorm.DB
@@ -1151,7 +1935,7 @@ func Init(database *gorm.DB) {
 	db = database
 }
 %s%s
-`, modelsImport, stubDtoCode.String(), stubCode.String())
+`, serverImports, stubDtoCode.String(), stubCode.String())
 
 	return os.WriteFile(".gux/api/client_server.go", []byte(stubFile), 0644)
 }
@@ -1402,7 +2186,7 @@ func runBuildNew(tinygo bool) {
 	}
 
 	// Parse CRUD models from app file
-	crudModels, modelsImport, err := parseCRUDModels(appFile)
+	crudModels, modelsImport, dtoImport, err := parseCRUDModels(appFile)
 	if err != nil {
 		fmt.Printf("Error parsing CRUD models: %v\n", err)
 		os.Exit(1)
@@ -1418,10 +2202,45 @@ func runBuildNew(tinygo bool) {
 		modelsImport = pkgPath + "/models"
 	}
 
+	// If no dto import found but we have DTOs, construct it
+	if dtoImport == "" {
+		for _, m := range crudModels {
+			if m.ListDTO != "" || m.DetailDTO != "" {
+				pkgPath, err := getCurrentPackagePath()
+				if err == nil {
+					dtoImport = pkgPath + "/dto"
+				}
+				break
+			}
+		}
+	}
+
 	// Generate API client if there are CRUD models
 	if len(crudModels) > 0 {
 		fmt.Println("Generating API client...")
-		if err := generateAPIClient(modelsImport, crudModels); err != nil {
+
+		// Parse DTO files to get field mappings
+		for i := range crudModels {
+			m := &crudModels[i]
+			if m.ListDTO != "" {
+				info, err := parseDTOFile("dto", m.ListDTO)
+				if err != nil {
+					fmt.Printf("Warning: could not parse DTO %s: %v\n", m.ListDTO, err)
+				} else {
+					m.ListDTOInfo = info
+				}
+			}
+			if m.DetailDTO != "" {
+				info, err := parseDTOFile("dto", m.DetailDTO)
+				if err != nil {
+					fmt.Printf("Warning: could not parse DTO %s: %v\n", m.DetailDTO, err)
+				} else {
+					m.DetailDTOInfo = info
+				}
+			}
+		}
+
+		if err := generateAPIClient(modelsImport, dtoImport, crudModels); err != nil {
 			fmt.Printf("Error generating API client: %v\n", err)
 			os.Exit(1)
 		}
@@ -1515,8 +2334,8 @@ func runClean() {
 	}
 }
 
-// runDevNew builds, runs, and cleans up on exit
-func runDevNew(tinygo bool) {
+// runDevNew builds and runs the server (does NOT clean up on exit to preserve .gux files)
+func runDevNew(tinygo bool, watch bool) {
 	// Build first
 	runBuildNew(tinygo)
 
@@ -1525,36 +2344,63 @@ func runDevNew(tinygo bool) {
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 
 	fmt.Printf("\nStarting dev server...\n")
-
-	// Run the binary
-	cmd := exec.Command("./bin/app")
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	if err := cmd.Start(); err != nil {
-		fmt.Printf("Failed to start: %v\n", err)
-		runClean()
-		os.Exit(1)
+	if watch {
+		fmt.Println("Hot reload enabled - watching for file changes...")
 	}
 
-	// Wait for signal or process exit
-	done := make(chan error, 1)
-	go func() {
-		done <- cmd.Wait()
-	}()
+	// Channel to signal rebuild needed
+	rebuildChan := make(chan struct{}, 1)
 
-	select {
-	case <-sigChan:
-		fmt.Println("\nShutting down...")
-		cmd.Process.Signal(os.Interrupt)
-		<-done
-	case err := <-done:
-		if err != nil {
-			fmt.Printf("Server exited with error: %v\n", err)
+	// Start file watcher if watch mode enabled
+	if watch {
+		go watchAndRegenerate(true, func() {
+			select {
+			case rebuildChan <- struct{}{}:
+			default:
+			}
+		})
+	}
+
+	for {
+		// Run the binary
+		cmd := exec.Command("./bin/app")
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		// Set hot reload env var if watch mode enabled
+		if watch {
+			cmd.Env = append(os.Environ(), "GUX_HOT_RELOAD=1")
+		}
+
+		if err := cmd.Start(); err != nil {
+			fmt.Printf("Failed to start: %v\n", err)
+			os.Exit(1)
+		}
+
+		// Wait for signal, rebuild request, or process exit
+		done := make(chan error, 1)
+		go func() {
+			done <- cmd.Wait()
+		}()
+
+		select {
+		case <-sigChan:
+			fmt.Println("\nShutting down...")
+			cmd.Process.Signal(os.Interrupt)
+			<-done
+			return // Exit without cleaning
+		case <-rebuildChan:
+			// Kill current server and rebuild
+			fmt.Println("\nRebuilding...")
+			cmd.Process.Signal(os.Interrupt)
+			<-done
+			runBuildNew(tinygo)
+			fmt.Println("\nRestarting server...")
+			continue // Restart loop
+		case err := <-done:
+			if err != nil {
+				fmt.Printf("Server exited with error: %v\n", err)
+			}
+			return // Exit without cleaning
 		}
 	}
-
-	// Clean up
-	fmt.Println("Cleaning up...")
-	runClean()
 }

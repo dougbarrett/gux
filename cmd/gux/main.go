@@ -41,10 +41,10 @@ func main() {
 
 	case "gen", "generate":
 		genCmd := flag.NewFlagSet("gen", flag.ExitOnError)
-		apiDir := genCmd.String("dir", "internal/api", "Directory containing API interface files")
+		watch := genCmd.Bool("watch", false, "Watch for file changes and regenerate")
 		genCmd.Parse(os.Args[2:])
 
-		runGenerate(*apiDir)
+		runGenNew(*watch)
 
 	case "pages":
 		pagesCmd := flag.NewFlagSet("pages", flag.ExitOnError)
@@ -63,9 +63,10 @@ func main() {
 	case "dev":
 		devCmd := flag.NewFlagSet("dev", flag.ExitOnError)
 		useGo := devCmd.Bool("go", false, "Use standard Go instead of TinyGo")
+		watch := devCmd.Bool("watch", false, "Watch for file changes and hot reload")
 		devCmd.Parse(os.Args[2:])
 
-		runDevNew(!*useGo) // TinyGo is default
+		runDevNew(!*useGo, *watch) // TinyGo is default
 
 	case "clean":
 		runClean()
@@ -99,10 +100,10 @@ func printUsage() {
 Usage:
     gux init [--module <module-path>] <appname>   Create a new Gux application
     gux init --module <module-path> .             Initialize in current directory
+    gux gen [--watch]                             Generate .gux files (API, WASM entry points)
     gux build [--go]                              Build WASM and server binary
-    gux dev [--go]                                Build, run, clean up on exit
+    gux dev [--go] [--watch]                      Build and run server
     gux clean                                     Remove generated files
-    gux gen [--dir <api-dir>]                     Generate API client code
     gux claude                                    Install Claude Code skill
     gux update [--check]                          Update gux to latest version
     gux version                                   Show version
@@ -113,9 +114,12 @@ TinyGo is the default compiler (~1MB WASM). Use --go for standard Go (~5MB).
 Examples:
     gux init --module github.com/myuser/myapp myapp   # Create new directory
     gux init --module github.com/myuser/myapp .       # Use current directory
+    gux gen                  # Generate .gux files only
+    gux gen --watch          # Generate and watch for changes
     gux build                # Build with TinyGo
     gux build --go           # Build with standard Go
-    gux dev                  # Build, run, clean on exit
+    gux dev                  # Build and run server
+    gux dev --watch          # Build, run, and hot reload on changes
     gux clean                # Remove bin/, .gux/, assets_gen.go
     gux claude               # Install Claude Code skill
     gux update               # Update gux to latest release
@@ -123,10 +127,11 @@ Examples:
 Project structure:
     app.go                   - Your application entry point
     pages/                   - Your page components
-    .gux/                    - Generated files (gitignored)
+    .gux/                    - Generated files (API client, WASM entry points)
     assets_gen.go            - Asset embedding (gitignored)
     bin/                     - Built binary (gitignored)
 
 After scaffolding, run:
-    gux dev       # Build, run, and auto-clean on exit`)
+    gux dev       # Build and run server
+    gux dev --watch  # Build, run, and hot reload on file changes`)
 }

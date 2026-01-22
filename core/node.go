@@ -48,6 +48,7 @@ type Attrs struct {
 	OnClick  func()
 	OnSubmit func()
 	OnChange func(value string)
+	OnEnter  func() // Called when Enter key is pressed
 
 	// Additional attributes not covered above
 	Extra map[string]string

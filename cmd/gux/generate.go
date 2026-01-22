@@ -6,7 +6,233 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
+
+	"github.com/fsnotify/fsnotify"
 )
+
+// runGenNew generates all .gux files without building WASM or binary
+func runGenNew(watch bool) {
+	// Initial generation
+	if err := generateGuxFiles(); err != nil {
+		fmt.Printf("Error: %v\n", err)
+		os.Exit(1)
+	}
+
+	if !watch {
+		fmt.Println("\nGeneration complete! Run 'gux build' or 'gux dev' to compile.")
+		return
+	}
+
+	// Watch mode
+	fmt.Println("\nWatching for file changes... (Ctrl+C to stop)")
+	watchAndRegenerate(false, nil)
+}
+
+// generateGuxFiles generates all files in the .gux directory
+func generateGuxFiles() error {
+	// Get module path
+	modulePath, err := getModulePath()
+	if err != nil {
+		return fmt.Errorf("getting module path: %w", err)
+	}
+
+	// Find main app file
+	appFile, err := findMainAppFile()
+	if err != nil {
+		return fmt.Errorf("finding app file: %w", err)
+	}
+
+	// Parse routes and bundles from app file
+	bundles, _, err := parseRoutesAndBundles(appFile)
+	if err != nil {
+		return fmt.Errorf("parsing routes: %w", err)
+	}
+
+	// Count total routes
+	totalRoutes := 0
+	for _, bundle := range bundles {
+		totalRoutes += len(bundle.Routes)
+	}
+	if totalRoutes == 0 {
+		fmt.Println("Warning: no Hybrid routes found")
+	}
+
+	// Collect bundle names
+	bundleNames := make([]string, 0, len(bundles))
+	for name := range bundles {
+		bundleNames = append(bundleNames, name)
+	}
+
+	// Parse CRUD models from app file
+	crudModels, modelsImport, dtoImport, err := parseCRUDModels(appFile)
+	if err != nil {
+		return fmt.Errorf("parsing CRUD models: %w", err)
+	}
+
+	// If no models import found, construct it from current package path
+	if modelsImport == "" && len(crudModels) > 0 {
+		pkgPath, err := getCurrentPackagePath()
+		if err != nil {
+			return fmt.Errorf("getting package path: %w", err)
+		}
+		modelsImport = pkgPath + "/models"
+	}
+
+	// If no dto import found but we have DTOs, construct it
+	if dtoImport == "" {
+		for _, m := range crudModels {
+			if m.ListDTO != "" || m.DetailDTO != "" {
+				pkgPath, err := getCurrentPackagePath()
+				if err == nil {
+					dtoImport = pkgPath + "/dto"
+				}
+				break
+			}
+		}
+	}
+
+	// Generate API client if there are CRUD models
+	if len(crudModels) > 0 {
+		fmt.Println("Generating API client...")
+
+		// Parse DTO files to get field mappings
+		for i := range crudModels {
+			m := &crudModels[i]
+			if m.ListDTO != "" {
+				info, err := parseDTOFile("dto", m.ListDTO)
+				if err != nil {
+					fmt.Printf("Warning: could not parse DTO %s: %v\n", m.ListDTO, err)
+				} else {
+					m.ListDTOInfo = info
+				}
+			}
+			if m.DetailDTO != "" {
+				info, err := parseDTOFile("dto", m.DetailDTO)
+				if err != nil {
+					fmt.Printf("Warning: could not parse DTO %s: %v\n", m.DetailDTO, err)
+				} else {
+					m.DetailDTOInfo = info
+				}
+			}
+		}
+
+		if err := generateAPIClient(modelsImport, dtoImport, crudModels); err != nil {
+			return fmt.Errorf("generating API client: %w", err)
+		}
+	}
+
+	// Generate WASM entry points for each bundle
+	fmt.Println("Generating WASM entry points...")
+	for name, bundle := range bundles {
+		if len(bundle.Routes) == 0 {
+			continue // Skip bundles with no routes
+		}
+		if err := generateBundleWasmEntryPoint(name, bundle); err != nil {
+			return fmt.Errorf("generating WASM entry for bundle %s: %w", name, err)
+		}
+		fmt.Printf("  Generated entry point for bundle: %s (%d routes)\n", name, len(bundle.Routes))
+	}
+
+	// Copy wasm_exec.js (use TinyGo by default)
+	if err := copyWasmExec(true); err != nil {
+		return fmt.Errorf("copying wasm_exec.js: %w", err)
+	}
+
+	// Generate assets_gen.go with all bundles
+	fmt.Println("Generating assets...")
+	if err := generateAssetsFile(modulePath, bundleNames); err != nil {
+		return fmt.Errorf("generating assets: %w", err)
+	}
+
+	return nil
+}
+
+// watchAndRegenerate watches for file changes and regenerates/rebuilds
+// If fullBuild is true, it rebuilds WASM and binary (for dev mode)
+// If notifyReload is not nil, it's called after successful rebuild
+func watchAndRegenerate(fullBuild bool, notifyReload func()) {
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		fmt.Printf("Error creating watcher: %v\n", err)
+		os.Exit(1)
+	}
+	defer watcher.Close()
+
+	// Add directories to watch (excluding .gux and bin)
+	err = filepath.Walk(".", func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return nil // Skip errors
+		}
+		if info.IsDir() {
+			// Skip .gux, bin, .git, and hidden directories
+			name := info.Name()
+			if name == ".gux" || name == "bin" || name == ".git" || (len(name) > 0 && name[0] == '.') {
+				return filepath.SkipDir
+			}
+			return watcher.Add(path)
+		}
+		return nil
+	})
+	if err != nil {
+		fmt.Printf("Error setting up watcher: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Debounce timer
+	var debounceTimer *time.Timer
+	debounceDuration := 500 * time.Millisecond
+
+	for {
+		select {
+		case event, ok := <-watcher.Events:
+			if !ok {
+				return
+			}
+			// Only watch .go, .templ, .css, .html files
+			ext := filepath.Ext(event.Name)
+			if ext != ".go" && ext != ".templ" && ext != ".css" && ext != ".html" {
+				continue
+			}
+			// Skip generated files
+			base := filepath.Base(event.Name)
+			if base == "assets_gen.go" || strings.HasSuffix(base, "_gen.go") {
+				continue
+			}
+
+			// Debounce: reset timer on each event
+			if debounceTimer != nil {
+				debounceTimer.Stop()
+			}
+			debounceTimer = time.AfterFunc(debounceDuration, func() {
+				fmt.Printf("\n[%s] File changed: %s\n", time.Now().Format("15:04:05"), event.Name)
+				if fullBuild {
+					// Full rebuild for dev mode
+					fmt.Println("Rebuilding...")
+					// Note: caller handles actual rebuild
+					if notifyReload != nil {
+						notifyReload()
+					}
+				} else {
+					// Just regenerate .gux files
+					if err := generateGuxFiles(); err != nil {
+						fmt.Printf("Error regenerating: %v\n", err)
+					} else {
+						fmt.Println("Regeneration complete!")
+					}
+				}
+			})
+
+		case err, ok := <-watcher.Errors:
+			if !ok {
+				return
+			}
+			fmt.Printf("Watcher error: %v\n", err)
+		}
+	}
+}
+
+// Legacy generate functions below - kept for backward compatibility
 
 func runGenerate(apiDir string) {
 	// Check if directory exists
