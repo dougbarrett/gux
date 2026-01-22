@@ -3,11 +3,11 @@
 ## Current Position
 
 Phase: 17 — Form Components
-Plan: 1/? in progress
+Plan: 2/3 complete
 Status: In progress
-Last activity: 2026-01-22 — Completed 17-01-PLAN.md (Input and FormField)
+Last activity: 2026-01-22 — Completed 17-02-PLAN.md (Textarea and Select)
 
-Progress: ████████░░ ~80% of Phase 17
+Progress: ████████░░ ~85% of Phase 17
 
 ## Project Reference
 
@@ -62,6 +62,9 @@ Full decision log preserved in milestone archives:
 - InputSize and input styling constants defined in input.go as canonical location
 - Error takes precedence over description in FormField
 - Required asterisk only shown when label is present
+- Textarea value renders as child text node (not value attr) for SSR
+- Select placeholder is disabled option at index 0, selected when Value is empty
+- Select uses appearance-none + pr-10 for custom dropdown styling
 
 ### Research Findings
 
@@ -90,9 +93,9 @@ None
 ## Session Continuity
 
 Last session: 2026-01-22
-Stopped at: Completed 17-01-PLAN.md (Input and FormField components)
+Stopped at: Completed 17-02-PLAN.md (Textarea and Select components)
 Resume file: None
 
 ---
 
-*Last updated: 2026-01-22 after 17-01 execution*
+*Last updated: 2026-01-22 after 17-02 execution*
