@@ -13,26 +13,25 @@ func main() {
 	document := js.Global().Get("document")
 	container := document.Call("getElementById", "app")
 
-	count := 0
-
+	var router *pages.Router
 	var render func()
+
 	render = func() {
-		// Clear and re-render
 		container.Set("innerHTML", "")
 
-		node := pages.Home(count, func() {
-			count++
-			render()
-		})
+		// Get the component function from the page
+		component := router.Home()
 
+		// Render the component
+		node := component()
 		result := node.Render(core.DOM())
 		if domVal := result.DOMValue(); domVal != nil {
 			container.Call("appendChild", domVal.(js.Value))
 		}
 	}
 
+	router = pages.NewRouter(render)
 	render()
 
-	// Keep alive
 	select {}
 }

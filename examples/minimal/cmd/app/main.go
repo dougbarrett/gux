@@ -18,28 +18,27 @@ var wasmExecJS []byte
 func main() {
 	mux := http.NewServeMux()
 
-	// Serve WASM binary
 	mux.HandleFunc("/app.wasm", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/wasm")
 		w.Write(wasmBinary)
 	})
 
-	// Serve wasm_exec.js
 	mux.HandleFunc("/wasm_exec.js", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/javascript")
 		w.Write(wasmExecJS)
 	})
 
-	// Home page - SSR with WASM hydration
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		// SSR the initial page (count=0, no handler for SSR)
-		html := pages.Home(0, nil).Render(core.HTML()).HTML()
+		// SSR: router with no rerender (static)
+		router := pages.NewRouter(nil)
+		component := router.Home()
+		html := component().Render(core.HTML()).HTML()
 
 		w.Header().Set("Content-Type", "text/html")
 		fmt.Fprintf(w, `<!DOCTYPE html>
 <html>
 <head>
-    <title>Gux Counter</title>
+    <title>Gux</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body>
@@ -54,6 +53,6 @@ func main() {
 </html>`, html)
 	})
 
-	fmt.Println("Server running on http://localhost:8080")
-	http.ListenAndServe(":8080", mux)
+	fmt.Println("http://localhost:8081")
+	http.ListenAndServe(":8081", mux)
 }
