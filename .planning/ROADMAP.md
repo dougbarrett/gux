@@ -79,7 +79,11 @@ Full details: [milestones/v1.2-ROADMAP.md](milestones/v1.2-ROADMAP.md)
   - [x] 16-01-PLAN.md - Utility functions (MergeClasses, ConditionalClass)
   - [x] 16-02-PLAN.md - Button component with variants and sizes
   - [x] 16-03-PLAN.md - Card compound components and layout primitives
-- [ ] Phase 17: Form Components - Input, Textarea, Select, Checkbox, Radio, Form
+- [ ] Phase 17: Form Components (3 plans) - Input, Textarea, Select, Checkbox, Radio, Switch, FormField
+  Plans:
+  - [ ] 17-01-PLAN.md - Input and FormField components
+  - [ ] 17-02-PLAN.md - Textarea and Select components
+  - [ ] 17-03-PLAN.md - Checkbox, RadioGroup, and Switch components
 - [ ] Phase 18: Data Display Components - Table, DataTable[T], Badge, Avatar, Pagination
 - [ ] Phase 19: Interactive Components - Modal, Dropdown, Tabs, Toast, Tooltip
 - [ ] Phase 20: Auth Example - Login, Register, Password Reset, Verification
@@ -114,7 +118,7 @@ Phases execute in numeric order: 1 -> 2 -> ... -> 15 -> 16 -> ... -> 23
 | 14. Keyboard Shortcuts | v1.2 | 1/1 | Complete | 2026-01-15 |
 | 15. Accessibility Guide | v1.2 | 1/1 | Complete | 2026-01-15 |
 | 16. Component Foundation | v2.0 | 3/3 | Complete | 2026-01-22 |
-| 17. Form Components | v2.0 | - | Pending | - |
+| 17. Form Components | v2.0 | 3 | Planned | - |
 | 18. Data Display Components | v2.0 | - | Pending | - |
 | 19. Interactive Components | v2.0 | - | Pending | - |
 | 20. Auth Example | v2.0 | - | Pending | - |
