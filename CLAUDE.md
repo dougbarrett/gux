@@ -13,6 +13,7 @@ The core package provides a universal rendering system that works identically on
 - **Renderers** - HTML (`html_renderer.go`) for server, DOM (`dom_renderer.go`) for WASM
 - **App & Routing** (`app.go`, `router_server.go`, `router_wasm.go`) - Hybrid SSR+WASM routing
 - **CRUD** (`crud.go`) - Automatic REST API generation with DTOs and hooks
+- **CSRF** (`csrf.go`) - Automatic CSRF protection for mutating operations
 
 ### Key Patterns
 
@@ -68,9 +69,11 @@ goquery/
 │   ├── elements.go         # Element helpers
 │   ├── app.go              # App, Router, State
 │   ├── crud.go             # CRUD API generation
+│   ├── csrf.go             # CSRF protection
 │   ├── html_renderer.go    # Server-side rendering
 │   ├── dom_renderer.go     # WASM DOM rendering
 │   └── router_*.go         # Platform-specific routing
+├── fetch/                   # WASM HTTP client with auto CSRF
 ├── components/             # Pre-built UI components (Gux library)
 ├── state/                  # State management utilities
 ├── api/                    # API utilities & error types
@@ -161,6 +164,23 @@ app.RouteGroup("/admin", core.WithBundle("admin")).
     Hybrid("/users/:id", admin.UserDetail)
 ```
 
+## CSRF Protection
+
+CSRF protection is enabled by default. It uses the Double Submit Cookie pattern:
+
+1. Server generates token, embeds in `<meta name="csrf-token">` and sets `__gux_csrf` cookie
+2. `fetch` package reads token and includes `X-CSRF-Token` header on POST/PUT/PATCH/DELETE
+3. Server middleware validates header matches cookie
+
+**Configuration**:
+```go
+app := core.New()                     // CSRF enabled by default
+app.DisableCSRF()                     // Disable for API-key authenticated endpoints
+app.EnableCSRF(core.CSRFConfig{...})  // Custom configuration
+```
+
+**Transparency**: Developers don't need to handle CSRF manually - it's automatic.
+
 ## Development Notes
 
 - **core/** is the low-level universal rendering system (focus of current development)
@@ -168,3 +188,4 @@ app.RouteGroup("/admin", core.WithBundle("admin")).
 - Always use `core.OnLoad()` for data fetching to support hydration
 - DTOs should exclude sensitive fields (passwords, internal IDs)
 - Use `core.External: true` in Attrs for links that cross bundle boundaries
+- CSRF protection is automatic for all CRUD operations

@@ -30,8 +30,56 @@ var (
 	ErrNetworkError = errors.New("network error")
 )
 
+// CSRF constants
+const (
+	csrfMetaName   = "csrf-token"
+	csrfCookieName = "__gux_csrf"
+	csrfHeaderName = "X-CSRF-Token"
+)
+
+// getCSRFToken reads the CSRF token from the meta tag or cookie.
+func getCSRFToken() string {
+	doc := js.Global().Get("document")
+	if doc.IsNull() || doc.IsUndefined() {
+		return ""
+	}
+
+	// Try meta tag first
+	meta := doc.Call("querySelector", `meta[name="`+csrfMetaName+`"]`)
+	if !meta.IsNull() && !meta.IsUndefined() {
+		content := meta.Get("content")
+		if !content.IsNull() && !content.IsUndefined() {
+			return content.String()
+		}
+	}
+
+	// Fall back to cookie
+	cookies := doc.Get("cookie").String()
+	prefix := csrfCookieName + "="
+	start := 0
+	for i := 0; i <= len(cookies)-len(prefix); i++ {
+		if i == 0 || cookies[i-1] == ';' || cookies[i-1] == ' ' {
+			if cookies[i:i+len(prefix)] == prefix {
+				start = i + len(prefix)
+				end := start
+				for end < len(cookies) && cookies[end] != ';' {
+					end++
+				}
+				return cookies[start:end]
+			}
+		}
+	}
+	return ""
+}
+
+// isMutatingMethod returns true for HTTP methods that modify data.
+func isMutatingMethod(method string) bool {
+	return method == "POST" || method == "PUT" || method == "PATCH" || method == "DELETE"
+}
+
 // Fetch performs an HTTP request using the browser's fetch API
 // This is synchronous and blocks until the request completes
+// CSRF tokens are automatically included for POST, PUT, PATCH, DELETE methods
 func Fetch(url string, opts *Options) (*Response, error) {
 	done := make(chan struct{})
 	var response *Response
@@ -39,19 +87,27 @@ func Fetch(url string, opts *Options) (*Response, error) {
 
 	// Build fetch options
 	jsOpts := js.Global().Get("Object").New()
+	headers := js.Global().Get("Object").New()
 
 	if opts != nil {
 		if opts.Method != "" {
 			jsOpts.Set("method", opts.Method)
 		}
 
-		if len(opts.Headers) > 0 {
-			headers := js.Global().Get("Object").New()
-			for k, v := range opts.Headers {
-				headers.Set(k, v)
-			}
-			jsOpts.Set("headers", headers)
+		// Copy provided headers
+		for k, v := range opts.Headers {
+			headers.Set(k, v)
 		}
+
+		// Automatically include CSRF token for mutating requests
+		if isMutatingMethod(opts.Method) {
+			csrfToken := getCSRFToken()
+			if csrfToken != "" {
+				headers.Set(csrfHeaderName, csrfToken)
+			}
+		}
+
+		jsOpts.Set("headers", headers)
 
 		if opts.Body != "" {
 			jsOpts.Set("body", opts.Body)

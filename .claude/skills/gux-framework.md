@@ -308,6 +308,42 @@ r.OnLoad(func() {
 })
 ```
 
+### CSRF Protection
+
+CSRF protection is **enabled by default** for all mutating operations (POST, PUT, PATCH, DELETE).
+
+**How it works:**
+1. Server generates a CSRF token and embeds it in the HTML (`<meta name="csrf-token">`)
+2. Server also sets a cookie (`__gux_csrf`) with the same token
+3. Client-side `fetch` package automatically reads the token and includes it in `X-CSRF-Token` header
+4. Server validates that header matches cookie (Double Submit Cookie pattern)
+
+**Configuration:**
+```go
+app := core.New()
+
+// CSRF is enabled by default - no configuration needed
+
+// Customize CSRF settings
+app.EnableCSRF(core.CSRFConfig{
+    Enabled:        true,
+    CookiePath:     "/",
+    CookieMaxAge:   43200, // 12 hours
+    CookieSameSite: http.SameSiteStrictMode,
+    Secure:         true,  // Require HTTPS (for production)
+    ExemptPaths:    []string{"/api/webhooks"}, // Skip CSRF for webhooks
+})
+
+// Disable CSRF (only for APIs using other auth methods)
+app.DisableCSRF()
+```
+
+**Transparency:**
+- CRUD operations are automatically protected
+- The `fetch` package automatically includes CSRF tokens for POST/PUT/PATCH/DELETE
+- Generated API clients automatically include CSRF tokens
+- No manual token handling required by developers
+
 ### Hydration Flow
 
 1. **Server renders HTML** with initial state

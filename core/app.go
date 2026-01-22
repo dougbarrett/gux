@@ -30,8 +30,9 @@ type App struct {
 	wasmExecJS  []byte
 	stylesCSS   []byte
 	title       string
-	db          interface{}   // Database connection (e.g., *gorm.DB)
-	crudModels  []CRUDModel   // Registered CRUD models
+	db          interface{} // Database connection (e.g., *gorm.DB)
+	crudModels  []CRUDModel // Registered CRUD models
+	csrfConfig  CSRFConfig  // CSRF protection configuration
 }
 
 // Default assets (set by generated code)
@@ -94,7 +95,27 @@ func New() *App {
 		wasmBundles: bundles,
 		wasmExecJS:  defaultWasmExecJS,
 		stylesCSS:   defaultStylesCSS,
+		csrfConfig:  DefaultCSRFConfig(), // CSRF enabled by default
 	}
+}
+
+// EnableCSRF configures CSRF protection.
+// CSRF is enabled by default. Use this to customize or disable.
+//
+// Usage:
+//
+//	app.EnableCSRF(core.CSRFConfig{Enabled: false}) // Disable
+//	app.EnableCSRF(core.CSRFConfig{Secure: true})   // Require HTTPS
+func (a *App) EnableCSRF(config CSRFConfig) *App {
+	a.csrfConfig = config
+	return a
+}
+
+// DisableCSRF disables CSRF protection.
+// Only use this for APIs that use other authentication methods (e.g., API keys).
+func (a *App) DisableCSRF() *App {
+	a.csrfConfig.Enabled = false
+	return a
 }
 
 // SetAssets sets the WASM binary and wasm_exec.js.
@@ -370,6 +391,22 @@ func (a *App) Run(addr string) error {
     </script>`
 				}
 
+				// Generate CSRF token and set cookie
+				csrfToken := ""
+				if a.csrfConfig.Enabled {
+					var err error
+					csrfToken, err = generateCSRFToken()
+					if err == nil {
+						setCSRFCookie(w, csrfToken, a.csrfConfig)
+					}
+				}
+
+				// Build CSRF meta tag
+				csrfMeta := ""
+				if csrfToken != "" {
+					csrfMeta = fmt.Sprintf(`<meta name="%s" content="%s">`, CSRFMetaName, csrfToken)
+				}
+
 				if route.Hybrid && hasWasm {
 					// Serialize state for hydration
 					stateJSON, _ := json.Marshal(router.state)
@@ -379,6 +416,7 @@ func (a *App) Run(addr string) error {
 <html>
 <head>
     <title>%s</title>
+    %s
     <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
@@ -391,19 +429,20 @@ func (a *App) Run(addr string) error {
             .then(result => go.run(result.instance));
     </script>%s
 </body>
-</html>`, a.title, html, stateJSON, wasmPath, hotReloadScript)
+</html>`, a.title, csrfMeta, html, stateJSON, wasmPath, hotReloadScript)
 				} else {
 					// SSR only, no WASM
 					fmt.Fprintf(w, `<!DOCTYPE html>
 <html>
 <head>
     <title>%s</title>
+    %s
     <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
     <div id="app">%s</div>%s
 </body>
-</html>`, a.title, html, hotReloadScript)
+</html>`, a.title, csrfMeta, html, hotReloadScript)
 				}
 				return
 			}
@@ -412,7 +451,14 @@ func (a *App) Run(addr string) error {
 	})
 
 	fmt.Printf("http://localhost%s\n", addr)
-	return http.ListenAndServe(addr, mux)
+
+	// Apply CSRF middleware if enabled
+	var handler http.Handler = mux
+	if a.csrfConfig.Enabled {
+		handler = CSRFMiddleware(a.csrfConfig)(mux)
+	}
+
+	return http.ListenAndServe(addr, handler)
 }
 
 // Router provides page context and state management.
