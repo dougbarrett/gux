@@ -2,10 +2,10 @@
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 16 — Component Foundation
 Plan: —
-Status: Defining requirements for v2.0
-Last activity: 2026-01-22 — Milestone v2.0 started
+Status: Ready to plan Phase 16
+Last activity: 2026-01-22 — Roadmap created
 
 Progress: ░░░░░░░░░░ 0%
 
@@ -20,12 +20,15 @@ See: .planning/PROJECT.md (updated 2026-01-22)
 
 **Goal:** Rebuild component library on core's Node system with four example applications
 
-**Target features:**
-- Fresh component library (layouts, forms, feedback, data display)
-- Marketing example (multi-page site)
-- SaaS example (dashboard + CRUD)
-- Admin example (full panel)
-- Auth example (core flows)
+**Phases:**
+- [ ] Phase 16: Component Foundation — utilities, Button, Card, layout primitives
+- [ ] Phase 17: Form Components — Input, Textarea, Select, Checkbox, Radio
+- [ ] Phase 18: Data Display — Table, DataTable[T], Badge, Avatar, Pagination
+- [ ] Phase 19: Interactive — Modal, Dropdown, Tabs, Toast, Tooltip
+- [ ] Phase 20: Auth Example — Login, Register, Password Reset
+- [ ] Phase 21: Marketing Example — Home, Features, Pricing, Contact
+- [ ] Phase 22: SaaS Dashboard — Dashboard, CRUD, Settings
+- [ ] Phase 23: Admin Panel — User Management, Activity Logs
 
 ## Accumulated Context
 
@@ -41,6 +44,17 @@ Full decision log preserved in milestone archives:
 - Shared foundation across examples
 - Tailwind CSS styling
 - Core auth flows only (no OAuth)
+- No new stack additions needed
+- 8 phases: 4 component phases + 4 example apps
+
+### Research Findings
+
+Research completed 2026-01-22. Key findings:
+- Stack: Go 1.24.3, GORM, Tailwind CDN — no changes needed
+- Architecture: Props structs, core.Node interface, compound patterns
+- Pitfalls: Callback cleanup, binary size, hydration mismatches
+
+See: [.planning/research/SUMMARY.md](research/SUMMARY.md)
 
 ### Blockers/Concerns Carried Forward
 
@@ -55,14 +69,14 @@ None
 - **v1.0 UX Polish** - 6 phases, 17 plans (shipped 2026-01-15)
 - **v1.1 Accessibility** - 5 phases, 16 plans (shipped 2026-01-16)
 - **v1.2 Documentation** - 4 phases, 4 plans (shipped 2026-01-15)
-- **v2.0 Core Components** - TBD phases (in progress)
+- **v2.0 Core Components** - 8 phases, ~20 plans (in progress)
 
 ## Session Continuity
 
 Last session: 2026-01-22
-Stopped at: Defining requirements for v2.0
+Stopped at: Roadmap complete, ready to plan Phase 16
 Resume file: None
 
 ---
 
-*Last updated: 2026-01-22 after v2.0 milestone start*
+*Last updated: 2026-01-22 after roadmap creation*

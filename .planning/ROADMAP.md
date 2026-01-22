@@ -1,8 +1,8 @@
-# Roadmap: GoQuery
+# Roadmap: Gux Framework
 
 ## Overview
 
-Transform GoQuery from a functional database query tool into a polished, production-ready application with comprehensive UI/UX enhancements including a command palette, enhanced tables, notification system, and progressive web app capabilities.
+A full-stack Go framework for building modern web applications with WebAssembly. The `core` package provides universal rendering (SSR + WASM hydration), and the component library provides pre-built UI components built on that foundation.
 
 ## Domain Expertise
 
@@ -14,6 +14,7 @@ Transform GoQuery from a functional database query tool into a polished, product
 - ✅ [v1.0 UX Polish](milestones/v1.0-ROADMAP.md) (Phases 1-6) - SHIPPED 2026-01-15
 - ✅ [v1.1 Accessibility](milestones/v1.1-ROADMAP.md) (Phases 7-11) - SHIPPED 2026-01-16
 - ✅ [v1.2 Documentation](milestones/v1.2-ROADMAP.md) (Phases 12-15) - SHIPPED 2026-01-15
+- 🚧 [v2.0 Core Components](milestones/v2.0-ROADMAP.md) (Phases 16-23) - IN PROGRESS
 
 ## Phases
 
@@ -68,10 +69,28 @@ Full details: [milestones/v1.2-ROADMAP.md](milestones/v1.2-ROADMAP.md)
 
 </details>
 
+<details open>
+<summary>v2.0 Core Components (Phases 16-23) - IN PROGRESS</summary>
+
+**Milestone Goal:** Build a fresh component library on core's Node system with four example applications
+
+- [ ] Phase 16: Component Foundation - Utilities, Button, Card, layout primitives
+- [ ] Phase 17: Form Components - Input, Textarea, Select, Checkbox, Radio, Form
+- [ ] Phase 18: Data Display Components - Table, DataTable[T], Badge, Avatar, Pagination
+- [ ] Phase 19: Interactive Components - Modal, Dropdown, Tabs, Toast, Tooltip
+- [ ] Phase 20: Auth Example - Login, Register, Password Reset, Verification
+- [ ] Phase 21: Marketing Example - Home, Features, Pricing, About, Contact
+- [ ] Phase 22: SaaS Dashboard Example - Dashboard, CRUD, Settings, Profile
+- [ ] Phase 23: Admin Panel Example - User Management, Activity Logs, Settings
+
+Full details: [milestones/v2.0-ROADMAP.md](milestones/v2.0-ROADMAP.md)
+
+</details>
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → ... → 11 → 12 → 13 → 14 → 15
+Phases execute in numeric order: 1 → 2 → ... → 15 → 16 → ... → 23
 
 | Phase | Milestone | Plans | Status | Completed |
 |-------|-----------|-------|--------|-----------|
@@ -90,3 +109,11 @@ Phases execute in numeric order: 1 → 2 → ... → 11 → 12 → 13 → 14 →
 | 13. Component Docs | v1.2 | 1/1 | Complete | 2026-01-15 |
 | 14. Keyboard Shortcuts | v1.2 | 1/1 | Complete | 2026-01-15 |
 | 15. Accessibility Guide | v1.2 | 1/1 | Complete | 2026-01-15 |
+| 16. Component Foundation | v2.0 | — | Pending | — |
+| 17. Form Components | v2.0 | — | Pending | — |
+| 18. Data Display Components | v2.0 | — | Pending | — |
+| 19. Interactive Components | v2.0 | — | Pending | — |
+| 20. Auth Example | v2.0 | — | Pending | — |
+| 21. Marketing Example | v2.0 | — | Pending | — |
+| 22. SaaS Dashboard Example | v2.0 | — | Pending | — |
+| 23. Admin Panel Example | v2.0 | — | Pending | — |
