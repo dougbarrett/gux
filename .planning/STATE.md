@@ -3,11 +3,11 @@
 ## Current Position
 
 Phase: 20 — Auth Example (IN PROGRESS)
-Plan: 1/5 complete
+Plan: 2/5 complete
 Status: In progress
-Last activity: 2026-01-22 — Completed 20-01-PLAN.md (Alert component)
+Last activity: 2026-01-22 — Completed 20-02-PLAN.md (Auth example foundation)
 
-Progress: █░░░░░░░░░ 20% of Phase 20
+Progress: ██░░░░░░░░ 40% of Phase 20
 
 ## Project Reference
 
@@ -129,6 +129,14 @@ Full decision log preserved in milestone archives:
 - Circled i unicode (U+24D8) for info icon to differentiate from Toast
 - Alert uses 3-part variant styling (bg + border + text) vs Toast's 2-part
 
+**Phase 20 decisions (20-02):**
+- User.PasswordHash uses json:"-" to never expose in JSON serialization
+- PasswordReset tokens have 1-hour expiry for security
+- All 7 routes share single WASM bundle (no separate admin bundle)
+- Stub pages ready for replacement in Plans 03/04
+- AuthLayout: centered full-height container with max-w-md card area
+- PageLayout: Nav header with max-w-7xl content area
+
 ### Research Findings
 
 Research completed 2026-01-22. Key findings:
@@ -156,9 +164,9 @@ None
 ## Session Continuity
 
 Last session: 2026-01-22
-Stopped at: Completed 20-01-PLAN.md (Alert component)
+Stopped at: Completed 20-02-PLAN.md (Auth example foundation)
 Resume file: None
 
 ---
 
-*Last updated: 2026-01-22 after 20-01 execution*
+*Last updated: 2026-01-22 after 20-02 execution*
