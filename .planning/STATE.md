@@ -2,12 +2,12 @@
 
 ## Current Position
 
-Phase: 18 — Data Display Components (COMPLETE)
-Plan: 3/3 complete
-Status: Phase complete
-Last activity: 2026-01-22 — Phase 18 executed and verified (12/12 must-haves)
+Phase: 19 — Interactive Components (IN PROGRESS)
+Plan: 1/5 complete
+Status: In progress
+Last activity: 2026-01-22 — Completed 19-01-PLAN.md (Modal component)
 
-Progress: ██████████ 100% of Phase 18
+Progress: ██░░░░░░░░ 20% of Phase 19
 
 ## Project Reference
 
@@ -93,6 +93,12 @@ Full decision log preserved in milestone archives:
 - DataTable striped applies to odd-indexed rows (i%2 == 1)
 - DataTable uses Table compound internally for consistent styling
 
+**Phase 19 decisions (19-01):**
+- Modal always renders full structure, visibility via CSS hidden class
+- Header shows when Title OR OnClose provided (allows close-only modals with spacer)
+- Backdrop OnClick calls OnClose (standard click-outside-to-close)
+- ModalFull uses max-w-4xl (not 100vw) for generous but not excessive width
+
 ### Research Findings
 
 Research completed 2026-01-22. Key findings:
@@ -120,9 +126,9 @@ None
 ## Session Continuity
 
 Last session: 2026-01-22
-Stopped at: Phase 18 complete, ready for Phase 19
+Stopped at: Completed 19-01-PLAN.md (Modal component)
 Resume file: None
 
 ---
 
-*Last updated: 2026-01-22 after Phase 18 execution and verification*
+*Last updated: 2026-01-22 after 19-01 Modal component completion*
