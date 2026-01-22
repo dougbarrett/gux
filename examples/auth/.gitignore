@@ -2,3 +2,4 @@
 bin/
 app.db
 assets_gen.go
+auth
