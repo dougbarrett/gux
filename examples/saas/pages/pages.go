@@ -4,20 +4,6 @@ import (
 	"github.com/dougbarrett/gux/core"
 )
 
-// Dashboard is the main dashboard page.
-func Dashboard(r *core.Router) func() core.Node {
-	return func() core.Node {
-		return DashboardLayout(
-			core.H1(core.Class("text-3xl font-bold text-white"),
-				core.Text("Dashboard"),
-			),
-			core.P(core.Class("text-gray-400 mt-4"),
-				core.Text("Welcome to your SaaS Dashboard"),
-			),
-		)
-	}
-}
-
 // Projects is the project list page.
 func Projects(r *core.Router) func() core.Node {
 	return func() core.Node {
