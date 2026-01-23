@@ -2,6 +2,7 @@ package pages
 
 import (
 	"github.com/dougbarrett/gux/core"
+	"github.com/dougbarrett/gux/ui"
 )
 
 // DashboardLayout wraps content with the dashboard navigation and dark theme.
@@ -37,8 +38,12 @@ func Nav() core.Node {
 						core.Text("Settings"),
 					),
 				),
-				// Right side: User info
+				// Right side: User avatar and profile link
 				core.Div(core.Class("flex items-center gap-3"),
+					ui.Avatar(ui.AvatarProps{
+						Name: "John Doe",
+						Size: ui.AvatarSM,
+					}),
 					core.A(
 						core.Attrs{Href: "/profile", Class: "text-gray-300 hover:text-white transition"},
 						core.Text("John Doe"),
