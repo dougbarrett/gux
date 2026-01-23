@@ -112,7 +112,11 @@ Full details: [milestones/v1.2-ROADMAP.md](milestones/v1.2-ROADMAP.md)
   - [x] 22-01-PLAN.md - App foundation with Project model, routes, DashboardLayout
   - [x] 22-02-PLAN.md - Dashboard and Projects CRUD pages
   - [x] 22-03-PLAN.md - Settings with Tabs and Profile with Avatar
-- [ ] Phase 23: Admin Panel Example - User Management, Activity Logs, Settings
+- [ ] Phase 23: Admin Panel Example (3 plans) - User Management, Activity Logs, Settings
+  Plans:
+  - [ ] 23-01-PLAN.md - App foundation with User/ActivityLog models, DTOs, AdminLayout
+  - [ ] 23-02-PLAN.md - Dashboard and User Management (list, detail, edit, new, bulk actions)
+  - [ ] 23-03-PLAN.md - Activity Logs and Settings with role-based UI
 
 Full details: [milestones/v2.0-ROADMAP.md](milestones/v2.0-ROADMAP.md)
 
@@ -147,4 +151,4 @@ Phases execute in numeric order: 1 -> 2 -> ... -> 15 -> 16 -> ... -> 23
 | 20. Auth Example | v2.0 | 4/4 | Complete | 2026-01-22 |
 | 21. Marketing Example | v2.0 | 3/3 | Complete | 2026-01-22 |
 | 22. SaaS Dashboard Example | v2.0 | 3/3 | Complete | 2026-01-23 |
-| 23. Admin Panel Example | v2.0 | - | Pending | - |
+| 23. Admin Panel Example | v2.0 | 0/3 | Planned | - |
