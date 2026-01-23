@@ -102,7 +102,11 @@ Full details: [milestones/v1.2-ROADMAP.md](milestones/v1.2-ROADMAP.md)
   - [x] 20-02-PLAN.md - Auth app foundation (models, routes, layout)
   - [x] 20-03-PLAN.md - Login and Register pages
   - [x] 20-04-PLAN.md - Forgot, Reset, and Verify pages
-- [ ] Phase 21: Marketing Example - Home, Features, Pricing, About, Contact
+- [ ] Phase 21: Marketing Example (3 plans) - Home, Features, Pricing, About, Contact
+  Plans:
+  - [ ] 21-01-PLAN.md - App foundation with responsive Nav and Footer
+  - [ ] 21-02-PLAN.md - Home and Features pages
+  - [ ] 21-03-PLAN.md - Pricing, About, and Contact pages
 - [ ] Phase 22: SaaS Dashboard Example - Dashboard, CRUD, Settings, Profile
 - [ ] Phase 23: Admin Panel Example - User Management, Activity Logs, Settings
 
@@ -137,6 +141,6 @@ Phases execute in numeric order: 1 -> 2 -> ... -> 15 -> 16 -> ... -> 23
 | 18. Data Display Components | v2.0 | 3/3 | Complete | 2026-01-22 |
 | 19. Interactive Components | v2.0 | 5/5 | Complete | 2026-01-22 |
 | 20. Auth Example | v2.0 | 4/4 | Complete | 2026-01-22 |
-| 21. Marketing Example | v2.0 | - | Pending | - |
+| 21. Marketing Example | v2.0 | 3 | Planned | - |
 | 22. SaaS Dashboard Example | v2.0 | - | Pending | - |
 | 23. Admin Panel Example | v2.0 | - | Pending | - |
