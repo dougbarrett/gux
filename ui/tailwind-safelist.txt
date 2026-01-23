@@ -1,0 +1,214 @@
+# Tailwind CSS classes used by gux/ui components
+# This file is read by `gux build` to ensure these classes are included
+# even when importing gux/ui as an external module.
+#
+# Generated from ui/*.go source files
+
+# Layout & Positioning
+absolute
+fixed
+relative
+inset-0
+top-4
+bottom-4
+left-4
+right-4
+top-full
+bottom-full
+left-full
+right-full
+z-40
+z-50
+
+# Flexbox
+flex
+flex-1
+flex-col
+flex-row
+items-center
+items-start
+items-end
+items-stretch
+justify-start
+justify-center
+justify-end
+justify-between
+justify-around
+
+# Grid
+grid
+grid-cols-1
+grid-cols-2
+grid-cols-3
+grid-cols-4
+grid-cols-6
+grid-cols-12
+gap-0
+gap-1
+gap-2
+gap-4
+gap-6
+gap-8
+
+# Spacing
+mx-auto
+my-4
+px-2
+px-3
+px-4
+px-6
+py-1.5
+py-2
+py-3
+py-4
+py-8
+
+# Sizing
+w-4
+w-10
+w-11
+w-12
+w-48
+w-64
+w-full
+w-px
+h-4
+h-6
+h-10
+h-full
+h-px
+min-h-32
+min-w-64
+min-w-full
+max-w-sm
+max-w-md
+max-w-lg
+max-w-xl
+max-w-2xl
+max-w-4xl
+max-w-7xl
+
+# Typography
+text-xs
+text-sm
+text-base
+text-lg
+text-left
+font-medium
+font-semibold
+font-bold
+
+# Colors - Background
+bg-transparent
+bg-white
+bg-gray-50
+bg-gray-100
+bg-gray-200
+bg-gray-300
+bg-gray-900
+bg-blue-50
+bg-blue-100
+bg-blue-500
+bg-blue-600
+bg-green-50
+bg-green-100
+bg-yellow-50
+bg-yellow-100
+bg-red-50
+bg-red-100
+bg-red-600
+
+# Colors - Text
+text-white
+text-gray-300
+text-gray-400
+text-gray-500
+text-gray-600
+text-gray-700
+text-gray-800
+text-gray-900
+text-blue-600
+text-blue-800
+text-green-800
+text-yellow-800
+text-red-500
+text-red-600
+text-red-800
+
+# Borders
+border
+border-2
+border-t
+border-b
+border-transparent
+border-gray-200
+border-gray-300
+border-blue-200
+border-blue-500
+border-green-200
+border-yellow-200
+border-red-200
+border-red-500
+rounded
+rounded-md
+rounded-lg
+rounded-full
+
+# Effects
+shadow
+shadow-lg
+opacity-0
+opacity-50
+transition-opacity
+duration-200
+
+# Interactive States
+cursor-pointer
+cursor-not-allowed
+hover:bg-gray-50
+hover:bg-gray-100
+hover:bg-red-50
+
+# Dark Mode
+dark:bg-gray-700
+dark:bg-gray-800
+dark:bg-gray-900
+dark:border-gray-600
+dark:border-gray-700
+dark:border-red-400
+dark:divide-gray-700
+dark:text-gray-100
+dark:text-gray-300
+dark:text-gray-400
+dark:text-gray-500
+dark:hover:bg-gray-700
+dark:hover:bg-gray-800
+dark:placeholder:text-gray-500
+
+# Focus States
+focus:outline-none
+focus:ring-2
+focus:ring-blue-500
+focus:ring-red-500
+focus:ring-offset-2
+focus:border-blue-500
+focus:border-red-500
+
+# Disabled States
+disabled:opacity-50
+disabled:cursor-not-allowed
+
+# Overflow
+overflow-hidden
+overflow-x-auto
+overflow-y-auto
+
+# Accessibility
+sr-only
+
+# Form-specific
+ring-1
+ring-red-500
+placeholder-gray-400
+placeholder:text-gray-400
+shadow-sm

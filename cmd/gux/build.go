@@ -2114,21 +2114,80 @@ func copyWasmExec(tinygo bool) error {
 	return os.WriteFile(".gux/dist/wasm_exec.js", data, 0644)
 }
 
+// getGuxModulePath finds the gux module in the Go module cache
+func getGuxModulePath() (string, error) {
+	cmd := exec.Command("go", "list", "-m", "-f", "{{.Dir}}", "github.com/dougbarrett/gux")
+	out, err := cmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("failed to find gux module: %w", err)
+	}
+	return strings.TrimSpace(string(out)), nil
+}
+
+// readSafelist reads the Tailwind safelist file from the gux module
+func readSafelist(guxPath string) ([]string, error) {
+	safelistPath := filepath.Join(guxPath, "ui", "tailwind-safelist.txt")
+	data, err := os.ReadFile(safelistPath)
+	if err != nil {
+		return nil, err
+	}
+
+	var classes []string
+	for _, line := range strings.Split(string(data), "\n") {
+		line = strings.TrimSpace(line)
+		// Skip empty lines and comments
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		classes = append(classes, line)
+	}
+	return classes, nil
+}
+
+// generateSafelistFile generates a file containing class names for Tailwind to scan
+func generateSafelistFile(classes []string) error {
+	// Create a file that Tailwind's @source can scan for class names
+	// Format: class="classname" so Tailwind recognizes them
+	var sb strings.Builder
+	sb.WriteString("<!-- Auto-generated safelist for gux/ui components -->\n")
+	sb.WriteString("<!-- Tailwind scans this file for class names -->\n")
+
+	for _, class := range classes {
+		sb.WriteString(fmt.Sprintf("<div class=\"%s\"></div>\n", class))
+	}
+
+	return os.WriteFile(".gux/styles/safelist.html", []byte(sb.String()), 0644)
+}
+
 // generateTailwindConfig generates Tailwind config files in .gux/
 func generateTailwindConfig() error {
 	if err := os.MkdirAll(".gux/styles", 0755); err != nil {
 		return err
 	}
 
+	// Try to find gux module and read safelist
+	var safelistImport string
+	guxPath, err := getGuxModulePath()
+	if err == nil {
+		classes, err := readSafelist(guxPath)
+		if err == nil && len(classes) > 0 {
+			if err := generateSafelistFile(classes); err == nil {
+				safelistImport = "\n/* Include gux/ui component classes */\n@source \"./safelist.html\";\n"
+				fmt.Printf("  Including %d classes from gux/ui safelist\n", len(classes))
+			}
+		}
+	}
+
 	// Generate input.css for Tailwind v4+
 	// Uses @source directive to scan Go files for class names
-	inputCSS := `@import "tailwindcss";
-
+	inputCSS := fmt.Sprintf(`@import "tailwindcss";
+%s
 /* Scan Go files for Tailwind classes */
 @source "./pages/**/*.go";
 @source "./components/**/*.go";
 @source "./*.go";
-`
+`, safelistImport)
+
 	return os.WriteFile(".gux/styles/input.css", []byte(inputCSS), 0644)
 }
 

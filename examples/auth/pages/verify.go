@@ -7,17 +7,18 @@ import (
 
 // Verify handles email verification with token
 func Verify(r *core.Router) func() core.Node {
-	// Verification state set during load
-	var token string
-	var verified bool
-	var verifyError string
+	// Use router state so values survive hydration
+	verifiedState := r.StateBool("verified", false)
+	verifyErrorState := r.StateString("verifyError", "")
+	loadedState := r.StateBool("loaded", false)
 
 	r.OnLoad(func() {
 		params := r.GetRouteParams()
-		token = params["token"]
+		token := params["token"]
 
 		if token == "" {
-			verifyError = "No verification token provided"
+			verifyErrorState.Set("No verification token provided")
+			loadedState.Set(true)
 			return
 		}
 
@@ -27,17 +28,18 @@ func Verify(r *core.Router) func() core.Node {
 		// - Mark user as verified
 		// For demo: accept any token except "expired" or "invalid"
 		if token == "expired" {
-			verifyError = "This verification link has expired. Please request a new one."
+			verifyErrorState.Set("This verification link has expired. Please request a new one.")
 		} else if token == "invalid" {
-			verifyError = "This verification link is invalid."
+			verifyErrorState.Set("This verification link is invalid.")
 		} else {
-			verified = true
+			verifiedState.Set(true)
 		}
+		loadedState.Set(true)
 	})
 
 	return func() core.Node {
 		// Error state
-		if verifyError != "" {
+		if verifyErrorState.Get() != "" {
 			return AuthLayout(
 				ui.Card(ui.CardProps{
 					Children: []core.Node{
@@ -49,7 +51,7 @@ func Verify(r *core.Router) func() core.Node {
 								core.H1(core.Class("text-2xl font-bold text-gray-900 dark:text-white mb-2"),
 									core.Text("Verification Failed")),
 								core.P(core.Class("text-gray-600 dark:text-gray-400 mb-6"),
-									core.Text(verifyError)),
+									core.Text(verifyErrorState.Get())),
 								ui.Button(ui.ButtonProps{
 									Variant: ui.ButtonPrimary,
 									OnClick: func() { r.Navigate("/login") },
@@ -65,7 +67,7 @@ func Verify(r *core.Router) func() core.Node {
 		}
 
 		// Success state
-		if verified {
+		if verifiedState.Get() {
 			return AuthLayout(
 				ui.Card(ui.CardProps{
 					Children: []core.Node{

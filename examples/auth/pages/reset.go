@@ -7,16 +7,17 @@ import (
 
 // Reset handles password reset with token
 func Reset(r *core.Router) func() core.Node {
-	// Get token from route params during load
-	var token string
-	var tokenValid bool
+	// Use router state so values survive hydration
+	tokenValidState := r.StateBool("tokenValid", false)
+	loadedState := r.StateBool("loaded", false)
 
 	r.OnLoad(func() {
 		params := r.GetRouteParams()
-		token = params["token"]
+		token := params["token"]
 		// In real app: validate token via API
 		// For demo: accept any non-empty token
-		tokenValid = token != ""
+		tokenValidState.Set(token != "")
+		loadedState.Set(true)
 	})
 
 	return func() core.Node {
@@ -28,7 +29,7 @@ func Reset(r *core.Router) func() core.Node {
 		loadingState := r.StateBool("loading", false)
 
 		// Invalid/expired token
-		if !tokenValid {
+		if !tokenValidState.Get() {
 			return AuthLayout(
 				ui.Card(ui.CardProps{
 					Children: []core.Node{

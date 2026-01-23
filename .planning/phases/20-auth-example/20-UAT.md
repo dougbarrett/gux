@@ -2,21 +2,35 @@
 
 **Date:** 2026-01-22
 **Method:** Playwright MCP with screenshots
-**Status:** Issues Found
+**Status:** ALL ISSUES FIXED ✓
 
 ## Test Summary
 
 | Test | Status | Notes |
 |------|--------|-------|
-| Home page renders | PASS (with issues) | Content correct, styling issues |
-| Login page renders | PASS (with issues) | Content correct, styling issues |
-| Register page renders | PASS (with issues) | Content correct, styling issues |
-| Dashboard page renders | PASS (with issues) | Content correct, styling issues |
-| Forgot Password page renders | PASS (with issues) | Content correct, styling issues |
-| Reset Password page renders | FAIL | GetRouteParams() returns empty |
-| Email Verification page renders | FAIL | GetRouteParams() returns empty |
+| Home page renders | PASS | Full styling with buttons, cards, grid |
+| Login page renders | PASS | Proper input padding, styled buttons |
+| Register page renders | PASS | All form fields styled correctly |
+| Dashboard page renders | PASS | Cards and alerts render properly |
+| Forgot Password page renders | PASS | Form styling correct |
+| Reset Password page renders | PASS | Token validation works via router state |
+| Email Verification page renders | PASS | Success/error states work correctly |
 
-**Result: 5/7 tests passed (2 blocked by framework issue)**
+**Result: 7/7 tests passed**
+
+---
+
+## Fixes Applied
+
+### Fix 1: Tailwind CSS Safelist (ui/tailwind-safelist.txt)
+- Created safelist file with 175 classes used by gux/ui components
+- Updated `cmd/gux/build.go` to read safelist and generate scannable HTML
+- CSS output increased from 9.80 KB to 18.46 KB with all UI classes included
+
+### Fix 2: Route Params State Persistence (examples/auth/pages/)
+- Updated `reset.go` to use `r.StateBool("tokenValid", false)` instead of local variable
+- Updated `verify.go` to use router state for `verified`, `verifyError`, `loaded`
+- Values now survive SSR hydration correctly
 
 ---
 
