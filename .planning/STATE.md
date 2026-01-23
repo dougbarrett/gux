@@ -2,12 +2,12 @@
 
 ## Current Position
 
-Phase: 21 — Marketing Example (COMPLETE)
-Plan: 3/3 complete
-Status: Phase complete
-Last activity: 2026-01-22 — Phase 21 verified (14/14 must-haves)
+Phase: 22 — SaaS Dashboard (IN PROGRESS)
+Plan: 1/3 complete
+Status: In progress
+Last activity: 2026-01-23 — Completed 22-01-PLAN.md (Foundation)
 
-Progress: ██████████ 100% of Phase 21
+Progress: █░░░░░░░░░ 33% of Phase 22
 
 ## Project Reference
 
@@ -167,6 +167,13 @@ Full decision log preserved in milestone archives:
 - Avatar initials from Name prop in teamMemberCard helper
 - Form validation uses strings.TrimSpace and @ check for email
 
+**Phase 22 decisions (22-01):**
+- Horizontal nav pattern (matching examples/minimal/admin) for consistency
+- Single WASM bundle (no separate admin bundle) for simplicity
+- Port 8082 to avoid conflicts with other examples
+- Mock user "John Doe" for avatar and profile display
+- DashboardLayout wraps all pages with Nav + max-w-6xl content area
+
 ### Research Findings
 
 Research completed 2026-01-22. Key findings:
@@ -193,10 +200,10 @@ None
 
 ## Session Continuity
 
-Last session: 2026-01-22
-Stopped at: Phase 21 complete, ready for Phase 22
+Last session: 2026-01-23
+Stopped at: Completed 22-01-PLAN.md (Foundation)
 Resume file: None
 
 ---
 
-*Last updated: 2026-01-22 after Phase 21 execution and verification*
+*Last updated: 2026-01-23 after 22-01 plan execution*
