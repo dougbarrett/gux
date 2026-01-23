@@ -194,6 +194,13 @@ Full decision log preserved in milestone archives:
 - Dark theme with bg-gray-900 and gray-800 nav
 - ActivityLog model with UserID, Action, Entity, Description, IPAddress, Metadata
 
+**Phase 23 decisions (23-02):**
+- Dashboard stats calculated from api.Users.List response (no separate count endpoint)
+- Bulk selection uses JSON array in StateString for array state
+- ui.Table used instead of DataTable for checkbox column support
+- Role badge colors: admin=red, editor=yellow, user=green (privilege hierarchy)
+- Password optional on edit, required on create
+
 **Phase 23 decisions (23-03):**
 - Client-side filtering with JSON state for activity logs
 - Action badge colors: created/login=Success, updated=Default, deleted=Error, logout=Warning
