@@ -58,91 +58,7 @@ func Nav() core.Node {
 	)
 }
 
-// Dashboard is the admin dashboard page (stub).
-func Dashboard(r *core.Router) func() core.Node {
-	return func() core.Node {
-		return AdminLayout(
-			core.H1(core.Class("text-2xl font-bold text-white mb-4"),
-				core.Text("Dashboard"),
-			),
-			core.P(core.Class("text-gray-400"),
-				core.Text("Dashboard - Coming Soon"),
-			),
-		)
-	}
-}
-
-// Users is the user list page (stub).
-func Users(r *core.Router) func() core.Node {
-	return func() core.Node {
-		return AdminLayout(
-			core.H1(core.Class("text-2xl font-bold text-white mb-4"),
-				core.Text("Users"),
-			),
-			core.P(core.Class("text-gray-400"),
-				core.Text("User Management - Coming Soon"),
-			),
-		)
-	}
-}
-
-// UserDetail is the user detail page (stub).
-func UserDetail(r *core.Router) func() core.Node {
-	return func() core.Node {
-		return AdminLayout(
-			core.H1(core.Class("text-2xl font-bold text-white mb-4"),
-				core.Text("User Detail"),
-			),
-			core.P(core.Class("text-gray-400"),
-				core.Text("User Detail - Coming Soon"),
-			),
-		)
-	}
-}
-
-// UserEdit is the user edit page (stub).
-func UserEdit(r *core.Router) func() core.Node {
-	return func() core.Node {
-		return AdminLayout(
-			core.H1(core.Class("text-2xl font-bold text-white mb-4"),
-				core.Text("Edit User"),
-			),
-			core.P(core.Class("text-gray-400"),
-				core.Text("Edit User - Coming Soon"),
-			),
-		)
-	}
-}
-
-// UserNew is the new user page (stub).
-func UserNew(r *core.Router) func() core.Node {
-	return func() core.Node {
-		return AdminLayout(
-			core.H1(core.Class("text-2xl font-bold text-white mb-4"),
-				core.Text("New User"),
-			),
-			core.P(core.Class("text-gray-400"),
-				core.Text("New User - Coming Soon"),
-			),
-		)
-	}
-}
-
-// Activity is the activity log page (stub).
-func Activity(r *core.Router) func() core.Node {
-	return func() core.Node {
-		return AdminLayout(
-			core.H1(core.Class("text-2xl font-bold text-white mb-4"),
-				core.Text("Activity Log"),
-			),
-			core.P(core.Class("text-gray-400"),
-				core.Text("Activity Log - Coming Soon"),
-			),
-		)
-	}
-}
-
-// Settings is the settings page (stub).
+// Settings is the settings page (stub for future implementation).
 func Settings(r *core.Router) func() core.Node {
 	return func() core.Node {
 		return AdminLayout(
@@ -150,7 +66,7 @@ func Settings(r *core.Router) func() core.Node {
 				core.Text("Settings"),
 			),
 			core.P(core.Class("text-gray-400"),
-				core.Text("Settings - Coming Soon"),
+				core.Text("Settings - Coming in Plan 03"),
 			),
 		)
 	}
