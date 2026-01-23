@@ -2,12 +2,12 @@
 
 ## Current Position
 
-Phase: 20 — Auth Example (COMPLETE)
-Plan: 4/4 complete
-Status: Phase complete
-Last activity: 2026-01-22 — Phase 20 verified (19/19 must-haves)
+Phase: 21 — Marketing Example (IN PROGRESS)
+Plan: 1/3 complete
+Status: In progress
+Last activity: 2026-01-22 — Completed 21-01-PLAN.md
 
-Progress: ██████████ 100% of Phase 20
+Progress: ███░░░░░░░ 33% of Phase 21
 
 ## Project Reference
 
@@ -149,6 +149,13 @@ Full decision log preserved in milestone archives:
 - 8 character minimum password length
 - Demo tokens "expired" and "invalid" for testing error states
 
+**Phase 21 decisions (21-01):**
+- Used core.El("h4", ...) for H4 elements since no core.H4 helper exists
+- Used core.Frag() for fragment creation (not core.Fragment{})
+- Used core.Attrs{} for empty attributes (nil not allowed)
+- Mobile menu toggle via r.StateBool("menuOpen", false)
+- Footer uses ui.Grid for 4-column responsive layout
+
 ### Research Findings
 
 Research completed 2026-01-22. Key findings:
@@ -176,9 +183,9 @@ None
 ## Session Continuity
 
 Last session: 2026-01-22
-Stopped at: Phase 20 complete, ready for Phase 21
+Stopped at: Completed 21-01-PLAN.md
 Resume file: None
 
 ---
 
-*Last updated: 2026-01-22 after Phase 20 execution and verification*
+*Last updated: 2026-01-22 after 21-01 execution*
