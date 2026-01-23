@@ -58,16 +58,4 @@ func Nav() core.Node {
 	)
 }
 
-// Settings is the settings page (stub for future implementation).
-func Settings(r *core.Router) func() core.Node {
-	return func() core.Node {
-		return AdminLayout(
-			core.H1(core.Class("text-2xl font-bold text-white mb-4"),
-				core.Text("Settings"),
-			),
-			core.P(core.Class("text-gray-400"),
-				core.Text("Settings - Coming in Plan 03"),
-			),
-		)
-	}
-}
+
