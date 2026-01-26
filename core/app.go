@@ -87,7 +87,11 @@ func SetDefaultBundle(name string, wasmBinary []byte) {
 }
 
 // New creates a new App instance.
+// Automatically loads .env file if present.
 func New() *App {
+	// Load .env file if present (before any config)
+	LoadEnv(".env")
+
 	// Copy default bundles
 	bundles := make(map[string][]byte)
 	for k, v := range defaultWasmBundles {

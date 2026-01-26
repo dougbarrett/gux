@@ -1,13 +1,11 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
 	"log"
 	"net"
 	"os"
 	"strconv"
-	"strings"
 
 	"github.com/dougbarrett/gux/core"
 	"{{.ModulePath}}/guxgen/api"
@@ -18,9 +16,6 @@ import (
 )
 
 func main() {
-	// Load .env file if present
-	loadEnv(".env")
-
 	// Set up database
 	db, err := gorm.Open(sqlite.Open("app.db"), &gorm.Config{})
 	if err != nil {
@@ -71,29 +66,4 @@ func findAvailablePort(startPort string) string {
 		}
 	}
 	return startPort // fallback to original
-}
-
-// loadEnv loads environment variables from a file
-func loadEnv(filename string) {
-	file, err := os.Open(filename)
-	if err != nil {
-		return // .env file is optional
-	}
-	defer file.Close()
-
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-		if idx := strings.Index(line, "="); idx > 0 {
-			key := strings.TrimSpace(line[:idx])
-			value := strings.TrimSpace(line[idx+1:])
-			// Only set if not already set in environment
-			if os.Getenv(key) == "" {
-				os.Setenv(key, value)
-			}
-		}
-	}
 }
