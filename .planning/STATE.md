@@ -2,19 +2,19 @@
 
 ## Current Position
 
-Phase: — (between milestones)
-Plan: —
-Status: Ready for next milestone
-Last activity: 2026-01-26 — v2.1 Dead Code Cleanup shipped
+Phase: 27 (gux init Modernization)
+Plan: Not started (defining requirements)
+Status: Defining requirements
+Last activity: 2026-01-26 — Milestone v2.2 started
 
-Progress: █████ (v2.1 complete)
+Progress: ░░░░░ (v2.2 in progress)
 
 ## Project Reference
 
 See: .planning/PROJECT.md (updated 2026-01-26)
 
 **Core value:** Developers can build complete web apps in Go with SSR + WASM
-**Current focus:** Planning next milestone
+**Current focus:** Update gux init to use core/ framework
 
 ## Milestone History
 

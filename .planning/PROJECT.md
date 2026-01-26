@@ -36,7 +36,16 @@ Developers can build complete web applications in Go — from marketing sites to
 
 ### Active
 
-<!-- Current scope: Next milestone TBD -->
+<!-- Current scope: v2.2 gux init Modernization -->
+
+- [ ] Update `gux init` to scaffold apps using `core/` framework (not old components/)
+- [ ] Generate app.go with core.New(), CRUD registration, hybrid routes
+- [ ] Generate models/item.go as example GORM model
+- [ ] Generate pages/home.go using ui/ components
+- [ ] Generate pages/items.go with OnLoad + API integration
+- [ ] Generate pages/item_new.go with form state + API submission
+- [ ] Auto-run `gux gen` after scaffolding
+- [ ] Update go.mod template with gorm/sqlite dependencies
 
 ### Out of Scope
 
@@ -52,9 +61,9 @@ Developers can build complete web applications in Go — from marketing sites to
 
 ## Context
 
-### Current State (v2.1)
+### Current State (v2.2)
 
-Shipped v2.1 Dead Code Cleanup. Codebase is now clean:
+Starting v2.2 gux init Modernization. Previous milestone shipped v2.1 Dead Code Cleanup. Codebase is clean:
 - **core/**: Universal rendering, routing, CRUD, CSRF (~3,500 LOC)
 - **ui/**: 49 component files (~9,700 LOC)
 - **examples/**: 5 apps (minimal, auth, marketing, saas, admin) (~6,400 LOC)
@@ -73,6 +82,7 @@ Shipped v2.1 Dead Code Cleanup. Codebase is now clean:
 - 6 P0 components not implemented (Spinner, Progress, Skeleton, Breadcrumb, ButtonGroup, IconButton)
 - No OAuth/2FA support yet
 - No real-time features yet
+- **gux init broken**: Templates use deleted components/ package (fixed in v2.2)
 
 ## Constraints
 
@@ -94,6 +104,17 @@ Shipped v2.1 Dead Code Cleanup. Codebase is now clean:
 | Props structs for all components | Type safety, no interface{} | Good - clean API |
 | CSS-driven visibility for overlays | SSR compatibility without JS state | Good - hydration-safe |
 
+## Current Milestone: v2.2 gux init Modernization
+
+**Goal:** Update `gux init` to scaffold working apps using the modern `core/` framework instead of the deleted `components/` package.
+
+**Target features:**
+- New app.go template with core.New(), DB setup, CRUD, hybrid routes
+- Example model (Item) with GORM
+- Three pages (Home, Items list, Item create) demonstrating patterns
+- Uses ui/ components for polished UI
+- Auto-runs `gux gen` to generate API client
+
 ---
 
-*Last updated: 2026-01-26 after v2.1 milestone shipped*
+*Last updated: 2026-01-26 after starting v2.2 milestone*

@@ -16,6 +16,7 @@ A full-stack Go framework for building modern web applications with WebAssembly.
 - [v1.2 Documentation](milestones/v1.2-ROADMAP.md) (Phases 12-15) - SHIPPED 2026-01-15
 - [v2.0 Core Components](milestones/v2.0-ROADMAP.md) (Phases 16-23) - SHIPPED 2026-01-25
 - [v2.1 Dead Code Cleanup](milestones/v2.1-ROADMAP.md) (Phases 24-26) - SHIPPED 2026-01-26
+- [v2.2 gux init Modernization](milestones/v2.2-ROADMAP.md) (Phase 27) - IN PROGRESS
 
 ## Phases
 
@@ -134,10 +135,25 @@ Full details: [milestones/v2.1-ROADMAP.md](milestones/v2.1-ROADMAP.md)
 
 </details>
 
+<details open>
+<summary>◆ v2.2 gux init Modernization (Phase 27) — IN PROGRESS</summary>
+
+**Milestone Goal:** Update `gux init` to scaffold working apps using the modern `core/` framework instead of the deleted `components/` package.
+
+- [ ] Phase 27: gux init Templates (3 plans)
+  Plans:
+  - [ ] 27-01-PLAN.md - New templates (app.go, go.mod, models/item.go)
+  - [ ] 27-02-PLAN.md - Page templates (home.go, items.go, item_new.go)
+  - [ ] 27-03-PLAN.md - Update scaffold.go, cleanup old templates, auto-run gux gen
+
+Full details: [milestones/v2.2-ROADMAP.md](milestones/v2.2-ROADMAP.md)
+
+</details>
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 -> 2 -> ... -> 15 -> 16 -> ... -> 23 -> 24 -> 25 -> 26
+Phases execute in numeric order: 1 -> 2 -> ... -> 15 -> 16 -> ... -> 23 -> 24 -> 25 -> 26 -> 27
 
 | Phase | Milestone | Plans | Status | Completed |
 |-------|-----------|-------|--------|-----------|
@@ -167,3 +183,4 @@ Phases execute in numeric order: 1 -> 2 -> ... -> 15 -> 16 -> ... -> 23 -> 24 ->
 | 24. Code Removal | v2.1 | 1/1 | Complete | 2026-01-25 |
 | 25. Documentation Updates | v2.1 | 3/3 | Complete | 2026-01-26 |
 | 26. Dependency Cleanup | v2.1 | 1/1 | Complete | 2026-01-26 |
+| 27. gux init Templates | v2.2 | 0/3 | In Progress | — |
