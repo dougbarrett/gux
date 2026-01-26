@@ -1,0 +1,12 @@
+package dto
+
+import "time"
+
+// UserDTO excludes password hash for API responses.
+type UserDTO struct {
+	ID        uint      `json:"id" gux:"User.ID"`
+	Email     string    `json:"email" gux:"User.Email"`
+	Name      string    `json:"name" gux:"User.Name"`
+	Verified  bool      `json:"verified" gux:"User.Verified"`
+	CreatedAt time.Time `json:"created_at" gux:"User.CreatedAt"`
+}

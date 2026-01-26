@@ -95,13 +95,13 @@ func Alert(props AlertProps) core.Node {
 	// Optional title
 	if props.Title != "" {
 		contentChildren = append(contentChildren,
-			core.El("strong", core.Class("block font-medium"), core.Text(props.Title)),
+			core.El("strong", core.Class("block font-medium mb-1"), core.Text(props.Title)),
 		)
 	}
 
-	// Message
+	// Message - use whitespace-pre-line to preserve newlines in message text
 	contentChildren = append(contentChildren,
-		core.Span(core.Attrs{}, core.Text(props.Message)),
+		core.Span(core.Class("block whitespace-pre-line"), core.Text(props.Message)),
 	)
 
 	// Build main children

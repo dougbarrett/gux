@@ -27,17 +27,25 @@ func main() {
 	case "init":
 		initCmd := flag.NewFlagSet("init", flag.ExitOnError)
 		modulePath := initCmd.String("module", "", "Go module path (e.g., github.com/user/myapp)")
+		withAuth := initCmd.Bool("auth", false, "Include authentication (admin-only, no public signup)")
+		withAuthPublic := initCmd.Bool("auth-public", false, "Include authentication with public signup")
 		initCmd.Parse(os.Args[2:])
 
 		if initCmd.NArg() < 1 {
 			fmt.Println("Error: app name required (use '.' for current directory)")
-			fmt.Println("Usage: gux init [--module <module-path>] <appname>")
+			fmt.Println("Usage: gux init [--module <module-path>] [--auth|--auth-public] <appname>")
 			fmt.Println("       gux init --module <module-path> .")
 			os.Exit(1)
 		}
 
 		appName := initCmd.Arg(0)
-		runInit(appName, *modulePath)
+		authMode := AuthModeNone
+		if *withAuthPublic {
+			authMode = AuthModePublic
+		} else if *withAuth {
+			authMode = AuthModePrivate
+		}
+		runInit(appName, *modulePath, authMode)
 
 	case "gen", "generate":
 		genCmd := flag.NewFlagSet("gen", flag.ExitOnError)

@@ -5,14 +5,14 @@ import (
 	"gorm.io/gorm"
 )
 
-// User represents a user account in the auth example.
+// User represents a user account.
 type User struct {
 	gorm.Model
-	Email        string `json:"email" gorm:"uniqueIndex"`
-	Name         string `json:"name"`
+	Email        string `json:"email" gorm:"uniqueIndex" gux:"expose"`
+	Name         string `json:"name" gux:"expose"`
 	PasswordHash string `json:"-"` // Never expose via JSON
-	Verified     bool   `json:"verified" gorm:"default:false"`
-	Role         string `json:"role" gorm:"default:user"` // user, admin, editor
+	Verified     bool   `json:"verified" gorm:"default:false" gux:"expose"`
+	Role         string `json:"role" gorm:"default:user" gux:"expose"` // user, admin
 }
 
 // SetPassword hashes and sets the user's password.

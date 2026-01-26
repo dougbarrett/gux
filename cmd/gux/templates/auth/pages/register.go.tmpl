@@ -2,8 +2,8 @@ package pages
 
 import (
 	"github.com/dougbarrett/gux/core"
-	"github.com/dougbarrett/gux/examples/auth/guxgen/api"
-	"github.com/dougbarrett/gux/examples/auth/dto"
+	"{{.ModulePath}}/guxgen/api"
+	"{{.ModulePath}}/dto"
 	"github.com/dougbarrett/gux/ui"
 )
 
@@ -104,7 +104,7 @@ func Register(r *core.Router) func() core.Node {
 								core.H1(core.Class("text-2xl font-bold text-gray-900 dark:text-white mb-2"),
 									core.Text("Registration Successful!")),
 								core.P(core.Class("text-gray-600 dark:text-gray-400 mb-6"),
-									core.Text("Your account has been created. Please check your email to verify your account.")),
+									core.Text("Your account has been created.")),
 								ui.Button(ui.ButtonProps{
 									Variant: ui.ButtonPrimary,
 									OnClick: func() { r.Navigate("/login") },

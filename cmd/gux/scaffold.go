@@ -14,15 +14,26 @@ import (
 //go:embed templates/*
 var templates embed.FS
 
+// AuthMode represents the authentication scaffolding mode
+type AuthMode int
+
+const (
+	AuthModeNone    AuthMode = iota // No authentication
+	AuthModePrivate                 // Auth with admin-only (no public signup)
+	AuthModePublic                  // Auth with public signup enabled
+)
+
 // TemplateData holds the variables for template substitution
 type TemplateData struct {
-	AppName    string
-	ModulePath string
-	GuxModule  string
-	GuxVersion string
+	AppName      string
+	ModulePath   string
+	GuxModule    string
+	GuxVersion   string
+	WithAuth     bool // true if --auth or --auth-public
+	PublicSignup bool // true if --auth-public (allows public registration)
 }
 
-func runInit(appName, modulePath string) {
+func runInit(appName, modulePath string, authMode AuthMode) {
 	// Check if initializing in current directory
 	initHere := appName == "."
 	var targetDir string
@@ -93,10 +104,12 @@ func runInit(appName, modulePath string) {
 	}
 
 	data := TemplateData{
-		AppName:    appName,
-		ModulePath: modulePath,
-		GuxModule:  "github.com/dougbarrett/gux",
-		GuxVersion: guxVersion,
+		AppName:      appName,
+		ModulePath:   modulePath,
+		GuxModule:    "github.com/dougbarrett/gux",
+		GuxVersion:   guxVersion,
+		WithAuth:     authMode != AuthModeNone,
+		PublicSignup: authMode == AuthModePublic,
 	}
 
 	// Define files to create from templates
@@ -108,12 +121,84 @@ func runInit(appName, modulePath string) {
 		destPath string
 	}{
 		{"templates/go.mod.tmpl", "go.mod"},
-		{"templates/app.go.tmpl", "app.go"},
-		{"templates/models/item.go.tmpl", "models/item.go"},
-		{"templates/pages/home.go.tmpl", "pages/home.go"},
-		{"templates/pages/items.go.tmpl", "pages/items.go"},
-		{"templates/pages/item_new.go.tmpl", "pages/item_new.go"},
 		{"templates/Dockerfile.tmpl", "Dockerfile"},
+	}
+
+	// Add app.go based on auth mode
+	if authMode != AuthModeNone {
+		filesToCreate = append(filesToCreate, struct {
+			tmplPath string
+			destPath string
+		}{"templates/auth/app.go.tmpl", "app.go"})
+	} else {
+		filesToCreate = append(filesToCreate, struct {
+			tmplPath string
+			destPath string
+		}{"templates/app.go.tmpl", "app.go"})
+	}
+
+	// Add standard files (non-auth)
+	if authMode == AuthModeNone {
+		filesToCreate = append(filesToCreate,
+			struct {
+				tmplPath string
+				destPath string
+			}{"templates/models/item.go.tmpl", "models/item.go"},
+			struct {
+				tmplPath string
+				destPath string
+			}{"templates/pages/home.go.tmpl", "pages/home.go"},
+			struct {
+				tmplPath string
+				destPath string
+			}{"templates/pages/items.go.tmpl", "pages/items.go"},
+			struct {
+				tmplPath string
+				destPath string
+			}{"templates/pages/item_new.go.tmpl", "pages/item_new.go"},
+		)
+	}
+
+	// Add auth-specific files
+	if authMode != AuthModeNone {
+		filesToCreate = append(filesToCreate,
+			struct {
+				tmplPath string
+				destPath string
+			}{"templates/auth/models/user.go.tmpl", "models/user.go"},
+			struct {
+				tmplPath string
+				destPath string
+			}{"templates/auth/dto/user.go.tmpl", "dto/user.go"},
+			struct {
+				tmplPath string
+				destPath string
+			}{"templates/auth/pages/layout.go.tmpl", "pages/layout.go"},
+			struct {
+				tmplPath string
+				destPath string
+			}{"templates/auth/pages/home.go.tmpl", "pages/home.go"},
+			struct {
+				tmplPath string
+				destPath string
+			}{"templates/auth/pages/login.go.tmpl", "pages/login.go"},
+			struct {
+				tmplPath string
+				destPath string
+			}{"templates/auth/pages/dashboard.go.tmpl", "pages/dashboard.go"},
+			struct {
+				tmplPath string
+				destPath string
+			}{"templates/auth/env.example.tmpl", ".env.example"},
+		)
+
+		// Add register page only for public signup
+		if authMode == AuthModePublic {
+			filesToCreate = append(filesToCreate, struct {
+				tmplPath string
+				destPath string
+			}{"templates/auth/pages/register.go.tmpl", "pages/register.go"})
+		}
 	}
 
 	fmt.Printf("Creating Gux application '%s'...\n\n", appName)
@@ -127,7 +212,7 @@ func runInit(appName, modulePath string) {
 	}
 
 	// Create or update .gitignore
-	if err := updateGitignore(targetDir); err != nil {
+	if err := updateGitignore(targetDir, authMode != AuthModeNone); err != nil {
 		fmt.Printf("Warning: could not update .gitignore: %v\n", err)
 	} else {
 		fmt.Println("  updated .gitignore")
@@ -159,7 +244,7 @@ func runInit(appName, modulePath string) {
 		fmt.Println("  API client generated")
 	}
 
-	printNextStepsWithDir(appName, initHere)
+	printNextStepsWithDir(appName, initHere, authMode)
 
 	// Check for updates
 	checkForUpdates()
@@ -234,12 +319,17 @@ func checkForConflicts(targetDir string) []string {
 }
 
 // updateGitignore creates or updates .gitignore with gux-generated file entries
-func updateGitignore(targetDir string) error {
+func updateGitignore(targetDir string, withAuth bool) error {
 	gitignorePath := filepath.Join(targetDir, ".gitignore")
 	guxEntries := []string{
 		"# Gux generated files",
 		"guxgen/",
 		"assets_gen.go",
+	}
+
+	// Add .env to gitignore if auth is enabled
+	if withAuth {
+		guxEntries = append(guxEntries, "", "# Environment (contains secrets)", ".env")
 	}
 
 	// Check if .gitignore exists
@@ -292,29 +382,40 @@ func updateGitignore(targetDir string) error {
 	return writer.Flush()
 }
 
-func printNextStepsWithDir(appName string, initHere bool) {
-	if initHere {
-		fmt.Printf(`
-Created Gux application in current directory
-
-Next steps:
-  gux dev         # Build and run dev server
-
-Your app will be available at http://localhost:8080
-
-To customize the HTML shell, create public/index.html (it will override the default).
-`)
-	} else {
-		fmt.Printf(`
-Created Gux application in ./%s
-
-Next steps:
-  cd %s
-  gux dev         # Build and run dev server
-
-Your app will be available at http://localhost:8080
-
-To customize the HTML shell, create public/index.html (it will override the default).
-`, appName, appName)
+func printNextStepsWithDir(appName string, initHere bool, authMode AuthMode) {
+	var cdCmd string
+	if !initHere {
+		cdCmd = fmt.Sprintf("  cd %s\n", appName)
 	}
+
+	var authNote string
+	if authMode != AuthModeNone {
+		authNote = `
+Authentication is enabled. Before running:
+  1. Copy .env.example to .env
+  2. Set ADMIN_EMAIL and ADMIN_PASSWORD in .env
+  3. The admin user will be created on first run
+`
+		if authMode == AuthModePublic {
+			authNote += "\nPublic signup is enabled at /register\n"
+		} else {
+			authNote += "\nPublic signup is disabled. Only the seeded admin can log in.\n"
+		}
+	}
+
+	location := "current directory"
+	if !initHere {
+		location = fmt.Sprintf("./%s", appName)
+	}
+
+	fmt.Printf(`
+Created Gux application in %s
+%s
+Next steps:
+%s  gux dev         # Build and run dev server
+
+Your app will be available at http://localhost:8080
+
+To customize the HTML shell, create public/index.html (it will override the default).
+`, location, authNote, cdCmd)
 }

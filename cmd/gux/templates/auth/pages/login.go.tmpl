@@ -2,7 +2,7 @@ package pages
 
 import (
 	"github.com/dougbarrett/gux/core"
-	"github.com/dougbarrett/gux/examples/auth/guxgen/api"
+	"{{.ModulePath}}/guxgen/api"
 	"github.com/dougbarrett/gux/ui"
 )
 
@@ -17,7 +17,6 @@ func Login(r *core.Router) func() core.Node {
 		// Form state
 		emailState := r.StateString("email", "")
 		passwordState := r.StateString("password", "")
-		rememberState := r.StateBool("remember", false)
 		errorState := r.StateString("error", "")
 		loadingState := r.StateBool("loading", false)
 
@@ -54,17 +53,11 @@ func Login(r *core.Router) func() core.Node {
 					return
 				}
 
-				// Success - navigate to dashboard (page will reload with session)
+				// Success - navigate to dashboard
 				if redirect, ok := result["redirect"]; ok {
-					// Force page reload to get new session cookie
 					r.Navigate(redirect)
 				}
 			})
-		}
-
-		// Toggle remember me
-		toggleRemember := func() {
-			rememberState.Set(!rememberState.Get())
 		}
 
 		// Error alert (only shown when error exists)
@@ -91,14 +84,6 @@ func Login(r *core.Router) func() core.Node {
 					ui.CardContent(ui.CardContentProps{
 						Children: []core.Node{
 							alertNode,
-
-							// Demo credentials info
-							ui.Alert(ui.AlertProps{
-								Variant: ui.AlertInfo,
-								Title:   "Demo Credentials",
-								Message: "Admin: admin@example.com / admin123 | User: demo@example.com / demo123",
-								Class:   "mb-4",
-							}),
 
 							// Email field
 							ui.FormField(ui.FormFieldProps{
@@ -136,35 +121,10 @@ func Login(r *core.Router) func() core.Node {
 								},
 							}),
 
-							// Remember me + Forgot password row
-							core.Div(core.Class("flex items-center justify-between mb-6"),
-								// Remember me checkbox with click handler on wrapper
-								core.Div(
-									core.Attrs{
-										Class:   "flex items-center gap-2 cursor-pointer",
-										OnClick: toggleRemember,
-									},
-									ui.Checkbox(ui.CheckboxProps{
-										ID:      "remember",
-										Name:    "remember",
-										Checked: rememberState.Get(),
-									}),
-									core.Span(core.Class("text-sm font-medium text-gray-700 dark:text-gray-300"),
-										core.Text("Remember me")),
-								),
-								core.A(
-									core.Attrs{
-										Href:  "/forgot",
-										Class: "text-sm text-blue-600 dark:text-blue-400 hover:underline",
-									},
-									core.Text("Forgot password?"),
-								),
-							),
-
 							// Submit button
 							ui.Button(ui.ButtonProps{
 								Variant:  ui.ButtonPrimary,
-								Class:    "w-full",
+								Class:    "w-full mt-4",
 								Disabled: loadingState.Get(),
 								OnClick:  submit,
 								Children: []core.Node{
@@ -177,7 +137,7 @@ func Login(r *core.Router) func() core.Node {
 								},
 							}),
 						},
-					}),
+					}),{{if .PublicSignup}}
 					ui.CardFooter(ui.CardFooterProps{
 						Class: "text-center",
 						Children: []core.Node{
@@ -192,7 +152,7 @@ func Login(r *core.Router) func() core.Node {
 								),
 							),
 						},
-					}),
+					}),{{end}}
 				},
 			}),
 		)

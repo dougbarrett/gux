@@ -1,0 +1,60 @@
+package pages
+
+import (
+	"github.com/dougbarrett/gux/core"
+	"{{.ModulePath}}/guxgen/api"
+	"github.com/dougbarrett/gux/ui"
+)
+
+// Dashboard is the authenticated user's home page
+func Dashboard(r *core.Router) func() core.Node {
+	return func() core.Node {
+		user := r.User()
+		userName := "User"
+		if user != nil && user.Name != "" {
+			userName = user.Name
+		}
+
+		// Logout handler
+		logout := func() {
+			api.Post("/api/logout", map[string]string{}, func(result map[string]string, err error) {
+				if redirect, ok := result["redirect"]; ok {
+					r.Navigate(redirect)
+				} else {
+					r.Navigate("/")
+				}
+			})
+		}
+
+		return PageLayout(
+			core.Div(core.Class("max-w-4xl mx-auto"),
+				// Welcome section
+				core.Div(core.Class("mb-8"),
+					core.H1(core.Class("text-3xl font-bold text-gray-900 dark:text-white mb-2"),
+						core.Text("Welcome back, "+userName+"!")),
+					core.P(core.Class("text-gray-600 dark:text-gray-400"),
+						core.Text("You are successfully logged in.")),
+				),
+
+				// Success alert
+				ui.Alert(ui.AlertProps{
+					Variant: ui.AlertSuccess,
+					Title:   "Authentication Complete",
+					Message: "Your session is active.",
+					Class:   "mb-8",
+				}),
+
+				// Actions
+				core.Div(core.Class("flex gap-4"),
+					ui.Button(ui.ButtonProps{
+						Variant:  ui.ButtonDestructive,
+						OnClick:  logout,
+						Children: []core.Node{
+							core.Text("Sign Out"),
+						},
+					}),
+				),
+			),
+		)
+	}
+}

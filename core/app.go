@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 )
 
 // PageFunc is a page handler that returns a component function.
@@ -14,26 +15,30 @@ type PageFunc func(r *Router) func() Node
 
 // Route represents a registered route.
 type Route struct {
-	Method  string   // GET, POST, etc.
-	Path    string   // /posts, /posts/:id
-	Handler PageFunc // The page function
-	Hybrid  bool     // If true, SSR + WASM hydration
-	Bundle  string   // Bundle name (empty = default "app" bundle)
+	Method        string   // GET, POST, etc.
+	Path          string   // /posts, /posts/:id
+	Handler       PageFunc // The page function
+	Hybrid        bool     // If true, SSR + WASM hydration
+	Bundle        string   // Bundle name (empty = default "app" bundle)
+	Protected     bool     // If true, requires authentication
+	RequiredRoles []string // Roles required to access (any of these roles)
 }
 
 // App is the main application container.
 type App struct {
-	routes      []Route
-	apiPrefix   string
-	wasmBinary  []byte            // Default bundle (backward compatibility)
-	wasmBundles map[string][]byte // Named bundles: "admin" -> admin.wasm bytes
-	wasmExecJS  []byte
-	stylesCSS   []byte
-	title       string
-	db          interface{} // Database connection (e.g., *gorm.DB)
-	crudModels  []CRUDModel // Registered CRUD models
-	csrfConfig  CSRFConfig  // CSRF protection configuration
-	darkMode    bool        // Enable dark mode (adds class="dark" to html element)
+	routes         []Route
+	apiPrefix      string
+	wasmBinary     []byte                       // Default bundle (backward compatibility)
+	wasmBundles    map[string][]byte            // Named bundles: "admin" -> admin.wasm bytes
+	wasmExecJS     []byte
+	stylesCSS      []byte
+	title          string
+	db             interface{}                  // Database connection (e.g., *gorm.DB)
+	crudModels     []CRUDModel                  // Registered CRUD models
+	csrfConfig     CSRFConfig                   // CSRF protection configuration
+	darkMode       bool                         // Enable dark mode (adds class="dark" to html element)
+	authConfig     *AuthConfig                  // Authentication configuration (nil = disabled)
+	customHandlers map[string]http.HandlerFunc // Custom HTTP handlers
 }
 
 // Default assets (set by generated code)
@@ -119,6 +124,66 @@ func (a *App) DisableCSRF() *App {
 	return a
 }
 
+// EnableAuth configures session-based authentication.
+// Requires a SessionStore implementation for session storage.
+//
+// Usage:
+//
+//	app.EnableAuth(core.AuthConfig{
+//	    SessionStore: core.NewMemorySessionStore(), // Use Redis in production
+//	    LoginPath:    "/login",
+//	})
+func (a *App) EnableAuth(config AuthConfig) *App {
+	// Apply defaults for unset values
+	if config.CookieName == "" {
+		config.CookieName = DefaultSessionCookieName
+	}
+	if config.CookieMaxAge == 0 {
+		config.CookieMaxAge = DefaultSessionMaxAge
+	}
+	if config.CookiePath == "" {
+		config.CookiePath = "/"
+	}
+	if config.CookieSameSite == 0 {
+		config.CookieSameSite = http.SameSiteLaxMode
+	}
+	if config.LoginPath == "" {
+		config.LoginPath = "/login"
+	}
+	// CookieHTTPOnly defaults to true if not explicitly set
+	// This is handled by checking the config when it matters
+
+	a.authConfig = &config
+	return a
+}
+
+// Auth returns the auth configuration, or nil if auth is disabled.
+func (a *App) Auth() *AuthConfig {
+	return a.authConfig
+}
+
+// customHandler represents a custom HTTP handler registration.
+type customHandler struct {
+	pattern string
+	handler http.HandlerFunc
+}
+
+// HandleFunc registers a custom HTTP handler.
+// Use this for API endpoints like login, logout, etc.
+//
+// Usage:
+//
+//	app.HandleFunc("POST /api/login", func(w http.ResponseWriter, r *http.Request) {
+//	    // Handle login
+//	})
+func (a *App) HandleFunc(pattern string, handler http.HandlerFunc) *App {
+	if a.customHandlers == nil {
+		a.customHandlers = make(map[string]http.HandlerFunc)
+	}
+	a.customHandlers[pattern] = handler
+	return a
+}
+
 // SetAssets sets the WASM binary and wasm_exec.js.
 // This is called by generated code, not by the developer.
 func (a *App) SetAssets(wasmBinary, wasmExecJS []byte) {
@@ -171,14 +236,60 @@ func (rb *RouteBuilder) POST(path string, handler PageFunc) *RouteBuilder {
 }
 
 // Hybrid registers a route with SSR + WASM hydration.
-func (rb *RouteBuilder) Hybrid(path string, handler PageFunc) *RouteBuilder {
-	rb.app.routes = append(rb.app.routes, Route{
+func (rb *RouteBuilder) Hybrid(path string, handler PageFunc) *RouteEntry {
+	route := Route{
 		Method:  "GET",
 		Path:    path,
 		Handler: handler,
 		Hybrid:  true,
-	})
-	return rb
+	}
+	rb.app.routes = append(rb.app.routes, route)
+	return &RouteEntry{
+		app:   rb.app,
+		index: len(rb.app.routes) - 1,
+	}
+}
+
+// RouteEntry represents a registered route that can be further configured.
+type RouteEntry struct {
+	app   *App
+	index int
+}
+
+// Protected marks this route as requiring authentication.
+// Unauthenticated users will be redirected to the login page.
+func (re *RouteEntry) Protected() *RouteEntry {
+	re.app.routes[re.index].Protected = true
+	return re
+}
+
+// WithRoles specifies required roles for this route.
+// User must have ANY of the specified roles (OR logic).
+// Automatically marks the route as protected.
+func (re *RouteEntry) WithRoles(roles ...string) *RouteEntry {
+	re.app.routes[re.index].Protected = true
+	re.app.routes[re.index].RequiredRoles = roles
+	return re
+}
+
+// Hybrid allows chaining back to RouteBuilder for additional routes.
+func (re *RouteEntry) Hybrid(path string, handler PageFunc) *RouteEntry {
+	return (&RouteBuilder{app: re.app}).Hybrid(path, handler)
+}
+
+// GET allows chaining back to RouteBuilder for additional routes.
+func (re *RouteEntry) GET(path string, handler PageFunc) *RouteEntry {
+	route := Route{
+		Method:  "GET",
+		Path:    path,
+		Handler: handler,
+		Hybrid:  false,
+	}
+	re.app.routes = append(re.app.routes, route)
+	return &RouteEntry{
+		app:   re.app,
+		index: len(re.app.routes) - 1,
+	}
 }
 
 // RouteGroupOption configures a route group.
@@ -201,9 +312,11 @@ func WithBundle(name string) RouteGroupOption {
 
 // RouteGroup represents a group of routes with a common prefix and options.
 type RouteGroup struct {
-	app    *App
-	prefix string
-	bundle string // WASM bundle name (empty = default)
+	app           *App
+	prefix        string
+	bundle        string   // WASM bundle name (empty = default)
+	protected     bool     // If true, all routes in group require auth
+	requiredRoles []string // Roles required for all routes in group
 }
 
 // RouteGroup creates a new route group with the given prefix and options.
@@ -212,6 +325,8 @@ type RouteGroup struct {
 // Usage:
 //
 //	app.RouteGroup("/admin", core.WithBundle("admin")).
+//	    Protected().
+//	    WithRoles("admin").
 //	    Hybrid("/", admin.Dashboard).
 //	    Hybrid("/users", admin.Users)
 func (a *App) RouteGroup(prefix string, opts ...RouteGroupOption) *RouteGroup {
@@ -222,6 +337,21 @@ func (a *App) RouteGroup(prefix string, opts ...RouteGroupOption) *RouteGroup {
 	for _, opt := range opts {
 		opt(rg)
 	}
+	return rg
+}
+
+// Protected marks all routes in this group as requiring authentication.
+func (rg *RouteGroup) Protected() *RouteGroup {
+	rg.protected = true
+	return rg
+}
+
+// WithRoles specifies required roles for all routes in this group.
+// User must have ANY of the specified roles (OR logic).
+// Automatically marks the group as protected.
+func (rg *RouteGroup) WithRoles(roles ...string) *RouteGroup {
+	rg.protected = true
+	rg.requiredRoles = roles
 	return rg
 }
 
@@ -248,11 +378,13 @@ func (rg *RouteGroup) Hybrid(path string, handler PageFunc) *RouteGroup {
 		fullPath = rg.prefix
 	}
 	rg.app.routes = append(rg.app.routes, Route{
-		Method:  "GET",
-		Path:    fullPath,
-		Handler: handler,
-		Hybrid:  true,
-		Bundle:  rg.bundle,
+		Method:        "GET",
+		Path:          fullPath,
+		Handler:       handler,
+		Hybrid:        true,
+		Bundle:        rg.bundle,
+		Protected:     rg.protected,
+		RequiredRoles: rg.requiredRoles,
 	})
 	return rg
 }
@@ -266,6 +398,11 @@ func (a *App) Run(addr string) error {
 
 	// Register CRUD handlers
 	a.registerCRUDHandlers(mux)
+
+	// Register custom handlers
+	for pattern, handler := range a.customHandlers {
+		mux.HandleFunc(pattern, handler)
+	}
 
 	// Hot reload ping endpoint (only active when GUX_HOT_RELOAD=1)
 	if os.Getenv("GUX_HOT_RELOAD") == "1" {
@@ -323,9 +460,54 @@ func (a *App) Run(addr string) error {
 				continue
 			}
 			if matches, params := matchRoute(route.Path, pagePath); matches {
-				router := NewRouterWithParams(a.db, params)
+				// Load session user if auth is enabled
+				var user *SessionUser
+				if a.authConfig != nil && a.authConfig.SessionStore != nil {
+					sessionID := getSessionIDFromCookie(r, a.authConfig.CookieName)
+					if sessionID != "" {
+						user, _ = a.authConfig.SessionStore.Get(sessionID)
+					}
+				}
+
+				// Check authentication for protected routes
+				if route.Protected {
+					if user == nil {
+						w.Header().Set("Content-Type", "application/json")
+						w.WriteHeader(http.StatusUnauthorized)
+						json.NewEncoder(w).Encode(map[string]string{
+							"error":    "unauthorized",
+							"redirect": a.authConfig.LoginPath,
+						})
+						return
+					}
+
+					// Check required roles
+					if len(route.RequiredRoles) > 0 {
+						hasRole := false
+						for _, role := range route.RequiredRoles {
+							if user.HasRole(role) {
+								hasRole = true
+								break
+							}
+						}
+						if !hasRole {
+							w.Header().Set("Content-Type", "application/json")
+							w.WriteHeader(http.StatusForbidden)
+							json.NewEncoder(w).Encode(map[string]string{"error": "forbidden"})
+							return
+						}
+					}
+				}
+
+				router := NewRouterWithAuth(a.db, params, user, r, w, a.authConfig)
 				component := route.Handler(router)
 				component()
+
+				// Include user in state for hydration
+				if user != nil {
+					router.state["__gux_user"] = user
+				}
+
 				w.Header().Set("Content-Type", "application/json")
 				json.NewEncoder(w).Encode(router.state)
 				return
@@ -351,7 +533,54 @@ func (a *App) Run(addr string) error {
 		// Find matching route
 		for _, route := range a.routes {
 			if matches, params := matchRoute(route.Path, path); matches {
-				router := NewRouterWithParams(a.db, params)
+				// Load session user if auth is enabled
+				var user *SessionUser
+				if a.authConfig != nil && a.authConfig.SessionStore != nil {
+					sessionID := getSessionIDFromCookie(r, a.authConfig.CookieName)
+					if sessionID != "" {
+						user, _ = a.authConfig.SessionStore.Get(sessionID)
+					}
+				}
+
+				// Check authentication for protected routes
+				if route.Protected {
+					if user == nil {
+						// Not authenticated - redirect to login
+						if a.authConfig != nil && a.authConfig.UnauthorizedHandler != nil {
+							a.authConfig.UnauthorizedHandler(w, r)
+						} else {
+							loginPath := "/login"
+							if a.authConfig != nil && a.authConfig.LoginPath != "" {
+								loginPath = a.authConfig.LoginPath
+							}
+							http.Redirect(w, r, loginPath+"?redirect="+path, http.StatusFound)
+						}
+						return
+					}
+
+					// Check required roles (if any)
+					if len(route.RequiredRoles) > 0 {
+						hasRole := false
+						for _, role := range route.RequiredRoles {
+							if user.HasRole(role) {
+								hasRole = true
+								break
+							}
+						}
+						if !hasRole {
+							// User doesn't have required role - forbidden
+							if a.authConfig != nil && a.authConfig.ForbiddenHandler != nil {
+								a.authConfig.ForbiddenHandler(w, r)
+							} else {
+								http.Error(w, "Forbidden", http.StatusForbidden)
+							}
+							return
+						}
+					}
+				}
+
+				// Create router with auth context
+				router := NewRouterWithAuth(a.db, params, user, r, w, a.authConfig)
 				component := route.Handler(router)
 				html := component().Render(HTML()).HTML()
 
@@ -422,6 +651,10 @@ func (a *App) Run(addr string) error {
 				}
 
 				if route.Hybrid && hasWasm {
+					// Include user in state for hydration
+					if user != nil {
+						router.state["__gux_user"] = user
+					}
 					// Serialize state for hydration
 					stateJSON, _ := json.Marshal(router.state)
 
@@ -482,10 +715,14 @@ type Router struct {
 	state          map[string]any
 	rerender       func()
 	navigate       func(path string)
-	db             interface{}       // Database connection (server-side only)
-	hydrated       bool              // True if state was hydrated from server
-	routeParams    map[string]string // Route parameters (e.g., :id -> "123")
-	suppressRender bool              // When true, Set() won't trigger re-render (for input events)
+	db             interface{}          // Database connection (server-side only)
+	hydrated       bool                 // True if state was hydrated from server
+	routeParams    map[string]string    // Route parameters (e.g., :id -> "123")
+	suppressRender bool                 // When true, Set() won't trigger re-render (for input events)
+	user           *SessionUser         // Current authenticated user (nil if not authenticated)
+	request        *http.Request        // Current HTTP request (server-side only)
+	response       http.ResponseWriter  // Current HTTP response (server-side only)
+	authConfig     *AuthConfig          // Auth configuration (server-side only)
 }
 
 // SuppressRender temporarily suppresses re-renders during the callback.
@@ -520,6 +757,19 @@ func NewRouterWithParams(db interface{}, params map[string]string) *Router {
 		state:       make(map[string]any),
 		db:          db,
 		routeParams: params,
+	}
+}
+
+// NewRouterWithAuth creates a router with full context including auth.
+func NewRouterWithAuth(db interface{}, params map[string]string, user *SessionUser, r *http.Request, w http.ResponseWriter, authConfig *AuthConfig) *Router {
+	return &Router{
+		state:       make(map[string]any),
+		db:          db,
+		routeParams: params,
+		user:        user,
+		request:     r,
+		response:    w,
+		authConfig:  authConfig,
 	}
 }
 
@@ -559,6 +809,34 @@ func (r *Router) Hydrate(state map[string]any) {
 		r.state[k] = v
 	}
 	r.hydrated = true
+
+	// Extract user from hydrated state
+	if userData, ok := state["__gux_user"]; ok && userData != nil {
+		// The user data comes as a map from JSON
+		if userMap, ok := userData.(map[string]interface{}); ok {
+			r.user = &SessionUser{}
+			if id, ok := userMap["id"].(string); ok {
+				r.user.ID = id
+			}
+			if email, ok := userMap["email"].(string); ok {
+				r.user.Email = email
+			}
+			if name, ok := userMap["name"].(string); ok {
+				r.user.Name = name
+			}
+			if roles, ok := userMap["roles"].([]interface{}); ok {
+				r.user.Roles = make([]string, len(roles))
+				for i, role := range roles {
+					if roleStr, ok := role.(string); ok {
+						r.user.Roles[i] = roleStr
+					}
+				}
+			}
+			if metadata, ok := userMap["metadata"].(map[string]interface{}); ok {
+				r.user.Metadata = metadata
+			}
+		}
+	}
 }
 
 // IsHydrated returns true if state was hydrated from server.
@@ -663,4 +941,102 @@ func (r *Router) StateBool(key string, initial bool) *State[bool] {
 // StateString creates a string state.
 func (r *Router) StateString(key string, initial string) *State[string] {
 	return UseState(r, key, initial)
+}
+
+// User returns the current authenticated user, or nil if not authenticated.
+func (r *Router) User() *SessionUser {
+	return r.user
+}
+
+// IsAuthenticated returns true if the user is authenticated.
+func (r *Router) IsAuthenticated() bool {
+	return r.user != nil
+}
+
+// HasRole checks if the current user has a specific role.
+func (r *Router) HasRole(role string) bool {
+	if r.user == nil {
+		return false
+	}
+	return r.user.HasRole(role)
+}
+
+// HasAnyRole checks if the current user has any of the specified roles.
+func (r *Router) HasAnyRole(roles ...string) bool {
+	if r.user == nil {
+		return false
+	}
+	return r.user.HasAnyRole(roles...)
+}
+
+// HasAllRoles checks if the current user has all of the specified roles.
+func (r *Router) HasAllRoles(roles ...string) bool {
+	if r.user == nil {
+		return false
+	}
+	return r.user.HasAllRoles(roles...)
+}
+
+// Login creates a session for the user.
+// Only works on server-side. Returns an error if session creation fails.
+func (r *Router) Login(user *SessionUser) error {
+	if r.authConfig == nil || r.authConfig.SessionStore == nil {
+		return fmt.Errorf("auth not configured")
+	}
+	if r.response == nil {
+		return fmt.Errorf("Login() can only be called server-side")
+	}
+
+	// Generate new session ID (session fixation prevention)
+	sessionID, err := generateSessionID()
+	if err != nil {
+		return fmt.Errorf("failed to generate session ID: %w", err)
+	}
+
+	// Store session
+	maxAge := time.Duration(r.authConfig.CookieMaxAge) * time.Second
+	if err := r.authConfig.SessionStore.Set(sessionID, user, maxAge); err != nil {
+		return fmt.Errorf("failed to store session: %w", err)
+	}
+
+	// Set session cookie
+	setSessionCookie(r.response, sessionID, *r.authConfig)
+
+	// Update router's user
+	r.user = user
+
+	return nil
+}
+
+// Logout destroys the current session.
+// Only works on server-side.
+func (r *Router) Logout() error {
+	if r.authConfig == nil || r.authConfig.SessionStore == nil {
+		return fmt.Errorf("auth not configured")
+	}
+	if r.response == nil || r.request == nil {
+		return fmt.Errorf("Logout() can only be called server-side")
+	}
+
+	// Get current session ID
+	sessionID := getSessionIDFromCookie(r.request, r.authConfig.CookieName)
+	if sessionID != "" {
+		// Delete from store
+		r.authConfig.SessionStore.Delete(sessionID)
+	}
+
+	// Clear session cookie
+	clearSessionCookie(r.response, *r.authConfig)
+
+	// Clear router's user
+	r.user = nil
+
+	return nil
+}
+
+// Redirect performs an HTTP redirect. Only works server-side.
+func (r *Router) Redirect(path string) {
+	if r.response != nil && r.request != nil {
+		http.Redirect(r.response, r.request, path, http.StatusFound)
+	}
 }

@@ -6,12 +6,13 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 
 	"github.com/dougbarrett/gux/core"
-	"github.com/dougbarrett/gux/examples/auth/guxgen/api"
-	"github.com/dougbarrett/gux/examples/auth/dto"
-	"github.com/dougbarrett/gux/examples/auth/models"
-	"github.com/dougbarrett/gux/examples/auth/pages"
+	"{{.ModulePath}}/guxgen/api"
+	"{{.ModulePath}}/dto"
+	"{{.ModulePath}}/models"
+	"{{.ModulePath}}/pages"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
@@ -24,35 +25,29 @@ func main() {
 	}
 
 	// Auto-migrate models
-	db.AutoMigrate(&models.User{}, &models.PasswordReset{})
+	db.AutoMigrate(&models.User{})
 
-	// Seed users if none exist
+	// Seed admin user from environment variables
 	var userCount int64
 	db.Model(&models.User{}).Count(&userCount)
 	if userCount == 0 {
-		// Create admin user (for systems without self-signup)
-		admin := models.User{
-			Email:    "admin@example.com",
-			Name:     "Admin User",
-			Verified: true,
-			Role:     "admin",
-		}
-		admin.SetPassword("admin123")
-		db.Create(&admin)
+		adminEmail := os.Getenv("ADMIN_EMAIL")
+		adminPassword := os.Getenv("ADMIN_PASSWORD")
 
-		// Create regular demo user
-		user := models.User{
-			Email:    "demo@example.com",
-			Name:     "Demo User",
-			Verified: true,
-			Role:     "user",
+		if adminEmail == "" || adminPassword == "" {
+			log.Println("Warning: ADMIN_EMAIL and ADMIN_PASSWORD not set in environment.")
+			log.Println("Please set these in your .env file to create an admin user.")
+		} else {
+			admin := models.User{
+				Email:    adminEmail,
+				Name:     "Admin",
+				Verified: true,
+				Role:     "admin",
+			}
+			admin.SetPassword(adminPassword)
+			db.Create(&admin)
+			fmt.Println("Seeded admin user:", adminEmail)
 		}
-		user.SetPassword("demo123")
-		db.Create(&user)
-
-		fmt.Println("Seeded users:")
-		fmt.Println("  Admin: admin@example.com / admin123")
-		fmt.Println("  User:  demo@example.com / demo123")
 	}
 
 	// Initialize API with database
@@ -60,7 +55,7 @@ func main() {
 
 	app := core.New()
 	app.SetDB(db)
-	app.SetTitle("Auth Example")
+	app.SetTitle("{{.AppName}}")
 
 	// Enable session-based authentication
 	app.EnableAuth(core.AuthConfig{
@@ -152,19 +147,12 @@ func main() {
 	// Public routes
 	app.Routes().
 		Hybrid("/", pages.Home).
-		Hybrid("/login", pages.Login).
-		Hybrid("/register", pages.Register).
-		Hybrid("/forgot", pages.Forgot).
-		Hybrid("/reset/:token", pages.Reset).
-		Hybrid("/verify/:token", pages.Verify)
+		Hybrid("/login", pages.Login){{if .PublicSignup}}.
+		Hybrid("/register", pages.Register){{end}}
 
 	// Protected routes - requires authentication
 	app.Routes().
 		Hybrid("/dashboard", pages.Dashboard).Protected()
 
-	// Admin-only routes - demonstrates RBAC
-	app.Routes().
-		Hybrid("/admin", pages.Admin).Protected().WithRoles("admin")
-
-	app.Run(":8082")
+	app.Run(":8080")
 }
