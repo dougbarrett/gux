@@ -11,6 +11,5 @@
   - [Server Utilities](server.md)
 
 - **Reference**
-  - [Keyboard Shortcuts](keyboard-shortcuts.md)
   - [Accessibility](accessibility.md)
   - [Deployment](deployment.md)
