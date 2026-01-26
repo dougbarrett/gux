@@ -36,16 +36,17 @@ Developers can build complete web applications in Go — from marketing sites to
 
 ### Active
 
-<!-- Current scope: v2.2 gux init Modernization -->
+<!-- Current scope: v2.3 gux help Patterns -->
 
-- [ ] Update `gux init` to scaffold apps using `core/` framework (not old components/)
-- [ ] Generate app.go with core.New(), CRUD registration, hybrid routes
-- [ ] Generate models/item.go as example GORM model
-- [ ] Generate pages/home.go using ui/ components
-- [ ] Generate pages/items.go with OnLoad + API integration
-- [ ] Generate pages/item_new.go with form state + API submission
-- [ ] Auto-run `gux gen` after scaffolding
-- [ ] Update go.mod template with gorm/sqlite dependencies
+- [ ] Add `gux help page` command — basic page structure with OnLoad
+- [ ] Add `gux help page:list` command — list page with API call, table
+- [ ] Add `gux help page:form` command — form page with state, validation
+- [ ] Add `gux help model` command — GORM model template
+- [ ] Add `gux help dto` command — DTO struct with gux tags
+- [ ] Add `gux help routes` command — route registration with CRUD
+- [ ] Add `gux help app` command — full app.go setup
+- [ ] Read go.mod to detect module path for import replacement
+- [ ] Output includes file path header comment
 
 ### Out of Scope
 
@@ -104,17 +105,21 @@ Starting v2.2 gux init Modernization. Previous milestone shipped v2.1 Dead Code 
 | Props structs for all components | Type safety, no interface{} | Good - clean API |
 | CSS-driven visibility for overlays | SSR compatibility without JS state | Good - hydration-safe |
 
-## Current Milestone: v2.2 gux init Modernization
+## Current Milestone: v2.3 gux help Patterns
 
-**Goal:** Update `gux init` to scaffold working apps using the modern `core/` framework instead of the deleted `components/` package.
+**Goal:** Add `gux help <pattern>` commands that output boilerplate code for developers and LLMs working in established projects.
 
 **Target features:**
-- New app.go template with core.New(), DB setup, CRUD, hybrid routes
-- Example model (Item) with GORM
-- Three pages (Home, Items list, Item create) demonstrating patterns
-- Uses ui/ components for polished UI
-- Auto-runs `gux gen` to generate API client
+- `gux help page` — basic page structure with OnLoad
+- `gux help page:list` — list page with API call, table display
+- `gux help page:form` — form page with state, validation, submission
+- `gux help model` — GORM model with common fields
+- `gux help dto` — DTO struct with gux tags
+- `gux help routes` — route registration with CRUD
+- `gux help app` — full app.go setup
+- Read go.mod to replace import path placeholders with actual module path
+- Output includes file path header (e.g., `// pages/items.go`)
 
 ---
 
-*Last updated: 2026-01-26 after starting v2.2 milestone*
+*Last updated: 2026-01-26 after starting v2.3 milestone*
