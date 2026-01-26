@@ -363,6 +363,76 @@ type ItemDetail struct {
 }
 `,
 	},
+	"routes": {
+		Name:        "routes",
+		Description: "Route registration with Hybrid and RouteGroup",
+		FilePath:    "app.go (routes section)",
+		Template: `// app.go (routes section)
+// Import your pages: "{{.ModulePath}}/pages"
+
+// Register routes
+app.Routes().
+	Hybrid("/", pages.Home).
+	Hybrid("/items", pages.Items).
+	Hybrid("/items/new", pages.ItemNew).
+	Hybrid("/items/:id", pages.ItemDetail)
+
+// Route groups with separate WASM bundle
+app.RouteGroup("/admin", core.WithBundle("admin")).
+	Hybrid("/", admin.Dashboard).
+	Hybrid("/users", admin.Users)
+`,
+	},
+	"app": {
+		Name:        "app",
+		Description: "Complete app.go with database, CRUD, and routes",
+		FilePath:    "app.go",
+		Template: `// app.go
+package main
+
+import (
+	"log"
+
+	"github.com/dougbarrett/gux/core"
+	"{{.ModulePath}}/.gux/api"
+	"{{.ModulePath}}/models"
+	"{{.ModulePath}}/pages"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
+)
+
+func main() {
+	// Set up database
+	db, err := gorm.Open(sqlite.Open("app.db"), &gorm.Config{})
+	if err != nil {
+		log.Fatal("Failed to connect database:", err)
+	}
+
+	// Auto-migrate models
+	db.AutoMigrate(&models.Item{})
+
+	// Initialize API with database for server-side queries
+	api.Init(db)
+
+	app := core.New()
+	app.SetDB(db)
+	app.SetTitle("My App")
+
+	// Register CRUD for Item model
+	// Creates: GET/POST /__gux_api/crud/items
+	//          GET/PUT/DELETE /__gux_api/crud/items/:id
+	app.CRUD(models.Item{})
+
+	// Register routes
+	app.Routes().
+		Hybrid("/", pages.Home).
+		Hybrid("/items", pages.Items).
+		Hybrid("/items/new", pages.ItemNew)
+
+	app.Run(":8080")
+}
+`,
+	},
 }
 
 // getModulePathForHelp reads go.mod and extracts the module path.
