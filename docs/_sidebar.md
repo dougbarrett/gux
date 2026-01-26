@@ -5,13 +5,9 @@
 
 - **Core Concepts**
   - [API Generation](api-generation.md)
-  - [Components](components.md)
   - [Templates](templates.md)
-  - [State Management](state-management.md)
 
 - **Features**
-  - [WebSocket](websocket.md)
-  - [Authentication](auth.md)
   - [Server Utilities](server.md)
 
 - **Reference**
