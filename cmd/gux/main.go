@@ -85,7 +85,13 @@ func main() {
 		fmt.Printf("gux version %s\n", getVersion())
 
 	case "help", "-h", "--help":
-		printUsage()
+		if len(os.Args) > 2 {
+			// gux help <pattern> - show pattern template
+			runHelpPattern(os.Args[2])
+		} else {
+			// gux help - show general usage
+			printUsage()
+		}
 
 	default:
 		fmt.Printf("Unknown command: %s\n", os.Args[1])
@@ -108,6 +114,7 @@ Usage:
     gux update [--check]                          Update gux to latest version
     gux version                                   Show version
     gux help                                      Show this help
+    gux help <pattern>                            Show boilerplate for a pattern
 
 TinyGo is the default compiler (~1MB WASM). Use --go for standard Go (~5MB).
 
@@ -123,6 +130,8 @@ Examples:
     gux clean                # Remove bin/, .gux/, assets_gen.go
     gux claude               # Install Claude Code skill
     gux update               # Update gux to latest release
+    gux help page            # Show basic page template
+    gux help                 # List all available patterns
 
 Project structure:
     app.go                   - Your application entry point
