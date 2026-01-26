@@ -17,6 +17,7 @@ A full-stack Go framework for building modern web applications with WebAssembly.
 - [v2.0 Core Components](milestones/v2.0-ROADMAP.md) (Phases 16-23) - SHIPPED 2026-01-25
 - [v2.1 Dead Code Cleanup](milestones/v2.1-ROADMAP.md) (Phases 24-26) - SHIPPED 2026-01-26
 - [v2.2 gux init Modernization](milestones/v2.2-ROADMAP.md) (Phase 27) - SHIPPED 2026-01-26
+- [v2.3 gux help Patterns](milestones/v2.3-ROADMAP.md) (Phase 28) - IN PROGRESS
 
 ## Phases
 
@@ -125,31 +126,39 @@ Full details: [milestones/v2.0-ROADMAP.md](milestones/v2.0-ROADMAP.md)
 </details>
 
 <details>
-<summary>✅ v2.1 Dead Code Cleanup (Phases 24-26) — SHIPPED 2026-01-26</summary>
+<summary>v2.1 Dead Code Cleanup (Phases 24-26) - SHIPPED 2026-01-26</summary>
 
-- [x] Phase 24: Code Removal (1/1 plans) — completed 2026-01-25
-- [x] Phase 25: Documentation Updates (3/3 plans) — completed 2026-01-26
-- [x] Phase 26: Dependency Cleanup (1/1 plans) — completed 2026-01-26
+- [x] Phase 24: Code Removal (1/1 plans) - completed 2026-01-25
+- [x] Phase 25: Documentation Updates (3/3 plans) - completed 2026-01-26
+- [x] Phase 26: Dependency Cleanup (1/1 plans) - completed 2026-01-26
 
 Full details: [milestones/v2.1-ROADMAP.md](milestones/v2.1-ROADMAP.md)
 
 </details>
 
 <details>
-<summary>✅ v2.2 gux init Modernization (Phase 27) — SHIPPED 2026-01-26</summary>
+<summary>v2.2 gux init Modernization (Phase 27) - SHIPPED 2026-01-26</summary>
 
 **Milestone Goal:** Update `gux init` to scaffold working apps using the modern `core/` framework instead of the deleted `components/` package.
 
-- [x] Phase 27: gux init Templates (3/3 plans) — completed 2026-01-26
+- [x] Phase 27: gux init Templates (3/3 plans) - completed 2026-01-26
 
 Full details: [milestones/v2.2-ROADMAP.md](milestones/v2.2-ROADMAP.md)
 
 </details>
 
+### v2.3 gux help Patterns (In Progress)
+
+**Milestone Goal:** Add `gux help <pattern>` commands that output boilerplate code for developers and LLMs working in established projects.
+
+- [ ] Phase 28: Help Pattern Commands (0/TBD plans) - All help commands with go.mod integration
+
+Full details: [milestones/v2.3-ROADMAP.md](milestones/v2.3-ROADMAP.md)
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 -> 2 -> ... -> 15 -> 16 -> ... -> 23 -> 24 -> 25 -> 26 -> 27
+Phases execute in numeric order: 1 -> 2 -> ... -> 15 -> 16 -> ... -> 23 -> 24 -> 25 -> 26 -> 27 -> 28
 
 | Phase | Milestone | Plans | Status | Completed |
 |-------|-----------|-------|--------|-----------|
@@ -180,3 +189,4 @@ Phases execute in numeric order: 1 -> 2 -> ... -> 15 -> 16 -> ... -> 23 -> 24 ->
 | 25. Documentation Updates | v2.1 | 3/3 | Complete | 2026-01-26 |
 | 26. Dependency Cleanup | v2.1 | 1/1 | Complete | 2026-01-26 |
 | 27. gux init Templates | v2.2 | 3/3 | Complete | 2026-01-26 |
+| 28. Help Pattern Commands | v2.3 | 0/TBD | Not started | - |

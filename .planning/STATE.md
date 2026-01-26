@@ -2,19 +2,19 @@
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-01-26 — Milestone v2.3 started
+Phase: 28 of 28 (Help Pattern Commands)
+Plan: 0 of TBD in current phase
+Status: Ready to plan
+Last activity: 2026-01-26 - Created v2.3 roadmap
 
-Progress: ░░░░░ (v2.3 - requirements phase)
+Progress: [============================] 97% (27/28 phases complete)
 
 ## Project Reference
 
 See: .planning/PROJECT.md (updated 2026-01-26)
 
 **Core value:** Developers can build complete web apps in Go with SSR + WASM
-**Current focus:** v2.3 gux help Patterns
+**Current focus:** v2.3 gux help Patterns - Phase 28 Help Pattern Commands
 
 ## Milestone History
 
@@ -24,7 +24,7 @@ See: .planning/PROJECT.md (updated 2026-01-26)
 - **v2.0 Core Components** - 8 phases, 25 plans (shipped 2026-01-25)
 - **v2.1 Dead Code Cleanup** - 3 phases, 5 plans (shipped 2026-01-26)
 - **v2.2 gux init Modernization** - 1 phase, 3 plans (shipped 2026-01-26)
-- **v2.3 gux help Patterns** - defining requirements
+- **v2.3 gux help Patterns** - 1 phase, TBD plans (in progress)
 
 ## Accumulated Context
 
@@ -44,19 +44,7 @@ Full decision log preserved in milestone archives:
 |----|-------|----------|--------|
 | 27-01-D1 | 27 | Use core.New() pattern instead of cmd/app | Generated apps follow modern examples/minimal pattern |
 | 27-02-D1 | 27 | Use ui components (Card, Table, FormField, etc.) | Consistent styling across generated apps |
-| 27-02-D2 | 27 | State created inside inner function | Proper component lifecycle association |
-| 27-02-D3 | 27 | JSON serialization for complex state | Enables hydration of arrays and objects |
 | 27-03-D1 | 27 | Run gux gen automatically after go mod tidy | API client generated automatically, apps immediately runnable |
-| 27-03-D2 | 27 | Remove old templates completely | Only modern apps can be generated, no maintenance burden |
-
-### Research Findings
-
-Research completed 2026-01-22. Key findings:
-- Stack: Go 1.24.3, GORM, Tailwind CDN — no changes needed
-- Architecture: Props structs, core.Node interface, compound patterns
-- Pitfalls: Callback cleanup, binary size, hydration mismatches
-
-See: [.planning/research/SUMMARY.md](research/SUMMARY.md)
 
 ### Blockers/Concerns Carried Forward
 
@@ -70,9 +58,9 @@ v2.0 Tech Debt:
 ## Session Continuity
 
 Last session: 2026-01-26
-Stopped at: Starting v2.3 milestone
+Stopped at: Created v2.3 roadmap, ready for phase planning
 Resume file: None
 
 ---
 
-*Last updated: 2026-01-26 after starting v2.3 milestone*
+*Last updated: 2026-01-26 after creating v2.3 roadmap*
