@@ -84,14 +84,18 @@ func main() {
 	case "version", "-v", "--version":
 		fmt.Printf("gux version %s\n", getVersion())
 
-	case "help", "-h", "--help":
+	case "help":
 		if len(os.Args) > 2 {
 			// gux help <pattern> - show pattern template
 			runHelpPattern(os.Args[2])
 		} else {
-			// gux help - show general usage
-			printUsage()
+			// gux help - list available patterns
+			runHelpPattern("")
 		}
+
+	case "-h", "--help":
+		// Show general usage
+		printUsage()
 
 	default:
 		fmt.Printf("Unknown command: %s\n", os.Args[1])
