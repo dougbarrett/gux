@@ -80,12 +80,11 @@ func itemRows(items []api.Item) []core.Node {
 			ui.Tr(ui.TrProps{
 				Children: []core.Node{
 					ui.Td(ui.TdProps{
-						Class: "text-center text-gray-500 dark:text-gray-400 py-8",
-						Attrs: core.Attrs{
-							Colspan: "3",
-						},
+						Class:    "text-center text-gray-500 dark:text-gray-400 py-8",
 						Children: []core.Node{core.Text("No items yet")},
 					}),
+					ui.Td(ui.TdProps{}),
+					ui.Td(ui.TdProps{}),
 				},
 			}),
 		}

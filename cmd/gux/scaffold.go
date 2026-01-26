@@ -1,11 +1,13 @@
 package main
 
 import (
+	"bufio"
 	"embed"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"text/template"
 )
 
@@ -124,6 +126,13 @@ func runInit(appName, modulePath string) {
 		fmt.Printf("  created %s\n", f.destPath)
 	}
 
+	// Create or update .gitignore
+	if err := updateGitignore(targetDir); err != nil {
+		fmt.Printf("Warning: could not update .gitignore: %v\n", err)
+	} else {
+		fmt.Println("  updated .gitignore")
+	}
+
 	// Run go mod tidy to download dependencies
 	fmt.Println("\nRunning go mod tidy...")
 	cmd := exec.Command("go", "mod", "tidy")
@@ -222,6 +231,65 @@ func checkForConflicts(targetDir string) []string {
 		}
 	}
 	return conflicts
+}
+
+// updateGitignore creates or updates .gitignore with gux-generated file entries
+func updateGitignore(targetDir string) error {
+	gitignorePath := filepath.Join(targetDir, ".gitignore")
+	guxEntries := []string{
+		"# Gux generated files",
+		".gux/",
+		"assets_gen.go",
+	}
+
+	// Check if .gitignore exists
+	existingContent := ""
+	if data, err := os.ReadFile(gitignorePath); err == nil {
+		existingContent = string(data)
+	}
+
+	// Check which entries are already present
+	var entriesToAdd []string
+	for _, entry := range guxEntries {
+		// Skip comment lines when checking for duplicates
+		if strings.HasPrefix(entry, "#") {
+			continue
+		}
+		if !strings.Contains(existingContent, entry) {
+			entriesToAdd = append(entriesToAdd, entry)
+		}
+	}
+
+	// If all entries already exist, nothing to do
+	if len(entriesToAdd) == 0 {
+		return nil
+	}
+
+	// Open file for appending (or create if doesn't exist)
+	file, err := os.OpenFile(gitignorePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return fmt.Errorf("open .gitignore: %w", err)
+	}
+	defer file.Close()
+
+	writer := bufio.NewWriter(file)
+
+	// Add newline if file has content and doesn't end with newline
+	if existingContent != "" && !strings.HasSuffix(existingContent, "\n") {
+		writer.WriteString("\n")
+	}
+
+	// Add blank line before gux section if file has content
+	if existingContent != "" {
+		writer.WriteString("\n")
+	}
+
+	// Write gux entries
+	for _, entry := range guxEntries {
+		writer.WriteString(entry + "\n")
+	}
+
+	return writer.Flush()
 }
 
 func printNextStepsWithDir(appName string, initHere bool) {

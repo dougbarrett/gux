@@ -1464,11 +1464,11 @@ func generateAPIClient(modelsImport string, dtoImport string, models []CRUDModel
 		dtoCode.WriteString(fmt.Sprintf(`
 // %s is a WASM-compatible DTO for %s.
 type %s struct {
-	ID        uint   `+"`json:\"ID\"`"+`
-	CreatedAt string `+"`json:\"CreatedAt,omitempty\"`"+`
-	UpdatedAt string `+"`json:\"UpdatedAt,omitempty\"`"+`
-	Name      string `+"`json:\"name,omitempty\"`"+`
-	Value     int    `+"`json:\"value\"`"+`
+	ID          uint   `+"`json:\"ID\"`"+`
+	CreatedAt   string `+"`json:\"CreatedAt,omitempty\"`"+`
+	UpdatedAt   string `+"`json:\"UpdatedAt,omitempty\"`"+`
+	Name        string `+"`json:\"name,omitempty\"`"+`
+	Description string `+"`json:\"description,omitempty\"`"+`
 }
 `, m.Name, m.Name, m.Name))
 	}
@@ -1804,11 +1804,11 @@ func fetch(method, url string, body []byte) ([]byte, error) {
 		stubDtoCode.WriteString(fmt.Sprintf(`
 // %s is the API DTO for %s.
 type %s struct {
-	ID        uint   `+"`json:\"ID\"`"+`
-	CreatedAt string `+"`json:\"CreatedAt,omitempty\"`"+`
-	UpdatedAt string `+"`json:\"UpdatedAt,omitempty\"`"+`
-	Name      string `+"`json:\"name,omitempty\"`"+`
-	Value     int    `+"`json:\"value\"`"+`
+	ID          uint   `+"`json:\"ID\"`"+`
+	CreatedAt   string `+"`json:\"CreatedAt,omitempty\"`"+`
+	UpdatedAt   string `+"`json:\"UpdatedAt,omitempty\"`"+`
+	Name        string `+"`json:\"name,omitempty\"`"+`
+	Description string `+"`json:\"description,omitempty\"`"+`
 }
 `, m.Name, m.Name, m.Name))
 	}

@@ -23,11 +23,11 @@ func ItemNew(r *core.Router) func() core.Node {
 			}
 
 			// Create item via generated API
-			data := map[string]interface{}{
-				"name":        nameState.Get(),
-				"description": descState.Get(),
+			item := &api.Item{
+				Name:        nameState.Get(),
+				Description: descState.Get(),
 			}
-			api.Items.Create(data, func(result *api.Item, err error) {
+			api.Items.Create(item, func(result *api.Item, err error) {
 				if err != nil {
 					errorState.Set(err.Error())
 				} else {
@@ -42,10 +42,8 @@ func ItemNew(r *core.Router) func() core.Node {
 		var errorNode core.Node = core.Frag()
 		if errorState.Get() != "" {
 			errorNode = ui.Alert(ui.AlertProps{
-				Variant: "destructive",
-				Children: []core.Node{
-					core.Text(errorState.Get()),
-				},
+				Message: errorState.Get(),
+				Variant: ui.AlertError,
 			})
 		}
 
