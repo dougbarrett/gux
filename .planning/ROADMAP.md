@@ -130,7 +130,7 @@ Full details: [milestones/v2.0-ROADMAP.md](milestones/v2.0-ROADMAP.md)
 
 - [ ] Phase 24: Code Removal (1 plan) - Remove dead packages (components/, auth/, storage/, state/, ws/)
   Plans:
-  - [ ] 24-01-PLAN.md - Delete dead packages and verify no remaining references
+  - [ ] 24-01-PLAN.md - Delete dead packages and verify build passes
 - [ ] Phase 25: Documentation Updates (1 plan) - Update docs to reflect removed packages
   Plans:
   - [ ] 25-01-PLAN.md - Remove/update stale documentation
@@ -170,6 +170,6 @@ Phases execute in numeric order: 1 -> 2 -> ... -> 15 -> 16 -> ... -> 23 -> 24 ->
 | 21. Marketing Example | v2.0 | 3/3 | Complete | 2026-01-22 |
 | 22. SaaS Dashboard Example | v2.0 | 3/3 | Complete | 2026-01-23 |
 | 23. Admin Panel Example | v2.0 | 3/3 | Complete | 2026-01-23 |
-| 24. Code Removal | v2.1 | 0/1 | Pending | — |
-| 25. Documentation Updates | v2.1 | 0/1 | Pending | — |
-| 26. Dependency Cleanup | v2.1 | 0/1 | Pending | — |
+| 24. Code Removal | v2.1 | 1/1 | Planned | - |
+| 25. Documentation Updates | v2.1 | 0/1 | Pending | - |
+| 26. Dependency Cleanup | v2.1 | 0/1 | Pending | - |
