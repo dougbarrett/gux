@@ -1,0 +1,43 @@
+package pages
+
+import (
+	"github.com/dougbarrett/gux/core"
+	"github.com/dougbarrett/gux/ui"
+)
+
+// Home is the landing page.
+func Home(r *core.Router) func() core.Node {
+	return func() core.Node {
+		return core.Div(core.Class("min-h-screen bg-gray-100 dark:bg-gray-900"),
+			core.Div(core.Class("max-w-4xl mx-auto px-4 py-8"),
+				ui.Card(ui.CardProps{
+					Children: []core.Node{
+						ui.CardHeader(ui.CardHeaderProps{
+							Children: []core.Node{
+								core.H1(core.Class("text-3xl font-bold text-gray-900 dark:text-white"),
+									core.Text("Welcome to {{.AppName}}"),
+								),
+							},
+						}),
+						ui.CardContent(ui.CardContentProps{
+							Children: []core.Node{
+								core.P(core.Class("text-gray-600 dark:text-gray-400 mb-4"),
+									core.Text("This is a starter application built with Gux, a full-stack Go framework for building modern web applications with WebAssembly."),
+								),
+								core.Div(core.Class("mt-6"),
+									core.A(
+										core.Attrs{
+											Href:  "/items",
+											Class: "inline-block px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition",
+										},
+										core.Text("View Items"),
+									),
+								),
+							},
+						}),
+					},
+				}),
+			),
+		)
+	}
+}
