@@ -33,9 +33,15 @@ Developers can build complete web applications in Go — from marketing sites to
 
 ### Active
 
-<!-- Current scope: Planning next milestone -->
+<!-- Current scope: v2.1 Dead Code Cleanup -->
 
-(No active requirements — planning next milestone)
+- [ ] Remove dead components/ package (61 files, old js.Value approach)
+- [ ] Remove dead auth/ package (unused JWT/localStorage auth)
+- [ ] Remove dead storage/ package (only used by old components)
+- [ ] Remove dead state/ package (superseded by core.Router state)
+- [ ] Remove dead ws/ package (never integrated)
+- [ ] Update documentation to reflect removed packages
+- [ ] Clean up go.mod/go.sum (remove unused dependencies)
 
 ### Out of Scope
 
@@ -71,6 +77,7 @@ Shipped v2.0 with complete component library and four example applications:
 - 6 P0 components not implemented (Spinner, Progress, Skeleton, Breadcrumb, ButtonGroup, IconButton)
 - No OAuth/2FA support yet
 - No real-time features yet
+- Dead code from pre-v2.0 architecture needs cleanup (components/, auth/, storage/, state/, ws/)
 
 ## Constraints
 
@@ -94,4 +101,4 @@ Shipped v2.0 with complete component library and four example applications:
 
 ---
 
-*Last updated: 2026-01-25 after v2.0 milestone*
+*Last updated: 2026-01-25 after v2.1 milestone started*

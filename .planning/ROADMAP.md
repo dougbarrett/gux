@@ -15,6 +15,7 @@ A full-stack Go framework for building modern web applications with WebAssembly.
 - [v1.1 Accessibility](milestones/v1.1-ROADMAP.md) (Phases 7-11) - SHIPPED 2026-01-16
 - [v1.2 Documentation](milestones/v1.2-ROADMAP.md) (Phases 12-15) - SHIPPED 2026-01-15
 - [v2.0 Core Components](milestones/v2.0-ROADMAP.md) (Phases 16-23) - SHIPPED 2026-01-25
+- v2.1 Dead Code Cleanup (Phases 24-26) - IN PROGRESS
 
 ## Phases
 
@@ -122,10 +123,27 @@ Full details: [milestones/v2.0-ROADMAP.md](milestones/v2.0-ROADMAP.md)
 
 </details>
 
+<details open>
+<summary>v2.1 Dead Code Cleanup (Phases 24-26) - IN PROGRESS</summary>
+
+**Milestone Goal:** Remove dead code from pre-v2.0 architecture and clean up documentation
+
+- [ ] Phase 24: Code Removal (1 plan) - Remove dead packages (components/, auth/, storage/, state/, ws/)
+  Plans:
+  - [ ] 24-01-PLAN.md - Delete dead packages and verify no remaining references
+- [ ] Phase 25: Documentation Updates (1 plan) - Update docs to reflect removed packages
+  Plans:
+  - [ ] 25-01-PLAN.md - Remove/update stale documentation
+- [ ] Phase 26: Dependency Cleanup (1 plan) - Clean up go.mod and verify builds
+  Plans:
+  - [ ] 26-01-PLAN.md - Run go mod tidy, verify all examples build
+
+</details>
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 -> 2 -> ... -> 15 -> 16 -> ... -> 23
+Phases execute in numeric order: 1 -> 2 -> ... -> 15 -> 16 -> ... -> 23 -> 24 -> 25 -> 26
 
 | Phase | Milestone | Plans | Status | Completed |
 |-------|-----------|-------|--------|-----------|
@@ -152,3 +170,6 @@ Phases execute in numeric order: 1 -> 2 -> ... -> 15 -> 16 -> ... -> 23
 | 21. Marketing Example | v2.0 | 3/3 | Complete | 2026-01-22 |
 | 22. SaaS Dashboard Example | v2.0 | 3/3 | Complete | 2026-01-23 |
 | 23. Admin Panel Example | v2.0 | 3/3 | Complete | 2026-01-23 |
+| 24. Code Removal | v2.1 | 0/1 | Pending | — |
+| 25. Documentation Updates | v2.1 | 0/1 | Pending | — |
+| 26. Dependency Cleanup | v2.1 | 0/1 | Pending | — |

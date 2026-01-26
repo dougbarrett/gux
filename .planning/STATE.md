@@ -2,19 +2,19 @@
 
 ## Current Position
 
-Phase: Ready for next milestone
-Plan: N/A
-Status: v2.0 milestone shipped
-Last activity: 2026-01-25 — v2.0 milestone shipped
+Phase: 24 (not started)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-01-25 — Milestone v2.1 started
 
-Progress: Planning next milestone
+Progress: Defining requirements
 
 ## Project Reference
 
 See: .planning/PROJECT.md (updated 2026-01-25)
 
 **Core value:** Developers can build complete web apps in Go with SSR + WASM
-**Current focus:** Planning next milestone
+**Current focus:** v2.1 Dead Code Cleanup
 
 ## Milestone History
 
@@ -54,9 +54,9 @@ v2.0 Tech Debt:
 ## Session Continuity
 
 Last session: 2026-01-25
-Stopped at: v2.0 milestone shipped
+Stopped at: v2.1 milestone initialized
 Resume file: None
 
 ---
 
-*Last updated: 2026-01-25 after v2.0 milestone completion*
+*Last updated: 2026-01-25 after v2.1 milestone started*
