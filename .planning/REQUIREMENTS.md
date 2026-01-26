@@ -1,65 +1,65 @@
-# Requirements: Gux Framework v2.2
+# Requirements: Gux Framework v2.3
 
 **Defined:** 2026-01-26
-**Core Value:** Developers can scaffold working apps with `gux init` that use the modern core/ framework
+**Core Value:** Developers can quickly see correct patterns for common gux tasks without leaving the terminal
 
-## v2.2 Requirements
+## v2.3 Requirements
 
-Requirements for the gux init modernization milestone.
+Requirements for the gux help patterns milestone.
 
-### Templates
+### Help Commands
 
-- [ ] **TMPL-01**: app.go template creates app with core.New(), SetDB(), SetTitle(), CRUD(), Routes(), Run()
-- [ ] **TMPL-02**: go.mod template includes gux, gorm, and sqlite dependencies
-- [ ] **TMPL-03**: models/item.go template provides example GORM model with ID, Name, Description, timestamps
-- [ ] **TMPL-04**: pages/home.go template renders landing page with ui.Card, links to /items
-- [ ] **TMPL-05**: pages/items.go template shows list with OnLoad(), API call, ui.Table
-- [ ] **TMPL-06**: pages/item_new.go template shows form with state, validation, API submission, navigation
+- [ ] **HELP-01**: `gux help` lists all available pattern names with brief descriptions
+- [ ] **HELP-02**: `gux help page` outputs basic page template with OnLoad pattern
+- [ ] **HELP-03**: `gux help page:list` outputs list page with API call and table display
+- [ ] **HELP-04**: `gux help page:form` outputs form page with state, validation, API submission
+- [ ] **HELP-05**: `gux help model` outputs GORM model with ID, common fields, timestamps
+- [ ] **HELP-06**: `gux help dto` outputs DTO struct with gux tags for field mapping
+- [ ] **HELP-07**: `gux help routes` outputs route registration with hybrid routes and CRUD
+- [ ] **HELP-08**: `gux help app` outputs complete app.go with core.New(), DB, routes, run
 
-### Scaffold Process
+### go.mod Integration
 
-- [ ] **PROC-01**: `gux init` creates all required files from templates
-- [ ] **PROC-02**: `gux init` runs `gux gen` automatically after file creation
-- [ ] **PROC-03**: `gux init` runs `go mod tidy` to download dependencies
-- [ ] **PROC-04**: Scaffolded app runs with `gux dev` immediately after init
+- [ ] **MOD-01**: Read module path from go.mod in current directory
+- [ ] **MOD-02**: Replace import path placeholders with actual module path in output
+- [ ] **MOD-03**: Gracefully handle missing go.mod (use placeholder, warn user)
 
-### Cleanup
+### Output Format
 
-- [ ] **CLNP-01**: Remove old cmd/app/main.go.tmpl template (uses deleted components/)
-- [ ] **CLNP-02**: Remove old cmd/server/main.go.tmpl template (not needed with core/)
-- [ ] **CLNP-03**: Remove internal/api/*.tmpl templates (replaced by gux gen)
-- [ ] **CLNP-04**: Update scaffold.go to use new file list
+- [ ] **OUT-01**: Output includes file path header comment (e.g., `// pages/items.go`)
+- [ ] **OUT-02**: Output uses correct package name for file location
+- [ ] **OUT-03**: Output is valid, copy-pasteable Go code
 
 ## Out of Scope
 
 | Feature | Reason |
 |---------|--------|
-| Admin routes in scaffold | Keep simple, users add themselves |
-| DTOs in scaffold | Adds complexity, basic CRUD is cleaner for starter |
-| Multiple models | One model demonstrates the pattern |
-| Authentication | Covered by auth example, not starter scaffold |
+| Interactive prompts for names | Keep simple, fixed templates with placeholders |
+| File generation (writing files) | This is for viewing patterns, gux init handles generation |
+| Context-aware detection | Adds complexity, fixed templates are sufficient |
+| Custom template support | Defer to future, built-in templates cover common cases |
 
 ## Traceability
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| TMPL-01 | Phase 27 | Pending |
-| TMPL-02 | Phase 27 | Pending |
-| TMPL-03 | Phase 27 | Pending |
-| TMPL-04 | Phase 27 | Pending |
-| TMPL-05 | Phase 27 | Pending |
-| TMPL-06 | Phase 27 | Pending |
-| PROC-01 | Phase 27 | Pending |
-| PROC-02 | Phase 27 | Pending |
-| PROC-03 | Phase 27 | Pending |
-| PROC-04 | Phase 27 | Pending |
-| CLNP-01 | Phase 27 | Pending |
-| CLNP-02 | Phase 27 | Pending |
-| CLNP-03 | Phase 27 | Pending |
-| CLNP-04 | Phase 27 | Pending |
+| HELP-01 | Phase 28 | Pending |
+| HELP-02 | Phase 28 | Pending |
+| HELP-03 | Phase 28 | Pending |
+| HELP-04 | Phase 28 | Pending |
+| HELP-05 | Phase 28 | Pending |
+| HELP-06 | Phase 28 | Pending |
+| HELP-07 | Phase 28 | Pending |
+| HELP-08 | Phase 28 | Pending |
+| MOD-01 | Phase 28 | Pending |
+| MOD-02 | Phase 28 | Pending |
+| MOD-03 | Phase 28 | Pending |
+| OUT-01 | Phase 28 | Pending |
+| OUT-02 | Phase 28 | Pending |
+| OUT-03 | Phase 28 | Pending |
 
 **Coverage:**
-- v2.2 requirements: 14 total
+- v2.3 requirements: 14 total
 - Mapped to phases: 14
 - Unmapped: 0 ✓
 
