@@ -371,15 +371,22 @@ func (c *CommandPalette) RegisterKeyboardShortcut() {
 
 ### Skip Links
 
-The SkipLink component allows keyboard users to bypass navigation.
+Skip links allow keyboard users to bypass navigation and jump directly to main content. Implement a visually-hidden link at the start of the page that becomes visible on focus.
 
 ```go
-skipLinks := components.SkipLinks()
-document.Get("body").Call("prepend", skipLinks)
+// Create skip link that targets #main-content
+skipLink := core.A(
+    core.Href("#main-content"),
+    core.Class("sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:p-2 focus:bg-white focus:border"),
+    core.Text("Skip to main content"),
+)
 
-// Targets #main-content landmark
-main := document.Call("createElement", "main")
-main.Set("id", "main-content")
+// Ensure main content has the target ID
+main := core.Main(
+    core.Id("main-content"),
+    core.Attr("tabindex", "-1"),
+    // ... content
+)
 ```
 
 ## Visual Accessibility
@@ -567,4 +574,4 @@ When adding a new interactive component:
 
 ---
 
-See also: [Keyboard Shortcuts](keyboard-shortcuts.md) | [Components Reference](components.md)
+See also: [Getting Started](getting-started.md)
