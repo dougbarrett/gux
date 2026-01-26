@@ -1847,9 +1847,9 @@ func (a *%sAPI) List(callback func([]%s, error)) {
 	result := make([]%s, len(items))
 	for i, item := range items {
 		result[i] = %s{
-			ID:    item.ID,
-			Name:  item.Name,
-			Value: item.Value,
+			ID:          item.ID,
+			Name:        item.Name,
+			Description: item.Description,
 		}
 	}
 	callback(result, nil)
@@ -1867,9 +1867,9 @@ func (a *%sAPI) Get(id uint, callback func(*%s, error)) {
 		return
 	}
 	result := &%s{
-		ID:    item.ID,
-		Name:  item.Name,
-		Value: item.Value,
+		ID:          item.ID,
+		Name:        item.Name,
+		Description: item.Description,
 	}
 	callback(result, nil)
 }
@@ -1881,17 +1881,17 @@ func (a *%sAPI) Create(item *%s, callback func(*%s, error)) {
 		return
 	}
 	model := models.%s{
-		Name:  item.Name,
-		Value: item.Value,
+		Name:        item.Name,
+		Description: item.Description,
 	}
 	if err := db.Create(&model).Error; err != nil {
 		callback(nil, err)
 		return
 	}
 	result := &%s{
-		ID:    model.ID,
-		Name:  model.Name,
-		Value: model.Value,
+		ID:          model.ID,
+		Name:        model.Name,
+		Description: model.Description,
 	}
 	callback(result, nil)
 }
@@ -1908,15 +1908,15 @@ func (a *%sAPI) Update(item *%s, callback func(*%s, error)) {
 		return
 	}
 	model.Name = item.Name
-	model.Value = item.Value
+	model.Description = item.Description
 	if err := db.Save(&model).Error; err != nil {
 		callback(nil, err)
 		return
 	}
 	result := &%s{
-		ID:    model.ID,
-		Name:  model.Name,
-		Value: model.Value,
+		ID:          model.ID,
+		Name:        model.Name,
+		Description: model.Description,
 	}
 	callback(result, nil)
 }
