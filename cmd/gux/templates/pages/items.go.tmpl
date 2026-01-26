@@ -1,0 +1,117 @@
+package pages
+
+import (
+	"encoding/json"
+	"fmt"
+
+	"github.com/dougbarrett/gux/core"
+	"github.com/dougbarrett/gux/ui"
+	"{{.ModulePath}}/.gux/api"
+)
+
+// Items displays a list of items.
+func Items(r *core.Router) func() core.Node {
+	// Loader - runs on server, fetches data
+	var items []api.Item
+	r.OnLoad(func() {
+		api.Items.List(func(result []api.Item, err error) {
+			if err == nil {
+				items = result
+			}
+		})
+	})
+
+	// Component - reactive rendering
+	return func() core.Node {
+		// State for hydration - serialize items to JSON string
+		itemsJSON, _ := json.Marshal(items)
+		itemsState := r.StateString("items", string(itemsJSON))
+
+		// Deserialize items from state
+		var currentItems []api.Item
+		if itemsState.Get() != "" {
+			json.Unmarshal([]byte(itemsState.Get()), &currentItems)
+		}
+
+		return core.Div(core.Class("min-h-screen bg-gray-100 dark:bg-gray-900"),
+			core.Div(core.Class("max-w-6xl mx-auto px-4 py-8"),
+				// Header
+				core.Div(core.Class("flex justify-between items-center mb-6"),
+					core.H1(core.Class("text-3xl font-bold text-gray-900 dark:text-white"),
+						core.Text("Items"),
+					),
+					core.A(
+						core.Attrs{
+							Href:  "/items/new",
+							Class: "px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition",
+						},
+						core.Text("Add Item"),
+					),
+				),
+
+				// Table
+				ui.Table(ui.TableProps{
+					Children: []core.Node{
+						ui.Thead(ui.TheadProps{
+							Children: []core.Node{
+								ui.Tr(ui.TrProps{
+									Children: []core.Node{
+										ui.Th(ui.ThProps{Children: []core.Node{core.Text("ID")}}),
+										ui.Th(ui.ThProps{Children: []core.Node{core.Text("Name")}}),
+										ui.Th(ui.ThProps{Children: []core.Node{core.Text("Description")}}),
+									},
+								}),
+							},
+						}),
+						ui.Tbody(ui.TbodyProps{
+							Children: itemRows(currentItems),
+						}),
+					},
+				}),
+			),
+		)
+	}
+}
+
+// itemRows converts items to table rows.
+func itemRows(items []api.Item) []core.Node {
+	if len(items) == 0 {
+		return []core.Node{
+			ui.Tr(ui.TrProps{
+				Children: []core.Node{
+					ui.Td(ui.TdProps{
+						Class: "text-center text-gray-500 dark:text-gray-400 py-8",
+						Attrs: core.Attrs{
+							Colspan: "3",
+						},
+						Children: []core.Node{core.Text("No items yet")},
+					}),
+				},
+			}),
+		}
+	}
+
+	rows := make([]core.Node, len(items))
+	for i, item := range items {
+		rows[i] = ui.Tr(ui.TrProps{
+			Children: []core.Node{
+				ui.Td(ui.TdProps{
+					Children: []core.Node{
+						core.Text(fmt.Sprintf("%d", item.ID)),
+					},
+				}),
+				ui.Td(ui.TdProps{
+					Children: []core.Node{
+						core.Text(item.Name),
+					},
+				}),
+				ui.Td(ui.TdProps{
+					Children: []core.Node{
+						core.Text(item.Description),
+					},
+				}),
+			},
+		})
+	}
+	return rows
+}
