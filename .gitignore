@@ -2,6 +2,10 @@
 *.wasm
 bin/
 
+# Gux generated files
+.gux/
+guxgen/
+
 # Go
 *.exe
 *.exe~
