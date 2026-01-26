@@ -1,5 +1,9 @@
 module {{.ModulePath}}
 
-go 1.25
+go 1.24
 
-require {{.GuxModule}} {{.GuxVersion}}
+require (
+	{{.GuxModule}} {{.GuxVersion}}
+	gorm.io/driver/sqlite v1.6.0
+	gorm.io/gorm v1.31.1
+)
