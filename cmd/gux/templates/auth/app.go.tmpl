@@ -5,8 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"os"
+	"strconv"
 
 	"github.com/dougbarrett/gux/core"
 	"{{.ModulePath}}/guxgen/api"
@@ -154,5 +156,27 @@ func main() {
 	app.Routes().
 		Hybrid("/dashboard", pages.Dashboard).Protected()
 
-	app.Run(":8080")
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+	port = findAvailablePort(port)
+	app.Run(":" + port)
+}
+
+// findAvailablePort returns the given port if available, or increments until finding one
+func findAvailablePort(startPort string) string {
+	port, err := strconv.Atoi(startPort)
+	if err != nil {
+		port = 8080
+	}
+	for i := 0; i < 100; i++ {
+		addr := fmt.Sprintf(":%d", port+i)
+		ln, err := net.Listen("tcp", addr)
+		if err == nil {
+			ln.Close()
+			return strconv.Itoa(port + i)
+		}
+	}
+	return startPort // fallback to original
 }
