@@ -151,7 +151,10 @@ Full details: [milestones/v2.2-ROADMAP.md](milestones/v2.2-ROADMAP.md)
 
 **Milestone Goal:** Add `gux help <pattern>` commands that output boilerplate code for developers and LLMs working in established projects.
 
-- [ ] Phase 28: Help Pattern Commands (0/TBD plans) - All help commands with go.mod integration
+- [ ] Phase 28: Help Pattern Commands (2 plans) - All help commands with go.mod integration
+  Plans:
+  - [ ] 28-01-PLAN.md - Help command infrastructure and go.mod reading
+  - [ ] 28-02-PLAN.md - Pattern templates (page, page:list, page:form, model, dto, routes, app)
 
 Full details: [milestones/v2.3-ROADMAP.md](milestones/v2.3-ROADMAP.md)
 
@@ -189,4 +192,4 @@ Phases execute in numeric order: 1 -> 2 -> ... -> 15 -> 16 -> ... -> 23 -> 24 ->
 | 25. Documentation Updates | v2.1 | 3/3 | Complete | 2026-01-26 |
 | 26. Dependency Cleanup | v2.1 | 1/1 | Complete | 2026-01-26 |
 | 27. gux init Templates | v2.2 | 3/3 | Complete | 2026-01-26 |
-| 28. Help Pattern Commands | v2.3 | 0/TBD | Not started | - |
+| 28. Help Pattern Commands | v2.3 | 0/2 | Not started | - |
