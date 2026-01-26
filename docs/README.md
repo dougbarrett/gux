@@ -9,7 +9,6 @@ Gux enables you to write entire web applications in Go:
 - **Frontend**: Compiles to WebAssembly, runs natively in the browser
 - **Backend**: Standard Go HTTP server with generated handlers
 - **API**: Type-safe clients and servers generated from Go interfaces
-- **Components**: 45+ production-ready UI components with Tailwind CSS
 
 ## Quick Start
 
@@ -28,15 +27,14 @@ gux dev
 ## Features
 
 - **Type-Safe APIs** - Define Go interfaces, get generated clients and servers
-- **45+ Components** - Buttons, forms, tables, modals, charts, and more
-- **State Management** - Reactive stores with localStorage/sessionStorage persistence
-- **WebSocket Support** - Real-time updates with automatic reconnection
-- **PWA Ready** - Service worker and manifest included
-- **Docker Deployment** - Multi-stage Dockerfile included
+- **SSR + WASM Hydration** - Server-side rendering with client-side interactivity
+- **Reactive State** - Type-safe state management with `r.StateInt`, `r.StateString`, etc.
+- **CRUD Generation** - Automatic REST API generation with DTOs and hooks
+- **CSRF Protection** - Built-in security with automatic token handling
+- **Hot Reload Development** - Fast development cycle with `gux dev`
 
 ## Links
 
 - [Live Demo](https://gux-demo.production.app.dbb1.dev/) — Try Gux in your browser
 - [GitHub Repository](https://github.com/dougbarrett/gux)
 - [Getting Started Guide](getting-started.md)
-- [Component Library](components.md)
