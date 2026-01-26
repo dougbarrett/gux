@@ -1,0 +1,127 @@
+package pages
+
+import (
+	"github.com/dougbarrett/gux/core"
+	"github.com/dougbarrett/gux/ui"
+	"{{.ModulePath}}/.gux/api"
+)
+
+// ItemNew is the form for creating a new item.
+func ItemNew(r *core.Router) func() core.Node {
+	return func() core.Node {
+		// Form state (created inside component function)
+		nameState := r.StateString("name", "")
+		descState := r.StateString("description", "")
+		errorState := r.StateString("error", "")
+
+		// Save function
+		save := func() {
+			// Validate
+			if nameState.Get() == "" {
+				errorState.Set("Name is required")
+				return
+			}
+
+			// Create item via generated API
+			data := map[string]interface{}{
+				"name":        nameState.Get(),
+				"description": descState.Get(),
+			}
+			api.Items.Create(data, func(result *api.Item, err error) {
+				if err != nil {
+					errorState.Set(err.Error())
+				} else {
+					// Clear error and navigate to items list
+					errorState.Set("")
+					r.Navigate("/items")
+				}
+			})
+		}
+
+		// Error message node (conditional)
+		var errorNode core.Node = core.Frag()
+		if errorState.Get() != "" {
+			errorNode = ui.Alert(ui.AlertProps{
+				Variant: "destructive",
+				Children: []core.Node{
+					core.Text(errorState.Get()),
+				},
+			})
+		}
+
+		return core.Div(core.Class("min-h-screen bg-gray-100 dark:bg-gray-900"),
+			core.Div(core.Class("max-w-2xl mx-auto px-4 py-8"),
+				// Back link
+				core.A(
+					core.Attrs{
+						Href:  "/items",
+						Class: "text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 mb-4 inline-block",
+					},
+					core.Text("← Back to Items"),
+				),
+
+				// Page title
+				core.H1(core.Class("text-3xl font-bold text-gray-900 dark:text-white mb-6"),
+					core.Text("Create New Item"),
+				),
+
+				// Error message
+				errorNode,
+
+				// Form card
+				ui.Card(ui.CardProps{
+					Children: []core.Node{
+						ui.CardContent(ui.CardContentProps{
+							Children: []core.Node{
+								// Name field
+								ui.FormField(ui.FormFieldProps{
+									Label:    "Name",
+									Required: true,
+									Children: []core.Node{
+										ui.Input(ui.InputProps{
+											Type:        "text",
+											Placeholder: "Enter item name",
+											Value:       nameState.Get(),
+											OnChange: func(v string) {
+												nameState.Set(v)
+												// Clear error when user starts typing
+												if errorState.Get() != "" {
+													errorState.Set("")
+												}
+											},
+										}),
+									},
+								}),
+
+								// Description field
+								ui.FormField(ui.FormFieldProps{
+									Label: "Description",
+									Children: []core.Node{
+										ui.Textarea(ui.TextareaProps{
+											Placeholder: "Enter item description (optional)",
+											Value:       descState.Get(),
+											OnChange: func(v string) {
+												descState.Set(v)
+											},
+										}),
+									},
+								}),
+
+								// Submit button
+								core.Div(core.Class("mt-6"),
+									ui.Button(ui.ButtonProps{
+										Variant: "default",
+										OnClick: save,
+										Children: []core.Node{
+											core.Text("Create Item"),
+										},
+									}),
+								),
+							},
+						}),
+					},
+				}),
+			),
+		)
+	}
+}
