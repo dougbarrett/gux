@@ -1740,6 +1740,16 @@ import (
 // Init is a no-op in WASM (database not available).
 func Init(db interface{}) {}
 
+// getCSRFToken reads the CSRF token from the meta tag.
+func getCSRFToken() string {
+	doc := js.Global().Get("document")
+	meta := doc.Call("querySelector", "meta[name=\"csrf-token\"]")
+	if meta.IsNull() || meta.IsUndefined() {
+		return ""
+	}
+	return meta.Get("content").String()
+}
+
 // fetch makes an HTTP request and returns the response body.
 func fetch(method, url string, body []byte) ([]byte, error) {
 	done := make(chan struct{})
@@ -1751,6 +1761,14 @@ func fetch(method, url string, body []byte) ([]byte, error) {
 	jsOpts.Set("method", method)
 	headers := js.Global().Get("Object").New()
 	headers.Set("Content-Type", "application/json")
+
+	// Add CSRF token for mutating requests
+	if method == "POST" || method == "PUT" || method == "PATCH" || method == "DELETE" {
+		if token := getCSRFToken(); token != "" {
+			headers.Set("X-CSRF-Token", token)
+		}
+	}
+
 	jsOpts.Set("headers", headers)
 	if body != nil {
 		jsOpts.Set("body", string(body))

@@ -108,7 +108,7 @@ func ItemNew(r *core.Router) func() core.Node {
 								// Submit button
 								core.Div(core.Class("mt-6"),
 									ui.Button(ui.ButtonProps{
-										Variant: "default",
+										Variant: ui.ButtonPrimary,
 										OnClick: save,
 										Children: []core.Node{
 											core.Text("Create Item"),
