@@ -17,7 +17,7 @@ A full-stack Go framework for building modern web applications with WebAssembly.
 - [v2.0 Core Components](milestones/v2.0-ROADMAP.md) (Phases 16-23) - SHIPPED 2026-01-25
 - [v2.1 Dead Code Cleanup](milestones/v2.1-ROADMAP.md) (Phases 24-26) - SHIPPED 2026-01-26
 - [v2.2 gux init Modernization](milestones/v2.2-ROADMAP.md) (Phase 27) - SHIPPED 2026-01-26
-- [v2.3 gux help Patterns](milestones/v2.3-ROADMAP.md) (Phase 28) - IN PROGRESS
+- [v2.3 gux help Patterns](milestones/v2.3-ROADMAP.md) (Phase 28) - SHIPPED 2026-01-26
 
 ## Phases
 
@@ -147,16 +147,16 @@ Full details: [milestones/v2.2-ROADMAP.md](milestones/v2.2-ROADMAP.md)
 
 </details>
 
-### v2.3 gux help Patterns (In Progress)
+<details>
+<summary>v2.3 gux help Patterns (Phase 28) - SHIPPED 2026-01-26</summary>
 
 **Milestone Goal:** Add `gux help <pattern>` commands that output boilerplate code for developers and LLMs working in established projects.
 
-- [ ] Phase 28: Help Pattern Commands (2 plans) - All help commands with go.mod integration
-  Plans:
-  - [ ] 28-01-PLAN.md - Help command infrastructure and go.mod reading
-  - [ ] 28-02-PLAN.md - Pattern templates (page, page:list, page:form, model, dto, routes, app)
+- [x] Phase 28: Help Pattern Commands (2/2 plans) - completed 2026-01-26
 
 Full details: [milestones/v2.3-ROADMAP.md](milestones/v2.3-ROADMAP.md)
+
+</details>
 
 ## Progress
 
@@ -192,4 +192,4 @@ Phases execute in numeric order: 1 -> 2 -> ... -> 15 -> 16 -> ... -> 23 -> 24 ->
 | 25. Documentation Updates | v2.1 | 3/3 | Complete | 2026-01-26 |
 | 26. Dependency Cleanup | v2.1 | 1/1 | Complete | 2026-01-26 |
 | 27. gux init Templates | v2.2 | 3/3 | Complete | 2026-01-26 |
-| 28. Help Pattern Commands | v2.3 | 0/2 | Not started | - |
+| 28. Help Pattern Commands | v2.3 | 2/2 | Complete | 2026-01-26 |
