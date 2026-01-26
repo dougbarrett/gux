@@ -3,11 +3,11 @@
 ## Current Position
 
 Phase: 27 of 27 (gux init Modernization)
-Plan: 2 of 3 in phase
-Status: In progress
-Last activity: 2026-01-26 — Completed 27-02-PLAN.md
+Plan: 3 of 3 in phase
+Status: Phase complete
+Last activity: 2026-01-26 — Completed 27-03-PLAN.md
 
-Progress: ██░░░ (v2.2 in progress - 2/3 plans)
+Progress: █████ (v2.2 complete - 3/3 plans)
 
 ## Project Reference
 
@@ -43,6 +43,8 @@ Full decision log preserved in milestone archives:
 | 27-02-D1 | 27 | Use ui components (Card, Table, FormField, etc.) | Consistent styling across generated apps |
 | 27-02-D2 | 27 | State created inside inner function | Proper component lifecycle association |
 | 27-02-D3 | 27 | JSON serialization for complex state | Enables hydration of arrays and objects |
+| 27-03-D1 | 27 | Run gux gen automatically after go mod tidy | API client generated automatically, apps immediately runnable |
+| 27-03-D2 | 27 | Remove old templates completely | Only modern apps can be generated, no maintenance burden |
 
 ### Research Findings
 
@@ -65,9 +67,9 @@ v2.0 Tech Debt:
 ## Session Continuity
 
 Last session: 2026-01-26
-Stopped at: Completed 27-02-PLAN.md
+Stopped at: Completed 27-03-PLAN.md (Phase 27 complete)
 Resume file: None
 
 ---
 
-*Last updated: 2026-01-26 after completing plan 27-02*
+*Last updated: 2026-01-26 after completing plan 27-03*
