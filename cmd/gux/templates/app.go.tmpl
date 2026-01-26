@@ -1,0 +1,43 @@
+package main
+
+import (
+	"log"
+
+	"github.com/dougbarrett/gux/core"
+	"{{.ModulePath}}/.gux/api"
+	"{{.ModulePath}}/models"
+	"{{.ModulePath}}/pages"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
+)
+
+func main() {
+	// Set up database
+	db, err := gorm.Open(sqlite.Open("app.db"), &gorm.Config{})
+	if err != nil {
+		log.Fatal("Failed to connect database:", err)
+	}
+
+	// Auto-migrate models
+	db.AutoMigrate(&models.Item{})
+
+	// Initialize API with database for server-side queries
+	api.Init(db)
+
+	app := core.New()
+	app.SetDB(db)
+	app.SetTitle("{{.AppName}}")
+
+	// Register CRUD for Item model
+	// Creates: GET/POST /__gux_api/crud/items
+	//          GET/PUT/DELETE /__gux_api/crud/items/:id
+	app.CRUD(models.Item{})
+
+	// Register routes
+	app.Routes().
+		Hybrid("/", pages.Home).
+		Hybrid("/items", pages.Items).
+		Hybrid("/items/new", pages.ItemNew)
+
+	app.Run(":8080")
+}
