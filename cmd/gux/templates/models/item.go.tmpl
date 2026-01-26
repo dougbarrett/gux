@@ -1,0 +1,10 @@
+package models
+
+import "gorm.io/gorm"
+
+// Item is an example model demonstrating GORM integration
+type Item struct {
+	gorm.Model
+	Name        string `json:"name"`
+	Description string `json:"description"`
+}
