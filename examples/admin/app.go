@@ -36,6 +36,7 @@ func main() {
 	app := core.New()
 	app.SetDB(db)
 	app.SetTitle("Admin Panel")
+	app.DarkMode() // Enable dark mode for Tailwind dark: variants
 
 	// Register CRUD for User model
 	// Creates: GET/POST /__gux_api/crud/users
@@ -50,6 +51,7 @@ func main() {
 	//          GET /__gux_api/crud/activitylogs/:id
 	app.CRUD(models.ActivityLog{},
 		core.WithListDTO(dto.ActivityLogList{}),
+		core.WithDetailDTO(dto.ActivityLogList{}),
 	)
 
 	// Register routes (single bundle)

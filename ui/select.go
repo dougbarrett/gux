@@ -3,8 +3,7 @@ package ui
 import "github.com/dougbarrett/gux/core"
 
 // selectBaseClasses are the common classes applied to all select elements.
-// Includes extra right padding for the dropdown arrow.
-const selectBaseClasses = inputBaseClasses + " appearance-none pr-10"
+const selectBaseClasses = inputBaseClasses + " appearance-none"
 
 // SelectOption represents a single option in a select dropdown.
 type SelectOption struct {
@@ -51,9 +50,11 @@ func Select(props SelectProps) core.Node {
 	}
 
 	// Build class string
+	// Note: pr-10 must come after size classes to prevent px-* from overriding
 	class := MergeClasses(
 		selectBaseClasses,
 		inputSizeClasses[size],
+		"pr-10", // Arrow padding - must be after size classes
 		ConditionalClass(props.Error != "", inputErrorClasses),
 		ConditionalClass(props.Disabled, inputDisabledClasses),
 		props.Class,

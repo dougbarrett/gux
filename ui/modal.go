@@ -66,14 +66,16 @@ func Modal(props ModalProps) core.Node {
 	}
 
 	// Overlay - covers entire screen, hidden when closed
+	// Use conditional flex to avoid CSS specificity issues with hidden
 	overlayClass := MergeClasses(
-		"fixed inset-0 bg-black/50 flex items-center justify-center z-50",
+		"fixed inset-0 bg-black/50 items-center justify-center z-50",
+		ConditionalClass(props.Open, "flex"),
 		ConditionalClass(!props.Open, "hidden"),
 	)
 
 	// Modal container
 	modalClass := MergeClasses(
-		"bg-white dark:bg-gray-800 rounded-lg shadow-xl max-h-[90vh] flex flex-col",
+		"bg-white dark:bg-gray-800 rounded-lg shadow-2xl border border-gray-200 dark:border-gray-600 max-h-[90vh] flex flex-col",
 		modalSizeClasses[size],
 		props.Class,
 	)

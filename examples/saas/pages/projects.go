@@ -32,7 +32,7 @@ func Projects(r *core.Router) func() core.Node {
 		var displayProjects []dto.ProjectList
 		json.Unmarshal([]byte(projectsState.Get()), &displayProjects)
 
-		return DashboardLayout(
+		return DashboardLayout(r, "/projects",
 			core.H1(core.Class("text-3xl font-bold text-white mb-8"),
 				core.Text("Projects"),
 			),

@@ -181,6 +181,29 @@ app.EnableCSRF(core.CSRFConfig{...})  // Custom configuration
 
 **Transparency**: Developers don't need to handle CSRF manually - it's automatic.
 
+## Testing Examples
+
+**IMPORTANT**: When testing or running example apps, ALWAYS use `gux dev`:
+
+```bash
+cd examples/marketing
+gux dev   # Builds WASM, generates Tailwind CSS, and runs with hot reload
+```
+
+**DO NOT** use `go build` or `go run` directly - these will not generate the required assets (WASM, CSS) and the app will not render correctly.
+
+If something appears broken (missing styles, assets not loading):
+```bash
+gux clean   # Removes .gux/ directory and generated files
+gux dev     # Fresh build with all assets
+```
+
+**Example Ports**:
+- Auth: 8082
+- Marketing: 8083
+- SaaS: 8082 (run separately from Auth)
+- Admin: 8084
+
 ## Development Notes
 
 - **core/** is the low-level universal rendering system (focus of current development)

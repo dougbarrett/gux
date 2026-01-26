@@ -49,6 +49,7 @@ func main() {
 	app := core.New()
 	app.SetDB(db)
 	app.SetTitle("SaaS Dashboard")
+	app.DarkMode() // Enable dark mode for Tailwind dark: variants
 
 	// Register CRUD for Project model
 	// Creates: GET/POST /__gux_api/crud/projects

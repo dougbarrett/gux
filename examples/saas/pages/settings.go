@@ -10,7 +10,7 @@ func Settings(r *core.Router) func() core.Node {
 	return func() core.Node {
 		activeTab := r.StateInt("activeTab", 0)
 
-		return DashboardLayout(
+		return DashboardLayout(r, "/settings",
 			core.H1(core.Class("text-3xl font-bold text-white mb-8"),
 				core.Text("Settings"),
 			),

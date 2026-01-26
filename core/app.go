@@ -33,6 +33,7 @@ type App struct {
 	db          interface{} // Database connection (e.g., *gorm.DB)
 	crudModels  []CRUDModel // Registered CRUD models
 	csrfConfig  CSRFConfig  // CSRF protection configuration
+	darkMode    bool        // Enable dark mode (adds class="dark" to html element)
 }
 
 // Default assets (set by generated code)
@@ -128,6 +129,13 @@ func (a *App) SetAssets(wasmBinary, wasmExecJS []byte) {
 // SetTitle sets the page title.
 func (a *App) SetTitle(title string) {
 	a.title = title
+}
+
+// DarkMode enables dark mode for the application.
+// This adds class="dark" to the html element, activating Tailwind dark mode variants.
+func (a *App) DarkMode() *App {
+	a.darkMode = true
+	return a
 }
 
 // RouteBuilder provides methods for registering routes.
@@ -407,15 +415,22 @@ func (a *App) Run(addr string) error {
 					csrfMeta = fmt.Sprintf(`<meta name="%s" content="%s">`, CSRFMetaName, csrfToken)
 				}
 
+				// Build dark mode class
+				htmlClass := ""
+				if a.darkMode {
+					htmlClass = ` class="dark"`
+				}
+
 				if route.Hybrid && hasWasm {
 					// Serialize state for hydration
 					stateJSON, _ := json.Marshal(router.state)
 
 					// Include WASM loader for hydration
 					fmt.Fprintf(w, `<!DOCTYPE html>
-<html>
+<html%s>
 <head>
     <title>%s</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     %s
     <link rel="stylesheet" href="/styles.css">
 </head>
@@ -429,20 +444,21 @@ func (a *App) Run(addr string) error {
             .then(result => go.run(result.instance));
     </script>%s
 </body>
-</html>`, a.title, csrfMeta, html, stateJSON, wasmPath, hotReloadScript)
+</html>`, htmlClass, a.title, csrfMeta, html, stateJSON, wasmPath, hotReloadScript)
 				} else {
 					// SSR only, no WASM
 					fmt.Fprintf(w, `<!DOCTYPE html>
-<html>
+<html%s>
 <head>
     <title>%s</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     %s
     <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
     <div id="app">%s</div>%s
 </body>
-</html>`, a.title, csrfMeta, html, hotReloadScript)
+</html>`, htmlClass, a.title, csrfMeta, html, hotReloadScript)
 				}
 				return
 			}

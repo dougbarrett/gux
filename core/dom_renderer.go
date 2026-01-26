@@ -8,13 +8,59 @@ import (
 
 var document = js.Global().Get("document")
 
+// SVG namespace URI
+const svgNamespace = "http://www.w3.org/2000/svg"
+
+// svgElements contains tags that should be created in the SVG namespace
+var svgElements = map[string]bool{
+	"svg":            true,
+	"path":           true,
+	"circle":         true,
+	"rect":           true,
+	"line":           true,
+	"polygon":        true,
+	"polyline":       true,
+	"ellipse":        true,
+	"g":              true,
+	"defs":           true,
+	"use":            true,
+	"text":           true,
+	"tspan":          true,
+	"clipPath":       true,
+	"mask":           true,
+	"linearGradient": true,
+	"radialGradient": true,
+	"stop":           true,
+	"symbol":         true,
+	"marker":         true,
+	"pattern":        true,
+	"filter":         true,
+	"feBlend":        true,
+	"feColorMatrix":  true,
+	"feGaussianBlur": true,
+	"feOffset":       true,
+	"feMerge":        true,
+	"feMergeNode":    true,
+	"animate":        true,
+	"animateMotion":  true,
+	"animateTransform": true,
+	"foreignObject":  true,
+}
+
 // DOMRenderer renders nodes to DOM elements.
 // Used for client-side WASM rendering.
-type DOMRenderer struct{}
+type DOMRenderer struct {
+	inSVG bool // Track if we're inside an SVG element
+}
 
 // DOM returns a new DOMRenderer.
 func DOM() *DOMRenderer {
-	return &DOMRenderer{}
+	return &DOMRenderer{inSVG: false}
+}
+
+// withSVGContext returns a new renderer that's in SVG context
+func (r *DOMRenderer) withSVGContext() *DOMRenderer {
+	return &DOMRenderer{inSVG: true}
 }
 
 func (r *DOMRenderer) RenderText(content string) RenderResult {
@@ -23,7 +69,19 @@ func (r *DOMRenderer) RenderText(content string) RenderResult {
 }
 
 func (r *DOMRenderer) RenderElement(tag string, attrs Attrs, children []Node) RenderResult {
-	el := document.Call("createElement", tag)
+	// Debug: track all tags
+	js.Global().Set("__lastTag", tag)
+
+	// Determine if this element should be in SVG namespace
+	isSVGElement := svgElements[tag] || r.inSVG
+
+	var el js.Value
+	if isSVGElement {
+		js.Global().Set("__svgCreated", tag)
+		el = document.Call("createElementNS", svgNamespace, tag)
+	} else {
+		el = document.Call("createElement", tag)
+	}
 
 	// Set attributes
 	setAttr := func(name, value string) {
@@ -109,8 +167,17 @@ func (r *DOMRenderer) RenderElement(tag string, attrs Attrs, children []Node) Re
 	}
 
 	// Render and append children
+	// Use SVG context for children if we're inside an SVG element
+	childRenderer := r
+	if isSVGElement && !r.inSVG {
+		childRenderer = r.withSVGContext()
+	}
+
 	for _, child := range children {
-		result := child.Render(r)
+		if child == nil {
+			continue
+		}
+		result := child.Render(childRenderer)
 		if domVal := result.DOMValue(); domVal != nil {
 			el.Call("appendChild", domVal.(js.Value))
 		}
@@ -122,6 +189,9 @@ func (r *DOMRenderer) RenderElement(tag string, attrs Attrs, children []Node) Re
 func (r *DOMRenderer) RenderFragment(children []Node) RenderResult {
 	fragment := document.Call("createDocumentFragment")
 	for _, child := range children {
+		if child == nil {
+			continue
+		}
 		result := child.Render(r)
 		if domVal := result.DOMValue(); domVal != nil {
 			fragment.Call("appendChild", domVal.(js.Value))

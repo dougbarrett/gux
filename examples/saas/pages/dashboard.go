@@ -27,7 +27,7 @@ func Dashboard(r *core.Router) func() core.Node {
 		active := r.StateInt("activeProjects", activeProjects)
 		completed := r.StateInt("completedProjects", completedProjects)
 
-		return DashboardLayout(
+		return DashboardLayout(r, "/",
 			core.H1(core.Class("text-3xl font-bold text-white mb-8"),
 				core.Text("Dashboard"),
 			),

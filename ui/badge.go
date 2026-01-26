@@ -28,7 +28,7 @@ var badgeVariantClasses = map[BadgeVariant]string{
 }
 
 // badgeBaseClasses are the common classes applied to all badges.
-const badgeBaseClasses = "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
+const badgeBaseClasses = "inline-flex items-center px-3 py-1 rounded-full text-xs font-medium"
 
 // Badge creates a badge component for status indicators.
 //

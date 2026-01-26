@@ -58,7 +58,7 @@ func ProjectNew(r *core.Router) func() core.Node {
 			})
 		}
 
-		return DashboardLayout(
+		return DashboardLayout(r, "/projects",
 			// Back link
 			core.A(
 				core.Attrs{Href: "/projects", Class: "text-blue-400 hover:text-blue-300 mb-4 inline-block"},

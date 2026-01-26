@@ -39,7 +39,7 @@ func ProjectEdit(r *core.Router) func() core.Node {
 		json.Unmarshal([]byte(projectState.Get()), &displayProject)
 
 		if displayProject == nil {
-			return DashboardLayout(
+			return DashboardLayout(r, "/projects",
 				core.Div(core.Class("text-white text-center py-12"),
 					core.Text("Project not found"),
 				),
@@ -91,7 +91,7 @@ func ProjectEdit(r *core.Router) func() core.Node {
 			})
 		}
 
-		return DashboardLayout(
+		return DashboardLayout(r, "/projects",
 			// Back link
 			core.A(
 				core.Attrs{Href: fmt.Sprintf("/projects/%d", displayProject.ID), Class: "text-blue-400 hover:text-blue-300 mb-4 inline-block"},

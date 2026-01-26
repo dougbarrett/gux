@@ -1,0 +1,12 @@
+@import "tailwindcss";
+
+/* Enable class-based dark mode (requires class="dark" on html element) */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Include gux/ui component classes */
+@source "./safelist.html";
+
+/* Scan Go files for Tailwind classes */
+@source "./pages/**/*.go";
+@source "./components/**/*.go";
+@source "./*.go";

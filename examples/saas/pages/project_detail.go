@@ -42,14 +42,14 @@ func ProjectDetail(r *core.Router) func() core.Node {
 		deleteModalOpen := r.StateBool("deleteModal", false)
 
 		if displayProject == nil {
-			return DashboardLayout(
+			return DashboardLayout(r, "/projects",
 				core.Div(core.Class("text-white text-center py-12"),
 					core.Text("Project not found"),
 				),
 			)
 		}
 
-		return DashboardLayout(
+		return DashboardLayout(r, "/projects",
 			// Back link
 			core.A(
 				core.Attrs{Href: "/projects", Class: "text-blue-400 hover:text-blue-300 mb-4 inline-block"},

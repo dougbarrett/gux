@@ -27,7 +27,7 @@ func Profile(r *core.Router) func() core.Node {
 		successState := r.StateString("success", "")
 		errorState := r.StateString("error", "")
 
-		return DashboardLayout(
+		return DashboardLayout(r, "/profile",
 			core.H1(core.Class("text-3xl font-bold text-white mb-8"),
 				core.Text("Profile"),
 			),

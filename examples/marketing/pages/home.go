@@ -14,10 +14,10 @@ func Home(r *core.Router) func() core.Node {
 				"Build Products People Love",
 				"The modern platform for teams who ship fast. Start free, scale infinitely.",
 				ui.Button(ui.ButtonProps{
-					Variant: ui.ButtonPrimary,
+					Variant: ui.ButtonGhost,
 					Size:    ui.ButtonLG,
 					OnClick: func() { r.Navigate("/pricing") },
-					Class:   "bg-white text-blue-600 hover:bg-gray-100",
+					Class:   "bg-white text-blue-600 hover:bg-gray-100 font-semibold",
 					Children: []core.Node{
 						core.Text("Start Free Trial"),
 					},

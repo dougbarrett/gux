@@ -2181,6 +2181,9 @@ func generateTailwindConfig() error {
 	// Generate input.css for Tailwind v4+
 	// Uses @source directive to scan Go files for class names
 	inputCSS := fmt.Sprintf(`@import "tailwindcss";
+
+/* Enable class-based dark mode (requires class="dark" on html element) */
+@custom-variant dark (&:where(.dark, .dark *));
 %s
 /* Scan Go files for Tailwind classes */
 @source "./pages/**/*.go";

@@ -73,6 +73,9 @@ func (r *HTMLRenderer) RenderElement(tag string, attrs Attrs, children []Node) R
 
 	// Render children
 	for _, child := range children {
+		if child == nil {
+			continue
+		}
 		result := child.Render(r)
 		b.WriteString(result.HTML())
 	}
@@ -87,6 +90,9 @@ func (r *HTMLRenderer) RenderElement(tag string, attrs Attrs, children []Node) R
 func (r *HTMLRenderer) RenderFragment(children []Node) RenderResult {
 	var b strings.Builder
 	for _, child := range children {
+		if child == nil {
+			continue
+		}
 		result := child.Render(r)
 		b.WriteString(result.HTML())
 	}

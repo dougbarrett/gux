@@ -41,13 +41,12 @@ func (a *UsersAPI) List(callback func([]dto.UserList, error)) {
 	result := make([]dto.UserList, len(items))
 	for i, item := range items {
 		result[i] = dto.UserList{
-			ID:          item.ID,
-			Email:       item.Email,
-			Name:        item.Name,
-			Role:        item.Role,
-			Status:      item.Status,
-			LastLoginAt: item.LastLoginAt,
-			CreatedAt:   item.CreatedAt,
+			ID: item.ID,
+			Email: item.Email,
+			Name: item.Name,
+			Role: item.Role,
+			Status: item.Status,
+			CreatedAt: item.CreatedAt,
 		}
 	}
 	callback(result, nil)
@@ -65,14 +64,13 @@ func (a *UsersAPI) Get(id uint, callback func(*dto.UserDetail, error)) {
 		return
 	}
 	result := &dto.UserDetail{
-		ID:          item.ID,
-		Email:       item.Email,
-		Name:        item.Name,
-		Role:        item.Role,
-		Status:      item.Status,
-		LastLoginAt: item.LastLoginAt,
-		CreatedAt:   item.CreatedAt,
-		UpdatedAt:   item.UpdatedAt,
+			ID: item.ID,
+			Email: item.Email,
+			Name: item.Name,
+			Role: item.Role,
+			Status: item.Status,
+			CreatedAt: item.CreatedAt,
+			UpdatedAt: item.UpdatedAt,
 	}
 	callback(result, nil)
 }
@@ -109,26 +107,19 @@ func (a *ActivityLogsAPI) List(callback func([]dto.ActivityLogList, error)) {
 		return
 	}
 	var items []models.ActivityLog
-	if err := db.Preload("User").Order("created_at DESC").Find(&items).Error; err != nil {
+	if err := db.Find(&items).Error; err != nil {
 		callback(nil, err)
 		return
 	}
 	// Convert to DTOs using field mappings from gux tags
 	result := make([]dto.ActivityLogList, len(items))
 	for i, item := range items {
-		var userName string
-		if item.User != nil {
-			userName = item.User.Name
-		}
 		result[i] = dto.ActivityLogList{
-			ID:          item.ID,
-			UserID:      item.UserID,
-			UserName:    userName,
-			Action:      item.Action,
-			Entity:      item.Entity,
-			EntityID:    item.EntityID,
+			ID: item.ID,
+			Action: item.Action,
+			Entity: item.Entity,
 			Description: item.Description,
-			CreatedAt:   item.CreatedAt,
+			CreatedAt: item.CreatedAt,
 		}
 	}
 	callback(result, nil)
@@ -141,23 +132,36 @@ func (a *ActivityLogsAPI) Get(id uint, callback func(*dto.ActivityLogList, error
 		return
 	}
 	var item models.ActivityLog
-	if err := db.Preload("User").First(&item, id).Error; err != nil {
+	if err := db.First(&item, id).Error; err != nil {
 		callback(nil, err)
 		return
 	}
-	var userName string
-	if item.User != nil {
-		userName = item.User.Name
-	}
 	result := &dto.ActivityLogList{
-		ID:          item.ID,
-		UserID:      item.UserID,
-		UserName:    userName,
-		Action:      item.Action,
-		Entity:      item.Entity,
-		EntityID:    item.EntityID,
-		Description: item.Description,
-		CreatedAt:   item.CreatedAt,
+			ID: item.ID,
+			Action: item.Action,
+			Entity: item.Entity,
+			Description: item.Description,
+			CreatedAt: item.CreatedAt,
 	}
 	callback(result, nil)
 }
+
+// Create creates a new ActivityLog (server-side stub - actual creation handled by CRUD endpoint).
+func (a *ActivityLogsAPI) Create(data map[string]interface{}, callback func(*dto.ActivityLogList, error)) {
+	// Server-side: this is typically not called directly
+	// The CRUD endpoint handles creation with hooks
+	callback(nil, nil)
+}
+
+// Update updates an existing ActivityLog (server-side stub).
+func (a *ActivityLogsAPI) Update(id uint, data map[string]interface{}, callback func(*dto.ActivityLogList, error)) {
+	// Server-side: this is typically not called directly
+	callback(nil, nil)
+}
+
+// Delete deletes a ActivityLog by ID (server-side stub).
+func (a *ActivityLogsAPI) Delete(id uint, callback func(error)) {
+	// Server-side: this is typically not called directly
+	callback(nil)
+}
+
