@@ -1,5 +1,55 @@
 # Project Milestones: Gux Framework
 
+## v2.3 gux help Patterns (Shipped: 2026-01-26)
+
+**Delivered:** Added `gux help <pattern>` commands that output boilerplate code for developers and LLMs working in established gux projects.
+
+**Phases completed:** 28 (2 plans total)
+
+**Key accomplishments:**
+- Created `gux help` command showing all 7 available patterns
+- Added page, page:list, page:form, model, dto, routes, and app pattern templates
+- Integrated go.mod parsing for automatic module path substitution in output
+- Split `gux help` (patterns) from `gux -h` (usage) for better UX
+- All output is valid, copy-pasteable Go code with file path headers
+
+**Stats:**
+- 13 files changed
+- ~2,000 lines added
+- 1 phase, 2 plans, 6 tasks
+- 1 day (2026-01-26)
+
+**Git range:** `docs(28): milestone start` → `docs(28): complete help pattern commands phase`
+
+**What's next:** TBD — next milestone planning
+
+---
+
+## v2.2 gux init Modernization (Shipped: 2026-01-26)
+
+**Delivered:** Updated `gux init` to scaffold working apps using the modern `core/` framework instead of the deleted `components/` package.
+
+**Phases completed:** 27 (3 plans total)
+
+**Key accomplishments:**
+- Created new app.go template using core.New() with DB, CRUD, routes
+- Added modern page templates demonstrating OnLoad, state, and API patterns
+- Removed all old templates that used deleted components/ package
+- Integrated automatic `gux gen` call after scaffolding
+- `gux init myapp && cd myapp && gux dev` works out of the box
+
+**Stats:**
+- 15 files changed
+- ~1,200 lines modified
+- 1 phase, 3 plans
+- 1 day (2026-01-26)
+
+**Git range:** `docs(27): milestone start` → `docs(27): complete gux init templates phase`
+
+**What's next:** v2.3 gux help Patterns
+
+---
+
 ## v2.1 Dead Code Cleanup (Shipped: 2026-01-26)
 
 **Delivered:** Removed all dead code from pre-v2.0 architecture (66 Go files, 17,135 lines), updated documentation, and cleaned up dependencies.

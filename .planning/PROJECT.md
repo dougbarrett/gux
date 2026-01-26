@@ -33,20 +33,13 @@ Developers can build complete web applications in Go — from marketing sites to
 - ✓ Dead code removal (components/, auth/, storage/, state/, ws/) — v2.1
 - ✓ Documentation cleanup (removed stale references, updated core docs) — v2.1
 - ✓ Dependency cleanup (removed gorilla/websocket) — v2.1
+- ✓ Updated `gux init` to use modern core/ framework — v2.2
+- ✓ Added `gux help <pattern>` commands for 7 common patterns — v2.3
+- ✓ go.mod parsing for automatic module path substitution — v2.3
 
 ### Active
 
-<!-- Current scope: v2.3 gux help Patterns -->
-
-- [ ] Add `gux help page` command — basic page structure with OnLoad
-- [ ] Add `gux help page:list` command — list page with API call, table
-- [ ] Add `gux help page:form` command — form page with state, validation
-- [ ] Add `gux help model` command — GORM model template
-- [ ] Add `gux help dto` command — DTO struct with gux tags
-- [ ] Add `gux help routes` command — route registration with CRUD
-- [ ] Add `gux help app` command — full app.go setup
-- [ ] Read go.mod to detect module path for import replacement
-- [ ] Output includes file path header comment
+<!-- No active requirements — milestone complete, awaiting next milestone definition -->
 
 ### Out of Scope
 
@@ -62,13 +55,13 @@ Developers can build complete web applications in Go — from marketing sites to
 
 ## Context
 
-### Current State (v2.2)
+### Current State (v2.3)
 
-Starting v2.2 gux init Modernization. Previous milestone shipped v2.1 Dead Code Cleanup. Codebase is clean:
+Completed v2.3 gux help Patterns. Codebase is clean with full CLI tooling:
 - **core/**: Universal rendering, routing, CRUD, CSRF (~3,500 LOC)
 - **ui/**: 49 component files (~9,700 LOC)
 - **examples/**: 5 apps (minimal, auth, marketing, saas, admin) (~6,400 LOC)
-- **Dead code removed:** 66 Go files (17,135 lines), 5 doc files (4,007 lines)
+- **cmd/gux/**: CLI with dev, build, gen, init, help commands (~29,400 LOC total Go)
 
 ### Tech Stack
 
@@ -83,7 +76,6 @@ Starting v2.2 gux init Modernization. Previous milestone shipped v2.1 Dead Code 
 - 6 P0 components not implemented (Spinner, Progress, Skeleton, Breadcrumb, ButtonGroup, IconButton)
 - No OAuth/2FA support yet
 - No real-time features yet
-- **gux init broken**: Templates use deleted components/ package (fixed in v2.2)
 
 ## Constraints
 
@@ -105,21 +97,21 @@ Starting v2.2 gux init Modernization. Previous milestone shipped v2.1 Dead Code 
 | Props structs for all components | Type safety, no interface{} | Good - clean API |
 | CSS-driven visibility for overlays | SSR compatibility without JS state | Good - hydration-safe |
 
-## Current Milestone: v2.3 gux help Patterns
+## Current State
 
-**Goal:** Add `gux help <pattern>` commands that output boilerplate code for developers and LLMs working in established projects.
+**Latest shipped:** v2.3 gux help Patterns (2026-01-26)
 
-**Target features:**
-- `gux help page` — basic page structure with OnLoad
-- `gux help page:list` — list page with API call, table display
-- `gux help page:form` — form page with state, validation, submission
-- `gux help model` — GORM model with common fields
-- `gux help dto` — DTO struct with gux tags
-- `gux help routes` — route registration with CRUD
-- `gux help app` — full app.go setup
-- Read go.mod to replace import path placeholders with actual module path
-- Output includes file path header (e.g., `// pages/items.go`)
+**Milestone history:**
+- v1.0 UX Polish — 6 phases, 17 plans
+- v1.1 Accessibility — 5 phases, 16 plans
+- v1.2 Documentation — 4 phases, 4 plans
+- v2.0 Core Components — 8 phases, 25 plans
+- v2.1 Dead Code Cleanup — 3 phases, 5 plans
+- v2.2 gux init Modernization — 1 phase, 3 plans
+- v2.3 gux help Patterns — 1 phase, 2 plans
+
+**Total:** 28 phases, 72 plans shipped
 
 ---
 
-*Last updated: 2026-01-26 after starting v2.3 milestone*
+*Last updated: 2026-01-26 after v2.3 milestone completion*
