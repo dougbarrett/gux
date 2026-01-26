@@ -74,8 +74,6 @@ goquery/
 │   ├── dom_renderer.go     # WASM DOM rendering
 │   └── router_*.go         # Platform-specific routing
 ├── fetch/                   # WASM HTTP client with auto CSRF
-├── components/             # Pre-built UI components (Gux library)
-├── state/                  # State management utilities
 ├── api/                    # API utilities & error types
 ├── server/                 # Server middleware
 ├── cmd/gux/               # CLI tool
@@ -207,7 +205,6 @@ gux dev     # Fresh build with all assets
 ## Development Notes
 
 - **core/** is the low-level universal rendering system (focus of current development)
-- **components/** contains the pre-built Gux component library (separate from core)
 - Always use `core.OnLoad()` for data fetching to support hydration
 - DTOs should exclude sensitive fields (passwords, internal IDs)
 - Use `core.External: true` in Attrs for links that cross bundle boundaries
