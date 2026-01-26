@@ -177,7 +177,7 @@ api.WithBasePath(path string)
 api.WithHeader(key, value string)
 
 // Dynamic auth token injection (called on each request)
-api.WithAuthProvider(func() string { return "Bearer " + auth.GetToken() })
+api.WithAuthProvider(func() string { return "Bearer " + getAuthToken() })
 ```
 
 ### Dynamic Authentication
@@ -187,7 +187,8 @@ For applications with token refresh, use `WithAuthProvider` to inject auth heade
 ```go
 client := api.NewPostsClient(
     api.WithAuthProvider(func() string {
-        token := auth.GetToken()
+        // Get token from your auth system
+        token := getAuthToken()
         if token == "" {
             return ""
         }
@@ -295,7 +296,7 @@ The generated client returns errors for:
 post, err := client.GetByID(999)
 if err != nil {
     // Handle error
-    components.Toast(err.Error(), components.ToastError)
+    log.Println("Error:", err)
 }
 ```
 

@@ -12,13 +12,9 @@ A full-stack Go framework for building modern web applications with WebAssembly.
 ## Features
 
 - **Type-Safe API Generation** — Define Go interfaces, generate HTTP clients and server handlers automatically
-- **45+ UI Components** — Forms, layouts, data display, feedback, and charts with Tailwind CSS
-- **WCAG 2.1 AA Accessible** — Screen reader support, keyboard navigation, focus management
-- **Command Palette** — Quick actions with Cmd/Ctrl+K
-- **Data Export** — CSV, JSON, and PDF export for tables
-- **Reactive State Management** — Generic stores, persistence, async loading, and SWR-style query caching
-- **WebSocket Support** — Type-safe real-time communication with automatic reconnection
-- **PWA Ready** — Installable with offline support
+- **Universal Rendering** — SSR + WASM hydration with the core framework
+- **CRUD API Generation** — Automatic REST endpoints from GORM models with DTOs
+- **CSRF Protection** — Automatic Double Submit Cookie pattern for all mutations
 - **Server Utilities** — Middleware composition, SPA handler, CORS, logging, and error handling
 - **Go-Powered Frontend** — Compile to WebAssembly, run natively in the browser
 
@@ -116,47 +112,12 @@ This scans the `api/` directory and generates:
 
 ### 3. Build Your Frontend
 
-```go
-//go:build js && wasm
-package main
+See the [examples/minimal](examples/minimal) directory for a complete reference implementation with:
 
-import (
-    "yourapp/api"
-    "github.com/dougbarrett/gux/components"
-)
-
-func main() {
-    components.LoadTailwind()
-    components.InitToasts()
-
-    // Type-safe API client
-    posts := api.NewPostsClient()
-
-    // Build reactive UI
-    app := components.NewApp("#app")
-    app.Mount(
-        components.Layout(components.LayoutProps{
-            Sidebar: components.SidebarProps{
-                Title: "My App",
-                Items: []components.NavItem{
-                    {Label: "Dashboard", Path: "/", Icon: "home"},
-                    {Label: "Posts", Path: "/posts", Icon: "file-text"},
-                },
-            },
-        }),
-    )
-
-    // Fetch and display
-    allPosts, err := posts.GetAll()
-    if err != nil {
-        components.Toast(err.Error(), components.ToastError)
-        return
-    }
-
-    // Use posts...
-    select {} // Keep WASM running
-}
-```
+- **Hybrid rendering** — SSR + WASM hydration
+- **Route groups** — Public and admin routes with separate WASM bundles
+- **CRUD with DTOs** — Users and Posts with secure field filtering
+- **State management** — Server-side data loading with client hydration
 
 ### 4. Compile to WebAssembly
 
@@ -208,229 +169,69 @@ func main() {
 |-------|-------------|
 | [Getting Started](docs/getting-started.md) | Installation, setup, and first app |
 | [API Generation](docs/api-generation.md) | Code generation annotations and usage |
-| [Components](docs/components.md) | Complete UI component reference |
-| [State Management](docs/state-management.md) | Stores, persistence, and async data |
-| [WebSocket](docs/websocket.md) | Real-time communication patterns |
+| [Templates](docs/templates.md) | Page templates and patterns |
 | [Server Utilities](docs/server.md) | Middleware and backend helpers |
-| [Keyboard Shortcuts](docs/keyboard-shortcuts.md) | Complete keyboard navigation reference |
-| [Accessibility](docs/accessibility.md) | ARIA patterns and a11y guidelines |
 | [Deployment](docs/deployment.md) | Docker and production setup |
 
-## Component Library
+## Core Framework
 
-Gux includes 45+ production-ready UI components:
+The `core/` package provides universal rendering that works identically on server (SSR) and client (WASM):
 
-### Forms
 ```go
-// Text input with validation
-input := components.Input(components.InputProps{
-    Label:       "Email",
-    Type:        components.InputEmail,
-    Placeholder: "you@example.com",
-    OnChange:    func(value string) { /* validate */ },
-})
+import "github.com/dougbarrett/gux/core"
 
-// Dynamic form builder
-form := components.NewFormBuilder(components.FormBuilderProps{
-    Fields: []components.BuilderField{
-        {Name: "email", Type: components.BuilderFieldEmail, Label: "Email",
-         Rules: []components.ValidationRule{components.Required, components.Email}},
-        {Name: "password", Type: components.BuilderFieldPassword, Label: "Password",
-         Rules: []components.ValidationRule{components.Required, components.MinLength(8)}},
-    },
-    OnSubmit: func(values map[string]string) { /* handle */ },
-})
+func MyPage(r *core.Router) func() core.Node {
+    // Loader: runs on server for SSR, via API for client navigation
+    var items []Item
+    r.OnLoad(func() {
+        // Fetch data
+    })
+
+    // Component: returns UI, re-runs on state changes
+    return func() core.Node {
+        count := r.StateInt("count", 0)
+
+        return core.Div(core.Class("container"),
+            core.H1(core.Attrs{}, core.Text("Items")),
+            core.Button(core.Attrs{
+                OnClick: func() { count.Set(count.Get() + 1) },
+            }, core.Text("Increment")),
+        )
+    }
+}
 ```
 
-### Data Display
-```go
-// Interactive table
-table := components.Table(components.TableProps{
-    Columns: []components.TableColumn{
-        {Header: "Name", Key: "name"},
-        {Header: "Status", Key: "status", Render: func(row map[string]any) js.Value {
-            return components.Badge(components.BadgeProps{
-                Text: row["status"].(string),
-                Variant: components.BadgeSuccess,
-            })
-        }},
-    },
-    Data:       tableData,
-    Striped:    true,
-    OnRowClick: func(row map[string]any) { /* handle */ },
-})
-
-// Charts
-chart := components.BarChart(components.ChartProps{
-    Data: []components.ChartData{
-        {Label: "Jan", Value: 100},
-        {Label: "Feb", Value: 150},
-        {Label: "Mar", Value: 120},
-    },
-    Height:     200,
-    ShowValues: true,
-})
-```
-
-### Feedback
-```go
-// Toast notifications
-components.Toast("Post created!", components.ToastSuccess)
-
-// Modal dialogs
-modal := components.Modal(components.ModalProps{
-    Title: "Confirm Delete",
-    Content: components.Text("Are you sure?"),
-    Footer: components.Div("flex gap-2",
-        components.Button(components.ButtonProps{Text: "Cancel", OnClick: modal.Close}),
-        components.Button(components.ButtonProps{Text: "Delete", Variant: components.ButtonDanger}),
-    ),
-})
-modal.Open()
-```
-
-### Header Components
-```go
-// UserMenu with avatar and dropdown
-userMenu := components.UserMenu(components.UserMenuProps{
-    Name:      "John Doe",
-    Email:     "john@example.com",
-    AvatarURL: "/avatar.png",
-    OnLogout:  func() { /* handle logout */ },
-})
-
-// NotificationCenter with real-time updates
-notifications := components.NotificationCenter(components.NotificationCenterProps{
-    Notifications: notificationList,
-    OnMarkRead:    func(id string) { /* mark read */ },
-    OnClear:       func() { /* clear all */ },
-})
-
-// Connection status indicator for WebSocket state
-status := components.ConnectionStatus(components.ConnectionStatusProps{
-    Connected: wsClient.IsConnected(),
-    Variant:   components.StatusDot,  // or StatusBanner
-})
-```
-
-### Command Palette
-```go
-// Command Palette (Cmd/Ctrl+K)
-palette := components.CommandPalette(components.CommandPaletteProps{
-    Commands: []components.CommandItem{
-        {ID: "new", Label: "Create New Post", Category: "Actions", Action: handleNew},
-        {ID: "search", Label: "Search", Category: "Navigation", Action: openSearch},
-    },
-})
-```
-
-### Data Export
-```go
-// Export table data to CSV, JSON, or PDF
-exporter := components.DataExport(components.DataExportProps{
-    Data:     tableData,
-    Columns:  []string{"Name", "Email", "Status"},
-    Filename: "users",
-    Formats:  []string{"csv", "json", "pdf"},
-})
-```
-
-### Full Component List
-
-| Category | Components |
-|----------|------------|
-| **Forms** | Button, Input, TextArea, Select, Checkbox, Toggle, DatePicker, Combobox, FileUpload, FormBuilder |
-| **Layout** | Layout, Sidebar, Header, Card, Tabs, Accordion, Drawer |
-| **Header** | UserMenu, NotificationCenter, ConnectionStatus |
-| **Navigation** | Router, Link, Stepper, CommandPalette |
-| **Data** | Table, Badge, Avatar, Breadcrumbs, Pagination, VirtualList, DataExport |
-| **Feedback** | Modal, Toast, Alert, Progress, Spinner, Skeleton, Tooltip, EmptyState |
-| **Charts** | BarChart, LineChart, PieChart, DonutChart, Sparkline |
-| **Utilities** | Theme, Animation, Clipboard, FocusTrap, SkipLinks, Inspector |
+See [examples/minimal](examples/minimal) for complete patterns and best practices.
 
 ## State Management
 
 ```go
-// Generic reactive store
-store := state.New(AppState{Count: 0, User: nil})
+import "github.com/dougbarrett/gux/core"
 
-// Subscribe to changes
-unsubscribe := store.Subscribe(func(s AppState) {
-    fmt.Println("Count:", s.Count)
-})
-defer unsubscribe()
+func MyPage(r *core.Router) func() core.Node {
+    return func() core.Node {
+        // Typed state helpers
+        count := r.StateInt("count", 0)
+        name := r.StateString("name", "")
+        active := r.StateBool("active", false)
 
-// Update state
-store.Update(func(s *AppState) {
-    s.Count++
-})
+        // Generic state for any type
+        user := core.UseState(r, "user", User{Name: "Guest"})
 
-// Persistent store (auto-saves to localStorage)
-userStore := state.NewPersistentStore("currentUser", User{})
+        // Read state
+        current := count.Get()
 
-// Async data with loading states
-posts := state.NewAsync[[]Post]()
-posts.Load(func() ([]Post, error) {
-    return api.GetPosts()
-})
+        // Update state (triggers re-render)
+        count.Set(current + 1)
 
-if posts.IsLoading() {
-    // Show spinner
-}
-if posts.HasError() {
-    // Show error
-}
-data := posts.Data()
+        // Update without re-render
+        name.SetQuiet("new value")
 
-// Query caching (SWR pattern)
-result := state.UseQuery("posts", fetchPosts, state.QueryOptions{
-    StaleTime:      5 * time.Minute,
-    RefetchOnFocus: true,
-})
-```
-
-## WebSocket Support
-
-### Type-Safe Subscriptions
-
-```go
-// Subscribe to real-time events (mirrors HTTP client pattern)
-sub, err := posts.Subscribe(func(event api.PostEvent) {
-    switch event.Type {
-    case "created":
-        fmt.Println("New post:", event.Post.Title)
-    case "updated":
-        fmt.Println("Updated:", event.Post.Title)
-    case "deleted":
-        fmt.Println("Deleted ID:", event.ID)
+        return core.Div(core.Class("container"))
     }
-})
-if err != nil {
-    log.Fatal(err)
 }
-defer sub.Close()
 ```
 
-### Low-Level WebSocket Client
-
-```go
-client := ws.NewClient("ws://localhost:8080/ws",
-    ws.WithOnOpen(func() { fmt.Println("Connected") }),
-    ws.WithOnClose(func(code int, reason string) { fmt.Println("Closed") }),
-)
-client.Connect()
-
-// Typed message handlers
-ws.OnTyped(client, "chat.message", func(msg ChatMessage) {
-    fmt.Println(msg.Author, ":", msg.Text)
-})
-
-// Send typed messages
-client.Send("chat.join", JoinRequest{Room: "general"})
-
-// Request/response pattern
-resp, err := ws.RequestTyped[JoinReq, JoinResp](client, "room.join", req)
-```
 
 ## Server Utilities
 
@@ -478,56 +279,18 @@ func handleList(w http.ResponseWriter, r *http.Request) {
 }
 ```
 
-## Accessibility
-
-Gux components are built with WCAG 2.1 AA compliance:
-
-- **Screen Reader Support** — All components have proper ARIA labels, roles, and live regions
-- **Keyboard Navigation** — Full keyboard access with visible focus indicators
-- **Reduced Motion** — Respects `prefers-reduced-motion` system setting
-- **Color Contrast** — Meets WCAG 2.1 AA contrast requirements (4.5:1 minimum)
-- **Focus Management** — Modal focus traps, focus restoration, skip links
-
-### Accessibility Testing
-
-Automated accessibility testing with axe-core and Playwright:
-
-```bash
-make test-a11y        # Run accessibility tests
-make test-a11y-debug  # Run with visible browser
-```
-
-## Keyboard Shortcuts
-
-| Shortcut | Action |
-|----------|--------|
-| `Cmd/Ctrl + K` | Open command palette |
-| `Cmd/Ctrl + B` | Toggle sidebar |
-| `Escape` | Close modal/dropdown/palette |
-| `Enter` | Confirm selection |
-| `Arrow Up/Down` | Navigate dropdown/menu items |
-| `Arrow Left/Right` | Switch tabs |
-| `Home/End` | Jump to first/last tab |
-| `Tab` | Move between focusable elements |
 
 ## Project Structure
 
 ```
 gux/
-├── api/           # Error handling, query utilities, pagination
-├── auth/          # Authentication helpers
-├── cmd/gux/       # CLI tool (gux init, gux gen)
-├── components/    # 45+ UI components (WASM)
-├── example/       # Complete working application
-│   ├── app/       # WASM frontend
-│   ├── server/    # Go backend
-│   ├── api/       # API definitions
-│   └── Dockerfile # Production deployment
-├── fetch/         # Browser fetch API wrapper
-├── server/        # Middleware and SPA handler
-├── state/         # Reactive state management
-├── storage/       # Data persistence layer
-└── ws/            # WebSocket client
+├── api/            # Error handling, query utilities, pagination
+├── cmd/gux/        # CLI tool (gux init, gux gen)
+├── core/           # Universal rendering framework (SSR + WASM)
+├── examples/       # Reference implementations
+│   └── minimal/    # Complete app with hybrid rendering
+├── fetch/          # Browser fetch API wrapper with CSRF
+└── server/         # Middleware and SPA handler
 ```
 
 ## Deployment

@@ -137,112 +137,43 @@ This scans `api/` for interfaces with `@client` annotations and generates:
 - `api/posts_client_gen.go` — Type-safe HTTP client for WASM
 - `api/posts_server_gen.go` — HTTP handler wrapper for the server
 
-### Step 4: Build Your Frontend
+### Step 4: Build Your Application
+
+For a complete working example with hybrid rendering (SSR + WASM), see the [examples/minimal](https://github.com/dougbarrett/gux/tree/main/examples/minimal) directory.
+
+The minimal example demonstrates:
+
+- **Hybrid rendering** — Server-side rendering with WASM hydration
+- **Route groups** — Public and admin routes with separate WASM bundles
+- **CRUD with DTOs** — Users and Posts with secure field filtering
+- **State management** — Data loading with server-to-client hydration
+- **Security hooks** — Password hashing in create/update hooks
+
+Key patterns:
 
 ```go
-// app/main.go
-//go:build js && wasm
+import "github.com/dougbarrett/gux/core"
 
-package main
+// Page function with loader and component
+func MyPage(r *core.Router) func() core.Node {
+    var items []Item
 
-import (
-    "fmt"
-    "myapp/api"
-    "github.com/dougbarrett/gux/components"
-    "github.com/dougbarrett/gux/state"
-)
-
-func main() {
-    // Initialize UI framework
-    components.LoadTailwind()
-    components.InitToasts()
-
-    // Create API client
-    posts := api.NewPostsClient()
-
-    // Create reactive state
-    postsStore := state.NewAsync[[]api.Post]()
-
-    // Setup router
-    router := components.NewRouter()
-    components.SetGlobalRouter(router)
-
-    // Create layout
-    layout := components.Layout(components.LayoutProps{
-        Sidebar: components.SidebarProps{
-            Title: "My App",
-            Items: []components.NavItem{
-                {Label: "Dashboard", Path: "/", Icon: "home"},
-                {Label: "Posts", Path: "/posts", Icon: "file-text"},
-            },
-        },
-        Header: components.HeaderProps{
-            Title: "Dashboard",
-        },
+    // OnLoad runs on server for SSR, via API for client navigation
+    r.OnLoad(func() {
+        // Fetch data
     })
 
-    // Mount app
-    app := components.NewApp("#app")
-    app.Mount(layout)
+    // Component returns UI
+    return func() core.Node {
+        count := r.StateInt("count", 0)
 
-    // Register routes
-    router.Register("/", func() {
-        layout.SetPageWithHeader("Dashboard",
-            components.Card(components.CardProps{},
-                components.H2("Welcome to Gux!"),
-                components.Text("Your Go-powered web application."),
-            ),
+        return core.Div(core.Class("container"),
+            core.H1(core.Attrs{}, core.Text("My Page")),
+            core.Button(core.Attrs{
+                OnClick: func() { count.Set(count.Get() + 1) },
+            }, core.Text("Increment")),
         )
-    })
-
-    router.Register("/posts", func() {
-        layout.SetPageWithHeader("Posts", renderPostsPage(posts, postsStore))
-    })
-
-    // Start router
-    router.Start()
-
-    // Keep WASM running
-    select {}
-}
-
-func renderPostsPage(client *api.PostsClient, store *state.AsyncStore[[]api.Post]) js.Value {
-    // Load posts
-    store.Load(func() ([]api.Post, error) {
-        return client.GetAll()
-    })
-
-    container := components.Div("space-y-4")
-
-    // Show loading state
-    if store.IsLoading() {
-        container.Call("appendChild", components.Spinner(components.SpinnerProps{
-            Size:  components.SpinnerLG,
-            Label: "Loading posts...",
-        }))
-        return container
     }
-
-    // Show error
-    if store.HasError() {
-        container.Call("appendChild", components.Alert(components.AlertProps{
-            Variant: components.AlertError,
-            Message: store.Err().Error(),
-        }))
-        return container
-    }
-
-    // Render posts
-    posts := store.Data()
-    for _, post := range posts {
-        card := components.Card(components.CardProps{},
-            components.H3(post.Title),
-            components.Text(post.Body),
-        )
-        container.Call("appendChild", card)
-    }
-
-    return container
 }
 ```
 
@@ -395,12 +326,12 @@ gux build --tinygo
 
 ## Next Steps
 
-- [CLI Reference](cli.md) — Full command-line tool documentation
 - [API Generation](api-generation.md) — Learn about all annotation options
-- [Components](components.md) — Explore the full component library
-- [State Management](state-management.md) — Master reactive state patterns
-- [WebSocket](websocket.md) — Add real-time features
+- [Templates](templates.md) — Page templates and common patterns
+- [Server Utilities](server.md) — Middleware and backend helpers
 - [Deployment](deployment.md) — Deploy to production
+
+For complete examples, see [examples/minimal](https://github.com/dougbarrett/gux/tree/main/examples/minimal).
 
 ## Troubleshooting
 
