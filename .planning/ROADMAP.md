@@ -15,7 +15,7 @@ A full-stack Go framework for building modern web applications with WebAssembly.
 - [v1.1 Accessibility](milestones/v1.1-ROADMAP.md) (Phases 7-11) - SHIPPED 2026-01-16
 - [v1.2 Documentation](milestones/v1.2-ROADMAP.md) (Phases 12-15) - SHIPPED 2026-01-15
 - [v2.0 Core Components](milestones/v2.0-ROADMAP.md) (Phases 16-23) - SHIPPED 2026-01-25
-- v2.1 Dead Code Cleanup (Phases 24-26) - IN PROGRESS
+- v2.1 Dead Code Cleanup (Phases 24-26) - SHIPPED 2026-01-26
 
 ## Phases
 
@@ -123,8 +123,8 @@ Full details: [milestones/v2.0-ROADMAP.md](milestones/v2.0-ROADMAP.md)
 
 </details>
 
-<details open>
-<summary>v2.1 Dead Code Cleanup (Phases 24-26) - IN PROGRESS</summary>
+<details>
+<summary>v2.1 Dead Code Cleanup (Phases 24-26) - SHIPPED 2026-01-26</summary>
 
 **Milestone Goal:** Remove dead code from pre-v2.0 architecture and clean up documentation
 
@@ -136,9 +136,11 @@ Full details: [milestones/v2.0-ROADMAP.md](milestones/v2.0-ROADMAP.md)
   - [x] 25-01-PLAN.md - Delete dead doc files, update navigation and core docs
   - [x] 25-02-PLAN.md - Update remaining docs, Claude skills, create verification script
   - [x] 25-03-PLAN.md - Gap closure: clean stale refs in docs/README.md, keyboard-shortcuts.md, accessibility.md
-- [ ] Phase 26: Dependency Cleanup (1/1 plans) - Clean up go.mod and verify builds
+- [x] Phase 26: Dependency Cleanup (1/1 plans) - Clean up go.mod and verify builds
   Plans:
-  - [ ] 26-01-PLAN.md - Clean dependencies (go mod tidy) and verify all 5 examples build
+  - [x] 26-01-PLAN.md - Clean dependencies (go mod tidy) and verify all 5 examples build
+
+Full details: [milestones/v2.1-ROADMAP.md](milestones/v2.1-ROADMAP.md)
 
 </details>
 
@@ -174,4 +176,4 @@ Phases execute in numeric order: 1 -> 2 -> ... -> 15 -> 16 -> ... -> 23 -> 24 ->
 | 23. Admin Panel Example | v2.0 | 3/3 | Complete | 2026-01-23 |
 | 24. Code Removal | v2.1 | 1/1 | Complete | 2026-01-25 |
 | 25. Documentation Updates | v2.1 | 3/3 | Complete | 2026-01-26 |
-| 26. Dependency Cleanup | v2.1 | 1/1 | Ready | - |
+| 26. Dependency Cleanup | v2.1 | 1/1 | Complete | 2026-01-26 |

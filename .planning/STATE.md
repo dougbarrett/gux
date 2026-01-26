@@ -14,7 +14,7 @@ Progress: █████ (100% - v2.1 Dead Code Cleanup complete)
 See: .planning/PROJECT.md (updated 2026-01-25)
 
 **Core value:** Developers can build complete web apps in Go with SSR + WASM
-**Current focus:** v2.1 Dead Code Cleanup
+**Current focus:** v2.1 Dead Code Cleanup — SHIPPED
 
 ## Milestone History
 
@@ -22,6 +22,7 @@ See: .planning/PROJECT.md (updated 2026-01-25)
 - **v1.1 Accessibility** - 5 phases, 16 plans (shipped 2026-01-16)
 - **v1.2 Documentation** - 4 phases, 4 plans (shipped 2026-01-15)
 - **v2.0 Core Components** - 8 phases, 25 plans (shipped 2026-01-25)
+- **v2.1 Dead Code Cleanup** - 3 phases, 5 plans (shipped 2026-01-26)
 
 ## Accumulated Context
 

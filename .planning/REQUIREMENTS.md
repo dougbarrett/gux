@@ -17,18 +17,18 @@ Requirements for dead code cleanup. Each maps to roadmap phases.
 
 ### Documentation Updates
 
-- [ ] **DOCS-01**: Remove docs/websocket.md (documents deleted ws/ package)
-- [ ] **DOCS-02**: Update or remove docs/auth.md (documents deleted auth/ package)
-- [ ] **DOCS-03**: Update docs/components.md (may reference old components/)
-- [ ] **DOCS-04**: Update docs/_sidebar.md navigation
-- [ ] **DOCS-05**: Update README.md if it references removed packages
-- [ ] **DOCS-06**: Update LLM.txt framework description
+- [x] **DOCS-01**: Remove docs/websocket.md (documents deleted ws/ package)
+- [x] **DOCS-02**: Update or remove docs/auth.md (documents deleted auth/ package)
+- [x] **DOCS-03**: Update docs/components.md (may reference old components/)
+- [x] **DOCS-04**: Update docs/_sidebar.md navigation
+- [x] **DOCS-05**: Update README.md if it references removed packages
+- [x] **DOCS-06**: Update LLM.txt framework description
 
 ### Dependency Cleanup
 
-- [ ] **DEPS-01**: Remove unused dependencies from go.mod (gorilla/websocket, etc.)
-- [ ] **DEPS-02**: Run go mod tidy to clean up go.sum
-- [ ] **DEPS-03**: Verify all examples still build after cleanup
+- [x] **DEPS-01**: Remove unused dependencies from go.mod (gorilla/websocket, etc.)
+- [x] **DEPS-02**: Run go mod tidy to clean up go.sum
+- [x] **DEPS-03**: Verify all examples still build after cleanup
 
 ## Out of Scope
 
@@ -51,15 +51,15 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CLEAN-03 | Phase 24 | Complete |
 | CLEAN-04 | Phase 24 | Complete |
 | CLEAN-05 | Phase 24 | Complete |
-| DOCS-01 | Phase 25 | Pending |
-| DOCS-02 | Phase 25 | Pending |
-| DOCS-03 | Phase 25 | Pending |
-| DOCS-04 | Phase 25 | Pending |
-| DOCS-05 | Phase 25 | Pending |
-| DOCS-06 | Phase 25 | Pending |
-| DEPS-01 | Phase 26 | Pending |
-| DEPS-02 | Phase 26 | Pending |
-| DEPS-03 | Phase 26 | Pending |
+| DOCS-01 | Phase 25 | Complete |
+| DOCS-02 | Phase 25 | Complete |
+| DOCS-03 | Phase 25 | Complete |
+| DOCS-04 | Phase 25 | Complete |
+| DOCS-05 | Phase 25 | Complete |
+| DOCS-06 | Phase 25 | Complete |
+| DEPS-01 | Phase 26 | Complete |
+| DEPS-02 | Phase 26 | Complete |
+| DEPS-03 | Phase 26 | Complete |
 
 **Coverage:**
 - v2.1 requirements: 14 total
@@ -68,4 +68,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-01-25*
-*Last updated: 2026-01-25 after phase 24 complete*
+*Last updated: 2026-01-26 after phase 26 complete — v2.1 milestone shipped*
