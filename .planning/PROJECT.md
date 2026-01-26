@@ -30,18 +30,13 @@ Developers can build complete web applications in Go — from marketing sites to
 - Marketing example with responsive nav, hero, pricing, contact — v2.0
 - SaaS Dashboard example with CRUD, DataTable, settings — v2.0
 - Admin Panel example with user management, activity logs, bulk actions — v2.0
+- ✓ Dead code removal (components/, auth/, storage/, state/, ws/) — v2.1
+- ✓ Documentation cleanup (removed stale references, updated core docs) — v2.1
+- ✓ Dependency cleanup (removed gorilla/websocket) — v2.1
 
 ### Active
 
-<!-- Current scope: v2.1 Dead Code Cleanup -->
-
-- [ ] Remove dead components/ package (61 files, old js.Value approach)
-- [ ] Remove dead auth/ package (unused JWT/localStorage auth)
-- [ ] Remove dead storage/ package (only used by old components)
-- [ ] Remove dead state/ package (superseded by core.Router state)
-- [ ] Remove dead ws/ package (never integrated)
-- [ ] Update documentation to reflect removed packages
-- [ ] Clean up go.mod/go.sum (remove unused dependencies)
+<!-- Current scope: Next milestone TBD -->
 
 ### Out of Scope
 
@@ -57,12 +52,13 @@ Developers can build complete web applications in Go — from marketing sites to
 
 ## Context
 
-### Current State (v2.0)
+### Current State (v2.1)
 
-Shipped v2.0 with complete component library and four example applications:
-- **ui/**: 49 component files, ~9,700 LOC
-- **examples/**: 4 apps (auth, marketing, saas, admin), ~6,400 LOC
-- **core/**: Universal rendering, routing, CRUD, CSRF
+Shipped v2.1 Dead Code Cleanup. Codebase is now clean:
+- **core/**: Universal rendering, routing, CRUD, CSRF (~3,500 LOC)
+- **ui/**: 49 component files (~9,700 LOC)
+- **examples/**: 5 apps (minimal, auth, marketing, saas, admin) (~6,400 LOC)
+- **Dead code removed:** 66 Go files (17,135 lines), 5 doc files (4,007 lines)
 
 ### Tech Stack
 
@@ -77,7 +73,6 @@ Shipped v2.0 with complete component library and four example applications:
 - 6 P0 components not implemented (Spinner, Progress, Skeleton, Breadcrumb, ButtonGroup, IconButton)
 - No OAuth/2FA support yet
 - No real-time features yet
-- Dead code from pre-v2.0 architecture needs cleanup (components/, auth/, storage/, state/, ws/)
 
 ## Constraints
 
@@ -101,4 +96,4 @@ Shipped v2.0 with complete component library and four example applications:
 
 ---
 
-*Last updated: 2026-01-25 after v2.1 milestone started*
+*Last updated: 2026-01-26 after v2.1 milestone shipped*

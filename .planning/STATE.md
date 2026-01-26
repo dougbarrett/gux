@@ -2,19 +2,19 @@
 
 ## Current Position
 
-Phase: 26 of 26 (dependency-cleanup)
-Plan: 01 of 01
-Status: Phase complete, Milestone complete
-Last activity: 2026-01-26 — Completed 26-01-PLAN.md
+Phase: — (between milestones)
+Plan: —
+Status: Ready for next milestone
+Last activity: 2026-01-26 — v2.1 Dead Code Cleanup shipped
 
-Progress: █████ (100% - v2.1 Dead Code Cleanup complete)
+Progress: █████ (v2.1 complete)
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-01-25)
+See: .planning/PROJECT.md (updated 2026-01-26)
 
 **Core value:** Developers can build complete web apps in Go with SSR + WASM
-**Current focus:** v2.1 Dead Code Cleanup — SHIPPED
+**Current focus:** Planning next milestone
 
 ## Milestone History
 
@@ -33,13 +33,7 @@ Full decision log preserved in milestone archives:
 - [v1.1-ROADMAP.md](milestones/v1.1-ROADMAP.md) - Accessibility patterns
 - [v1.2-ROADMAP.md](milestones/v1.2-ROADMAP.md) - Documentation patterns
 - [v2.0-ROADMAP.md](milestones/v2.0-ROADMAP.md) - Component library patterns
-
-**v2.1 Dead Code Cleanup:**
-- Phase 24 Plan 01: Delete all five packages atomically to avoid transient build breaks
-- Phase 25 Plan 01: Remove 5 doc files and update core docs (CLAUDE.md, LLM.txt)
-- Phase 25 Plan 02: Update README, docs, Claude skills; create verification script
-- Phase 25 Plan 03: Delete keyboard-shortcuts.md entirely; update Skip Links to use core package
-- Phase 26 Plan 01: Remove gorilla/websocket dependency; verify all 5 examples build
+- [v2.1-ROADMAP.md](milestones/v2.1-ROADMAP.md) - Dead code cleanup patterns
 
 ### Research Findings
 
@@ -62,9 +56,9 @@ v2.0 Tech Debt:
 ## Session Continuity
 
 Last session: 2026-01-26
-Stopped at: Completed 26-01-PLAN.md (v2.1 milestone complete)
+Stopped at: Completed v2.1 milestone
 Resume file: None
 
 ---
 
-*Last updated: 2026-01-26 after phase 26 plan 01 completed*
+*Last updated: 2026-01-26 after v2.1 milestone shipped*

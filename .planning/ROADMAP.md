@@ -15,7 +15,7 @@ A full-stack Go framework for building modern web applications with WebAssembly.
 - [v1.1 Accessibility](milestones/v1.1-ROADMAP.md) (Phases 7-11) - SHIPPED 2026-01-16
 - [v1.2 Documentation](milestones/v1.2-ROADMAP.md) (Phases 12-15) - SHIPPED 2026-01-15
 - [v2.0 Core Components](milestones/v2.0-ROADMAP.md) (Phases 16-23) - SHIPPED 2026-01-25
-- v2.1 Dead Code Cleanup (Phases 24-26) - SHIPPED 2026-01-26
+- [v2.1 Dead Code Cleanup](milestones/v2.1-ROADMAP.md) (Phases 24-26) - SHIPPED 2026-01-26
 
 ## Phases
 
@@ -124,21 +124,11 @@ Full details: [milestones/v2.0-ROADMAP.md](milestones/v2.0-ROADMAP.md)
 </details>
 
 <details>
-<summary>v2.1 Dead Code Cleanup (Phases 24-26) - SHIPPED 2026-01-26</summary>
+<summary>✅ v2.1 Dead Code Cleanup (Phases 24-26) — SHIPPED 2026-01-26</summary>
 
-**Milestone Goal:** Remove dead code from pre-v2.0 architecture and clean up documentation
-
-- [x] Phase 24: Code Removal (1/1 plans) - Remove dead packages (components/, auth/, storage/, state/, ws/)
-  Plans:
-  - [x] 24-01-PLAN.md - Delete dead packages and verify build passes
-- [x] Phase 25: Documentation Updates (3/3 plans) - Update docs to reflect removed packages
-  Plans:
-  - [x] 25-01-PLAN.md - Delete dead doc files, update navigation and core docs
-  - [x] 25-02-PLAN.md - Update remaining docs, Claude skills, create verification script
-  - [x] 25-03-PLAN.md - Gap closure: clean stale refs in docs/README.md, keyboard-shortcuts.md, accessibility.md
-- [x] Phase 26: Dependency Cleanup (1/1 plans) - Clean up go.mod and verify builds
-  Plans:
-  - [x] 26-01-PLAN.md - Clean dependencies (go mod tidy) and verify all 5 examples build
+- [x] Phase 24: Code Removal (1/1 plans) — completed 2026-01-25
+- [x] Phase 25: Documentation Updates (3/3 plans) — completed 2026-01-26
+- [x] Phase 26: Dependency Cleanup (1/1 plans) — completed 2026-01-26
 
 Full details: [milestones/v2.1-ROADMAP.md](milestones/v2.1-ROADMAP.md)
 

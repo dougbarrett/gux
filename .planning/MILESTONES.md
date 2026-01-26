@@ -1,5 +1,30 @@
 # Project Milestones: Gux Framework
 
+## v2.1 Dead Code Cleanup (Shipped: 2026-01-26)
+
+**Delivered:** Removed all dead code from pre-v2.0 architecture (66 Go files, 17,135 lines), updated documentation, and cleaned up dependencies.
+
+**Phases completed:** 24-26 (5 plans total)
+
+**Key accomplishments:**
+- Deleted 5 orphaned packages: components/, auth/, storage/, state/, ws/
+- Removed 5 dead documentation files (4,007 lines)
+- Updated all core documentation (CLAUDE.md, LLM.txt, README.md, docs/)
+- Created verification script for CI integration
+- Cleaned dependency tree (removed gorilla/websocket)
+
+**Stats:**
+- 107 files changed
+- 19,969 net lines removed
+- 3 phases, 5 plans
+- 2 days (2026-01-25 → 2026-01-26)
+
+**Git range:** `docs(24)` → `docs(26)`
+
+**What's next:** TBD — next milestone planning
+
+---
+
 ## v2.0 Core Components (Shipped: 2026-01-25)
 
 **Delivered:** Complete component library on core's Node system with four example applications (Auth, Marketing, SaaS Dashboard, Admin Panel) demonstrating real-world usage patterns.
