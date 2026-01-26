@@ -2,12 +2,12 @@
 
 ## Current Position
 
-Phase: 27 (gux init Modernization)
-Plan: Not started (defining requirements)
-Status: Defining requirements
-Last activity: 2026-01-26 — Milestone v2.2 started
+Phase: 27 of 27 (gux init Modernization)
+Plan: 2 of 3 in phase
+Status: In progress
+Last activity: 2026-01-26 — Completed 27-02-PLAN.md
 
-Progress: ░░░░░ (v2.2 in progress)
+Progress: ██░░░ (v2.2 in progress - 2/3 plans)
 
 ## Project Reference
 
@@ -35,6 +35,12 @@ Full decision log preserved in milestone archives:
 - [v2.0-ROADMAP.md](milestones/v2.0-ROADMAP.md) - Component library patterns
 - [v2.1-ROADMAP.md](milestones/v2.1-ROADMAP.md) - Dead code cleanup patterns
 
+### Recent Decisions (Phase 27)
+
+| ID | Phase | Decision | Impact |
+|----|-------|----------|--------|
+| 27-01-D1 | 27 | Use core.New() pattern instead of cmd/app | Generated apps follow modern examples/minimal pattern |
+
 ### Research Findings
 
 Research completed 2026-01-22. Key findings:
@@ -56,9 +62,9 @@ v2.0 Tech Debt:
 ## Session Continuity
 
 Last session: 2026-01-26
-Stopped at: Completed v2.1 milestone
+Stopped at: Completed 27-01-PLAN.md
 Resume file: None
 
 ---
 
-*Last updated: 2026-01-26 after v2.1 milestone shipped*
+*Last updated: 2026-01-26 after completing plan 27-01*
