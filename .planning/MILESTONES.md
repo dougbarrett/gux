@@ -1,4 +1,33 @@
-# Project Milestones: GoQuery
+# Project Milestones: Gux Framework
+
+## v2.0 Core Components (Shipped: 2026-01-25)
+
+**Delivered:** Complete component library on core's Node system with four example applications (Auth, Marketing, SaaS Dashboard, Admin Panel) demonstrating real-world usage patterns.
+
+**Phases completed:** 16-23 (25 plans total)
+
+**Key accomplishments:**
+- Component library with 26 components (Button, Card, Form, Table, Modal, Tabs, Toast, Tooltip, etc.) on core's Node system
+- Auth example with complete login, registration, password reset, and email verification flows
+- Marketing example with responsive navigation, hero sections, feature grid, pricing, and contact forms
+- SaaS Dashboard example with CRUD operations, DataTable, stats cards, and settings
+- Admin Panel example with user management, activity logs, bulk actions, and role-based UI
+- All components render identically in SSR and WASM with proper ARIA accessibility
+
+**Stats:**
+- 49 component files (~9,700 LOC)
+- 30 example pages (~6,400 LOC)
+- 8 phases, 25 plans
+- 2 days (2026-01-22 → 2026-01-23)
+
+**Git range:** `docs(16)` → `docs(23)`
+
+**Tech debt accepted:**
+- 6 P0 components deferred (Spinner, Progress, Skeleton, Breadcrumb, ButtonGroup, IconButton) — not needed by example apps
+
+**What's next:** TBD — next milestone planning
+
+---
 
 ## v1.2 Documentation (Shipped: 2026-01-15)
 

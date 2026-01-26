@@ -14,7 +14,7 @@ A full-stack Go framework for building modern web applications with WebAssembly.
 - [v1.0 UX Polish](milestones/v1.0-ROADMAP.md) (Phases 1-6) - SHIPPED 2026-01-15
 - [v1.1 Accessibility](milestones/v1.1-ROADMAP.md) (Phases 7-11) - SHIPPED 2026-01-16
 - [v1.2 Documentation](milestones/v1.2-ROADMAP.md) (Phases 12-15) - SHIPPED 2026-01-15
-- [v2.0 Core Components](milestones/v2.0-ROADMAP.md) (Phases 16-23) - IN PROGRESS
+- [v2.0 Core Components](milestones/v2.0-ROADMAP.md) (Phases 16-23) - SHIPPED 2026-01-25
 
 ## Phases
 
@@ -69,8 +69,8 @@ Full details: [milestones/v1.2-ROADMAP.md](milestones/v1.2-ROADMAP.md)
 
 </details>
 
-<details open>
-<summary>v2.0 Core Components (Phases 16-23) - IN PROGRESS</summary>
+<details>
+<summary>v2.0 Core Components (Phases 16-23) - SHIPPED 2026-01-25</summary>
 
 **Milestone Goal:** Build a fresh component library on core's Node system with four example applications
 
