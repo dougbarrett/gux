@@ -3,18 +3,18 @@
 ## Current Position
 
 Phase: 28 of 28 (Help Pattern Commands)
-Plan: 1 of TBD in current phase
-Status: In progress
-Last activity: 2026-01-26 - Completed 28-01-PLAN.md
+Plan: 2 of 2 in current phase
+Status: Phase complete
+Last activity: 2026-01-26 - Completed 28-02-PLAN.md
 
-Progress: [============================] 97% (27/28 phases complete)
+Progress: [==============================] 100% (28/28 phases complete)
 
 ## Project Reference
 
 See: .planning/PROJECT.md (updated 2026-01-26)
 
 **Core value:** Developers can build complete web apps in Go with SSR + WASM
-**Current focus:** v2.3 gux help Patterns - Phase 28 Help Pattern Commands
+**Current focus:** v2.3 gux help Patterns - Phase 28 complete
 
 ## Milestone History
 
@@ -24,7 +24,7 @@ See: .planning/PROJECT.md (updated 2026-01-26)
 - **v2.0 Core Components** - 8 phases, 25 plans (shipped 2026-01-25)
 - **v2.1 Dead Code Cleanup** - 3 phases, 5 plans (shipped 2026-01-26)
 - **v2.2 gux init Modernization** - 1 phase, 3 plans (shipped 2026-01-26)
-- **v2.3 gux help Patterns** - 1 phase, TBD plans (in progress)
+- **v2.3 gux help Patterns** - 1 phase, 2 plans (shipped 2026-01-26)
 
 ## Accumulated Context
 
@@ -37,13 +37,16 @@ Full decision log preserved in milestone archives:
 - [v2.0-ROADMAP.md](milestones/v2.0-ROADMAP.md) - Component library patterns
 - [v2.1-ROADMAP.md](milestones/v2.1-ROADMAP.md) - Dead code cleanup patterns
 - [v2.2-ROADMAP.md](milestones/v2.2-ROADMAP.md) - gux init modernization patterns
+- [v2.3-ROADMAP.md](milestones/v2.3-ROADMAP.md) - gux help patterns
 
 ### Recent Decisions (Phase 28)
 
 | ID | Phase | Decision | Impact |
 |----|-------|----------|--------|
 | 28-01-D1 | 28 | Named getModulePathForHelp to avoid collision with build.go | No conflict with existing getModulePath function |
-| 28-01-D2 | 28 | Empty patterns registry in Plan 01 | Patterns to be added in Plan 02 |
+| 28-01-D2 | 28 | Empty patterns registry in Plan 01 | Patterns populated in Plan 02 |
+| 28-02-D1 | 28 | String concatenation for backticks in struct tags | Avoids template escaping issues |
+| 28-02-D2 | 28 | Split 'gux help' vs 'gux -h/--help' | Better UX: help shows patterns, -h shows usage |
 
 ### Blockers/Concerns Carried Forward
 
@@ -57,9 +60,9 @@ v2.0 Tech Debt:
 ## Session Continuity
 
 Last session: 2026-01-26
-Stopped at: Completed 28-01-PLAN.md
+Stopped at: Completed 28-02-PLAN.md (Phase 28 complete)
 Resume file: None
 
 ---
 
-*Last updated: 2026-01-26 after completing 28-01-PLAN.md*
+*Last updated: 2026-01-26 after completing 28-02-PLAN.md*
