@@ -640,9 +640,9 @@ func parseRoutesAndBundles(filename string) (map[string]*BundleInfo, map[string]
 	return bundles, imports, nil
 }
 
-// generateWasmEntryPoint generates .gux/wasm/main.go
+// generateWasmEntryPoint generates guxgen/wasm/main.go
 func generateWasmEntryPoint(modulePath, pagesImport string, routes []PageRoute) error {
-	if err := os.MkdirAll(".gux/wasm", 0755); err != nil {
+	if err := os.MkdirAll("guxgen/wasm", 0755); err != nil {
 		return err
 	}
 
@@ -881,14 +881,14 @@ func main() {
 }
 `, pagesImport, routeCode.String())
 
-	return os.WriteFile(".gux/wasm/main.go", []byte(code), 0644)
+	return os.WriteFile("guxgen/wasm/main.go", []byte(code), 0644)
 }
 
 // generateBundleWasmEntryPoint generates a WASM entry point for a specific bundle
 func generateBundleWasmEntryPoint(bundleName string, bundle *BundleInfo) error {
-	wasmDir := ".gux/wasm_" + bundleName
+	wasmDir := "guxgen/wasm_" + bundleName
 	if bundleName == "app" {
-		wasmDir = ".gux/wasm"
+		wasmDir = "guxgen/wasm"
 	}
 
 	if err := os.MkdirAll(wasmDir, 0755); err != nil {
@@ -1155,15 +1155,15 @@ func main() {
 
 // buildWasmBundle builds a specific WASM bundle
 func buildWasmBundle(bundleName string, tinygo bool) error {
-	wasmDir := ".gux/wasm_" + bundleName
-	outputFile := ".gux/dist/" + bundleName + ".wasm"
+	wasmDir := "guxgen/wasm_" + bundleName
+	outputFile := "guxgen/dist/" + bundleName + ".wasm"
 
 	if bundleName == "app" {
-		wasmDir = ".gux/wasm"
-		outputFile = ".gux/dist/app.wasm"
+		wasmDir = "guxgen/wasm"
+		outputFile = "guxgen/dist/app.wasm"
 	}
 
-	if err := os.MkdirAll(".gux/dist", 0755); err != nil {
+	if err := os.MkdirAll("guxgen/dist", 0755); err != nil {
 		return err
 	}
 
@@ -1444,13 +1444,13 @@ func generateNestedDTOMapping(info *DTOInfo, resultVar, itemVar string, forList 
 	return sb.String()
 }
 
-// generateAPIClient generates .gux/api/client.go with WASM-compatible DTOs
+// generateAPIClient generates guxgen/api/client.go with WASM-compatible DTOs
 func generateAPIClient(modelsImport string, dtoImport string, models []CRUDModel) error {
 	if len(models) == 0 {
 		return nil // No CRUD models, skip API client generation
 	}
 
-	if err := os.MkdirAll(".gux/api", 0755); err != nil {
+	if err := os.MkdirAll("guxgen/api", 0755); err != nil {
 		return err
 	}
 
@@ -1790,7 +1790,7 @@ func fetch(method, url string, body []byte) ([]byte, error) {
 %s%s
 `, imports, dtoCode.String(), modelCode.String())
 
-	if err := os.WriteFile(".gux/api/client.go", []byte(code), 0644); err != nil {
+	if err := os.WriteFile("guxgen/api/client.go", []byte(code), 0644); err != nil {
 		return err
 	}
 
@@ -1991,7 +1991,7 @@ func Init(database *gorm.DB) {
 %s%s
 `, serverImports, stubDtoCode.String(), stubCode.String())
 
-	return os.WriteFile(".gux/api/client_server.go", []byte(stubFile), 0644)
+	return os.WriteFile("guxgen/api/client_server.go", []byte(stubFile), 0644)
 }
 
 // generateAssetsFile generates assets_gen.go with support for multiple bundles
@@ -2000,13 +2000,13 @@ func generateAssetsFile(modulePath string, bundles []string) error {
 	var initCode strings.Builder
 
 	// Default bundle (app.wasm)
-	embedCode.WriteString(`//go:embed .gux/dist/app.wasm
+	embedCode.WriteString(`//go:embed guxgen/dist/app.wasm
 var wasmBinary []byte
 
-//go:embed .gux/dist/wasm_exec.js
+//go:embed guxgen/dist/wasm_exec.js
 var wasmExecJS []byte
 
-//go:embed .gux/dist/styles.css
+//go:embed guxgen/dist/styles.css
 var stylesCSS []byte
 `)
 
@@ -2014,7 +2014,7 @@ var stylesCSS []byte
 	for _, bundle := range bundles {
 		if bundle != "app" {
 			embedCode.WriteString(fmt.Sprintf(`
-//go:embed .gux/dist/%s.wasm
+//go:embed guxgen/dist/%s.wasm
 var wasm%s []byte
 `, bundle, strings.Title(bundle)))
 		}
@@ -2047,7 +2047,7 @@ import (
 
 // buildWasmNew builds the WASM module using TinyGo
 func buildWasmNew(tinygo bool) error {
-	if err := os.MkdirAll(".gux/dist", 0755); err != nil {
+	if err := os.MkdirAll("guxgen/dist", 0755); err != nil {
 		return err
 	}
 
@@ -2055,9 +2055,9 @@ func buildWasmNew(tinygo bool) error {
 
 	var cmd *exec.Cmd
 	if tinygo {
-		cmd = exec.Command("tinygo", "build", "-o", ".gux/dist/app.wasm", "-target", "wasm", "./.gux/wasm")
+		cmd = exec.Command("tinygo", "build", "-o", "guxgen/dist/app.wasm", "-target", "wasm", "./guxgen/wasm")
 	} else {
-		cmd = exec.Command("go", "build", "-o", ".gux/dist/app.wasm", "./.gux/wasm")
+		cmd = exec.Command("go", "build", "-o", "guxgen/dist/app.wasm", "./guxgen/wasm")
 		cmd.Env = append(os.Environ(), "GOOS=js", "GOARCH=wasm")
 	}
 	cmd.Stdout = os.Stdout
@@ -2068,7 +2068,7 @@ func buildWasmNew(tinygo bool) error {
 	}
 
 	// Get size for display
-	info, err := os.Stat(".gux/dist/app.wasm")
+	info, err := os.Stat("guxgen/dist/app.wasm")
 	if err != nil {
 		return err
 	}
@@ -2077,7 +2077,7 @@ func buildWasmNew(tinygo bool) error {
 	if !tinygo {
 		compiler = "Go"
 	}
-	fmt.Printf("Built .gux/dist/app.wasm (%.2f MB) with %s\n", sizeMB, compiler)
+	fmt.Printf("Built guxgen/dist/app.wasm (%.2f MB) with %s\n", sizeMB, compiler)
 
 	return nil
 }
@@ -2085,7 +2085,7 @@ func buildWasmNew(tinygo bool) error {
 // copyWasmExec copies wasm_exec.js from TinyGo/Go installation
 func copyWasmExec(tinygo bool) error {
 	// Ensure dist directory exists
-	if err := os.MkdirAll(".gux/dist", 0755); err != nil {
+	if err := os.MkdirAll("guxgen/dist", 0755); err != nil {
 		return err
 	}
 
@@ -2111,7 +2111,7 @@ func copyWasmExec(tinygo bool) error {
 		return fmt.Errorf("read wasm_exec.js: %w", err)
 	}
 
-	return os.WriteFile(".gux/dist/wasm_exec.js", data, 0644)
+	return os.WriteFile("guxgen/dist/wasm_exec.js", data, 0644)
 }
 
 // getGuxModulePath finds the gux module in the Go module cache
@@ -2156,12 +2156,12 @@ func generateSafelistFile(classes []string) error {
 		sb.WriteString(fmt.Sprintf("<div class=\"%s\"></div>\n", class))
 	}
 
-	return os.WriteFile(".gux/styles/safelist.html", []byte(sb.String()), 0644)
+	return os.WriteFile("guxgen/styles/safelist.html", []byte(sb.String()), 0644)
 }
 
-// generateTailwindConfig generates Tailwind config files in .gux/
+// generateTailwindConfig generates Tailwind config files in guxgen/
 func generateTailwindConfig() error {
-	if err := os.MkdirAll(".gux/styles", 0755); err != nil {
+	if err := os.MkdirAll("guxgen/styles", 0755); err != nil {
 		return err
 	}
 
@@ -2191,7 +2191,7 @@ func generateTailwindConfig() error {
 @source "./*.go";
 `, safelistImport)
 
-	return os.WriteFile(".gux/styles/input.css", []byte(inputCSS), 0644)
+	return os.WriteFile("guxgen/styles/input.css", []byte(inputCSS), 0644)
 }
 
 // buildTailwind builds Tailwind CSS using the CLI
@@ -2203,7 +2203,7 @@ func buildTailwind() error {
 		return fmt.Errorf("failed to generate Tailwind config: %w", err)
 	}
 
-	if err := os.MkdirAll(".gux/dist", 0755); err != nil {
+	if err := os.MkdirAll("guxgen/dist", 0755); err != nil {
 		return err
 	}
 
@@ -2211,8 +2211,8 @@ func buildTailwind() error {
 	// Then fall back to npx if global not found
 	// Tailwind v4 doesn't need -c config flag, uses CSS directives
 	args := []string{
-		"-i", ".gux/styles/input.css",
-		"-o", ".gux/dist/styles.css",
+		"-i", "guxgen/styles/input.css",
+		"-o", "guxgen/dist/styles.css",
 		"--minify",
 	}
 
@@ -2231,12 +2231,12 @@ func buildTailwind() error {
 	}
 
 	// Get size for display
-	info, err := os.Stat(".gux/dist/styles.css")
+	info, err := os.Stat("guxgen/dist/styles.css")
 	if err != nil {
 		return err
 	}
 	sizeKB := float64(info.Size()) / 1024
-	fmt.Printf("Built .gux/dist/styles.css (%.2f KB)\n", sizeKB)
+	fmt.Printf("Built guxgen/dist/styles.css (%.2f KB)\n", sizeKB)
 
 	return nil
 }
@@ -2435,8 +2435,8 @@ func runClean() {
 		removed = append(removed, "bin/")
 	}
 
-	if err := os.RemoveAll(".gux"); err == nil {
-		removed = append(removed, ".gux/")
+	if err := os.RemoveAll("guxgen"); err == nil {
+		removed = append(removed, "guxgen/")
 	}
 
 	if err := os.Remove("assets_gen.go"); err == nil {
@@ -2450,7 +2450,7 @@ func runClean() {
 	}
 }
 
-// runDevNew builds and runs the server (does NOT clean up on exit to preserve .gux files)
+// runDevNew builds and runs the server (does NOT clean up on exit to preserve guxgen files)
 func runDevNew(tinygo bool, watch bool) {
 	// Build first
 	runBuildNew(tinygo)

@@ -620,7 +620,7 @@ examples/minimal/
 │   ├── user_new.go     # Create user form
 │   ├── posts.go        # Post management
 │   └── nav.go          # Admin navigation
-└── .gux/
+└── guxgen/
     ├── api/            # Generated API client
     └── wasm/           # WASM entry points
 ```

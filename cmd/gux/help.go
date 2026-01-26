@@ -73,7 +73,7 @@ import (
 
 	"github.com/dougbarrett/gux/core"
 	"github.com/dougbarrett/gux/ui"
-	"{{.ModulePath}}/.gux/api"
+	"{{.ModulePath}}/guxgen/api"
 )
 
 // Items displays a list of items.
@@ -194,7 +194,7 @@ package pages
 import (
 	"github.com/dougbarrett/gux/core"
 	"github.com/dougbarrett/gux/ui"
-	"{{.ModulePath}}/.gux/api"
+	"{{.ModulePath}}/guxgen/api"
 )
 
 // ItemNew is the form for creating a new item.
@@ -394,7 +394,7 @@ import (
 	"log"
 
 	"github.com/dougbarrett/gux/core"
-	"{{.ModulePath}}/.gux/api"
+	"{{.ModulePath}}/guxgen/api"
 	"{{.ModulePath}}/models"
 	"{{.ModulePath}}/pages"
 	"gorm.io/driver/sqlite"

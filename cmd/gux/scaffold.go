@@ -238,7 +238,7 @@ func updateGitignore(targetDir string) error {
 	gitignorePath := filepath.Join(targetDir, ".gitignore")
 	guxEntries := []string{
 		"# Gux generated files",
-		".gux/",
+		"guxgen/",
 		"assets_gen.go",
 	}
 

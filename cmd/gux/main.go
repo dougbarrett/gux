@@ -110,7 +110,7 @@ func printUsage() {
 Usage:
     gux init [--module <module-path>] <appname>   Create a new Gux application
     gux init --module <module-path> .             Initialize in current directory
-    gux gen [--watch]                             Generate .gux files (API, WASM entry points)
+    gux gen [--watch]                             Generate guxgen files (API, WASM entry points)
     gux build [--go]                              Build WASM and server binary
     gux dev [--go] [--watch]                      Build and run server
     gux clean                                     Remove generated files
@@ -125,13 +125,13 @@ TinyGo is the default compiler (~1MB WASM). Use --go for standard Go (~5MB).
 Examples:
     gux init --module github.com/myuser/myapp myapp   # Create new directory
     gux init --module github.com/myuser/myapp .       # Use current directory
-    gux gen                  # Generate .gux files only
+    gux gen                  # Generate guxgen files only
     gux gen --watch          # Generate and watch for changes
     gux build                # Build with TinyGo
     gux build --go           # Build with standard Go
     gux dev                  # Build and run server
     gux dev --watch          # Build, run, and hot reload on changes
-    gux clean                # Remove bin/, .gux/, assets_gen.go
+    gux clean                # Remove bin/, guxgen/, assets_gen.go
     gux claude               # Install Claude Code skill
     gux update               # Update gux to latest release
     gux help page            # Show basic page template
@@ -140,7 +140,7 @@ Examples:
 Project structure:
     app.go                   - Your application entry point
     pages/                   - Your page components
-    .gux/                    - Generated files (API client, WASM entry points)
+    guxgen/                    - Generated files (API client, WASM entry points)
     assets_gen.go            - Asset embedding (gitignored)
     bin/                     - Built binary (gitignored)
 

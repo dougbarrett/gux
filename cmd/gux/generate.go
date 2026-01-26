@@ -11,7 +11,7 @@ import (
 	"github.com/fsnotify/fsnotify"
 )
 
-// runGenNew generates all .gux files without building WASM or binary
+// runGenNew generates all guxgen files without building WASM or binary
 func runGenNew(watch bool) {
 	// Initial generation
 	if err := generateGuxFiles(); err != nil {
@@ -29,7 +29,7 @@ func runGenNew(watch bool) {
 	watchAndRegenerate(false, nil)
 }
 
-// generateGuxFiles generates all files in the .gux directory
+// generateGuxFiles generates all files in the guxgen directory
 func generateGuxFiles() error {
 	// Get module path
 	modulePath, err := getModulePath()
@@ -159,15 +159,15 @@ func watchAndRegenerate(fullBuild bool, notifyReload func()) {
 	}
 	defer watcher.Close()
 
-	// Add directories to watch (excluding .gux and bin)
+	// Add directories to watch (excluding guxgen and bin)
 	err = filepath.Walk(".", func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return nil // Skip errors
 		}
 		if info.IsDir() {
-			// Skip .gux, bin, .git, and hidden directories
+			// Skip guxgen, bin, .git, and hidden directories
 			name := info.Name()
-			if name == ".gux" || name == "bin" || name == ".git" || (len(name) > 0 && name[0] == '.') {
+			if name == "guxgen" || name == "bin" || name == ".git" || (len(name) > 0 && name[0] == '.') {
 				return filepath.SkipDir
 			}
 			return watcher.Add(path)
@@ -214,7 +214,7 @@ func watchAndRegenerate(fullBuild bool, notifyReload func()) {
 						notifyReload()
 					}
 				} else {
-					// Just regenerate .gux files
+					// Just regenerate guxgen files
 					if err := generateGuxFiles(); err != nil {
 						fmt.Printf("Error regenerating: %v\n", err)
 					} else {
