@@ -9,11 +9,11 @@ Requirements for dead code cleanup. Each maps to roadmap phases.
 
 ### Code Removal
 
-- [ ] **CLEAN-01**: Remove components/ directory (61 files, old js.Value component library)
-- [ ] **CLEAN-02**: Remove auth/ directory (unused JWT/localStorage auth package)
-- [ ] **CLEAN-03**: Remove storage/ directory (only used by old components)
-- [ ] **CLEAN-04**: Remove state/ directory (superseded by core.Router state management)
-- [ ] **CLEAN-05**: Remove ws/ directory (WebSocket package never integrated)
+- [x] **CLEAN-01**: Remove components/ directory (61 files, old js.Value component library)
+- [x] **CLEAN-02**: Remove auth/ directory (unused JWT/localStorage auth package)
+- [x] **CLEAN-03**: Remove storage/ directory (only used by old components)
+- [x] **CLEAN-04**: Remove state/ directory (superseded by core.Router state management)
+- [x] **CLEAN-05**: Remove ws/ directory (WebSocket package never integrated)
 
 ### Documentation Updates
 
@@ -46,11 +46,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CLEAN-01 | Phase 24 | Pending |
-| CLEAN-02 | Phase 24 | Pending |
-| CLEAN-03 | Phase 24 | Pending |
-| CLEAN-04 | Phase 24 | Pending |
-| CLEAN-05 | Phase 24 | Pending |
+| CLEAN-01 | Phase 24 | Complete |
+| CLEAN-02 | Phase 24 | Complete |
+| CLEAN-03 | Phase 24 | Complete |
+| CLEAN-04 | Phase 24 | Complete |
+| CLEAN-05 | Phase 24 | Complete |
 | DOCS-01 | Phase 25 | Pending |
 | DOCS-02 | Phase 25 | Pending |
 | DOCS-03 | Phase 25 | Pending |
@@ -68,4 +68,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-01-25*
-*Last updated: 2026-01-25 after initial definition*
+*Last updated: 2026-01-25 after phase 24 complete*
