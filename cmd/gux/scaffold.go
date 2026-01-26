@@ -106,10 +106,11 @@ func runInit(appName, modulePath string) {
 		destPath string
 	}{
 		{"templates/go.mod.tmpl", "go.mod"},
-		{"templates/cmd/app/main.go.tmpl", "cmd/app/main.go"},
-		{"templates/cmd/server/main.go.tmpl", "cmd/server/main.go"},
-		{"templates/internal/api/types.go.tmpl", "internal/api/types.go"},
-		{"templates/internal/api/example.go.tmpl", "internal/api/example.go"},
+		{"templates/app.go.tmpl", "app.go"},
+		{"templates/models/item.go.tmpl", "models/item.go"},
+		{"templates/pages/home.go.tmpl", "pages/home.go"},
+		{"templates/pages/items.go.tmpl", "pages/items.go"},
+		{"templates/pages/item_new.go.tmpl", "pages/item_new.go"},
 		{"templates/Dockerfile.tmpl", "Dockerfile"},
 	}
 
@@ -134,6 +135,19 @@ func runInit(appName, modulePath string) {
 		fmt.Println("You may need to run 'go mod tidy' manually.")
 	} else {
 		fmt.Println("  dependencies downloaded")
+	}
+
+	// Run gux gen to generate API client
+	fmt.Println("\nRunning gux gen...")
+	genCmd := exec.Command("gux", "gen")
+	genCmd.Dir = targetDir
+	genCmd.Stdout = os.Stdout
+	genCmd.Stderr = os.Stderr
+	if err := genCmd.Run(); err != nil {
+		fmt.Printf("Warning: gux gen failed: %v\n", err)
+		fmt.Println("You may need to run 'gux gen' manually.")
+	} else {
+		fmt.Println("  API client generated")
 	}
 
 	printNextStepsWithDir(appName, initHere)
@@ -192,10 +206,11 @@ func isValidAppName(name string) bool {
 func checkForConflicts(targetDir string) []string {
 	filesToCheck := []string{
 		"go.mod",
-		"cmd/app/main.go",
-		"cmd/server/main.go",
-		"internal/api/types.go",
-		"internal/api/example.go",
+		"app.go",
+		"models/item.go",
+		"pages/home.go",
+		"pages/items.go",
+		"pages/item_new.go",
 		"Dockerfile",
 	}
 
