@@ -136,9 +136,9 @@ Full details: [milestones/v2.0-ROADMAP.md](milestones/v2.0-ROADMAP.md)
   - [x] 25-01-PLAN.md - Delete dead doc files, update navigation and core docs
   - [x] 25-02-PLAN.md - Update remaining docs, Claude skills, create verification script
   - [x] 25-03-PLAN.md - Gap closure: clean stale refs in docs/README.md, keyboard-shortcuts.md, accessibility.md
-- [ ] Phase 26: Dependency Cleanup (1 plan) - Clean up go.mod and verify builds
+- [ ] Phase 26: Dependency Cleanup (1/1 plans) - Clean up go.mod and verify builds
   Plans:
-  - [ ] 26-01-PLAN.md - Run go mod tidy, verify all examples build
+  - [ ] 26-01-PLAN.md - Clean dependencies (go mod tidy) and verify all 5 examples build
 
 </details>
 
@@ -174,4 +174,4 @@ Phases execute in numeric order: 1 -> 2 -> ... -> 15 -> 16 -> ... -> 23 -> 24 ->
 | 23. Admin Panel Example | v2.0 | 3/3 | Complete | 2026-01-23 |
 | 24. Code Removal | v2.1 | 1/1 | Complete | 2026-01-25 |
 | 25. Documentation Updates | v2.1 | 3/3 | Complete | 2026-01-26 |
-| 26. Dependency Cleanup | v2.1 | 0/1 | Pending | - |
+| 26. Dependency Cleanup | v2.1 | 1/1 | Ready | - |
