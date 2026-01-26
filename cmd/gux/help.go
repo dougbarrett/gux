@@ -318,6 +318,51 @@ func ItemNew(r *core.Router) func() core.Node {
 }
 `,
 	},
+	"model": {
+		Name:        "model",
+		Description: "GORM model with common fields",
+		FilePath:    "models/item.go",
+		Template: `// models/item.go
+package models
+
+import "gorm.io/gorm"
+
+// Item is a GORM model example.
+type Item struct {
+	gorm.Model
+	Name        string ` + "`" + `json:"name"` + "`" + `
+	Description string ` + "`" + `json:"description"` + "`" + `
+}
+`,
+	},
+	"dto": {
+		Name:        "dto",
+		Description: "DTO structs with gux tags for field mapping",
+		FilePath:    "dto/item.go",
+		Template: `// dto/item.go
+package dto
+
+import "time"
+
+// ItemList is the DTO for item list responses.
+// The gux tags map DTO fields to model fields for automatic code generation.
+type ItemList struct {
+	ID        uint      ` + "`" + `json:"id" gux:"Item.ID"` + "`" + `
+	Name      string    ` + "`" + `json:"name" gux:"Item.Name"` + "`" + `
+	CreatedAt time.Time ` + "`" + `json:"created_at" gux:"Item.CreatedAt"` + "`" + `
+}
+
+// ItemDetail is the DTO for single item responses.
+// Use preload tag to include related data.
+type ItemDetail struct {
+	ID          uint      ` + "`" + `json:"id" gux:"Item.ID"` + "`" + `
+	Name        string    ` + "`" + `json:"name" gux:"Item.Name"` + "`" + `
+	Description string    ` + "`" + `json:"description" gux:"Item.Description"` + "`" + `
+	CreatedAt   time.Time ` + "`" + `json:"created_at" gux:"Item.CreatedAt"` + "`" + `
+	UpdatedAt   time.Time ` + "`" + `json:"updated_at" gux:"Item.UpdatedAt"` + "`" + `
+}
+`,
+	},
 }
 
 // getModulePathForHelp reads go.mod and extracts the module path.
