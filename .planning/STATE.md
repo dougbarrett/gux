@@ -40,6 +40,9 @@ Full decision log preserved in milestone archives:
 | ID | Phase | Decision | Impact |
 |----|-------|----------|--------|
 | 27-01-D1 | 27 | Use core.New() pattern instead of cmd/app | Generated apps follow modern examples/minimal pattern |
+| 27-02-D1 | 27 | Use ui components (Card, Table, FormField, etc.) | Consistent styling across generated apps |
+| 27-02-D2 | 27 | State created inside inner function | Proper component lifecycle association |
+| 27-02-D3 | 27 | JSON serialization for complex state | Enables hydration of arrays and objects |
 
 ### Research Findings
 
@@ -62,9 +65,9 @@ v2.0 Tech Debt:
 ## Session Continuity
 
 Last session: 2026-01-26
-Stopped at: Completed 27-01-PLAN.md
+Stopped at: Completed 27-02-PLAN.md
 Resume file: None
 
 ---
 
-*Last updated: 2026-01-26 after completing plan 27-01*
+*Last updated: 2026-01-26 after completing plan 27-02*
