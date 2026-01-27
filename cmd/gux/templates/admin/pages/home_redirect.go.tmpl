@@ -1,0 +1,18 @@
+package pages
+
+import (
+	"{{.GuxModule}}/core"
+)
+
+// HomeRedirect redirects unauthenticated users to login, authenticated users to admin.
+func HomeRedirect(r *core.Router) func() core.Node {
+	return func() core.Node {
+		// Redirect based on authentication status
+		if r.IsAuthenticated() {
+			r.Navigate("/admin")
+		} else {
+			r.Navigate("/login")
+		}
+		return core.Frag()
+	}
+}

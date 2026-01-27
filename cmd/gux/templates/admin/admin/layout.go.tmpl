@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"{{.ModulePath}}/dto"
+	"{{.ModulePath}}/guxgen/api"
 
 	"{{.GuxModule}}/core"
 	"{{.GuxModule}}/ui"
@@ -34,6 +35,7 @@ func AdminLayout(page func(*core.Router) func() core.Node) func(*core.Router) fu
 			// State for sidebar
 			collapsed := r.StateBool("sidebar_collapsed", false)
 			mobileOpen := r.StateBool("sidebar_mobile", false)
+			userMenuOpen := r.StateBool("user_menu_open", false)
 
 			// Current path for active state
 			currentPath := r.Path()
@@ -67,6 +69,15 @@ func AdminLayout(page func(*core.Router) func() core.Node) func(*core.Router) fu
 				userEmail = ""
 			}
 
+			// Logout handler
+			handleLogout := func() {
+				api.Logout(struct{}{}, func(resp dto.LogoutResponse, err error) {
+					if err == nil && resp.Success {
+						r.Navigate(resp.Redirect)
+					}
+				})
+			}
+
 			return ui.SidebarLayout(ui.SidebarLayoutProps{
 				Sidebar: ui.Sidebar(ui.SidebarProps{
 					Collapsed:     collapsed.Get(),
@@ -91,12 +102,11 @@ func AdminLayout(page func(*core.Router) func() core.Node) func(*core.Router) fu
 						ui.SidebarFooter(ui.SidebarFooterProps{
 							Collapsed: collapsed.Get(),
 							Children: []core.Node{
-								ui.SidebarUser(ui.SidebarUserProps{
-									Name:      userName,
-									Email:     userEmail,
-									Href:      "/admin/profile",
-									Collapsed: collapsed.Get(),
-								}),
+								// User menu with dropdown
+								userMenu(userName, userEmail, collapsed.Get(), userMenuOpen.Get(),
+									func() { userMenuOpen.Set(!userMenuOpen.Get()) },
+									handleLogout,
+								),
 							},
 						}),
 					},
@@ -115,6 +125,67 @@ func AdminLayout(page func(*core.Router) func() core.Node) func(*core.Router) fu
 			})
 		}
 	}
+}
+
+// userMenu creates a user display with a dropdown menu containing logout.
+func userMenu(name, email string, collapsed, menuOpen bool, onToggle, onLogout func()) core.Node {
+	// Base classes for the user button
+	buttonClass := "flex items-center w-full rounded-lg transition-colors cursor-pointer text-gray-300 hover:bg-gray-700 hover:text-white"
+	if collapsed {
+		buttonClass += " justify-center p-2"
+	} else {
+		buttonClass += " gap-4 p-3"
+	}
+
+	var content []core.Node
+
+	// Avatar
+	content = append(content, ui.Avatar(ui.AvatarProps{
+		Name:  name,
+		Size:  ui.AvatarMD,
+		Class: "flex-shrink-0",
+	}))
+
+	// User info (hidden when collapsed)
+	if !collapsed {
+		content = append(content,
+			core.Div(core.Class("flex-1 min-w-0 text-left"),
+				core.Div(core.Class("font-medium text-white text-sm truncate"), core.Text(name)),
+				core.Div(core.Class("text-xs text-gray-400 truncate"), core.Text(email)),
+			),
+			// Chevron indicator
+			ui.Icon(ui.IconProps{
+				Name:  "chevron-up",
+				Size:  ui.IconSM,
+				Class: "text-gray-400",
+			}),
+		)
+	}
+
+	// Dropdown menu (positioned above the button)
+	var dropdown core.Node = core.Frag()
+	if menuOpen && !collapsed {
+		dropdown = core.Div(core.Class("absolute bottom-full left-0 right-0 mb-2 bg-gray-700 rounded-lg shadow-lg overflow-hidden"),
+			core.Div(core.Class("py-1"),
+				// Logout button
+				core.Button(core.Attrs{
+					Class:   "w-full px-4 py-2 text-left text-sm text-gray-300 hover:bg-gray-600 hover:text-white flex items-center gap-2",
+					OnClick: onLogout,
+				},
+					ui.Icon(ui.IconProps{Name: "log-out", Size: ui.IconSM}),
+					core.Text("Sign out"),
+				),
+			),
+		)
+	}
+
+	return core.Div(core.Class("relative"),
+		dropdown,
+		core.Button(core.Attrs{
+			Class:   buttonClass,
+			OnClick: onToggle,
+		}, content...),
+	)
 }
 
 // PageHeader creates a consistent page header with title and breadcrumbs.

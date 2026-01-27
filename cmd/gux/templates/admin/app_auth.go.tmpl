@@ -67,8 +67,9 @@ func main() {
 	// Register API endpoints
 	registerAPIEndpoints(app, db)
 
-	// Public routes (login page - standalone, no sidebar)
+	// Redirect homepage to login
 	app.Routes().
+		Hybrid("/", pages.HomeRedirect).
 		Hybrid("/login", pages.Login)
 {{if .PublicSignup}}
 	// Public registration

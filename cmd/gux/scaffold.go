@@ -226,8 +226,12 @@ func runInit(appName, modulePath string, authMode AuthMode, withAdmin bool) {
 
 		// Add pages based on whether admin is also enabled
 		if withAdmin {
-			// Auth + Admin: login page standalone (no sidebar)
+			// Auth + Admin: login page standalone (no sidebar), home redirect
 			filesToCreate = append(filesToCreate,
+				struct {
+					tmplPath string
+					destPath string
+				}{"templates/admin/pages/home_redirect.go.tmpl", "pages/home_redirect.go"},
 				struct {
 					tmplPath string
 					destPath string
