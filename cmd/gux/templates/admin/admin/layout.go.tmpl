@@ -71,7 +71,7 @@ func AdminLayout(page func(*core.Router) func() core.Node) func(*core.Router) fu
 
 			// Logout handler
 			handleLogout := func() {
-				api.Logout(struct{}{}, func(resp dto.LogoutResponse, err error) {
+				api.Logout(func(resp dto.LogoutResponse, err error) {
 					if err == nil && resp.Success {
 						r.Navigate(resp.Redirect)
 					}
