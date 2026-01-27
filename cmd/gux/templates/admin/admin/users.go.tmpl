@@ -16,6 +16,14 @@ func Users(r *core.Router) func() core.Node {
 	users := core.UseState(r, "users", []dto.UserList{})
 	loading := r.StateBool("loading", true)
 
+	// State for add user modal
+	showAddModal := r.StateBool("show_add_modal", false)
+	newName := r.StateString("new_name", "")
+	newEmail := r.StateString("new_email", "")
+	newPassword := r.StateString("new_password", "")
+	addError := r.StateString("add_error", "")
+	addSaving := r.StateBool("add_saving", false)
+
 	// Fetch users on load
 	r.OnLoad(func() {
 		api.Users.List(func(result []dto.UserList, err error) {
@@ -25,6 +33,24 @@ func Users(r *core.Router) func() core.Node {
 			}
 		})
 	})
+
+	// Refresh users list
+	refreshUsers := func() {
+		api.Users.List(func(result []dto.UserList, err error) {
+			if err == nil {
+				users.Set(result)
+			}
+		})
+	}
+
+	// Reset add form
+	resetAddForm := func() {
+		newName.Set("")
+		newEmail.Set("")
+		newPassword.Set("")
+		addError.Set("")
+		addSaving.Set(false)
+	}
 
 	return func() core.Node {
 		// Build table rows
@@ -74,7 +100,132 @@ func Users(r *core.Router) func() core.Node {
 			tableContent = core.Frag(rows...)
 		}
 
+		// Add user modal
+		var addModal core.Node = core.Frag()
+		if showAddModal.Get() {
+			// Error alert
+			var errorNode core.Node = core.Frag()
+			if addError.Get() != "" {
+				errorNode = core.Div(core.Class("mb-4"),
+					ui.Alert(ui.AlertProps{
+						Variant: ui.AlertError,
+						Message: addError.Get(),
+					}),
+				)
+			}
+
+			addModal = core.Div(core.Class("fixed inset-0 bg-black/50 flex items-center justify-center z-50"),
+				ui.Card(ui.CardProps{
+					Class: "max-w-md w-full mx-4",
+					Children: []core.Node{
+						ui.CardHeader(ui.CardHeaderProps{
+							Children: []core.Node{
+								core.H3(core.Class("text-lg font-semibold text-gray-900 dark:text-white"),
+									core.Text("Add New User")),
+							},
+						}),
+						ui.CardContent(ui.CardContentProps{
+							Children: []core.Node{
+								errorNode,
+								core.Div(core.Class("space-y-4"),
+									// Name field
+									core.Div(core.Attrs{},
+										core.Label(core.Attrs{
+											Class: "block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1",
+										}, core.Text("Name")),
+										ui.Input(ui.InputProps{
+											Type:        ui.InputText,
+											Placeholder: "Enter name",
+											Value:       newName.Get(),
+											OnChange:    func(v string) { newName.Set(v) },
+										}),
+									),
+									// Email field
+									core.Div(core.Attrs{},
+										core.Label(core.Attrs{
+											Class: "block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1",
+										}, core.Text("Email")),
+										ui.Input(ui.InputProps{
+											Type:        ui.InputEmail,
+											Placeholder: "Enter email",
+											Value:       newEmail.Get(),
+											OnChange:    func(v string) { newEmail.Set(v) },
+										}),
+									),
+									// Password field
+									core.Div(core.Attrs{},
+										core.Label(core.Attrs{
+											Class: "block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1",
+										}, core.Text("Password")),
+										ui.Input(ui.InputProps{
+											Type:        ui.InputPassword,
+											Placeholder: "Enter password",
+											Value:       newPassword.Get(),
+											OnChange:    func(v string) { newPassword.Set(v) },
+										}),
+									),
+								),
+							},
+						}),
+						ui.CardFooter(ui.CardFooterProps{
+							Class: "flex justify-end gap-2",
+							Children: []core.Node{
+								ui.Button(ui.ButtonProps{
+									Variant:  ui.ButtonSecondary,
+									Disabled: addSaving.Get(),
+									OnClick: func() {
+										resetAddForm()
+										showAddModal.Set(false)
+									},
+									Children: []core.Node{core.Text("Cancel")},
+								}),
+								ui.Button(ui.ButtonProps{
+									Variant:  ui.ButtonPrimary,
+									Disabled: addSaving.Get(),
+									OnClick: func() {
+										// Validate
+										if newName.Get() == "" || newEmail.Get() == "" || newPassword.Get() == "" {
+											addError.Set("All fields are required")
+											return
+										}
+
+										addSaving.Set(true)
+										addError.Set("")
+
+										data := map[string]interface{}{
+											"name":     newName.Get(),
+											"email":    newEmail.Get(),
+											"password": newPassword.Get(),
+										}
+										api.Users.Create(data, func(_ *dto.UserDetail, err error) {
+											addSaving.Set(false)
+											if err != nil {
+												addError.Set("Failed to create user: " + err.Error())
+												return
+											}
+											resetAddForm()
+											showAddModal.Set(false)
+											refreshUsers()
+										})
+									},
+									Children: []core.Node{
+										core.Text(func() string {
+											if addSaving.Get() {
+												return "Creating..."
+											}
+											return "Create User"
+										}()),
+									},
+								}),
+							},
+						}),
+					},
+				}),
+			)
+		}
+
 		return core.Frag(
+			addModal,
 			PageHeader("Users", "Manage system users", []dto.Breadcrumb{
 				{Label: "Admin", Href: "/admin"},
 				{Label: "Users", Href: "/admin/users"},
@@ -84,6 +235,7 @@ func Users(r *core.Router) func() core.Node {
 			core.Div(core.Class("flex justify-end mb-6"),
 				ui.Button(ui.ButtonProps{
 					Variant: ui.ButtonPrimary,
+					OnClick: func() { showAddModal.Set(true) },
 					Children: []core.Node{
 						ui.Icon(ui.IconProps{Name: "plus", Size: ui.IconSM, Class: "mr-2"}),
 						core.Text("Add User"),
