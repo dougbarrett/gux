@@ -961,6 +961,16 @@ func (s *State[T]) Get() T {
 				return any(uint(f)).(T)
 			}
 		}
+		// Handle complex types from JSON (slices, maps, structs)
+		// Re-marshal and unmarshal to convert []interface{} to []T etc.
+		if jsonBytes, err := json.Marshal(val); err == nil {
+			var result T
+			if err := json.Unmarshal(jsonBytes, &result); err == nil {
+				// Cache the converted value for future Gets
+				s.router.state[s.key] = result
+				return result
+			}
+		}
 	}
 	var zero T
 	return zero

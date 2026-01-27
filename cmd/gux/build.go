@@ -1050,24 +1050,15 @@ func fetchLoader(path string, callback func(map[string]any)) {
 	promise.Call("then", js.FuncOf(func(this js.Value, args []js.Value) any {
 		resp := args[0]
 		if resp.Get("ok").Bool() {
-			resp.Call("json").Call("then", js.FuncOf(func(this js.Value, args []js.Value) any {
-				// Convert JS object to Go map
-				state := make(map[string]any)
-				jsObj := args[0]
-				keys := js.Global().Get("Object").Call("keys", jsObj)
-				for i := 0; i < keys.Get("length").Int(); i++ {
-					key := keys.Index(i).String()
-					val := jsObj.Get(key)
-					switch val.Type() {
-					case js.TypeNumber:
-						state[key] = val.Float()
-					case js.TypeBoolean:
-						state[key] = val.Bool()
-					case js.TypeString:
-						state[key] = val.String()
-					}
+			resp.Call("text").Call("then", js.FuncOf(func(this js.Value, args []js.Value) any {
+				// Parse JSON response properly to preserve all types (arrays, objects, etc.)
+				jsonStr := args[0].String()
+				var state map[string]any
+				if err := json.Unmarshal([]byte(jsonStr), &state); err == nil {
+					callback(state)
+				} else {
+					callback(nil)
 				}
-				callback(state)
 				return nil
 			}))
 		} else {
@@ -1359,24 +1350,15 @@ func fetchLoader(path string, callback func(map[string]any)) {
 	promise.Call("then", js.FuncOf(func(this js.Value, args []js.Value) any {
 		resp := args[0]
 		if resp.Get("ok").Bool() {
-			resp.Call("json").Call("then", js.FuncOf(func(this js.Value, args []js.Value) any {
-				// Convert JS object to Go map
-				state := make(map[string]any)
-				jsObj := args[0]
-				keys := js.Global().Get("Object").Call("keys", jsObj)
-				for i := 0; i < keys.Get("length").Int(); i++ {
-					key := keys.Index(i).String()
-					val := jsObj.Get(key)
-					switch val.Type() {
-					case js.TypeNumber:
-						state[key] = val.Float()
-					case js.TypeBoolean:
-						state[key] = val.Bool()
-					case js.TypeString:
-						state[key] = val.String()
-					}
+			resp.Call("text").Call("then", js.FuncOf(func(this js.Value, args []js.Value) any {
+				// Parse JSON response properly to preserve all types (arrays, objects, etc.)
+				jsonStr := args[0].String()
+				var state map[string]any
+				if err := json.Unmarshal([]byte(jsonStr), &state); err == nil {
+					callback(state)
+				} else {
+					callback(nil)
 				}
-				callback(state)
 				return nil
 			}))
 		} else {
