@@ -14,6 +14,7 @@ func UserNew(r *core.Router) func() core.Node {
 	name := r.StateString("name", "")
 	email := r.StateString("email", "")
 	password := r.StateString("password", "")
+	role := r.StateString("role", "user")
 
 	// Form state
 	saving := r.StateBool("saving", false)
@@ -39,7 +40,6 @@ func UserNew(r *core.Router) func() core.Node {
 			}),
 
 			ui.Card(ui.CardProps{
-				Class: "max-w-2xl",
 				Children: []core.Node{
 					ui.CardHeader(ui.CardHeaderProps{
 						Children: []core.Node{
@@ -89,6 +89,20 @@ func UserNew(r *core.Router) func() core.Node {
 										OnChange:    func(v string) { password.Set(v) },
 									}),
 								),
+								// Role field
+								core.Div(core.Attrs{},
+									core.Label(core.Attrs{
+										Class: "block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1",
+									}, core.Text("Role")),
+									ui.Select(ui.SelectProps{
+										Value: role.Get(),
+										Options: []ui.SelectOption{
+											{Value: "user", Label: "User"},
+											{Value: "admin", Label: "Admin"},
+										},
+										OnChange: func(v string) { role.Set(v) },
+									}),
+								),
 							),
 						},
 					}),
@@ -125,6 +139,7 @@ func UserNew(r *core.Router) func() core.Node {
 											"name":     name.Get(),
 											"email":    email.Get(),
 											"password": password.Get(),
+											"role":     role.Get(),
 										}
 										api.Users.Create(data, func(_ *dto.UserDetail, err error) {
 											saving.Set(false)

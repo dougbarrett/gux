@@ -25,6 +25,7 @@ func UserDetail(r *core.Router) func() core.Node {
 	// Editable fields
 	editName := r.StateString("edit_name", "")
 	editEmail := r.StateString("edit_email", "")
+	editRole := r.StateString("edit_role", "")
 
 	// Get user ID from route params
 	userIDStr := r.Param("id")
@@ -43,6 +44,9 @@ func UserDetail(r *core.Router) func() core.Node {
 			if editEmail.Get() == "" {
 				editEmail.Set(u.Email)
 			}
+			if editRole.Get() == "" {
+				editRole.Set(u.Role)
+			}
 			return
 		}
 
@@ -55,6 +59,7 @@ func UserDetail(r *core.Router) func() core.Node {
 			user.Set(*result)
 			editName.Set(result.Name)
 			editEmail.Set(result.Email)
+			editRole.Set(result.Role)
 		})
 	})
 
@@ -183,8 +188,20 @@ func UserDetail(r *core.Router) func() core.Node {
 								OnChange: func(v string) { editEmail.Set(v) },
 							}),
 						),
+						core.Div(core.Attrs{},
+							core.Label(core.Attrs{
+								Class: "block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1",
+							}, core.Text("Role")),
+							ui.Select(ui.SelectProps{
+								Value: editRole.Get(),
+								Options: []ui.SelectOption{
+									{Value: "user", Label: "User"},
+									{Value: "admin", Label: "Admin"},
+								},
+								OnChange: func(v string) { editRole.Set(v) },
+							}),
+						),
 						detailRow("User ID", userIDStr),
-						detailRow("Role", u.Role),
 					),
 				},
 			})
@@ -196,6 +213,7 @@ func UserDetail(r *core.Router) func() core.Node {
 						// Cancel - reset fields
 						editName.Set(u.Name)
 						editEmail.Set(u.Email)
+						editRole.Set(u.Role)
 						isEditing.Set(false)
 					},
 					Children: []core.Node{core.Text("Cancel")},
@@ -208,6 +226,7 @@ func UserDetail(r *core.Router) func() core.Node {
 						data := map[string]interface{}{
 							"name":  editName.Get(),
 							"email": editEmail.Get(),
+							"role":  editRole.Get(),
 						}
 						api.Users.Update(u.ID, data, func(result *dto.UserDetail, err error) {
 							saving.Set(false)
@@ -239,7 +258,7 @@ func UserDetail(r *core.Router) func() core.Node {
 			})
 			footerButtons = core.Div(core.Class("flex gap-2"),
 				ui.Button(ui.ButtonProps{
-					Variant: ui.ButtonSecondary,
+					Variant: ui.ButtonPrimary,
 					OnClick: func() { isEditing.Set(true) },
 					Children: []core.Node{core.Text("Edit")},
 				}),

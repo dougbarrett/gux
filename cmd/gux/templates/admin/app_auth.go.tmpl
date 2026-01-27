@@ -93,7 +93,12 @@ func main() {
 			} else {
 				return nil, errors.New("password is required")
 			}
-			user.Role = "user" // Default role for new users
+			// Set role from data, default to "user"
+			if role, ok := data["role"].(string); ok && role != "" {
+				user.Role = role
+			} else {
+				user.Role = "user"
+			}
 			return user, nil
 		}),
 		core.WithUpdateHook(func(existing interface{}, data map[string]interface{}) (interface{}, error) {
@@ -103,6 +108,9 @@ func main() {
 			}
 			if email, ok := data["email"].(string); ok {
 				user.Email = email
+			}
+			if role, ok := data["role"].(string); ok {
+				user.Role = role
 			}
 			if password, ok := data["password"].(string); ok && password != "" {
 				user.SetPassword(password)
