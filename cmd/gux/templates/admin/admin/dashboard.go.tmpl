@@ -15,8 +15,13 @@ func Dashboard(r *core.Router) func() core.Node {
 	// State for stats
 	userCount := r.StateInt("user_count", 0)
 
-	// Fetch stats on load
+	// Fetch stats on load (skip if already hydrated from SSR)
 	r.OnLoad(func() {
+		// If we already have data from SSR hydration, don't re-fetch
+		if userCount.Get() > 0 {
+			return
+		}
+
 		api.Users.List(func(users []dto.UserList, err error) {
 			if err == nil {
 				userCount.Set(len(users))

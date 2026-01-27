@@ -30,8 +30,22 @@ func UserDetail(r *core.Router) func() core.Node {
 	userIDStr := r.Param("id")
 	userID, _ := strconv.ParseUint(userIDStr, 10, 64)
 
-	// Fetch user on load
+	// Fetch user on load (skip if already hydrated from SSR)
 	r.OnLoad(func() {
+		// If we already have user data from SSR hydration, don't re-fetch
+		if user.Get().ID > 0 {
+			loading.Set(false)
+			// Initialize edit fields from hydrated data
+			u := user.Get()
+			if editName.Get() == "" {
+				editName.Set(u.Name)
+			}
+			if editEmail.Get() == "" {
+				editEmail.Set(u.Email)
+			}
+			return
+		}
+
 		api.Users.Get(uint(userID), func(result *dto.UserDetail, err error) {
 			loading.Set(false)
 			if err != nil {

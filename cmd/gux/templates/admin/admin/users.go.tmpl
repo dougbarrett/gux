@@ -24,8 +24,14 @@ func Users(r *core.Router) func() core.Node {
 	addError := r.StateString("add_error", "")
 	addSaving := r.StateBool("add_saving", false)
 
-	// Fetch users on load
+	// Fetch users on load (skip if already hydrated from SSR)
 	r.OnLoad(func() {
+		// If we already have users from SSR hydration, don't re-fetch
+		if len(users.Get()) > 0 {
+			loading.Set(false)
+			return
+		}
+
 		api.Users.List(func(result []dto.UserList, err error) {
 			loading.Set(false)
 			if err == nil {
