@@ -29,12 +29,13 @@ type TemplateData struct {
 	ModulePath   string
 	GuxModule    string
 	GuxVersion   string
-	WithAuth     bool // true if --auth or --auth-public
-	PublicSignup bool // true if --auth-public (allows public registration)
-	WithAdmin    bool // true if --admin (admin panel with sidebar layout)
+	WithAuth     bool   // true if --auth or --auth-public
+	PublicSignup bool   // true if --auth-public (allows public registration)
+	WithAdmin    bool   // true if --admin (admin panel with sidebar layout)
+	Port         string // Server port (default: 8080)
 }
 
-func runInit(appName, modulePath string, authMode AuthMode, withAdmin bool) {
+func runInit(appName, modulePath string, authMode AuthMode, withAdmin bool, port string) {
 	// Check if initializing in current directory
 	initHere := appName == "."
 	var targetDir string
@@ -104,6 +105,11 @@ func runInit(appName, modulePath string, authMode AuthMode, withAdmin bool) {
 		guxVersion = "latest"
 	}
 
+	// Default port if not specified
+	if port == "" {
+		port = "8080"
+	}
+
 	data := TemplateData{
 		AppName:      appName,
 		ModulePath:   modulePath,
@@ -112,6 +118,7 @@ func runInit(appName, modulePath string, authMode AuthMode, withAdmin bool) {
 		WithAuth:     authMode != AuthModeNone,
 		PublicSignup: authMode == AuthModePublic,
 		WithAdmin:    withAdmin,
+		Port:         port,
 	}
 
 	// Define files to create from templates

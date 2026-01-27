@@ -13,18 +13,20 @@ import (
 
 // InitOptions holds the options gathered from interactive prompts
 type InitOptions struct {
-	AppName      string
-	ModulePath   string
-	AuthMode     AuthMode
-	WithAdmin    bool
-	AdminEmail   string
+	AppName       string
+	ModulePath    string
+	AuthMode      AuthMode
+	WithAdmin     bool
+	AdminEmail    string
 	AdminPassword string
+	Port          string
 }
 
 // RunInteractiveInit runs the interactive prompts for gux init
-func RunInteractiveInit(appName string, providedModule string) {
+func RunInteractiveInit(appName string, providedModule string, providedPort string) {
 	opts := InitOptions{
 		AppName: appName,
+		Port:    providedPort,
 	}
 
 	// Determine if we're initializing in current directory
@@ -86,6 +88,32 @@ func RunInteractiveInit(appName string, providedModule string) {
 			Negative("No").
 			Value(&opts.WithAdmin),
 	))
+
+	// Port selection (only if not provided via flag or if default)
+	if opts.Port == "" || opts.Port == "8080" {
+		if opts.Port == "" {
+			opts.Port = "8080"
+		}
+		groups = append(groups, huh.NewGroup(
+			huh.NewInput().
+				Title("Server port").
+				Description("Port for the development server").
+				Placeholder("8080").
+				Value(&opts.Port).
+				Validate(func(s string) error {
+					if s == "" {
+						return nil // Empty means use default
+					}
+					// Basic validation - should be numeric
+					for _, c := range s {
+						if c < '0' || c > '9' {
+							return fmt.Errorf("port must be a number")
+						}
+					}
+					return nil
+				}),
+		))
+	}
 
 	// Run the form
 	form := huh.NewForm(groups...)
@@ -211,22 +239,28 @@ func generateSecurePassword(length int) string {
 // runInitWithEnv runs init and creates .env file with credentials
 func runInitWithEnv(originalAppName string, opts InitOptions) {
 	// Run the standard init
-	runInit(originalAppName, opts.ModulePath, opts.AuthMode, opts.WithAdmin)
+	runInit(originalAppName, opts.ModulePath, opts.AuthMode, opts.WithAdmin, opts.Port)
 
-	// If auth is enabled, create .env file with credentials
+	targetDir := originalAppName
+	if originalAppName == "." {
+		targetDir = "."
+	}
+
+	// Determine port line
+	port := opts.Port
+	if port == "" {
+		port = "8080"
+	}
+
+	// If auth is enabled, create .env file with credentials and port
 	if opts.AuthMode != AuthModeNone {
-		targetDir := originalAppName
-		if originalAppName == "." {
-			targetDir = "."
-		}
-
 		envContent := fmt.Sprintf(`# Admin credentials (created by gux init)
 ADMIN_EMAIL=%s
 ADMIN_PASSWORD=%s
 
-# Server port (optional)
-# PORT=8080
-`, opts.AdminEmail, opts.AdminPassword)
+# Server port
+PORT=%s
+`, opts.AdminEmail, opts.AdminPassword, port)
 
 		envPath := filepath.Join(targetDir, ".env")
 		if err := os.WriteFile(envPath, []byte(envContent), 0600); err != nil {
@@ -236,7 +270,21 @@ ADMIN_PASSWORD=%s
 			fmt.Printf("\n  Admin credentials:\n")
 			fmt.Printf("    Email:    %s\n", opts.AdminEmail)
 			fmt.Printf("    Password: %s\n", opts.AdminPassword)
+			fmt.Printf("    Port:     %s\n", port)
 			fmt.Println("\n  Save these credentials - the password won't be shown again!")
+		}
+	} else {
+		// No auth - just create .env with port if non-default
+		if port != "8080" {
+			envContent := fmt.Sprintf(`# Server port
+PORT=%s
+`, port)
+			envPath := filepath.Join(targetDir, ".env")
+			if err := os.WriteFile(envPath, []byte(envContent), 0600); err != nil {
+				fmt.Printf("Warning: could not create .env file: %v\n", err)
+			} else {
+				fmt.Println("  created .env")
+			}
 		}
 	}
 }

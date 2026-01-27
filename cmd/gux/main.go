@@ -30,6 +30,7 @@ func main() {
 		withAuth := initCmd.Bool("auth", false, "Include authentication (admin-only, no public signup)")
 		withAuthPublic := initCmd.Bool("auth-public", false, "Include authentication with public signup")
 		withAdmin := initCmd.Bool("admin", false, "Include admin panel with sidebar layout")
+		port := initCmd.String("port", "8080", "Server port (default: 8080)")
 		nonInteractive := initCmd.Bool("yes", false, "Non-interactive mode with defaults (no auth, no admin)")
 		initCmd.Parse(os.Args[2:])
 
@@ -45,7 +46,7 @@ func main() {
 		// Determine if we should run interactive mode
 		// Interactive if: no auth flags, no admin flag, and not --yes
 		if ShouldRunInteractive(*withAuth, *withAuthPublic, *withAdmin) && !*nonInteractive {
-			RunInteractiveInit(appName, *modulePath)
+			RunInteractiveInit(appName, *modulePath, *port)
 		} else {
 			// Non-interactive mode with explicit flags
 			authMode := AuthModeNone
@@ -54,7 +55,7 @@ func main() {
 			} else if *withAuth {
 				authMode = AuthModePrivate
 			}
-			runInit(appName, *modulePath, authMode, *withAdmin)
+			runInit(appName, *modulePath, authMode, *withAdmin, *port)
 		}
 
 	case "gen", "generate":
@@ -144,6 +145,7 @@ Init options:
     --auth              Include authentication (admin-only, no public signup)
     --auth-public       Include authentication with public signup
     --admin             Include admin panel with sidebar layout
+    --port <port>       Server port (default: 8080)
     --yes               Non-interactive mode with defaults (no auth, no admin)
 
 Interactive mode:
@@ -157,6 +159,7 @@ Examples:
     gux init myapp                                # Interactive setup wizard
     gux init --yes myapp                          # Quick start with defaults
     gux init --auth --admin --module github.com/x/y app   # Admin with auth
+    gux init --port 3000 myapp                    # Custom port
     gux init --module github.com/myuser/myapp .           # Current directory
     gux gen                  # Generate guxgen files only
     gux gen --watch          # Generate and watch for changes
