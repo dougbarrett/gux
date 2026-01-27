@@ -212,11 +212,13 @@ func findInterfaces(node *ast.File) []InterfaceInfo {
 						methodInfo.ReturnType = returnType
 						methodInfo.HasReturn = true
 
-						// Check if pointer or slice
-						if _, ok := firstResult.Type.(*ast.StarExpr); ok {
+						// Check if pointer or slice (handle nested types like *[]User)
+						typeExpr := firstResult.Type
+						if star, ok := typeExpr.(*ast.StarExpr); ok {
 							methodInfo.IsPointer = true
+							typeExpr = star.X // Look inside the pointer
 						}
-						if _, ok := firstResult.Type.(*ast.ArrayType); ok {
+						if _, ok := typeExpr.(*ast.ArrayType); ok {
 							methodInfo.IsSlice = true
 						}
 					}
