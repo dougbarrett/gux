@@ -104,6 +104,52 @@ r.User()                // Authenticated user (or nil)
 r.IsAuthenticated()     // Check if logged in
 r.HasRole("admin")      // Check user role
 ```
+
+## API Authentication
+
+All CRUD and typed API endpoints are **protected by default** when auth is configured.
+
+### CRUD Endpoints
+
+```go
+// Protected by default
+app.CRUD(models.Order{})
+
+// Public endpoint (no auth required)
+app.CRUD(models.Product{}, core.WithPublic())
+
+// Requires specific role(s)
+app.CRUD(models.User{}, core.WithRoles("admin"))
+```
+
+### Typed API Endpoints
+
+```go
+// Protected by default
+core.APIGet(app, "/api/orders", listOrders)
+
+// Public endpoint
+core.APIGet(app, "/api/products", listProducts).Public()
+
+// Requires specific role
+core.APIGet(app, "/api/stats", getStats).WithRoles("admin")
+core.APIDelete(app, "/api/users/:id", deleteUser).WithRoles("admin")
+```
+
+### SSR Session Propagation
+
+To enable API calls during SSR to inherit user authentication, add this to app.go:
+
+```go
+import "{{.ModulePath}}/guxgen/api"
+
+func init() {
+    // Wire up SSR session propagation
+    core.SSRSessionSetter = api.SetEndpointSession
+    core.SSRSessionClearer = api.ClearEndpointSession
+}
+```
+
 {{if .WithAuth}}
 ## Authentication
 

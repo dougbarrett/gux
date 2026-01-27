@@ -49,14 +49,22 @@ current := count.Get()
 count.Set(current + 1)
 ```
 
-**CRUD with DTOs**:
+**CRUD with DTOs and Authentication**:
 ```go
+// Protected by default (requires authentication when auth is enabled)
 app.CRUD(models.User{},
     core.WithListDTO(dto.UserList{}),
     core.WithDetailDTO(dto.UserDetail{}, "Posts"), // with preload
     core.WithCreateHook(func(data map[string]interface{}) (interface{}, error) {
         // Custom creation logic (e.g., password hashing)
     }),
+    core.WithRoles("admin"), // Require admin role
+)
+
+// Public CRUD (no authentication required)
+app.CRUD(models.Product{},
+    core.WithPublic(), // Anyone can access
+    core.WithListDTO(dto.ProductList{}),
 )
 ```
 
@@ -75,27 +83,33 @@ type LoginResponse struct {
     Redirect string `json:"redirect,omitempty"`
 }
 
-// POST endpoint with request body - auto JSON decode/encode
+// POST endpoint - public (e.g., login doesn't require auth)
 core.API(app, "POST", "/api/login", func(ctx *core.APIContext, req LoginRequest) (LoginResponse, error) {
     db := ctx.DB().(*gorm.DB)
     // ... business logic
     ctx.Login(&core.SessionUser{ID: "123", Email: user.Email})
     return LoginResponse{Success: true, Redirect: "/dashboard"}, nil
-})
+}).Public()  // No auth required for login
 
-// GET endpoint without request body
+// GET endpoint - protected by default
 core.APIGet(app, "/api/users/:id", func(ctx *core.APIContext) (dto.UserDetail, error) {
     id := ctx.ParamUint("id")
     // ... fetch user
     return userDetail, nil
-})
+})  // Requires authentication when auth is enabled
 
-// DELETE endpoint
+// GET endpoint - public
+core.APIGet(app, "/api/products", func(ctx *core.APIContext) ([]dto.Product, error) {
+    // ... fetch products
+    return products, nil
+}).Public()  // Anyone can access
+
+// DELETE endpoint - requires admin role
 core.APIDelete(app, "/api/users/:id", func(ctx *core.APIContext) error {
     id := ctx.ParamUint("id")
     // ... delete user
     return nil
-})
+}).WithRoles("admin")  // Only admins can delete users
 ```
 
 **APIContext Methods**:
@@ -229,6 +243,61 @@ app.EnableCSRF(core.CSRFConfig{...})  // Custom configuration
 ```
 
 **Transparency**: Developers don't need to handle CSRF manually - it's automatic.
+
+## API Authentication
+
+All CRUD and typed API endpoints are **protected by default** when authentication is configured. This provides secure-by-default behavior.
+
+### CRUD Authentication
+
+```go
+// Protected by default (requires login)
+app.CRUD(models.Order{})
+
+// Public endpoint (no auth required)
+app.CRUD(models.Product{}, core.WithPublic())
+
+// Requires specific role(s) - user must have ANY of these roles
+app.CRUD(models.User{}, core.WithRoles("admin"))
+app.CRUD(models.AuditLog{}, core.WithRoles("admin", "auditor"))
+```
+
+### Typed API Authentication
+
+```go
+// Protected by default (requires login)
+core.APIGet(app, "/api/orders", listOrders)
+
+// Public endpoint (no auth required)
+core.APIGet(app, "/api/products", listProducts).Public()
+
+// Requires admin role
+core.APIGet(app, "/api/stats", getStats).WithRoles("admin")
+core.API(app, "POST", "/api/admin/users", createUser).WithRoles("admin")
+core.APIDelete(app, "/api/users/:id", deleteUser).WithRoles("admin")
+```
+
+### SSR Session Propagation
+
+When pages call protected APIs during server-side rendering, the user's session is automatically propagated. To enable this, wire up the generated API functions in your main():
+
+```go
+import "yourapp/guxgen/api"
+
+func main() {
+    // Wire up SSR session propagation
+    core.SSRSessionSetter = api.SetEndpointSession
+    core.SSRSessionClearer = api.ClearEndpointSession
+
+    // ... rest of setup
+}
+```
+
+This allows page loaders to call protected API endpoints during SSR while inheriting the user's authentication.
+
+### Backwards Compatibility
+
+If auth is not configured on the app (`app.EnableAuth()` not called), all endpoints remain accessible (backwards compatible behavior). Auth enforcement only applies when auth is explicitly configured.
 
 ## Testing Examples
 

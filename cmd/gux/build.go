@@ -2536,11 +2536,33 @@ import (
 // Set via InitEndpoints() or defaults to http://localhost:PORT.
 var endpointBaseURL = ""
 
+// endpointSessionID stores the current session ID for SSR requests.
+// This allows API calls during SSR to inherit the user's authentication.
+var endpointSessionID = ""
+
+// endpointSessionCookieName is the name of the session cookie.
+var endpointSessionCookieName = "__gux_session"
+
 // InitEndpoints sets the base URL for server-side API calls.
 // Call this in your main() before starting the server.
 // If not called, defaults to http://localhost:$PORT or http://localhost:8080.
 func InitEndpoints(baseURL string) {
 	endpointBaseURL = baseURL
+}
+
+// SetEndpointSession sets the session ID and cookie name for SSR API calls.
+// This should be called before rendering pages that make API calls.
+// The session is automatically propagated to API requests made during SSR.
+func SetEndpointSession(sessionID, cookieName string) {
+	endpointSessionID = sessionID
+	if cookieName != "" {
+		endpointSessionCookieName = cookieName
+	}
+}
+
+// ClearEndpointSession clears the session after page rendering is complete.
+func ClearEndpointSession() {
+	endpointSessionID = ""
 }
 
 // getEndpointBaseURL returns the base URL for API calls.
@@ -2557,6 +2579,7 @@ func getEndpointBaseURL() string {
 }
 
 // endpointFetch makes an HTTP request to the API endpoint.
+// If a session ID is set, it will be passed as a cookie for authentication.
 func endpointFetch(method, path string, body []byte) ([]byte, error) {
 	url := getEndpointBaseURL() + path
 
@@ -2570,6 +2593,14 @@ func endpointFetch(method, path string, body []byte) ([]byte, error) {
 		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/json")
+
+	// Pass session cookie if available (for SSR auth propagation)
+	if endpointSessionID != "" {
+		req.AddCookie(&http.Cookie{
+			Name:  endpointSessionCookieName,
+			Value: endpointSessionID,
+		})
+	}
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {

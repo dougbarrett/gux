@@ -251,13 +251,21 @@ Automatically generate REST endpoints for GORM models:
 // Basic CRUD - creates endpoints:
 // GET/POST    /__gux_api/crud/counters
 // GET/PUT/DEL /__gux_api/crud/counters/:id
+// Protected by default when auth is enabled
 app.CRUD(models.Counter{})
+
+// Public CRUD (no auth required)
+app.CRUD(models.Product{}, core.WithPublic())
+
+// Restricted to specific roles
+app.CRUD(models.User{}, core.WithRoles("admin"))
 
 // With DTOs (control what's exposed)
 app.CRUD(models.User{},
     core.WithListDTO(dto.UserList{}),                    // For list responses
     core.WithDetailDTO(dto.UserDetail{}, "Posts"),       // For single item, with preload
     core.WithDTO(dto.User{}),                            // Same DTO for both
+    core.WithRoles("admin"),                             // Admin only
 )
 
 // With create/update hooks (custom logic)
@@ -368,6 +376,59 @@ return nil, api.Forbidden("access denied")
 return nil, api.Conflict("email already exists")
 return nil, api.InternalError("database error")
 ```
+
+### API Authentication
+
+All CRUD and typed API endpoints are **protected by default** when auth is configured on the app.
+
+**CRUD Authentication:**
+```go
+// Protected by default (requires login)
+app.CRUD(models.Order{})
+
+// Public endpoint (no auth required)
+app.CRUD(models.Product{}, core.WithPublic())
+
+// Requires specific role(s) - user must have ANY of these
+app.CRUD(models.User{}, core.WithRoles("admin"))
+app.CRUD(models.AuditLog{}, core.WithRoles("admin", "auditor"))
+```
+
+**Typed API Authentication:**
+```go
+// Protected by default (requires login)
+core.APIGet(app, "/api/orders", listOrders)
+
+// Public endpoint (no auth required)
+core.APIGet(app, "/api/products", listProducts).Public()
+
+// Mark login endpoint as public
+core.API(app, "POST", "/api/login", handleLogin).Public()
+
+// Requires specific role
+core.APIGet(app, "/api/stats", getStats).WithRoles("admin")
+core.APIDelete(app, "/api/users/:id", deleteUser).WithRoles("admin")
+```
+
+**SSR Session Propagation:**
+
+When pages call protected APIs during server-side rendering, the user's session must be propagated. Wire this up in your app.go:
+
+```go
+import "yourapp/guxgen/api"
+
+func init() {
+    // Enable SSR session propagation
+    core.SSRSessionSetter = api.SetEndpointSession
+    core.SSRSessionClearer = api.ClearEndpointSession
+}
+```
+
+This allows page loaders that call `api.Orders.List()` etc. during SSR to inherit the user's authentication.
+
+**Backwards Compatibility:**
+
+If auth is not configured (`app.EnableAuth()` not called), all endpoints remain accessible. Auth enforcement only applies when auth is explicitly configured.
 
 ### DTO Mapping
 

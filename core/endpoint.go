@@ -124,6 +124,54 @@ type APIEndpoint struct {
 	ResponseType string // Response type name (empty for DELETE)
 }
 
+// APIRegistration is returned by API registration functions for chaining auth options.
+type APIRegistration struct {
+	app    *App
+	public bool
+	roles  []string
+}
+
+// Public marks this API endpoint as public (no authentication required).
+// By default, all API endpoints require authentication when auth is configured.
+func (r *APIRegistration) Public() *APIRegistration {
+	r.public = true
+	return r
+}
+
+// WithRoles specifies required roles for this API endpoint.
+// User must have ANY of the specified roles (OR logic).
+func (r *APIRegistration) WithRoles(roles ...string) *APIRegistration {
+	r.roles = roles
+	return r
+}
+
+// checkAPIAuth checks if the request is authorized for this endpoint.
+// Returns false and writes error response if not authorized.
+func (r *APIRegistration) checkAuth(ctx *APIContext, w http.ResponseWriter) bool {
+	// Public endpoints don't require auth
+	if r.public {
+		return true
+	}
+
+	// If auth is not configured, allow access (backwards compatibility)
+	if r.app.authConfig == nil || r.app.authConfig.SessionStore == nil {
+		return true
+	}
+
+	if ctx.user == nil {
+		api.WriteError(w, api.Unauthorized("authentication required"))
+		return false
+	}
+
+	// Check roles if specified
+	if len(r.roles) > 0 && !ctx.user.HasAnyRole(r.roles...) {
+		api.WriteError(w, api.Forbidden("insufficient permissions"))
+		return false
+	}
+
+	return true
+}
+
 // newAPIContext creates an APIContext from an HTTP request.
 func newAPIContext(app *App, w http.ResponseWriter, r *http.Request, pattern string) *APIContext {
 	ctx := &APIContext{
@@ -177,14 +225,17 @@ func extractPathParams(pattern, path string) map[string]string {
 
 // API registers a typed API endpoint that expects a request body.
 // Use for POST, PUT, PATCH methods.
+// Returns an APIRegistration for chaining auth options.
 //
 // Usage:
 //
 //	core.API(app, "POST", "/api/login", func(ctx *core.APIContext, req LoginRequest) (LoginResponse, error) {
 //	    // Business logic here
 //	    return LoginResponse{Success: true}, nil
-//	})
-func API[Req any, Res any](app *App, method string, path string, handler func(*APIContext, Req) (Res, error)) {
+//	}).Public()  // Mark as public (no auth required)
+//
+//	core.API(app, "POST", "/api/admin/users", createUser).WithRoles("admin")
+func API[Req any, Res any](app *App, method string, path string, handler func(*APIContext, Req) (Res, error)) *APIRegistration {
 	// Register metadata for code generation
 	app.apiEndpoints = append(app.apiEndpoints, APIEndpoint{
 		Method:       method,
@@ -193,9 +244,16 @@ func API[Req any, Res any](app *App, method string, path string, handler func(*A
 		ResponseType: getTypeName[Res](),
 	})
 
+	reg := &APIRegistration{app: app}
+
 	// Create HTTP handler
 	app.HandleFunc(method+" "+path, func(w http.ResponseWriter, r *http.Request) {
 		ctx := newAPIContext(app, w, r, path)
+
+		// Auth check
+		if !reg.checkAuth(ctx, w) {
+			return
+		}
 
 		// Decode request body
 		var req Req
@@ -215,9 +273,12 @@ func API[Req any, Res any](app *App, method string, path string, handler func(*A
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(res)
 	})
+
+	return reg
 }
 
 // APIGet registers a typed GET endpoint (no request body).
+// Returns an APIRegistration for chaining auth options.
 //
 // Usage:
 //
@@ -226,7 +287,10 @@ func API[Req any, Res any](app *App, method string, path string, handler func(*A
 //	    // ... fetch user
 //	    return user, nil
 //	})
-func APIGet[Res any](app *App, path string, handler func(*APIContext) (Res, error)) {
+//
+//	core.APIGet(app, "/api/products", listProducts).Public()  // No auth required
+//	core.APIGet(app, "/api/admin/stats", getStats).WithRoles("admin")
+func APIGet[Res any](app *App, path string, handler func(*APIContext) (Res, error)) *APIRegistration {
 	// Register metadata for code generation
 	app.apiEndpoints = append(app.apiEndpoints, APIEndpoint{
 		Method:       "GET",
@@ -234,9 +298,16 @@ func APIGet[Res any](app *App, path string, handler func(*APIContext) (Res, erro
 		ResponseType: getTypeName[Res](),
 	})
 
+	reg := &APIRegistration{app: app}
+
 	// Create HTTP handler
 	app.HandleFunc("GET "+path, func(w http.ResponseWriter, r *http.Request) {
 		ctx := newAPIContext(app, w, r, path)
+
+		// Auth check
+		if !reg.checkAuth(ctx, w) {
+			return
+		}
 
 		// Call handler
 		res, err := handler(ctx)
@@ -249,9 +320,12 @@ func APIGet[Res any](app *App, path string, handler func(*APIContext) (Res, erro
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(res)
 	})
+
+	return reg
 }
 
 // APIDelete registers a typed DELETE endpoint.
+// Returns an APIRegistration for chaining auth options.
 //
 // Usage:
 //
@@ -259,17 +333,24 @@ func APIGet[Res any](app *App, path string, handler func(*APIContext) (Res, erro
 //	    id := ctx.ParamUint("id")
 //	    // ... delete user
 //	    return nil
-//	})
-func APIDelete(app *App, path string, handler func(*APIContext) error) {
+//	}).WithRoles("admin")
+func APIDelete(app *App, path string, handler func(*APIContext) error) *APIRegistration {
 	// Register metadata for code generation
 	app.apiEndpoints = append(app.apiEndpoints, APIEndpoint{
 		Method: "DELETE",
 		Path:   path,
 	})
 
+	reg := &APIRegistration{app: app}
+
 	// Create HTTP handler
 	app.HandleFunc("DELETE "+path, func(w http.ResponseWriter, r *http.Request) {
 		ctx := newAPIContext(app, w, r, path)
+
+		// Auth check
+		if !reg.checkAuth(ctx, w) {
+			return
+		}
 
 		// Call handler
 		err := handler(ctx)
@@ -280,6 +361,8 @@ func APIDelete(app *App, path string, handler func(*APIContext) error) {
 
 		w.WriteHeader(http.StatusNoContent)
 	})
+
+	return reg
 }
 
 // getTypeName returns the name of a type using generics.

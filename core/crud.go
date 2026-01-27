@@ -6,6 +6,8 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+
+	"github.com/dougbarrett/gux/api"
 )
 
 // DTOMapper is implemented by DTOs that can map from a model.
@@ -36,6 +38,8 @@ type CRUDModel struct {
 	DetailPreloads []string     // Preloads for detail queries
 	OnCreate       CreateHook   // Optional hook for custom create logic
 	OnUpdate       UpdateHook   // Optional hook for custom update logic
+	Public         bool         // If true, no authentication required
+	Roles          []string     // Roles required to access (any of these roles)
 }
 
 // WithListDTO sets a DTO type for list responses.
@@ -93,6 +97,23 @@ func WithUpdateHook(hook UpdateHook) CRUDOption {
 	}
 }
 
+// WithPublic marks this CRUD endpoint as public (no authentication required).
+// By default, all CRUD endpoints require authentication.
+func WithPublic() CRUDOption {
+	return func(m *CRUDModel) {
+		m.Public = true
+	}
+}
+
+// WithRoles specifies required roles for this CRUD endpoint.
+// User must have ANY of the specified roles (OR logic).
+// CRUD endpoints are protected by default, so this just adds role restrictions.
+func WithRoles(roles ...string) CRUDOption {
+	return func(m *CRUDModel) {
+		m.Roles = roles
+	}
+}
+
 // DB interface for database operations (compatible with GORM)
 type DB interface {
 	Find(dest interface{}, conds ...interface{}) DB
@@ -117,6 +138,52 @@ func (a *App) SetDB(db interface{}) {
 // GetDB returns the database connection.
 func (a *App) GetDB() interface{} {
 	return a.db
+}
+
+// getUserFromRequest extracts the authenticated user from the request session.
+// Returns nil if not authenticated or auth is not configured.
+func (a *App) getUserFromRequest(r *http.Request) *SessionUser {
+	if a.authConfig == nil || a.authConfig.SessionStore == nil {
+		return nil
+	}
+	cookieName := a.authConfig.CookieName
+	if cookieName == "" {
+		cookieName = DefaultSessionCookieName
+	}
+	sessionID := getSessionIDFromCookie(r, cookieName)
+	if sessionID == "" {
+		return nil
+	}
+	user, _ := a.authConfig.SessionStore.Get(sessionID)
+	return user
+}
+
+// checkCRUDAuth checks if the request is authorized for a CRUD model.
+// Returns an error if not authorized, nil if authorized.
+func (a *App) checkCRUDAuth(w http.ResponseWriter, r *http.Request, model CRUDModel) bool {
+	// Public endpoints don't require auth
+	if model.Public {
+		return true
+	}
+
+	// If auth is not configured, allow access (backwards compatibility)
+	if a.authConfig == nil || a.authConfig.SessionStore == nil {
+		return true
+	}
+
+	user := a.getUserFromRequest(r)
+	if user == nil {
+		api.WriteError(w, api.Unauthorized("authentication required"))
+		return false
+	}
+
+	// Check roles if specified
+	if len(model.Roles) > 0 && !user.HasAnyRole(model.Roles...) {
+		api.WriteError(w, api.Forbidden("insufficient permissions"))
+		return false
+	}
+
+	return true
 }
 
 // CRUD registers CRUD endpoints for a model.
@@ -161,6 +228,11 @@ func (a *App) registerModelHandlers(mux *http.ServeMux, model CRUDModel) {
 
 	// List and Create: /__gux_api/crud/counters
 	mux.HandleFunc(basePath, func(w http.ResponseWriter, r *http.Request) {
+		// Auth check
+		if !a.checkCRUDAuth(w, r, model) {
+			return
+		}
+
 		// Check for trailing path (ID)
 		path := r.URL.Path
 		if strings.HasPrefix(path, basePath+"/") {
@@ -182,6 +254,11 @@ func (a *App) registerModelHandlers(mux *http.ServeMux, model CRUDModel) {
 
 	// Single item: /__gux_api/crud/counters/
 	mux.HandleFunc(basePath+"/", func(w http.ResponseWriter, r *http.Request) {
+		// Auth check
+		if !a.checkCRUDAuth(w, r, model) {
+			return
+		}
+
 		idStr := strings.TrimPrefix(r.URL.Path, basePath+"/")
 		if idStr == "" {
 			http.Error(w, "ID required", http.StatusBadRequest)

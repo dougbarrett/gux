@@ -526,9 +526,28 @@ func (a *App) Run(addr string) error {
 					}
 				}
 
+				// Set session context for SSR API calls
+				sessionID := ""
+				cookieName := DefaultSessionCookieName
+				if a.authConfig != nil {
+					sessionID = getSessionIDFromCookie(r, a.authConfig.CookieName)
+					if a.authConfig.CookieName != "" {
+						cookieName = a.authConfig.CookieName
+					}
+				}
+				if SSRSessionSetter != nil && sessionID != "" {
+					SSRSessionSetter(sessionID, cookieName)
+				}
+
 				router := NewRouterWithAuth(a.db, params, user, r, w, a.authConfig)
+				router.sessionID = sessionID
 				component := route.Handler(router)
 				component()
+
+				// Clear session context after rendering
+				if SSRSessionClearer != nil {
+					SSRSessionClearer()
+				}
 
 				// Include user in state for hydration
 				if user != nil {
@@ -606,10 +625,29 @@ func (a *App) Run(addr string) error {
 					}
 				}
 
+				// Set session context for SSR API calls
+				sessionID := ""
+				cookieName := DefaultSessionCookieName
+				if a.authConfig != nil {
+					sessionID = getSessionIDFromCookie(r, a.authConfig.CookieName)
+					if a.authConfig.CookieName != "" {
+						cookieName = a.authConfig.CookieName
+					}
+				}
+				if SSRSessionSetter != nil && sessionID != "" {
+					SSRSessionSetter(sessionID, cookieName)
+				}
+
 				// Create router with auth context
 				router := NewRouterWithAuth(a.db, params, user, r, w, a.authConfig)
+				router.sessionID = sessionID
 				component := route.Handler(router)
 				html := component().Render(HTML()).HTML()
+
+				// Clear session context after rendering
+				if SSRSessionClearer != nil {
+					SSRSessionClearer()
+				}
 
 				w.Header().Set("Content-Type", "text/html")
 
@@ -765,7 +803,17 @@ type Router struct {
 	request        *http.Request        // Current HTTP request (server-side only)
 	response       http.ResponseWriter  // Current HTTP response (server-side only)
 	authConfig     *AuthConfig          // Auth configuration (server-side only)
+	sessionID      string               // Session ID for SSR API calls
 }
+
+// SSRSessionSetter is a function that sets the session context for SSR API calls.
+// This is used to propagate authentication to API calls made during page rendering.
+// Set this to your generated api.SetEndpointSession function.
+var SSRSessionSetter func(sessionID, cookieName string)
+
+// SSRSessionClearer is a function that clears the session context after SSR rendering.
+// Set this to your generated api.ClearEndpointSession function.
+var SSRSessionClearer func()
 
 // SuppressRender temporarily suppresses re-renders during the callback.
 // Used by the DOM renderer for input events to avoid re-render on every keystroke.
