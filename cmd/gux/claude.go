@@ -112,6 +112,20 @@ func createBasicClaudeMD(targetDir string) {
 
 A Gux application built with Go and WebAssembly.
 
+## Claude Code Instructions
+
+**Use the `+"`"+`.claude/skills/gux-framework.md`+"`"+` skill when working on this project.** This skill contains comprehensive Gux framework knowledge including:
+
+- Core rendering system and Node patterns
+- State management (`+"`"+`StateInt`+"`"+`, `+"`"+`StateString`+"`"+`, `+"`"+`StateBool`+"`"+`, `+"`"+`UseState`+"`"+`)
+- Router methods (`+"`"+`Param`+"`"+`, `+"`"+`Path`+"`"+`, `+"`"+`Navigate`+"`"+`, `+"`"+`User`+"`"+`)
+- CRUD generation and DTO mapping
+- Typed API endpoints (`+"`"+`core.API`+"`"+`, `+"`"+`APIGet`+"`"+`, `+"`"+`APIDelete`+"`"+`)
+- UI components (`+"`"+`ui/`+"`"+` package)
+- Authentication and protected routes
+
+For questions not covered by the skill, fetch the docs: https://dougbarrett.github.io/gux/
+
 ## Quick Start
 
 `+"```bash"+`
@@ -128,9 +142,6 @@ gux clean        # Remove generated files
 - DTOs hide sensitive fields from API responses
 - Generated files in `+"`guxgen/`"+` should not be edited
 
-## Claude Code Skills
-
-This project includes the Gux framework skill for Claude Code.
 Run `+"`gux claude`"+` to update the skill file if needed.
 `, appName)
 
