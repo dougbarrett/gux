@@ -2572,12 +2572,17 @@ func %s(%s) {
 }
 `, ep.FuncName, ep.Method, ep.Path, ep.FuncName, paramStr, respType, ep.Method, urlExpr, respType, respType, respType))
 		} else {
-			// GET without request body
+			// Request without explicit body type
+			// POST/PUT/PATCH need an empty JSON object, GET needs nil
+			bodyArg := "nil"
+			if ep.Method == "POST" || ep.Method == "PUT" || ep.Method == "PATCH" {
+				bodyArg = `[]byte("{}")`
+			}
 			sb.WriteString(fmt.Sprintf(`
 // %s calls %s %s
 func %s(%s) {
 	go func() {
-		resp, err := apiEndpointFetch("%s", %s, nil)
+		resp, err := apiEndpointFetch("%s", %s, %s)
 		if err != nil {
 			var zero %s
 			callback(zero, err)
@@ -2592,7 +2597,7 @@ func %s(%s) {
 		callback(result, nil)
 	}()
 }
-`, ep.FuncName, ep.Method, ep.Path, ep.FuncName, paramStr, ep.Method, urlExpr, respType, respType, respType))
+`, ep.FuncName, ep.Method, ep.Path, ep.FuncName, paramStr, ep.Method, urlExpr, bodyArg, respType, respType, respType))
 		}
 	}
 
