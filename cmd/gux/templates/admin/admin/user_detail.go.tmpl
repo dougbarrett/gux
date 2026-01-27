@@ -1,0 +1,97 @@
+package admin
+
+import (
+	"{{.ModulePath}}/dto"
+
+	"{{.GuxModule}}/core"
+	"{{.GuxModule}}/ui"
+)
+
+// UserDetail renders the user detail page.
+func UserDetail(r *core.Router) func() core.Node {
+	return func() core.Node {
+		// Get user ID from route params
+		userID := r.Param("id")
+
+		// Sample user data - in real app, fetch from API based on userID
+		user := struct {
+			ID    string
+			Name  string
+			Email string
+			Role  string
+		}{
+			ID:    userID,
+			Name:  "User " + userID,
+			Email: "user" + userID + "@example.com",
+			Role:  "user",
+		}
+
+		return core.Frag(
+			PageHeader("User Details", "View user information", []dto.Breadcrumb{
+				{Label: "Admin", Href: "/admin"},
+				{Label: "Users", Href: "/admin/users"},
+				{Label: user.Name, Href: ""},
+			}),
+
+			// User info card
+			ui.Card(ui.CardProps{
+				Children: []core.Node{
+					ui.CardHeader(ui.CardHeaderProps{
+						Children: []core.Node{
+							core.Div(core.Class("flex items-center gap-4"),
+								ui.Avatar(ui.AvatarProps{
+									Name: user.Name,
+									Size: ui.AvatarLG,
+								}),
+								core.Div(core.Attrs{},
+									core.H2(core.Class("text-xl font-bold text-gray-900 dark:text-white"),
+										core.Text(user.Name)),
+									core.P(core.Class("text-gray-500 dark:text-gray-400"),
+										core.Text(user.Email)),
+								),
+							),
+						},
+					}),
+					ui.CardContent(ui.CardContentProps{
+						Children: []core.Node{
+							// User details
+							detailRow("User ID", user.ID),
+							detailRow("Email", user.Email),
+							detailRow("Role", user.Role),
+						},
+					}),
+					ui.CardFooter(ui.CardFooterProps{
+						Class: "flex justify-between",
+						Children: []core.Node{
+							core.A(core.Attrs{
+								Href:  "/admin/users",
+								Class: "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200",
+							}, core.Text("← Back to Users")),
+							core.Div(core.Class("flex gap-2"),
+								ui.Button(ui.ButtonProps{
+									Variant: ui.ButtonSecondary,
+									Children: []core.Node{
+										core.Text("Edit"),
+									},
+								}),
+								ui.Button(ui.ButtonProps{
+									Variant: ui.ButtonDestructive,
+									Children: []core.Node{
+										core.Text("Delete"),
+									},
+								}),
+							),
+						},
+					}),
+				},
+			}),
+		)
+	}
+}
+
+func detailRow(label, value string) core.Node {
+	return core.Div(core.Class("flex justify-between py-3 border-b border-gray-200 dark:border-gray-700 last:border-0"),
+		core.Span(core.Class("text-gray-500 dark:text-gray-400"), core.Text(label)),
+		core.Span(core.Class("font-medium text-gray-900 dark:text-white"), core.Text(value)),
+	)
+}

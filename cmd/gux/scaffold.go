@@ -193,6 +193,10 @@ func runInit(appName, modulePath string, authMode AuthMode, withAdmin bool) {
 			struct {
 				tmplPath string
 				destPath string
+			}{"templates/admin/admin/user_detail.go.tmpl", "admin/user_detail.go"},
+			struct {
+				tmplPath string
+				destPath string
 			}{"templates/admin/admin/settings.go.tmpl", "admin/settings.go"},
 		)
 

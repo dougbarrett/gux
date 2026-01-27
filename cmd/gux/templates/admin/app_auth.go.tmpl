@@ -81,6 +81,7 @@ func main() {
 		Protected().
 		Hybrid("/", admin.AdminLayout(admin.Dashboard)).
 		Hybrid("/users", admin.AdminLayout(admin.Users)).
+		Hybrid("/users/:id", admin.AdminLayout(admin.UserDetail)).
 		Hybrid("/settings", admin.AdminLayout(admin.Settings))
 
 	// Start server
