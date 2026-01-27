@@ -32,16 +32,51 @@ func main() {
 		withAdmin := initCmd.Bool("admin", false, "Include admin panel with sidebar layout")
 		port := initCmd.String("port", "8080", "Server port (default: 8080)")
 		nonInteractive := initCmd.Bool("yes", false, "Non-interactive mode with defaults (no auth, no admin)")
+		fromConfig := initCmd.Bool("config", false, "Use settings from gux.config.json")
 		initCmd.Parse(os.Args[2:])
 
 		if initCmd.NArg() < 1 {
 			fmt.Println("Error: app name required (use '.' for current directory)")
 			fmt.Println("Usage: gux init [--module <module-path>] [--auth|--auth-public] [--admin] <appname>")
 			fmt.Println("       gux init --module <module-path> .")
+			fmt.Println("       gux init --config .")
 			os.Exit(1)
 		}
 
 		appName := initCmd.Arg(0)
+
+		// Check for config file if --config flag or initializing in current directory
+		if *fromConfig || (appName == "." && ConfigExists(".")) {
+			config, err := LoadConfig(".")
+			if err != nil {
+				if *fromConfig {
+					fmt.Printf("Error: could not read gux.config.json: %v\n", err)
+					os.Exit(1)
+				}
+				// Config doesn't exist, continue with normal flow
+			} else {
+				// Use config values, but allow flags to override
+				if *modulePath == "" {
+					*modulePath = config.Module
+				}
+				if *port == "8080" && config.Port != "" {
+					*port = config.Port
+				}
+				if !*withAdmin && config.Admin {
+					*withAdmin = true
+				}
+				if !*withAuth && !*withAuthPublic {
+					switch config.Auth {
+					case "private":
+						*withAuth = true
+					case "public":
+						*withAuthPublic = true
+					}
+				}
+				fmt.Println("Using settings from gux.config.json")
+				*nonInteractive = true // Skip interactive mode when using config
+			}
+		}
 
 		// Determine if we should run interactive mode
 		// Interactive if: no auth flags, no admin flag, and not --yes
@@ -147,6 +182,7 @@ Init options:
     --admin             Include admin panel with sidebar layout
     --port <port>       Server port (default: 8080)
     --yes               Non-interactive mode with defaults (no auth, no admin)
+    --config            Use settings from gux.config.json (auto-detected with '.')
 
 Interactive mode:
     Running 'gux init myapp' without flags launches an interactive setup wizard
@@ -161,6 +197,8 @@ Examples:
     gux init --auth --admin --module github.com/x/y app   # Admin with auth
     gux init --port 3000 myapp                    # Custom port
     gux init --module github.com/myuser/myapp .           # Current directory
+    gux init --config .                           # Re-init using gux.config.json
+    gux init .                                    # Auto-detects gux.config.json
     gux gen                  # Generate guxgen files only
     gux gen --watch          # Generate and watch for changes
     gux build                # Build with TinyGo

@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"embed"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -33,6 +34,77 @@ type TemplateData struct {
 	PublicSignup bool   // true if --auth-public (allows public registration)
 	WithAdmin    bool   // true if --admin (admin panel with sidebar layout)
 	Port         string // Server port (default: 8080)
+}
+
+// GuxConfig is the configuration file format for gux.config.json
+type GuxConfig struct {
+	Module string `json:"module"`          // Go module path
+	Auth   string `json:"auth,omitempty"`  // "none", "private", "public"
+	Admin  bool   `json:"admin,omitempty"` // Include admin panel
+	Port   string `json:"port,omitempty"`  // Server port
+}
+
+const configFileName = "gux.config.json"
+
+// SaveConfig writes the configuration to gux.config.json
+func SaveConfig(targetDir string, modulePath string, authMode AuthMode, withAdmin bool, port string) error {
+	config := GuxConfig{
+		Module: modulePath,
+		Admin:  withAdmin,
+		Port:   port,
+	}
+
+	switch authMode {
+	case AuthModeNone:
+		config.Auth = "none"
+	case AuthModePrivate:
+		config.Auth = "private"
+	case AuthModePublic:
+		config.Auth = "public"
+	}
+
+	data, err := json.MarshalIndent(config, "", "  ")
+	if err != nil {
+		return err
+	}
+
+	configPath := filepath.Join(targetDir, configFileName)
+	return os.WriteFile(configPath, data, 0644)
+}
+
+// LoadConfig reads the configuration from gux.config.json
+func LoadConfig(dir string) (*GuxConfig, error) {
+	configPath := filepath.Join(dir, configFileName)
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return nil, err
+	}
+
+	var config GuxConfig
+	if err := json.Unmarshal(data, &config); err != nil {
+		return nil, err
+	}
+
+	return &config, nil
+}
+
+// ConfigExists checks if gux.config.json exists in the given directory
+func ConfigExists(dir string) bool {
+	configPath := filepath.Join(dir, configFileName)
+	_, err := os.Stat(configPath)
+	return err == nil
+}
+
+// ParseAuthMode converts a string auth mode to AuthMode
+func ParseAuthMode(auth string) AuthMode {
+	switch auth {
+	case "private":
+		return AuthModePrivate
+	case "public":
+		return AuthModePublic
+	default:
+		return AuthModeNone
+	}
 }
 
 func runInit(appName, modulePath string, authMode AuthMode, withAdmin bool, port string) {
@@ -339,6 +411,13 @@ func runInit(appName, modulePath string, authMode AuthMode, withAdmin bool, port
 		fmt.Println("You may need to run 'go mod tidy' manually.")
 	} else {
 		fmt.Println("  dependencies downloaded")
+	}
+
+	// Save configuration for future use
+	if err := SaveConfig(targetDir, modulePath, authMode, withAdmin, port); err != nil {
+		fmt.Printf("Warning: could not save config: %v\n", err)
+	} else {
+		fmt.Println("  saved gux.config.json")
 	}
 
 	printNextStepsWithDir(appName, initHere, authMode)
