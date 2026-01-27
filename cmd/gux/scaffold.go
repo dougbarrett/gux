@@ -292,20 +292,7 @@ func runInit(appName, modulePath string, authMode AuthMode, withAdmin bool) {
 		fmt.Println("  updated .gitignore")
 	}
 
-	// Run go mod tidy to download dependencies
-	fmt.Println("\nRunning go mod tidy...")
-	cmd := exec.Command("go", "mod", "tidy")
-	cmd.Dir = targetDir
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
-		fmt.Printf("Warning: go mod tidy failed: %v\n", err)
-		fmt.Println("You may need to run 'go mod tidy' manually.")
-	} else {
-		fmt.Println("  dependencies downloaded")
-	}
-
-	// Run gux gen to generate API client
+	// Run gux gen to generate API client (must run before go mod tidy)
 	fmt.Println("\nRunning gux gen...")
 	genCmd := exec.Command("gux", "gen")
 	genCmd.Dir = targetDir
@@ -316,6 +303,19 @@ func runInit(appName, modulePath string, authMode AuthMode, withAdmin bool) {
 		fmt.Println("You may need to run 'gux gen' manually.")
 	} else {
 		fmt.Println("  API client generated")
+	}
+
+	// Run go mod tidy to download dependencies (after gux gen creates guxgen/)
+	fmt.Println("\nRunning go mod tidy...")
+	cmd := exec.Command("go", "mod", "tidy")
+	cmd.Dir = targetDir
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		fmt.Printf("Warning: go mod tidy failed: %v\n", err)
+		fmt.Println("You may need to run 'go mod tidy' manually.")
+	} else {
+		fmt.Println("  dependencies downloaded")
 	}
 
 	printNextStepsWithDir(appName, initHere, authMode)
