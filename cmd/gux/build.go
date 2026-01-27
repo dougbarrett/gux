@@ -2487,7 +2487,6 @@ func apiEndpointFetch(method, url string, body []byte) ([]byte, error) {
 	// Generate server-side implementation that makes HTTP requests
 	var serverFuncs strings.Builder
 	needsDTOImport := false
-	serverNeedsFmt := false
 	for _, ep := range endpoints {
 		serverFuncs.WriteString(generateEndpointServerFunc(ep))
 		// Track if we need dto import
@@ -2496,26 +2495,16 @@ func apiEndpointFetch(method, url string, body []byte) ([]byte, error) {
 				needsDTOImport = true
 			}
 		}
-		if len(ep.PathParams) > 0 {
-			serverNeedsFmt = true
-		}
 	}
 
 	// Build server imports
+	// fmt is always needed for endpointFetch error handling
 	serverImports := `"bytes"
-	"encoding/json"
-	"io"
-	"net/http"
-	"os"`
-
-	if serverNeedsFmt {
-		serverImports = `"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"os"`
-	}
 
 	if needsDTOImport && dtoImport != "" {
 		serverImports += fmt.Sprintf("\n\n\t\"%s\"", dtoImport)
