@@ -126,10 +126,10 @@ func PageHeader(title, subtitle string, breadcrumbs []dto.Breadcrumb) core.Node 
 	})
 }
 
-func toBreadcrumbs(items []dto.Breadcrumb) []ui.Breadcrumb {
-	result := make([]ui.Breadcrumb, len(items))
+func toBreadcrumbs(items []dto.Breadcrumb) []ui.BreadcrumbItem {
+	result := make([]ui.BreadcrumbItem, len(items))
 	for i, item := range items {
-		result[i] = ui.Breadcrumb{Label: item.Label, Href: item.Href}
+		result[i] = ui.BreadcrumbItem{Label: item.Label, Href: item.Href}
 	}
 	return result
 }

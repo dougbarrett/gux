@@ -1,6 +1,8 @@
 package admin
 
 import (
+	"fmt"
+
 	"{{.ModulePath}}/dto"
 
 	"{{.GuxModule}}/core"
@@ -26,12 +28,13 @@ func Users(r *core.Router) func() core.Node {
 		// Build table rows
 		var rows []core.Node
 		for _, user := range users {
-			rows = append(rows, core.Tr(core.Nil(),
+			userID := fmt.Sprintf("%d", user.ID)
+			rows = append(rows, core.Tr(core.Attrs{},
 				core.Td(core.Class("px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400"),
-					core.Text(string(rune('0'+user.ID)))),
+					core.Text(userID)),
 				core.Td(core.Class("px-6 py-4 whitespace-nowrap"),
 					core.A(core.Attrs{
-						Href:  "/admin/users/" + string(rune('0'+user.ID)),
+						Href:  "/admin/users/" + userID,
 						Class: "text-blue-600 hover:text-blue-800 dark:text-blue-400",
 					}, core.Text(user.Name))),
 				core.Td(core.Class("px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400"),
@@ -43,7 +46,7 @@ func Users(r *core.Router) func() core.Node {
 					})),
 				core.Td(core.Class("px-6 py-4 whitespace-nowrap text-right text-sm"),
 					core.A(core.Attrs{
-						Href:  "/admin/users/" + string(rune('0'+user.ID)),
+						Href:  "/admin/users/" + userID,
 						Class: "text-blue-600 hover:text-blue-800 dark:text-blue-400",
 					}, core.Text("View"))),
 			))
@@ -72,7 +75,7 @@ func Users(r *core.Router) func() core.Node {
 					core.Div(core.Class("overflow-x-auto"),
 						core.Table(core.Class("min-w-full divide-y divide-gray-200 dark:divide-gray-700"),
 							core.Thead(core.Class("bg-gray-50 dark:bg-gray-800"),
-								core.Tr(core.Nil(),
+								core.Tr(core.Attrs{},
 									core.Th(core.Class("px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"), core.Text("ID")),
 									core.Th(core.Class("px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"), core.Text("Name")),
 									core.Th(core.Class("px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"), core.Text("Email")),
@@ -94,8 +97,8 @@ func Users(r *core.Router) func() core.Node {
 func roleBadgeVariant(role string) ui.BadgeVariant {
 	switch role {
 	case "admin":
-		return ui.BadgePrimary
+		return ui.BadgeSuccess
 	default:
-		return ui.BadgeSecondary
+		return ui.BadgeDefault
 	}
 }
