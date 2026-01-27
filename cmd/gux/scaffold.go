@@ -31,9 +31,10 @@ type TemplateData struct {
 	GuxVersion   string
 	WithAuth     bool // true if --auth or --auth-public
 	PublicSignup bool // true if --auth-public (allows public registration)
+	WithAdmin    bool // true if --admin (admin panel with sidebar layout)
 }
 
-func runInit(appName, modulePath string, authMode AuthMode) {
+func runInit(appName, modulePath string, authMode AuthMode, withAdmin bool) {
 	// Check if initializing in current directory
 	initHere := appName == "."
 	var targetDir string
@@ -110,6 +111,7 @@ func runInit(appName, modulePath string, authMode AuthMode) {
 		GuxVersion:   guxVersion,
 		WithAuth:     authMode != AuthModeNone,
 		PublicSignup: authMode == AuthModePublic,
+		WithAdmin:    withAdmin,
 	}
 
 	// Define files to create from templates
@@ -124,21 +126,35 @@ func runInit(appName, modulePath string, authMode AuthMode) {
 		{"templates/Dockerfile.tmpl", "Dockerfile"},
 	}
 
-	// Add app.go based on auth mode
-	if authMode != AuthModeNone {
+	// Add app.go based on auth and admin mode
+	if withAdmin && authMode != AuthModeNone {
+		// Auth + Admin combined
+		filesToCreate = append(filesToCreate, struct {
+			tmplPath string
+			destPath string
+		}{"templates/admin/app_auth.go.tmpl", "app.go"})
+	} else if withAdmin {
+		// Admin only (no auth)
+		filesToCreate = append(filesToCreate, struct {
+			tmplPath string
+			destPath string
+		}{"templates/admin/app.go.tmpl", "app.go"})
+	} else if authMode != AuthModeNone {
+		// Auth only (no admin)
 		filesToCreate = append(filesToCreate, struct {
 			tmplPath string
 			destPath string
 		}{"templates/auth/app.go.tmpl", "app.go"})
 	} else {
+		// Basic app (no auth, no admin)
 		filesToCreate = append(filesToCreate, struct {
 			tmplPath string
 			destPath string
 		}{"templates/app.go.tmpl", "app.go"})
 	}
 
-	// Add standard files (non-auth)
-	if authMode == AuthModeNone {
+	// Add standard files (non-auth, non-admin)
+	if authMode == AuthModeNone && !withAdmin {
 		filesToCreate = append(filesToCreate,
 			struct {
 				tmplPath string
@@ -159,6 +175,38 @@ func runInit(appName, modulePath string, authMode AuthMode) {
 		)
 	}
 
+	// Add admin-specific files (with or without auth)
+	if withAdmin {
+		filesToCreate = append(filesToCreate,
+			struct {
+				tmplPath string
+				destPath string
+			}{"templates/admin/admin/layout.go.tmpl", "admin/layout.go"},
+			struct {
+				tmplPath string
+				destPath string
+			}{"templates/admin/admin/dashboard.go.tmpl", "admin/dashboard.go"},
+			struct {
+				tmplPath string
+				destPath string
+			}{"templates/admin/admin/users.go.tmpl", "admin/users.go"},
+			struct {
+				tmplPath string
+				destPath string
+			}{"templates/admin/admin/settings.go.tmpl", "admin/settings.go"},
+		)
+
+		// Add dto/breadcrumb.go for admin-only (no auth)
+		if authMode == AuthModeNone {
+			filesToCreate = append(filesToCreate,
+				struct {
+					tmplPath string
+					destPath string
+				}{"templates/admin/dto/breadcrumb.go.tmpl", "dto/breadcrumb.go"},
+			)
+		}
+	}
+
 	// Add auth-specific files
 	if authMode != AuthModeNone {
 		filesToCreate = append(filesToCreate,
@@ -173,31 +221,57 @@ func runInit(appName, modulePath string, authMode AuthMode) {
 			struct {
 				tmplPath string
 				destPath string
-			}{"templates/auth/pages/layout.go.tmpl", "pages/layout.go"},
-			struct {
-				tmplPath string
-				destPath string
-			}{"templates/auth/pages/home.go.tmpl", "pages/home.go"},
-			struct {
-				tmplPath string
-				destPath string
-			}{"templates/auth/pages/login.go.tmpl", "pages/login.go"},
-			struct {
-				tmplPath string
-				destPath string
-			}{"templates/auth/pages/dashboard.go.tmpl", "pages/dashboard.go"},
-			struct {
-				tmplPath string
-				destPath string
 			}{"templates/auth/env.example.tmpl", ".env.example"},
 		)
 
+		// Add pages based on whether admin is also enabled
+		if withAdmin {
+			// Auth + Admin: login page standalone (no sidebar)
+			filesToCreate = append(filesToCreate,
+				struct {
+					tmplPath string
+					destPath string
+				}{"templates/admin/pages/login.go.tmpl", "pages/login.go"},
+				struct {
+					tmplPath string
+					destPath string
+				}{"templates/admin/dto/auth.go.tmpl", "dto/auth.go"},
+			)
+		} else {
+			// Auth only: use standard auth pages
+			filesToCreate = append(filesToCreate,
+				struct {
+					tmplPath string
+					destPath string
+				}{"templates/auth/pages/layout.go.tmpl", "pages/layout.go"},
+				struct {
+					tmplPath string
+					destPath string
+				}{"templates/auth/pages/home.go.tmpl", "pages/home.go"},
+				struct {
+					tmplPath string
+					destPath string
+				}{"templates/auth/pages/login.go.tmpl", "pages/login.go"},
+				struct {
+					tmplPath string
+					destPath string
+				}{"templates/auth/pages/dashboard.go.tmpl", "pages/dashboard.go"},
+			)
+		}
+
 		// Add register page only for public signup
 		if authMode == AuthModePublic {
-			filesToCreate = append(filesToCreate, struct {
-				tmplPath string
-				destPath string
-			}{"templates/auth/pages/register.go.tmpl", "pages/register.go"})
+			if withAdmin {
+				filesToCreate = append(filesToCreate, struct {
+					tmplPath string
+					destPath string
+				}{"templates/admin/pages/register.go.tmpl", "pages/register.go"})
+			} else {
+				filesToCreate = append(filesToCreate, struct {
+					tmplPath string
+					destPath string
+				}{"templates/auth/pages/register.go.tmpl", "pages/register.go"})
+			}
 		}
 	}
 

@@ -122,6 +122,26 @@ func generateGuxFiles() error {
 		}
 	}
 
+	// Parse typed API endpoints from app file
+	apiEndpoints, endpointDTOImport, err := parseAPIEndpoints(appFile)
+	if err != nil {
+		return fmt.Errorf("parsing API endpoints: %w", err)
+	}
+
+	// Generate API endpoint client if there are endpoints
+	if len(apiEndpoints) > 0 {
+		fmt.Printf("Generating API endpoint clients (%d endpoints)...\n", len(apiEndpoints))
+
+		// Use dto import from endpoints or from CRUD
+		if endpointDTOImport == "" {
+			endpointDTOImport = dtoImport
+		}
+
+		if err := generateEndpointClient(apiEndpoints, endpointDTOImport); err != nil {
+			return fmt.Errorf("generating API endpoint client: %w", err)
+		}
+	}
+
 	// Generate WASM entry points for each bundle
 	fmt.Println("Generating WASM entry points...")
 	for name, bundle := range bundles {

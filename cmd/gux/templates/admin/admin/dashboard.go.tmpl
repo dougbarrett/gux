@@ -1,0 +1,73 @@
+package admin
+
+import (
+	"{{.ModulePath}}/dto"
+
+	"{{.GuxModule}}/core"
+	"{{.GuxModule}}/ui"
+)
+
+// Dashboard renders the admin dashboard page.
+func Dashboard(r *core.Router) func() core.Node {
+	return func() core.Node {
+		return core.Frag(
+			PageHeader("Dashboard", "Welcome to the admin panel", []dto.Breadcrumb{
+				{Label: "Admin", Href: "/admin"},
+			}),
+
+			// Stats row
+			core.Div(core.Class("grid grid-cols-1 md:grid-cols-3 gap-6 mb-8"),
+				ui.StatCard(ui.StatCardProps{
+					Title: "Total Users",
+					Value: "1,234",
+					Change: "+12%",
+					ChangeType: ui.ChangePositive,
+					Icon: "users",
+				}),
+				ui.StatCard(ui.StatCardProps{
+					Title: "Active Sessions",
+					Value: "89",
+					Subtitle: "Currently online",
+					Icon: "activity",
+				}),
+				ui.StatCard(ui.StatCardProps{
+					Title: "Storage Used",
+					Value: "2.4 GB",
+					Subtitle: "of 10 GB",
+					Icon: "database",
+				}),
+			),
+
+			// Recent activity
+			ui.Card(ui.CardProps{
+				Children: []core.Node{
+					ui.CardHeader(ui.CardHeaderProps{
+						Children: []core.Node{
+							core.H3(core.Class("text-lg font-semibold text-gray-900 dark:text-white"),
+								core.Text("Recent Activity"),
+							),
+						},
+					}),
+					ui.CardContent(ui.CardContentProps{
+						Children: []core.Node{
+							activityItem("User registered", "john@example.com", "2 minutes ago"),
+							activityItem("Settings updated", "Admin", "15 minutes ago"),
+							activityItem("User logged in", "jane@example.com", "1 hour ago"),
+							activityItem("Password reset", "bob@example.com", "3 hours ago"),
+						},
+					}),
+				},
+			}),
+		)
+	}
+}
+
+func activityItem(title, subtitle, time string) core.Node {
+	return core.Div(core.Class("flex items-center justify-between py-3 border-b border-gray-200 dark:border-gray-700 last:border-0"),
+		core.Div(core.Nil(),
+			core.Div(core.Class("font-medium text-gray-900 dark:text-white"), core.Text(title)),
+			core.Div(core.Class("text-sm text-gray-500 dark:text-gray-400"), core.Text(subtitle)),
+		),
+		core.Div(core.Class("text-sm text-gray-400"), core.Text(time)),
+	)
+}

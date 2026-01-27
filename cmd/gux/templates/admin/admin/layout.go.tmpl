@@ -1,0 +1,135 @@
+package admin
+
+import (
+	"strings"
+
+	"{{.ModulePath}}/dto"
+
+	"{{.GuxModule}}/core"
+	"{{.GuxModule}}/ui"
+)
+
+// NavItem represents a navigation item in the sidebar.
+type NavItem struct {
+	Label  string
+	Href   string
+	Icon   string
+	Active bool
+}
+
+// AdminLayout wraps admin pages with sidebar navigation.
+// Use this as a layout wrapper for all admin routes.
+//
+// Example:
+//
+//	app.RouteGroup("/admin", core.WithBundle("admin")).
+//	    Hybrid("/", AdminLayout(Dashboard)).
+//	    Hybrid("/users", AdminLayout(Users))
+func AdminLayout(page func(*core.Router) func() core.Node) func(*core.Router) func() core.Node {
+	return func(r *core.Router) func() core.Node {
+		// Get page content
+		pageContent := page(r)
+
+		return func() core.Node {
+			// State for sidebar
+			collapsed := r.StateBool("sidebar_collapsed", false)
+			mobileOpen := r.StateBool("sidebar_mobile", false)
+
+			// Current path for active state
+			currentPath := r.Path()
+
+			// Build navigation items
+			navItems := []NavItem{
+				{Label: "Dashboard", Href: "/admin", Icon: "home", Active: currentPath == "/admin"},
+				{Label: "Users", Href: "/admin/users", Icon: "users", Active: strings.HasPrefix(currentPath, "/admin/users")},
+				{Label: "Settings", Href: "/admin/settings", Icon: "settings", Active: currentPath == "/admin/settings"},
+			}
+
+			// Convert to SidebarItems
+			var sidebarItems []core.Node
+			for _, item := range navItems {
+				sidebarItems = append(sidebarItems, ui.SidebarItem(ui.SidebarItemProps{
+					Label:     item.Label,
+					Href:      item.Href,
+					Icon:      item.Icon,
+					Active:    item.Active,
+					Collapsed: collapsed.Get(),
+				}))
+			}
+
+			// Get user from context
+			var userName, userEmail string
+			if user := r.User(); user != nil {
+				userName = user.Name
+				userEmail = user.Email
+			} else {
+				userName = "Guest"
+				userEmail = ""
+			}
+
+			return ui.SidebarLayout(ui.SidebarLayoutProps{
+				Sidebar: ui.Sidebar(ui.SidebarProps{
+					Collapsed:     collapsed.Get(),
+					MobileOpen:    mobileOpen.Get(),
+					OnCloseMobile: func() { mobileOpen.Set(false) },
+					Children: []core.Node{
+						ui.SidebarHeader(ui.SidebarHeaderProps{
+							Title:            "{{.AppName}}",
+							Collapsed:        collapsed.Get(),
+							OnToggleCollapse: func() { collapsed.Set(!collapsed.Get()) },
+							OnCloseMobile:    func() { mobileOpen.Set(false) },
+						}),
+						ui.SidebarNav(ui.SidebarNavProps{
+							Children: []core.Node{
+								ui.SidebarSection(ui.SidebarSectionProps{
+									Title:     "Main",
+									Collapsed: collapsed.Get(),
+									Children:  sidebarItems,
+								}),
+							},
+						}),
+						ui.SidebarFooter(ui.SidebarFooterProps{
+							Collapsed: collapsed.Get(),
+							Children: []core.Node{
+								ui.SidebarUser(ui.SidebarUserProps{
+									Name:      userName,
+									Email:     userEmail,
+									Href:      "/admin/profile",
+									Collapsed: collapsed.Get(),
+								}),
+							},
+						}),
+					},
+				}),
+				Children: []core.Node{
+					ui.SidebarMain(ui.SidebarMainProps{
+						Collapsed:    collapsed.Get(),
+						MobileOpen:   mobileOpen.Get(),
+						OnOpenMobile: func() { mobileOpen.Set(true) },
+						HeaderTitle:  "Admin",
+						Children: []core.Node{
+							pageContent(),
+						},
+					}),
+				},
+			})
+		}
+	}
+}
+
+// PageHeader creates a consistent page header with title and breadcrumbs.
+func PageHeader(title, subtitle string, breadcrumbs []dto.Breadcrumb) core.Node {
+	return ui.PageHeader(ui.PageHeaderProps{
+		Title:       title,
+		Subtitle:    subtitle,
+		Breadcrumbs: toBreadcrumbs(breadcrumbs),
+	})
+}
+
+func toBreadcrumbs(items []dto.Breadcrumb) []ui.Breadcrumb {
+	result := make([]ui.Breadcrumb, len(items))
+	for i, item := range items {
+		result[i] = ui.Breadcrumb{Label: item.Label, Href: item.Href}
+	}
+	return result
+}

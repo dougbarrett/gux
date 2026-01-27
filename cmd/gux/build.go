@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/md5"
 	"fmt"
 	"go/ast"
 	"go/parser"
@@ -90,6 +91,17 @@ type DTOFieldMapping struct {
 	SliceDTO    string // For slice fields, the element DTO type, e.g., "PostBrief"
 	Preload     string // Preload directive if any
 	IsNestedDTO bool   // Whether this is a nested DTO type (e.g., UserBrief)
+}
+
+// APIEndpointInfo represents a parsed API endpoint for code generation
+type APIEndpointInfo struct {
+	Method       string   // HTTP method: GET, POST, PUT, PATCH, DELETE
+	Path         string   // URL path: /api/login, /api/users/:id
+	FuncName     string   // Generated function name: Login, GetUser, DeleteUser
+	RequestType  string   // Request body type name (empty for GET/DELETE)
+	ResponseType string   // Response type name (empty for DELETE)
+	Package      string   // Package where types are defined (e.g., "dto")
+	PathParams   []string // Path parameter names (e.g., ["id"])
 }
 
 // isPrimitiveType checks if a type string represents a primitive Go type
@@ -392,6 +404,253 @@ func parseCRUDModels(filename string) ([]CRUDModel, string, string, error) {
 	return models, modelsImport, dtoImport, nil
 }
 
+// parseAPIEndpoints parses the main app file to find core.API, core.APIGet, and core.APIDelete calls
+func parseAPIEndpoints(filename string) ([]APIEndpointInfo, string, error) {
+	fset := token.NewFileSet()
+	node, err := parser.ParseFile(fset, filename, nil, parser.ParseComments)
+	if err != nil {
+		return nil, "", fmt.Errorf("parse %s: %w", filename, err)
+	}
+
+	var endpoints []APIEndpointInfo
+	var dtoImport string
+
+	// Find dto import
+	for _, imp := range node.Imports {
+		path := strings.Trim(imp.Path.Value, `"`)
+		if strings.HasSuffix(path, "/dto") || strings.Contains(path, "/dto") {
+			dtoImport = path
+			break
+		}
+	}
+
+	// Find core.API, core.APIGet, core.APIDelete calls
+	ast.Inspect(node, func(n ast.Node) bool {
+		call, ok := n.(*ast.CallExpr)
+		if !ok {
+			return true
+		}
+
+		// Look for core.API, core.APIGet, core.APIDelete calls
+		sel, ok := call.Fun.(*ast.SelectorExpr)
+		if !ok {
+			return true
+		}
+
+		// Must be from core package
+		ident, ok := sel.X.(*ast.Ident)
+		if !ok || ident.Name != "core" {
+			return true
+		}
+
+		var endpoint APIEndpointInfo
+
+		switch sel.Sel.Name {
+		case "API":
+			// core.API(app, "POST", "/api/login", handler)
+			if len(call.Args) >= 4 {
+				endpoint = parseAPICall(call.Args)
+			}
+		case "APIGet":
+			// core.APIGet(app, "/api/users/:id", handler)
+			if len(call.Args) >= 3 {
+				endpoint = parseAPIGetCall(call.Args)
+			}
+		case "APIDelete":
+			// core.APIDelete(app, "/api/users/:id", handler)
+			if len(call.Args) >= 3 {
+				endpoint = parseAPIDeleteCall(call.Args)
+			}
+		default:
+			return true
+		}
+
+		if endpoint.Path != "" {
+			endpoints = append(endpoints, endpoint)
+		}
+
+		return true
+	})
+
+	return endpoints, dtoImport, nil
+}
+
+// parseAPICall parses core.API(app, "POST", "/api/login", handler) call
+func parseAPICall(args []ast.Expr) APIEndpointInfo {
+	var ep APIEndpointInfo
+
+	// arg[1] = method string
+	if lit, ok := args[1].(*ast.BasicLit); ok {
+		ep.Method = strings.Trim(lit.Value, `"`)
+	}
+
+	// arg[2] = path string
+	if lit, ok := args[2].(*ast.BasicLit); ok {
+		ep.Path = strings.Trim(lit.Value, `"`)
+		ep.PathParams = extractPathParams(ep.Path)
+		ep.FuncName = generateFuncName(ep.Method, ep.Path)
+	}
+
+	// arg[3] = handler function - extract request/response types from signature
+	if funcLit, ok := args[3].(*ast.FuncLit); ok {
+		// Handler: func(ctx *core.APIContext, req LoginRequest) (LoginResponse, error)
+		if funcLit.Type.Params != nil && len(funcLit.Type.Params.List) >= 2 {
+			// Second param is the request type
+			reqParam := funcLit.Type.Params.List[1]
+			ep.RequestType, ep.Package = extractTypeName(reqParam.Type)
+		}
+		if funcLit.Type.Results != nil && len(funcLit.Type.Results.List) >= 1 {
+			// First result is the response type
+			var respPkg string
+			ep.ResponseType, respPkg = extractTypeName(funcLit.Type.Results.List[0].Type)
+			// Use response package if request package is empty (e.g., struct{} input)
+			if ep.Package == "" && respPkg != "" {
+				ep.Package = respPkg
+			}
+		}
+	}
+
+	return ep
+}
+
+// parseAPIGetCall parses core.APIGet(app, "/api/users/:id", handler) call
+func parseAPIGetCall(args []ast.Expr) APIEndpointInfo {
+	var ep APIEndpointInfo
+	ep.Method = "GET"
+
+	// arg[1] = path string
+	if lit, ok := args[1].(*ast.BasicLit); ok {
+		ep.Path = strings.Trim(lit.Value, `"`)
+		ep.PathParams = extractPathParams(ep.Path)
+		ep.FuncName = generateFuncName(ep.Method, ep.Path)
+	}
+
+	// arg[2] = handler function - extract response type from signature
+	if funcLit, ok := args[2].(*ast.FuncLit); ok {
+		// Handler: func(ctx *core.APIContext) (dto.UserDetail, error)
+		if funcLit.Type.Results != nil && len(funcLit.Type.Results.List) >= 1 {
+			ep.ResponseType, ep.Package = extractTypeName(funcLit.Type.Results.List[0].Type)
+		}
+	}
+
+	return ep
+}
+
+// parseAPIDeleteCall parses core.APIDelete(app, "/api/users/:id", handler) call
+func parseAPIDeleteCall(args []ast.Expr) APIEndpointInfo {
+	var ep APIEndpointInfo
+	ep.Method = "DELETE"
+
+	// arg[1] = path string
+	if lit, ok := args[1].(*ast.BasicLit); ok {
+		ep.Path = strings.Trim(lit.Value, `"`)
+		ep.PathParams = extractPathParams(ep.Path)
+		ep.FuncName = generateFuncName(ep.Method, ep.Path)
+	}
+
+	// DELETE has no request body and typically no response body
+	return ep
+}
+
+// extractTypeName extracts the type name from an AST expression
+func extractTypeName(expr ast.Expr) (typeName, pkg string) {
+	switch t := expr.(type) {
+	case *ast.Ident:
+		return t.Name, ""
+	case *ast.SelectorExpr:
+		if ident, ok := t.X.(*ast.Ident); ok {
+			return t.Sel.Name, ident.Name
+		}
+		return t.Sel.Name, ""
+	case *ast.StarExpr:
+		return extractTypeName(t.X)
+	case *ast.ArrayType:
+		elemType, elemPkg := extractTypeName(t.Elt)
+		return "[]" + elemType, elemPkg
+	}
+	return "", ""
+}
+
+// extractPathParams extracts path parameter names from a path pattern
+// e.g., "/api/users/:id/posts/:postId" -> ["id", "postId"]
+func extractPathParams(path string) []string {
+	var params []string
+	parts := strings.Split(path, "/")
+	for _, part := range parts {
+		if strings.HasPrefix(part, ":") {
+			params = append(params, strings.TrimPrefix(part, ":"))
+		}
+	}
+	return params
+}
+
+// generateFuncName generates a function name from method and path
+// e.g., POST /api/login -> Login, GET /api/users/:id -> GetUser, DELETE /api/users/:id -> DeleteUser
+func generateFuncName(method, path string) string {
+	// Remove /api prefix if present
+	path = strings.TrimPrefix(path, "/api/")
+	path = strings.TrimPrefix(path, "/")
+
+	// Split path and take meaningful parts
+	parts := strings.Split(path, "/")
+	var nameParts []string
+
+	for _, part := range parts {
+		if part == "" {
+			continue
+		}
+		// Skip path parameters
+		if strings.HasPrefix(part, ":") {
+			continue
+		}
+		// Capitalize first letter
+		if len(part) > 0 {
+			nameParts = append(nameParts, strings.ToUpper(part[:1])+part[1:])
+		}
+	}
+
+	name := strings.Join(nameParts, "")
+
+	// Add method prefix for non-POST methods
+	switch method {
+	case "GET":
+		if !strings.HasPrefix(name, "Get") {
+			name = "Get" + name
+		}
+	case "DELETE":
+		if !strings.HasPrefix(name, "Delete") {
+			name = "Delete" + name
+		}
+	case "PUT":
+		if !strings.HasPrefix(name, "Update") {
+			name = "Update" + name
+		}
+	case "PATCH":
+		if !strings.HasPrefix(name, "Patch") {
+			name = "Patch" + name
+		}
+	}
+
+	// Handle singular for endpoints with :id
+	if len(nameParts) > 0 && strings.HasSuffix(nameParts[len(nameParts)-1], "s") {
+		// Check if path has an :id parameter after this resource
+		if strings.Contains(path, "/:") {
+			// Make singular: users/:id -> User
+			lastPart := nameParts[len(nameParts)-1]
+			if strings.HasSuffix(lastPart, "s") {
+				singular := lastPart[:len(lastPart)-1]
+				name = strings.TrimSuffix(name, lastPart) + singular
+			}
+		}
+	}
+
+	if name == "" {
+		name = "Root"
+	}
+
+	return name
+}
+
 // parseRoutes parses the main app file to find Hybrid routes
 func parseRoutes(filename string) ([]PageRoute, string, error) {
 	fset := token.NewFileSet()
@@ -573,7 +832,7 @@ func parseRoutesAndBundles(filename string) (map[string]*BundleInfo, map[string]
 			path = strings.Trim(lit.Value, `"`)
 		}
 
-		// Get handler
+		// Get handler - handles direct handlers (pages.Home) and wrapped handlers (pages.Layout(pages.Home))
 		handler := ""
 		pkgAlias := ""
 		switch h := call.Args[1].(type) {
@@ -584,6 +843,23 @@ func parseRoutesAndBundles(filename string) (map[string]*BundleInfo, map[string]
 			}
 		case *ast.Ident:
 			handler = h.Name
+		case *ast.CallExpr:
+			// Wrapped handler like pages.AdminLayout(pages.Dashboard)
+			// Extract the outer function: pages.AdminLayout
+			if sel, ok := h.Fun.(*ast.SelectorExpr); ok {
+				if ident, ok := sel.X.(*ast.Ident); ok {
+					pkgAlias = ident.Name
+					handler = ident.Name + "." + sel.Sel.Name
+					// Add the inner call as argument: (pages.Dashboard)
+					if len(h.Args) > 0 {
+						if innerSel, ok := h.Args[0].(*ast.SelectorExpr); ok {
+							if innerIdent, ok := innerSel.X.(*ast.Ident); ok {
+								handler += "(" + innerIdent.Name + "." + innerSel.Sel.Name + ")"
+							}
+						}
+					}
+				}
+			}
 		}
 
 		if handler == "" {
@@ -671,6 +947,7 @@ func generateWasmEntryPoint(modulePath, pagesImport string, routes []PageRoute) 
 			routeCode.WriteString("\t\tswitch path {\n")
 			for _, route := range exactRoutes {
 				routeCode.WriteString(fmt.Sprintf("\t\tcase %q:\n", route.Path))
+				routeCode.WriteString("\t\t\trouter.SetRouteParams(map[string]string{\"__path\": path})\n")
 				routeCode.WriteString(fmt.Sprintf("\t\t\tcomponent = %s(router)\n", route.Handler))
 			}
 			routeCode.WriteString("\t\t}\n")
@@ -687,8 +964,8 @@ func generateWasmEntryPoint(modulePath, pagesImport string, routes []PageRoute) 
 				} else {
 					routeCode.WriteString(fmt.Sprintf("\t\t\t} else if matchRoute(path, %q, %q) {\n", prefix, suffix))
 				}
-				// Extract and set route params before rendering
-				routeCode.WriteString(fmt.Sprintf("\t\t\t\trouter.SetRouteParams(map[string]string{%q: extractRouteParam(path, %q, %q)})\n", paramName, prefix, suffix))
+				// Extract and set route params before rendering (include __path for Path() method)
+				routeCode.WriteString(fmt.Sprintf("\t\t\t\trouter.SetRouteParams(map[string]string{\"__path\": path, %q: extractRouteParam(path, %q, %q)})\n", paramName, prefix, suffix))
 				routeCode.WriteString(fmt.Sprintf("\t\t\t\tcomponent = %s(router)\n", route.Handler))
 			}
 			routeCode.WriteString("\t\t\t}\n")
@@ -923,6 +1200,7 @@ func generateBundleWasmEntryPoint(bundleName string, bundle *BundleInfo) error {
 			routeCode.WriteString("\t\tswitch path {\n")
 			for _, route := range exactRoutes {
 				routeCode.WriteString(fmt.Sprintf("\t\tcase %q:\n", route.Path))
+				routeCode.WriteString("\t\t\trouter.SetRouteParams(map[string]string{\"__path\": path})\n")
 				routeCode.WriteString(fmt.Sprintf("\t\t\tcomponent = %s(router)\n", route.Handler))
 			}
 			routeCode.WriteString("\t\t}\n")
@@ -940,8 +1218,8 @@ func generateBundleWasmEntryPoint(bundleName string, bundle *BundleInfo) error {
 				} else {
 					routeCode.WriteString(fmt.Sprintf("\t\t\t} else if matchRoute(path, %q, %q) {\n", prefix, suffix))
 				}
-				// Extract and set route params before rendering
-				routeCode.WriteString(fmt.Sprintf("\t\t\t\trouter.SetRouteParams(map[string]string{%q: extractRouteParam(path, %q, %q)})\n", paramName, prefix, suffix))
+				// Extract and set route params before rendering (include __path for Path() method)
+				routeCode.WriteString(fmt.Sprintf("\t\t\t\trouter.SetRouteParams(map[string]string{\"__path\": path, %q: extractRouteParam(path, %q, %q)})\n", paramName, prefix, suffix))
 				routeCode.WriteString(fmt.Sprintf("\t\t\t\tcomponent = %s(router)\n", route.Handler))
 			}
 			routeCode.WriteString("\t\t\t}\n")
@@ -974,6 +1252,24 @@ func generateBundleWasmEntryPoint(bundleName string, bundle *BundleInfo) error {
 		importSection.WriteString(fmt.Sprintf("\t\"%s\"\n", imp))
 		_ = alias // Alias inferred from path
 	}
+
+	// Build route patterns for cross-bundle navigation detection
+	var bundleRoutesCode strings.Builder
+	bundleRoutesCode.WriteString("// bundleRoutePatterns contains all route patterns in this bundle\n")
+	bundleRoutesCode.WriteString("var bundleRoutePatterns = []struct {\n")
+	bundleRoutesCode.WriteString("\texact  string // Exact path match (empty if parameterized)\n")
+	bundleRoutesCode.WriteString("\tprefix string // Prefix for parameterized routes\n")
+	bundleRoutesCode.WriteString("\tsuffix string // Suffix for parameterized routes\n")
+	bundleRoutesCode.WriteString("}{\n")
+	for _, route := range routes {
+		if strings.Contains(route.Path, ":") {
+			prefix, suffix := splitParamRoute(route.Path)
+			bundleRoutesCode.WriteString(fmt.Sprintf("\t{prefix: %q, suffix: %q},\n", prefix, suffix))
+		} else {
+			bundleRoutesCode.WriteString(fmt.Sprintf("\t{exact: %q},\n", route.Path))
+		}
+	}
+	bundleRoutesCode.WriteString("}\n")
 
 	code := fmt.Sprintf(`//go:build js && wasm
 
@@ -1018,6 +1314,27 @@ func extractRouteParam(path, prefix, suffix string) string {
 		return rest
 	}
 	return rest[:len(rest)-len(suffix)]
+}
+
+%s
+
+// isRouteInBundle checks if a path matches any route pattern in this bundle.
+// Returns true if the path should be handled by this bundle's router.
+func isRouteInBundle(path string) bool {
+	for _, pattern := range bundleRoutePatterns {
+		if pattern.exact != "" {
+			// Exact match
+			if path == pattern.exact {
+				return true
+			}
+		} else {
+			// Parameterized match
+			if matchRoute(path, pattern.prefix, pattern.suffix) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // fetchLoader fetches page state from loader endpoint
@@ -1115,7 +1432,15 @@ func main() {
 	}
 
 	// Navigate fetches page data then renders
+	// For cross-bundle navigation, do a full page redirect
 	navigate := func(path string) {
+		// Check if this path belongs to this bundle
+		if !isRouteInBundle(path) {
+			// Cross-bundle navigation - do full page redirect
+			window.Get("location").Set("href", path)
+			return
+		}
+		// Same-bundle navigation - client-side routing
 		window.Get("history").Call("pushState", nil, "", path)
 		fetchLoader(path, func(state map[string]any) {
 			if state != nil {
@@ -1148,7 +1473,7 @@ func main() {
 
 	select {}
 }
-`, importSection.String(), routeCode.String())
+`, importSection.String(), bundleRoutesCode.String(), routeCode.String())
 
 	return os.WriteFile(wasmDir+"/main.go", []byte(code), 0644)
 }
@@ -2047,10 +2372,312 @@ func Post[T any](url string, data any, callback func(T, error)) {
 	return os.WriteFile("guxgen/api/client_server.go", []byte(stubFile), 0644)
 }
 
+// generateEndpointClient generates guxgen/api/endpoints_gen.go for typed API endpoints
+func generateEndpointClient(endpoints []APIEndpointInfo, dtoImport string) error {
+	if len(endpoints) == 0 {
+		return nil
+	}
+
+	if err := os.MkdirAll("guxgen/api", 0755); err != nil {
+		return err
+	}
+
+	// Determine if we need fmt import (for path parameters)
+	needsFmt := false
+	for _, ep := range endpoints {
+		if len(ep.PathParams) > 0 {
+			needsFmt = true
+			break
+		}
+	}
+
+	// Build imports
+	imports := `"encoding/json"
+	"errors"
+
+	guxfetch "github.com/dougbarrett/gux/fetch"`
+
+	if needsFmt {
+		imports = `"encoding/json"
+	"errors"
+	"fmt"
+
+	guxfetch "github.com/dougbarrett/gux/fetch"`
+	}
+
+	// Check if we need dto import
+	hasDTOTypes := false
+	for _, ep := range endpoints {
+		if ep.Package != "" && ep.Package != "main" {
+			hasDTOTypes = true
+			break
+		}
+	}
+
+	if hasDTOTypes && dtoImport != "" {
+		imports += fmt.Sprintf("\n\n\t\"%s\"", dtoImport)
+	}
+
+	// Generate endpoint functions
+	var funcCode strings.Builder
+	for _, ep := range endpoints {
+		funcCode.WriteString(generateEndpointFunc(ep))
+	}
+
+	code := fmt.Sprintf(`//go:build js && wasm
+
+// Code generated by gux; DO NOT EDIT.
+// API endpoint client for typed API endpoints.
+package api
+
+import (
+	%s
+)
+
+// apiEndpointFetch makes an HTTP request and returns the response body
+func apiEndpointFetch(method, url string, body []byte) ([]byte, error) {
+	opts := &guxfetch.Options{
+		Method: method,
+		Headers: map[string]string{
+			"Content-Type": "application/json",
+		},
+	}
+	if body != nil {
+		opts.Body = string(body)
+	}
+
+	resp, err := guxfetch.Fetch(url, opts)
+	if err != nil {
+		return nil, err
+	}
+	if !resp.OK {
+		return nil, errors.New(resp.StatusText)
+	}
+	return []byte(resp.Body), nil
+}
+%s
+`, imports, funcCode.String())
+
+	if err := os.WriteFile("guxgen/api/endpoints_gen.go", []byte(code), 0644); err != nil {
+		return err
+	}
+
+	// Generate server-side stub with function stubs
+	var serverStubs strings.Builder
+	needsDTOImport := false
+	for _, ep := range endpoints {
+		stub := generateEndpointServerStub(ep)
+		serverStubs.WriteString(stub)
+		// Track if we need dto import
+		if ep.RequestType != "" || ep.ResponseType != "" {
+			if ep.Package != "" && ep.Package != "main" {
+				needsDTOImport = true
+			}
+		}
+	}
+
+	// Build server imports
+	serverImportBlock := ""
+	if needsDTOImport && dtoImport != "" {
+		serverImportBlock = fmt.Sprintf("\nimport (\n\t\"%s\"\n)\n", dtoImport)
+	}
+
+	serverCode := fmt.Sprintf(`//go:build !js || !wasm
+
+// Code generated by gux; DO NOT EDIT.
+// Server-side stub for typed API endpoints.
+// These stubs exist for compilation compatibility - they are never called.
+package api
+%s
+// Note: API endpoint handlers are registered directly with the App
+// via core.API(), core.APIGet(), and core.APIDelete() functions.
+%s`, serverImportBlock, serverStubs.String())
+
+	return os.WriteFile("guxgen/api/endpoints_server_gen.go", []byte(serverCode), 0644)
+}
+
+// generateEndpointFunc generates a single endpoint client function
+func generateEndpointFunc(ep APIEndpointInfo) string {
+	var sb strings.Builder
+
+	// Build function parameters
+	var params []string
+	for _, p := range ep.PathParams {
+		params = append(params, p+" uint")
+	}
+
+	// Add request body parameter if needed
+	if ep.RequestType != "" {
+		reqType := ep.RequestType
+		if ep.Package != "" && ep.Package != "main" {
+			reqType = ep.Package + "." + ep.RequestType
+		}
+		params = append(params, "req "+reqType)
+	}
+
+	// Build URL with path parameters
+	urlExpr := `"` + ep.Path + `"`
+	if len(ep.PathParams) > 0 {
+		// Replace :param with %d for formatting
+		urlPattern := ep.Path
+		for _, p := range ep.PathParams {
+			urlPattern = strings.Replace(urlPattern, ":"+p, "%d", 1)
+		}
+		urlExpr = `fmt.Sprintf("` + urlPattern + `", ` + strings.Join(ep.PathParams, ", ") + `)`
+	}
+
+	// Determine response handling
+	if ep.ResponseType == "" {
+		// DELETE - no response body
+		paramStr := strings.Join(params, ", ")
+		sb.WriteString(fmt.Sprintf(`
+// %s calls %s %s
+func %s(%s, callback func(error)) {
+	go func() {
+		_, err := apiEndpointFetch("%s", %s, nil)
+		callback(err)
+	}()
+}
+`, ep.FuncName, ep.Method, ep.Path, ep.FuncName, paramStr, ep.Method, urlExpr))
+	} else {
+		// Has response body
+		respType := ep.ResponseType
+		if ep.Package != "" && ep.Package != "main" {
+			respType = ep.Package + "." + ep.ResponseType
+		}
+
+		// Add callback parameter
+		params = append(params, fmt.Sprintf("callback func(%s, error)", respType))
+		paramStr := strings.Join(params, ", ")
+
+		if ep.RequestType != "" {
+			// POST/PUT/PATCH with request body
+			sb.WriteString(fmt.Sprintf(`
+// %s calls %s %s
+func %s(%s) {
+	go func() {
+		body, err := json.Marshal(req)
+		if err != nil {
+			var zero %s
+			callback(zero, err)
+			return
+		}
+		resp, err := apiEndpointFetch("%s", %s, body)
+		if err != nil {
+			var zero %s
+			callback(zero, err)
+			return
+		}
+		var result %s
+		if err := json.Unmarshal(resp, &result); err != nil {
+			var zero %s
+			callback(zero, err)
+			return
+		}
+		callback(result, nil)
+	}()
+}
+`, ep.FuncName, ep.Method, ep.Path, ep.FuncName, paramStr, respType, ep.Method, urlExpr, respType, respType, respType))
+		} else {
+			// GET without request body
+			sb.WriteString(fmt.Sprintf(`
+// %s calls %s %s
+func %s(%s) {
+	go func() {
+		resp, err := apiEndpointFetch("%s", %s, nil)
+		if err != nil {
+			var zero %s
+			callback(zero, err)
+			return
+		}
+		var result %s
+		if err := json.Unmarshal(resp, &result); err != nil {
+			var zero %s
+			callback(zero, err)
+			return
+		}
+		callback(result, nil)
+	}()
+}
+`, ep.FuncName, ep.Method, ep.Path, ep.FuncName, paramStr, ep.Method, urlExpr, respType, respType, respType))
+		}
+	}
+
+	return sb.String()
+}
+
+// generateEndpointServerStub generates a server-side stub for an endpoint
+// These stubs exist for compilation compatibility - they are never called on the server.
+func generateEndpointServerStub(ep APIEndpointInfo) string {
+	var sb strings.Builder
+
+	// Build function parameters (same as client but with _ prefix to avoid unused var errors)
+	var params []string
+	for _, p := range ep.PathParams {
+		params = append(params, "_ uint") // path param
+		_ = p
+	}
+
+	// Add request body parameter if needed
+	if ep.RequestType != "" {
+		reqType := ep.RequestType
+		if ep.Package != "" && ep.Package != "main" {
+			reqType = ep.Package + "." + ep.RequestType
+		}
+		params = append(params, "_ "+reqType)
+	}
+
+	// Determine callback signature
+	if ep.ResponseType == "" {
+		// DELETE - no response body, callback func(error)
+		params = append(params, "_ func(error)")
+	} else {
+		// Has response body
+		respType := ep.ResponseType
+		if ep.Package != "" && ep.Package != "main" {
+			respType = ep.Package + "." + ep.ResponseType
+		}
+		params = append(params, fmt.Sprintf("_ func(%s, error)", respType))
+	}
+
+	paramStr := strings.Join(params, ", ")
+
+	sb.WriteString(fmt.Sprintf(`
+// %s is a server-side stub - never called
+func %s(%s) {}
+`, ep.FuncName, ep.FuncName, paramStr))
+
+	return sb.String()
+}
+
+// computeFileHash computes a short hash of a file's content for cache busting
+func computeFileHash(path string) string {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	hash := fmt.Sprintf("%x", md5.Sum(data))
+	// Return first 8 characters of hash
+	if len(hash) > 8 {
+		return hash[:8]
+	}
+	return hash
+}
+
 // generateAssetsFile generates assets_gen.go with support for multiple bundles
 func generateAssetsFile(modulePath string, bundles []string) error {
 	var embedCode strings.Builder
 	var initCode strings.Builder
+
+	// Compute hashes for cache busting
+	stylesHash := computeFileHash("guxgen/dist/styles.css")
+	wasmHashes := make(map[string]string)
+	wasmHashes["app"] = computeFileHash("guxgen/dist/app.wasm")
+	for _, bundle := range bundles {
+		if bundle != "app" {
+			wasmHashes[bundle] = computeFileHash(fmt.Sprintf("guxgen/dist/%s.wasm", bundle))
+		}
+	}
 
 	// Default bundle (app.wasm)
 	embedCode.WriteString(`//go:embed guxgen/dist/app.wasm
@@ -2073,15 +2700,25 @@ var wasm%s []byte
 		}
 	}
 
+	// Build hash map code
+	var hashMapCode strings.Builder
+	hashMapCode.WriteString("map[string]string{")
+	for bundle, hash := range wasmHashes {
+		hashMapCode.WriteString(fmt.Sprintf("%q: %q, ", bundle, hash))
+	}
+	hashMapCode.WriteString("}")
+
 	// Init function
-	initCode.WriteString("\tfunc init() {\n")
-	initCode.WriteString("\t\tcore.SetDefaultAssets(wasmBinary, wasmExecJS, stylesCSS)\n")
+	initCode.WriteString("func init() {\n")
+	initCode.WriteString("\tcore.SetDefaultAssets(wasmBinary, wasmExecJS, stylesCSS)\n")
 	for _, bundle := range bundles {
 		if bundle != "app" {
-			initCode.WriteString(fmt.Sprintf("\t\tcore.SetDefaultBundle(%q, wasm%s)\n", bundle, strings.Title(bundle)))
+			initCode.WriteString(fmt.Sprintf("\tcore.SetDefaultBundle(%q, wasm%s)\n", bundle, strings.Title(bundle)))
 		}
 	}
-	initCode.WriteString("\t}\n")
+	// Set asset hashes for cache busting
+	initCode.WriteString(fmt.Sprintf("\tcore.SetDefaultAssetHashes(%q, %s)\n", stylesHash, hashMapCode.String()))
+	initCode.WriteString("}\n")
 
 	code := fmt.Sprintf(`// Code generated by gux; DO NOT EDIT.
 package main

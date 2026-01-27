@@ -199,7 +199,7 @@ type SidebarNavProps struct {
 //	    },
 //	})
 func SidebarNav(props SidebarNavProps) core.Node {
-	class := MergeClasses("flex-1 p-2 space-y-1 overflow-y-auto", props.Class)
+	class := MergeClasses("flex-1 px-3 py-2 space-y-1 overflow-y-auto", props.Class)
 
 	return core.El("nav", core.Attrs{
 		Class: class,
@@ -264,7 +264,7 @@ type SidebarItemProps struct {
 const sidebarItemBaseClasses = "flex items-center rounded-lg transition-colors cursor-pointer"
 
 // sidebarItemExpandedClasses are for expanded (full-width) mode.
-const sidebarItemExpandedClasses = "gap-3 px-3 py-2"
+const sidebarItemExpandedClasses = "gap-4 px-3 py-2"
 
 // sidebarItemCollapsedClasses are for collapsed (icon-only) mode.
 const sidebarItemCollapsedClasses = "justify-center px-2 py-2"
@@ -387,7 +387,7 @@ type SidebarFooterProps struct {
 //	})
 func SidebarFooter(props SidebarFooterProps) core.Node {
 	class := MergeClasses(
-		"border-t border-gray-700 p-2",
+		"border-t border-gray-700 p-3",
 		ConditionalClass(props.Collapsed, "flex justify-center"),
 		props.Class,
 	)
@@ -420,7 +420,7 @@ func SidebarUser(props SidebarUserProps) core.Node {
 		"flex items-center rounded-lg transition-colors cursor-pointer",
 		"text-gray-300 hover:bg-gray-700 hover:text-white",
 		ConditionalClass(props.Collapsed, "justify-center p-2"),
-		ConditionalClass(!props.Collapsed, "gap-3 p-2"),
+		ConditionalClass(!props.Collapsed, "gap-4 p-3"),
 		"group relative",
 		props.Class,
 	)

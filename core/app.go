@@ -39,6 +39,10 @@ type App struct {
 	darkMode       bool                         // Enable dark mode (adds class="dark" to html element)
 	authConfig     *AuthConfig                  // Authentication configuration (nil = disabled)
 	customHandlers map[string]http.HandlerFunc // Custom HTTP handlers
+	apiEndpoints   []APIEndpoint                // Registered typed API endpoints
+	// Cache busting hashes
+	stylesHash     string            // Hash for styles.css
+	wasmHashes     map[string]string // Hash for each WASM bundle
 }
 
 // Default assets (set by generated code)
@@ -46,6 +50,8 @@ var defaultWasmBinary []byte
 var defaultWasmBundles = make(map[string][]byte)
 var defaultWasmExecJS []byte
 var defaultStylesCSS []byte
+var defaultStylesHash string
+var defaultWasmHashes = make(map[string]string)
 
 // matchRoute checks if a URL path matches a route pattern and extracts parameters.
 // Pattern "/users/:id" matches path "/users/123" and returns {"id": "123"}.
@@ -86,6 +92,15 @@ func SetDefaultBundle(name string, wasmBinary []byte) {
 	defaultWasmBundles[name] = wasmBinary
 }
 
+// SetDefaultAssetHashes sets the cache-busting hashes for assets.
+// Called by generated assets_gen.go in init().
+func SetDefaultAssetHashes(stylesHash string, wasmHashes map[string]string) {
+	defaultStylesHash = stylesHash
+	for k, v := range wasmHashes {
+		defaultWasmHashes[k] = v
+	}
+}
+
 // New creates a new App instance.
 // Automatically loads .env file if present.
 func New() *App {
@@ -98,6 +113,12 @@ func New() *App {
 		bundles[k] = v
 	}
 
+	// Copy default hashes
+	hashes := make(map[string]string)
+	for k, v := range defaultWasmHashes {
+		hashes[k] = v
+	}
+
 	return &App{
 		apiPrefix:   "/__gux_api",
 		title:       "Gux App",
@@ -105,6 +126,8 @@ func New() *App {
 		wasmBundles: bundles,
 		wasmExecJS:  defaultWasmExecJS,
 		stylesCSS:   defaultStylesCSS,
+		stylesHash:  defaultStylesHash,
+		wasmHashes:  hashes,
 		csrfConfig:  DefaultCSRFConfig(), // CSRF enabled by default
 	}
 }
@@ -654,6 +677,21 @@ func (a *App) Run(addr string) error {
 					htmlClass = ` class="dark"`
 				}
 
+				// Build cache-busted asset URLs
+				stylesURL := "/styles.css"
+				if a.stylesHash != "" {
+					stylesURL = fmt.Sprintf("/styles.css?v=%s", a.stylesHash)
+				}
+
+				wasmURL := wasmPath
+				if bundleName := route.Bundle; bundleName != "" {
+					if hash, ok := a.wasmHashes[bundleName]; ok && hash != "" {
+						wasmURL = fmt.Sprintf("/%s.wasm?v=%s", bundleName, hash)
+					}
+				} else if hash, ok := a.wasmHashes["app"]; ok && hash != "" {
+					wasmURL = fmt.Sprintf("/app.wasm?v=%s", hash)
+				}
+
 				if route.Hybrid && hasWasm {
 					// Include user in state for hydration
 					if user != nil {
@@ -669,7 +707,7 @@ func (a *App) Run(addr string) error {
     <title>%s</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     %s
-    <link rel="stylesheet" href="/styles.css">
+    <link rel="stylesheet" href="%s">
 </head>
 <body>
     <div id="app">%s</div>
@@ -681,7 +719,7 @@ func (a *App) Run(addr string) error {
             .then(result => go.run(result.instance));
     </script>%s
 </body>
-</html>`, htmlClass, a.title, csrfMeta, html, stateJSON, wasmPath, hotReloadScript)
+</html>`, htmlClass, a.title, csrfMeta, stylesURL, html, stateJSON, wasmURL, hotReloadScript)
 				} else {
 					// SSR only, no WASM
 					fmt.Fprintf(w, `<!DOCTYPE html>
@@ -690,12 +728,12 @@ func (a *App) Run(addr string) error {
     <title>%s</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     %s
-    <link rel="stylesheet" href="/styles.css">
+    <link rel="stylesheet" href="%s">
 </head>
 <body>
     <div id="app">%s</div>%s
 </body>
-</html>`, htmlClass, a.title, csrfMeta, html, hotReloadScript)
+</html>`, htmlClass, a.title, csrfMeta, stylesURL, html, hotReloadScript)
 				}
 				return
 			}
@@ -785,6 +823,30 @@ func (r *Router) SetRouteParams(params map[string]string) {
 // GetRouteParams returns the current route parameters.
 func (r *Router) GetRouteParams() map[string]string {
 	return r.routeParams
+}
+
+// Param returns a route parameter by name.
+// Shortcut for r.GetRouteParams()[name].
+func (r *Router) Param(name string) string {
+	if r.routeParams == nil {
+		return ""
+	}
+	return r.routeParams[name]
+}
+
+// Path returns the current request path.
+// On server, returns the actual request URL path.
+// In WASM, returns the path from route params or empty string.
+func (r *Router) Path() string {
+	// Server-side: get from request
+	if r.request != nil {
+		return r.request.URL.Path
+	}
+	// WASM: would be set via route params or navigation
+	if path, ok := r.routeParams["__path"]; ok {
+		return path
+	}
+	return ""
 }
 
 // DB returns the database connection for server-side queries.

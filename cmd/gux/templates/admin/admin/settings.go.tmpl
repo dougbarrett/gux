@@ -1,0 +1,127 @@
+package admin
+
+import (
+	"{{.ModulePath}}/dto"
+
+	"{{.GuxModule}}/core"
+	"{{.GuxModule}}/ui"
+)
+
+// Settings renders the settings page.
+func Settings(r *core.Router) func() core.Node {
+	// Form state
+	siteName := r.StateString("site_name", "{{.AppName}}")
+	siteEmail := r.StateString("site_email", "admin@example.com")
+	maintenanceMode := r.StateBool("maintenance_mode", false)
+
+	return func() core.Node {
+		return core.Frag(
+			PageHeader("Settings", "Configure application settings", []dto.Breadcrumb{
+				{Label: "Admin", Href: "/admin"},
+				{Label: "Settings", Href: "/admin/settings"},
+			}),
+
+			// General settings card
+			ui.Card(ui.CardProps{
+				Class: "mb-6",
+				Children: []core.Node{
+					ui.CardHeader(ui.CardHeaderProps{
+						Children: []core.Node{
+							core.H3(core.Class("text-lg font-semibold text-gray-900 dark:text-white"),
+								core.Text("General Settings"),
+							),
+						},
+					}),
+					ui.CardContent(ui.CardContentProps{
+						Children: []core.Node{
+							// Site name
+							core.Div(core.Class("mb-4"),
+								core.Label(core.Attrs{
+									Class: "block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1",
+									Extra: map[string]string{"for": "site_name"},
+								}, core.Text("Site Name")),
+								ui.Input(ui.InputProps{
+									ID:       "site_name",
+									Type:     ui.InputText,
+									Value:    siteName.Get(),
+									OnChange: func(v string) { siteName.Set(v) },
+								}),
+							),
+
+							// Admin email
+							core.Div(core.Class("mb-4"),
+								core.Label(core.Attrs{
+									Class: "block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1",
+									Extra: map[string]string{"for": "site_email"},
+								}, core.Text("Admin Email")),
+								ui.Input(ui.InputProps{
+									ID:       "site_email",
+									Type:     ui.InputEmail,
+									Value:    siteEmail.Get(),
+									OnChange: func(v string) { siteEmail.Set(v) },
+								}),
+							),
+
+							// Maintenance mode toggle
+							core.Div(core.Class("flex items-center justify-between py-4 border-t border-gray-200 dark:border-gray-700"),
+								core.Div(core.Nil(),
+									core.Div(core.Class("font-medium text-gray-900 dark:text-white"),
+										core.Text("Maintenance Mode")),
+									core.Div(core.Class("text-sm text-gray-500 dark:text-gray-400"),
+										core.Text("Temporarily disable public access")),
+								),
+								ui.Toggle(ui.ToggleProps{
+									Checked:  maintenanceMode.Get(),
+									OnChange: func(v bool) { maintenanceMode.Set(v) },
+								}),
+							),
+						},
+					}),
+					ui.CardFooter(ui.CardFooterProps{
+						Class: "flex justify-end",
+						Children: []core.Node{
+							ui.Button(ui.ButtonProps{
+								Variant: ui.ButtonPrimary,
+								Children: []core.Node{
+									core.Text("Save Changes"),
+								},
+							}),
+						},
+					}),
+				},
+			}),
+
+			// Danger zone
+			ui.Card(ui.CardProps{
+				Class: "border-red-200 dark:border-red-800",
+				Children: []core.Node{
+					ui.CardHeader(ui.CardHeaderProps{
+						Children: []core.Node{
+							core.H3(core.Class("text-lg font-semibold text-red-600 dark:text-red-400"),
+								core.Text("Danger Zone"),
+							),
+						},
+					}),
+					ui.CardContent(ui.CardContentProps{
+						Children: []core.Node{
+							core.Div(core.Class("flex items-center justify-between"),
+								core.Div(core.Nil(),
+									core.Div(core.Class("font-medium text-gray-900 dark:text-white"),
+										core.Text("Delete All Data")),
+									core.Div(core.Class("text-sm text-gray-500 dark:text-gray-400"),
+										core.Text("Permanently delete all users and data")),
+								),
+								ui.Button(ui.ButtonProps{
+									Variant: ui.ButtonDanger,
+									Children: []core.Node{
+										core.Text("Delete All"),
+									},
+								}),
+							),
+						},
+					}),
+				},
+			}),
+		)
+	}
+}

@@ -1,15 +1,13 @@
 package main
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
-	"net/http"
 
 	"github.com/dougbarrett/gux/core"
-	"github.com/dougbarrett/gux/examples/auth/guxgen/api"
 	"github.com/dougbarrett/gux/examples/auth/dto"
+	"github.com/dougbarrett/gux/examples/auth/guxgen/api"
 	"github.com/dougbarrett/gux/examples/auth/models"
 	"github.com/dougbarrett/gux/examples/auth/pages"
 	"gorm.io/driver/sqlite"
@@ -93,60 +91,38 @@ func main() {
 		}),
 	)
 
-	// Login API endpoint
-	app.HandleFunc("POST /api/login", func(w http.ResponseWriter, r *http.Request) {
-		var req struct {
-			Email    string `json:"email"`
-			Password string `json:"password"`
-		}
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, "Invalid request", http.StatusBadRequest)
-			return
-		}
+	// Login API endpoint - typed with automatic JSON handling
+	core.API(app, "POST", "/api/login", func(ctx *core.APIContext, req dto.LoginRequest) (dto.LoginResponse, error) {
+		db := ctx.DB().(*gorm.DB)
 
 		// Find user by email
 		var user models.User
 		if err := db.Where("email = ?", req.Email).First(&user).Error; err != nil {
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusUnauthorized)
-			json.NewEncoder(w).Encode(map[string]string{"error": "Invalid email or password"})
-			return
+			return dto.LoginResponse{Error: "Invalid email or password"}, nil
 		}
 
 		// Check password
 		if !user.CheckPassword(req.Password) {
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusUnauthorized)
-			json.NewEncoder(w).Encode(map[string]string{"error": "Invalid email or password"})
-			return
+			return dto.LoginResponse{Error: "Invalid email or password"}, nil
 		}
 
-		// Create session using the auth system
-		router := core.NewRouterWithAuth(db, nil, nil, r, w, app.Auth())
-		err := router.Login(&core.SessionUser{
+		// Create session
+		if err := ctx.Login(&core.SessionUser{
 			ID:    fmt.Sprintf("%d", user.ID),
 			Email: user.Email,
 			Name:  user.Name,
 			Roles: []string{user.Role},
-		})
-		if err != nil {
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusInternalServerError)
-			json.NewEncoder(w).Encode(map[string]string{"error": "Failed to create session"})
-			return
+		}); err != nil {
+			return dto.LoginResponse{Error: "Failed to create session"}, nil
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]string{"success": "true", "redirect": "/dashboard"})
+		return dto.LoginResponse{Success: true, Redirect: "/dashboard"}, nil
 	})
 
-	// Logout API endpoint
-	app.HandleFunc("POST /api/logout", func(w http.ResponseWriter, r *http.Request) {
-		router := core.NewRouterWithAuth(db, nil, nil, r, w, app.Auth())
-		router.Logout()
-
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]string{"success": "true", "redirect": "/"})
+	// Logout API endpoint - typed with automatic JSON handling
+	core.API(app, "POST", "/api/logout", func(ctx *core.APIContext, _ struct{}) (dto.LogoutResponse, error) {
+		ctx.Logout()
+		return dto.LogoutResponse{Success: true, Redirect: "/"}, nil
 	})
 
 	// Public routes

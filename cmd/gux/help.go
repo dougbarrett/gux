@@ -433,6 +433,544 @@ func main() {
 }
 `,
 	},
+	"api": {
+		Name:        "api",
+		Description: "Typed API endpoint with request/response types",
+		FilePath:    "app.go (api section)",
+		Template: `// app.go (api section)
+// Typed API endpoints provide compile-time type safety with automatic JSON handling.
+
+// Define request and response types (typically in dto/ package)
+type LoginRequest struct {
+	Email    string ` + "`" + `json:"email"` + "`" + `
+	Password string ` + "`" + `json:"password"` + "`" + `
+}
+
+type LoginResponse struct {
+	Success  bool   ` + "`" + `json:"success"` + "`" + `
+	Redirect string ` + "`" + `json:"redirect,omitempty"` + "`" + `
+	Error    string ` + "`" + `json:"error,omitempty"` + "`" + `
+}
+
+// Register typed POST endpoint - request body is auto-decoded
+core.API(app, "POST", "/api/login", func(ctx *core.APIContext, req LoginRequest) (LoginResponse, error) {
+	db := ctx.DB().(*gorm.DB)
+
+	// Find user
+	var user models.User
+	if err := db.Where("email = ?", req.Email).First(&user).Error; err != nil {
+		return LoginResponse{Error: "Invalid credentials"}, nil
+	}
+
+	// Check password
+	if !user.CheckPassword(req.Password) {
+		return LoginResponse{Error: "Invalid credentials"}, nil
+	}
+
+	// Create session
+	ctx.Login(&core.SessionUser{
+		ID:    fmt.Sprintf("%d", user.ID),
+		Email: user.Email,
+		Name:  user.Name,
+		Roles: []string{user.Role},
+	})
+
+	return LoginResponse{Success: true, Redirect: "/dashboard"}, nil
+})
+
+// Register typed GET endpoint (no request body)
+core.APIGet(app, "/api/users/:id", func(ctx *core.APIContext) (dto.UserDetail, error) {
+	id := ctx.ParamUint("id")
+	db := ctx.DB().(*gorm.DB)
+
+	var user models.User
+	if err := db.First(&user, id).Error; err != nil {
+		return dto.UserDetail{}, api.NotFound("User not found")
+	}
+
+	return dto.UserDetail{
+		ID:    user.ID,
+		Email: user.Email,
+		Name:  user.Name,
+	}, nil
+})
+
+// Register typed DELETE endpoint
+core.APIDelete(app, "/api/users/:id", func(ctx *core.APIContext) error {
+	id := ctx.ParamUint("id")
+	db := ctx.DB().(*gorm.DB)
+
+	if err := db.Delete(&models.User{}, id).Error; err != nil {
+		return api.InternalError("Failed to delete user")
+	}
+	return nil
+})
+
+// APIContext methods:
+//   ctx.Param("id")      - Get path parameter as string
+//   ctx.ParamInt("id")   - Get path parameter as int
+//   ctx.ParamUint("id")  - Get path parameter as uint
+//   ctx.Query("search")  - Get query parameter
+//   ctx.Header("X-Key")  - Get request header
+//   ctx.User()           - Get authenticated user (or nil)
+//   ctx.DB()             - Get database connection
+//   ctx.Login(user)      - Create session for user
+//   ctx.Logout()         - Destroy current session
+`,
+	},
+	"api:handler": {
+		Name:        "api:handler",
+		Description: "Extracted API handler function",
+		FilePath:    "handlers/auth.go",
+		Template: `// handlers/auth.go
+// Extracted handlers for cleaner app.go organization
+package handlers
+
+import (
+	"fmt"
+
+	"{{.ModulePath}}/dto"
+	"{{.ModulePath}}/models"
+
+	"github.com/dougbarrett/gux/api"
+	"github.com/dougbarrett/gux/core"
+	"gorm.io/gorm"
+)
+
+// LoginHandler handles user authentication.
+// Register in app.go: core.API(app, "POST", "/api/login", handlers.LoginHandler)
+func LoginHandler(ctx *core.APIContext, req dto.LoginRequest) (dto.LoginResponse, error) {
+	db := ctx.DB().(*gorm.DB)
+
+	// Find user by email
+	var user models.User
+	if err := db.Where("email = ?", req.Email).First(&user).Error; err != nil {
+		return dto.LoginResponse{Error: "Invalid email or password"}, nil
+	}
+
+	// Verify password
+	if !user.CheckPassword(req.Password) {
+		return dto.LoginResponse{Error: "Invalid email or password"}, nil
+	}
+
+	// Create session
+	if err := ctx.Login(&core.SessionUser{
+		ID:    fmt.Sprintf("%d", user.ID),
+		Email: user.Email,
+		Name:  user.Name,
+		Roles: []string{user.Role},
+	}); err != nil {
+		return dto.LoginResponse{}, api.InternalError("Failed to create session")
+	}
+
+	return dto.LoginResponse{Success: true, Redirect: "/dashboard"}, nil
+}
+
+// LogoutHandler handles user logout.
+// Register in app.go: core.API(app, "POST", "/api/logout", handlers.LogoutHandler)
+func LogoutHandler(ctx *core.APIContext, req struct{}) (dto.LogoutResponse, error) {
+	ctx.Logout()
+	return dto.LogoutResponse{Success: true, Redirect: "/"}, nil
+}
+
+// GetUserHandler returns user details.
+// Register in app.go: core.APIGet(app, "/api/users/:id", handlers.GetUserHandler)
+func GetUserHandler(ctx *core.APIContext) (dto.UserDetail, error) {
+	id := ctx.ParamUint("id")
+	db := ctx.DB().(*gorm.DB)
+
+	var user models.User
+	if err := db.First(&user, id).Error; err != nil {
+		return dto.UserDetail{}, api.NotFound("User not found")
+	}
+
+	return dto.UserDetail{
+		ID:    user.ID,
+		Email: user.Email,
+		Name:  user.Name,
+	}, nil
+}
+`,
+	},
+	"layout:admin": {
+		Name:        "layout:admin",
+		Description: "Complete admin layout with sidebar, header, and breadcrumbs",
+		FilePath:    "pages/layout.go",
+		Template: `// pages/layout.go
+// Admin layout with collapsible sidebar, mobile menu, and page header with breadcrumbs
+package pages
+
+import (
+	"github.com/dougbarrett/gux/core"
+	"github.com/dougbarrett/gux/ui"
+)
+
+// AdminLayout wraps admin pages with sidebar navigation.
+// Use this as a layout wrapper for all admin routes.
+//
+// Usage in route registration:
+//   app.RouteGroup("/admin", core.WithBundle("admin")).
+//       Hybrid("/", AdminLayout(Dashboard)).
+//       Hybrid("/users", AdminLayout(Users)).
+//       Hybrid("/users/:id", AdminLayout(UserDetail))
+func AdminLayout(page func(*core.Router) func() core.Node) func(*core.Router) func() core.Node {
+	return func(r *core.Router) func() core.Node {
+		// Get the inner page component
+		pageComponent := page(r)
+
+		return func() core.Node {
+			// Sidebar state
+			collapsed := r.StateBool("collapsed", false)
+			mobileOpen := r.StateBool("mobileOpen", false)
+			currentPath := r.Path()
+
+			// Navigation items - customize for your app
+			navItems := []ui.SidebarItemProps{
+				{Label: "Dashboard", Href: "/admin", Icon: "home", Active: currentPath == "/admin"},
+				{Label: "Users", Href: "/admin/users", Icon: "users", Active: currentPath == "/admin/users" || currentPath[:12] == "/admin/users"},
+				{Label: "Settings", Href: "/admin/settings", Icon: "settings", Active: currentPath == "/admin/settings"},
+			}
+
+			// Build sidebar items
+			sidebarItems := make([]core.Node, len(navItems))
+			for i, item := range navItems {
+				item.Collapsed = collapsed.Get()
+				sidebarItems[i] = ui.SidebarItem(item)
+			}
+
+			return ui.SidebarLayout(ui.SidebarLayoutProps{
+				Sidebar: ui.Sidebar(ui.SidebarProps{
+					Collapsed:     collapsed.Get(),
+					MobileOpen:    mobileOpen.Get(),
+					OnCloseMobile: func() { mobileOpen.Set(false) },
+					Children: []core.Node{
+						// Header with logo/title
+						ui.SidebarHeader(ui.SidebarHeaderProps{
+							Title:            "Admin Panel",
+							Collapsed:        collapsed.Get(),
+							OnToggleCollapse: func() { collapsed.Set(!collapsed.Get()) },
+							OnCloseMobile:    func() { mobileOpen.Set(false) },
+						}),
+						// Navigation
+						ui.SidebarNav(ui.SidebarNavProps{
+							Children: []core.Node{
+								ui.SidebarSection(ui.SidebarSectionProps{
+									Title:     "Main",
+									Collapsed: collapsed.Get(),
+									Children:  sidebarItems,
+								}),
+							},
+						}),
+						// Footer with user info
+						ui.SidebarFooter(ui.SidebarFooterProps{
+							Collapsed: collapsed.Get(),
+							Children: []core.Node{
+								ui.SidebarUser(ui.SidebarUserProps{
+									Name:      "Admin User",
+									Email:     "admin@example.com",
+									Href:      "/admin/profile",
+									Collapsed: collapsed.Get(),
+								}),
+							},
+						}),
+					},
+				}),
+				Children: []core.Node{
+					ui.SidebarMain(ui.SidebarMainProps{
+						Collapsed:    collapsed.Get(),
+						MobileOpen:   mobileOpen.Get(),
+						OnOpenMobile: func() { mobileOpen.Set(true) },
+						HeaderTitle:  "Admin",
+						Children: []core.Node{
+							// Render the actual page content
+							pageComponent(),
+						},
+					}),
+				},
+			})
+		}
+	}
+}
+
+// Example: Dashboard page with breadcrumbs
+func Dashboard(r *core.Router) func() core.Node {
+	return func() core.Node {
+		return core.Div(core.Attrs{},
+			ui.PageHeader(ui.PageHeaderProps{
+				Title:    "Dashboard",
+				Subtitle: "Welcome to the admin panel",
+				Breadcrumbs: []ui.BreadcrumbItem{
+					{Label: "Admin", Href: "/admin"},
+					{Label: "Dashboard"},
+				},
+			}),
+			// Dashboard content here
+			core.Div(core.Class("grid grid-cols-1 md:grid-cols-3 gap-6"),
+				ui.Card(ui.CardProps{
+					Children: []core.Node{
+						ui.CardHeader(ui.CardHeaderProps{
+							Children: []core.Node{core.Text("Total Users")},
+						}),
+						ui.CardContent(ui.CardContentProps{
+							Children: []core.Node{
+								core.Div(core.Class("text-3xl font-bold"), core.Text("1,234")),
+							},
+						}),
+					},
+				}),
+			),
+		)
+	}
+}
+`,
+	},
+	"layout:sidebar": {
+		Name:        "layout:sidebar",
+		Description: "Sidebar navigation setup with sections and items",
+		FilePath:    "pages/sidebar.go",
+		Template: `// pages/sidebar.go
+// Sidebar navigation with sections, nested items, and user profile
+package pages
+
+import (
+	"github.com/dougbarrett/gux/core"
+	"github.com/dougbarrett/gux/ui"
+)
+
+// BuildSidebar creates the sidebar navigation component.
+// Call this from your layout to render the sidebar.
+func BuildSidebar(r *core.Router, collapsed, mobileOpen *core.StateBool) core.Node {
+	currentPath := r.Path()
+
+	return ui.Sidebar(ui.SidebarProps{
+		Collapsed:     collapsed.Get(),
+		MobileOpen:    mobileOpen.Get(),
+		OnCloseMobile: func() { mobileOpen.Set(false) },
+		Children: []core.Node{
+			// Header
+			ui.SidebarHeader(ui.SidebarHeaderProps{
+				Title:            "My App",
+				Collapsed:        collapsed.Get(),
+				OnToggleCollapse: func() { collapsed.Set(!collapsed.Get()) },
+				OnCloseMobile:    func() { mobileOpen.Set(false) },
+			}),
+
+			// Navigation with multiple sections
+			ui.SidebarNav(ui.SidebarNavProps{
+				Children: []core.Node{
+					// Main section
+					ui.SidebarSection(ui.SidebarSectionProps{
+						Title:     "Main",
+						Collapsed: collapsed.Get(),
+						Children: []core.Node{
+							ui.SidebarItem(ui.SidebarItemProps{
+								Label:     "Dashboard",
+								Href:      "/",
+								Icon:      "home",
+								Active:    currentPath == "/",
+								Collapsed: collapsed.Get(),
+							}),
+							ui.SidebarItem(ui.SidebarItemProps{
+								Label:     "Analytics",
+								Href:      "/analytics",
+								Icon:      "bar-chart-2",
+								Active:    currentPath == "/analytics",
+								Collapsed: collapsed.Get(),
+								Badge:     "New", // Optional badge
+							}),
+						},
+					}),
+
+					// Management section
+					ui.SidebarSection(ui.SidebarSectionProps{
+						Title:     "Management",
+						Collapsed: collapsed.Get(),
+						Children: []core.Node{
+							ui.SidebarItem(ui.SidebarItemProps{
+								Label:     "Users",
+								Href:      "/users",
+								Icon:      "users",
+								Active:    hasPrefix(currentPath, "/users"),
+								Collapsed: collapsed.Get(),
+							}),
+							ui.SidebarItem(ui.SidebarItemProps{
+								Label:     "Projects",
+								Href:      "/projects",
+								Icon:      "folder",
+								Active:    hasPrefix(currentPath, "/projects"),
+								Collapsed: collapsed.Get(),
+							}),
+							ui.SidebarItem(ui.SidebarItemProps{
+								Label:     "Teams",
+								Href:      "/teams",
+								Icon:      "users",
+								Active:    hasPrefix(currentPath, "/teams"),
+								Collapsed: collapsed.Get(),
+							}),
+						},
+					}),
+
+					// Settings section
+					ui.SidebarSection(ui.SidebarSectionProps{
+						Title:     "System",
+						Collapsed: collapsed.Get(),
+						Children: []core.Node{
+							ui.SidebarItem(ui.SidebarItemProps{
+								Label:     "Settings",
+								Href:      "/settings",
+								Icon:      "settings",
+								Active:    currentPath == "/settings",
+								Collapsed: collapsed.Get(),
+							}),
+							ui.SidebarItem(ui.SidebarItemProps{
+								Label:     "Help",
+								Href:      "/help",
+								Icon:      "help-circle",
+								Active:    currentPath == "/help",
+								Collapsed: collapsed.Get(),
+							}),
+						},
+					}),
+				},
+			}),
+
+			// Footer with user profile
+			ui.SidebarFooter(ui.SidebarFooterProps{
+				Collapsed: collapsed.Get(),
+				Children: []core.Node{
+					ui.SidebarUser(ui.SidebarUserProps{
+						Name:      "John Doe",
+						Email:     "john@example.com",
+						Href:      "/profile",
+						Collapsed: collapsed.Get(),
+					}),
+				},
+			}),
+		},
+	})
+}
+
+// hasPrefix checks if path starts with prefix.
+// Use for highlighting parent nav items when on child pages.
+func hasPrefix(path, prefix string) bool {
+	if len(path) < len(prefix) {
+		return false
+	}
+	return path[:len(prefix)] == prefix
+}
+
+// Available icons (from ui.Icon):
+// - home, users, settings, folder, file, search
+// - bar-chart-2, pie-chart, trending-up
+// - mail, bell, calendar, clock
+// - plus, minus, x, check, alert-circle
+// - chevron-left, chevron-right, chevron-down, chevron-up
+// - menu, grid, list, layout
+// - edit, trash, download, upload
+// - eye, eye-off, lock, unlock
+// - heart, star, bookmark
+// - help-circle, info, external-link
+`,
+	},
+	"breadcrumb": {
+		Name:        "breadcrumb",
+		Description: "Breadcrumb navigation with page header",
+		FilePath:    "pages/example.go",
+		Template: `// Breadcrumb navigation example
+// Use ui.Breadcrumb for simple trails, ui.PageHeader for full page headers
+package pages
+
+import (
+	"github.com/dougbarrett/gux/core"
+	"github.com/dougbarrett/gux/ui"
+)
+
+// Example page with breadcrumb navigation
+func UserDetail(r *core.Router) func() core.Node {
+	// Data loading
+	userID := r.Param("id")
+	userName := "John Doe" // Load from API
+
+	return func() core.Node {
+		return core.Div(core.Class("p-6"),
+			// Option 1: Simple breadcrumb trail
+			ui.Breadcrumb(ui.BreadcrumbProps{
+				Items: []ui.BreadcrumbItem{
+					{Label: "Home", Href: "/"},
+					{Label: "Users", Href: "/users"},
+					{Label: userName}, // Current page (no href)
+				},
+				HomeIcon: true, // Show home icon on first item
+			}),
+
+			// Page content
+			core.H1(core.Class("text-2xl font-bold mt-4 mb-6"),
+				core.Text(userName),
+			),
+		)
+	}
+}
+
+// Example with full PageHeader (includes title, subtitle, actions)
+func UserDetailFull(r *core.Router) func() core.Node {
+	userID := r.Param("id")
+	userName := "John Doe"
+
+	return func() core.Node {
+		return core.Div(core.Class("p-6"),
+			// PageHeader combines breadcrumbs, title, subtitle, and actions
+			ui.PageHeader(ui.PageHeaderProps{
+				Breadcrumbs: []ui.BreadcrumbItem{
+					{Label: "Home", Href: "/"},
+					{Label: "Users", Href: "/users"},
+					{Label: userName},
+				},
+				Title:    userName,
+				Subtitle: "User profile and settings",
+				Actions: []core.Node{
+					ui.Button(ui.ButtonProps{
+						Variant: "outline",
+						Children: []core.Node{
+							ui.Icon(ui.IconProps{Name: "edit", Size: ui.IconSM}),
+							core.Text(" Edit"),
+						},
+					}),
+					ui.Button(ui.ButtonProps{
+						Variant: "destructive",
+						Children: []core.Node{
+							ui.Icon(ui.IconProps{Name: "trash", Size: ui.IconSM}),
+							core.Text(" Delete"),
+						},
+					}),
+				},
+			}),
+
+			// Page content
+			ui.Card(ui.CardProps{
+				Children: []core.Node{
+					ui.CardContent(ui.CardContentProps{
+						Children: []core.Node{
+							core.Text("User details go here..."),
+						},
+					}),
+				},
+			}),
+		)
+	}
+}
+
+// BreadcrumbItem options:
+//   Label    string  - Display text (required)
+//   Href     string  - Link URL (empty for current page)
+//   Icon     string  - Custom icon (optional)
+
+// PageHeader options:
+//   Title       string            - Page title
+//   Subtitle    string            - Optional description
+//   Breadcrumbs []BreadcrumbItem  - Breadcrumb trail
+//   Actions     []core.Node       - Buttons on right side
+`,
+	},
 }
 
 // getModulePathForHelp reads go.mod and extracts the module path.

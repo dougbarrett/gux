@@ -60,6 +60,56 @@ app.CRUD(models.User{},
 )
 ```
 
+**Typed API Endpoints** (`endpoint.go`):
+
+For custom API endpoints with compile-time type safety:
+
+```go
+// Define request/response types (in dto/ package)
+type LoginRequest struct {
+    Email    string `json:"email"`
+    Password string `json:"password"`
+}
+type LoginResponse struct {
+    Success  bool   `json:"success"`
+    Redirect string `json:"redirect,omitempty"`
+}
+
+// POST endpoint with request body - auto JSON decode/encode
+core.API(app, "POST", "/api/login", func(ctx *core.APIContext, req LoginRequest) (LoginResponse, error) {
+    db := ctx.DB().(*gorm.DB)
+    // ... business logic
+    ctx.Login(&core.SessionUser{ID: "123", Email: user.Email})
+    return LoginResponse{Success: true, Redirect: "/dashboard"}, nil
+})
+
+// GET endpoint without request body
+core.APIGet(app, "/api/users/:id", func(ctx *core.APIContext) (dto.UserDetail, error) {
+    id := ctx.ParamUint("id")
+    // ... fetch user
+    return userDetail, nil
+})
+
+// DELETE endpoint
+core.APIDelete(app, "/api/users/:id", func(ctx *core.APIContext) error {
+    id := ctx.ParamUint("id")
+    // ... delete user
+    return nil
+})
+```
+
+**APIContext Methods**:
+- `ctx.Param("id")` - Get path parameter as string
+- `ctx.ParamInt("id")`, `ctx.ParamUint("id")` - Get path parameter as int/uint
+- `ctx.Query("search")` - Get query parameter
+- `ctx.Header("X-Key")` - Get request header
+- `ctx.User()` - Get authenticated user (or nil)
+- `ctx.DB()` - Get database connection
+- `ctx.Login(user)` - Create session for user
+- `ctx.Logout()` - Destroy current session
+
+**Error Handling**: Return `api.NotFound()`, `api.BadRequest()`, `api.Unauthorized()`, etc. for proper HTTP status codes.
+
 ## Project Structure
 
 ```
@@ -69,6 +119,7 @@ goquery/
 │   ├── elements.go         # Element helpers
 │   ├── app.go              # App, Router, State
 │   ├── crud.go             # CRUD API generation
+│   ├── endpoint.go         # Typed API endpoints (APIContext, API, APIGet, APIDelete)
 │   ├── csrf.go             # CSRF protection
 │   ├── html_renderer.go    # Server-side rendering
 │   ├── dom_renderer.go     # WASM DOM rendering

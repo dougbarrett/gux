@@ -1,0 +1,175 @@
+package pages
+
+import (
+	"test-admin/dto"
+	"test-admin/guxgen/api"
+
+	"github.com/dougbarrett/gux/core"
+	"github.com/dougbarrett/gux/ui"
+)
+
+// Login renders the login page.
+func Login(r *core.Router) func() core.Node {
+	return func() core.Node {
+		// Redirect if already authenticated
+		if r.IsAuthenticated() {
+			r.Navigate("/admin")
+		}
+
+		// Form state
+		emailState := r.StateString("email", "")
+		passwordState := r.StateString("password", "")
+		errorState := r.StateString("error", "")
+		loadingState := r.StateBool("loading", false)
+
+		// Login handler
+		handleLogin := func() {
+			if loadingState.Get() {
+				return
+			}
+
+			email := emailState.Get()
+			password := passwordState.Get()
+
+			if email == "" || password == "" {
+				errorState.Set("Email and password are required")
+				return
+			}
+
+			loadingState.Set(true)
+			errorState.Set("")
+
+			// Call login API using generated client
+			api.Login(dto.LoginRequest{
+				Email:    email,
+				Password: password,
+			}, func(result dto.LoginResponse, err error) {
+				loadingState.Set(false)
+				if err != nil {
+					errorState.Set("Login failed: " + err.Error())
+					return
+				}
+
+				if result.Error != "" {
+					errorState.Set(result.Error)
+					return
+				}
+
+				// Success - navigate to admin
+				if result.Redirect != "" {
+					r.Navigate(result.Redirect)
+				} else {
+					r.Navigate("/admin")
+				}
+			})
+		}
+
+		// Error alert
+		var errorNode core.Node = core.Frag()
+		if errorState.Get() != "" {
+			errorNode = core.Div(core.Class("mb-4"),
+				ui.Alert(ui.AlertProps{
+					Variant: ui.AlertError,
+					Message: errorState.Get(),
+				}),
+			)
+		}
+
+		return core.Div(core.Class("min-h-screen bg-gray-900 flex items-center justify-center p-4"),
+			core.Div(core.Class("w-full max-w-md"),
+				ui.Card(ui.CardProps{
+					Class: "bg-gray-800 border-gray-700",
+					Children: []core.Node{
+						ui.CardHeader(ui.CardHeaderProps{
+							Children: []core.Node{
+								core.H1(core.Class("text-2xl font-bold text-white text-center"),
+									core.Text("Admin Login"),
+								),
+								core.P(core.Class("text-gray-400 text-center mt-2"),
+									core.Text("Sign in to access the admin panel"),
+								),
+							},
+						}),
+						ui.CardContent(ui.CardContentProps{
+							Children: []core.Node{
+								errorNode,
+
+								// Demo credentials
+								ui.Alert(ui.AlertProps{
+									Variant: ui.AlertInfo,
+									Title:   "Demo Credentials",
+									Message: "admin@example.com / admin123",
+									Class:   "mb-4",
+								}),
+
+								// Email field
+								core.Div(core.Class("mb-4"),
+									core.Label(core.Attrs{
+										Class: "block text-sm font-medium text-gray-300 mb-1",
+										Extra: map[string]string{"for": "email"},
+									}, core.Text("Email"), core.Span(core.Class("text-red-400"), core.Text("*"))),
+									ui.Input(ui.InputProps{
+										ID:          "email",
+										Type:        ui.InputEmail,
+										Name:        "email",
+										Placeholder: "admin@example.com",
+										Value:       emailState.Get(),
+										Class:       "bg-gray-700 border-gray-600 text-white placeholder-gray-400",
+										OnChange: func(v string) {
+											emailState.Set(v)
+											if errorState.Get() != "" {
+												errorState.Set("")
+											}
+										},
+										OnEnter: handleLogin,
+									}),
+								),
+
+								// Password field
+								core.Div(core.Class("mb-4"),
+									core.Label(core.Attrs{
+										Class: "block text-sm font-medium text-gray-300 mb-1",
+										Extra: map[string]string{"for": "password"},
+									}, core.Text("Password"), core.Span(core.Class("text-red-400"), core.Text("*"))),
+									ui.Input(ui.InputProps{
+										ID:          "password",
+										Type:        ui.InputPassword,
+										Name:        "password",
+										Placeholder: "Enter your password",
+										Value:       passwordState.Get(),
+										Class:       "bg-gray-700 border-gray-600 text-white placeholder-gray-400",
+										OnChange: func(v string) {
+											passwordState.Set(v)
+											if errorState.Get() != "" {
+												errorState.Set("")
+											}
+										},
+										OnEnter: handleLogin,
+									}),
+								),
+
+								// Submit button
+								core.Div(core.Class("mt-6"),
+									ui.Button(ui.ButtonProps{
+										Variant:  ui.ButtonPrimary,
+										Class:    "w-full",
+										Disabled: loadingState.Get(),
+										OnClick:  handleLogin,
+										Children: []core.Node{
+											core.Text(func() string {
+												if loadingState.Get() {
+													return "Signing in..."
+												}
+												return "Sign In"
+											}()),
+										},
+									}),
+								),
+							},
+						}),
+					},
+				}),
+			),
+		)
+	}
+}

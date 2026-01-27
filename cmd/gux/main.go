@@ -29,23 +29,33 @@ func main() {
 		modulePath := initCmd.String("module", "", "Go module path (e.g., github.com/user/myapp)")
 		withAuth := initCmd.Bool("auth", false, "Include authentication (admin-only, no public signup)")
 		withAuthPublic := initCmd.Bool("auth-public", false, "Include authentication with public signup")
+		withAdmin := initCmd.Bool("admin", false, "Include admin panel with sidebar layout")
+		nonInteractive := initCmd.Bool("yes", false, "Non-interactive mode with defaults (no auth, no admin)")
 		initCmd.Parse(os.Args[2:])
 
 		if initCmd.NArg() < 1 {
 			fmt.Println("Error: app name required (use '.' for current directory)")
-			fmt.Println("Usage: gux init [--module <module-path>] [--auth|--auth-public] <appname>")
+			fmt.Println("Usage: gux init [--module <module-path>] [--auth|--auth-public] [--admin] <appname>")
 			fmt.Println("       gux init --module <module-path> .")
 			os.Exit(1)
 		}
 
 		appName := initCmd.Arg(0)
-		authMode := AuthModeNone
-		if *withAuthPublic {
-			authMode = AuthModePublic
-		} else if *withAuth {
-			authMode = AuthModePrivate
+
+		// Determine if we should run interactive mode
+		// Interactive if: no auth flags, no admin flag, and not --yes
+		if ShouldRunInteractive(*withAuth, *withAuthPublic, *withAdmin) && !*nonInteractive {
+			RunInteractiveInit(appName, *modulePath)
+		} else {
+			// Non-interactive mode with explicit flags
+			authMode := AuthModeNone
+			if *withAuthPublic {
+				authMode = AuthModePublic
+			} else if *withAuth {
+				authMode = AuthModePrivate
+			}
+			runInit(appName, *modulePath, authMode, *withAdmin)
 		}
-		runInit(appName, *modulePath, authMode)
 
 	case "gen", "generate":
 		genCmd := flag.NewFlagSet("gen", flag.ExitOnError)
@@ -116,7 +126,8 @@ func printUsage() {
 	fmt.Println(`gux - Gux application tool
 
 Usage:
-    gux init [--module <module-path>] <appname>   Create a new Gux application
+    gux init <appname>                            Create a new Gux application (interactive)
+    gux init [options] <appname>                  Create with explicit options (non-interactive)
     gux init --module <module-path> .             Initialize in current directory
     gux gen [--watch]                             Generate guxgen files (API, WASM entry points)
     gux build [--go]                              Build WASM and server binary
@@ -128,11 +139,25 @@ Usage:
     gux help                                      Show this help
     gux help <pattern>                            Show boilerplate for a pattern
 
+Init options:
+    --module <path>     Go module path (e.g., github.com/user/myapp)
+    --auth              Include authentication (admin-only, no public signup)
+    --auth-public       Include authentication with public signup
+    --admin             Include admin panel with sidebar layout
+    --yes               Non-interactive mode with defaults (no auth, no admin)
+
+Interactive mode:
+    Running 'gux init myapp' without flags launches an interactive setup wizard
+    that guides you through selecting authentication and admin panel options.
+    Use --yes or provide explicit flags to skip interactive mode.
+
 TinyGo is the default compiler (~1MB WASM). Use --go for standard Go (~5MB).
 
 Examples:
-    gux init --module github.com/myuser/myapp myapp   # Create new directory
-    gux init --module github.com/myuser/myapp .       # Use current directory
+    gux init myapp                                # Interactive setup wizard
+    gux init --yes myapp                          # Quick start with defaults
+    gux init --auth --admin --module github.com/x/y app   # Admin with auth
+    gux init --module github.com/myuser/myapp .           # Current directory
     gux gen                  # Generate guxgen files only
     gux gen --watch          # Generate and watch for changes
     gux build                # Build with TinyGo

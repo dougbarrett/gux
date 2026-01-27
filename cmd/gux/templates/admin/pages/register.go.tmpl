@@ -1,0 +1,206 @@
+package pages
+
+import (
+	"{{.GuxModule}}/core"
+	"{{.GuxModule}}/ui"
+)
+
+// Register renders the registration page (standalone, no sidebar).
+func Register(r *core.Router) func() core.Node {
+	return func() core.Node {
+		// Redirect if already authenticated
+		if r.IsAuthenticated() {
+			r.Navigate("/admin")
+		}
+
+		// Form state
+		nameState := r.StateString("name", "")
+		emailState := r.StateString("email", "")
+		passwordState := r.StateString("password", "")
+		confirmState := r.StateString("confirm", "")
+		errorState := r.StateString("error", "")
+		loadingState := r.StateBool("loading", false)
+
+		// Register handler
+		handleRegister := func() {
+			if loadingState.Get() {
+				return
+			}
+
+			name := nameState.Get()
+			email := emailState.Get()
+			password := passwordState.Get()
+			confirm := confirmState.Get()
+
+			if name == "" || email == "" || password == "" {
+				errorState.Set("All fields are required")
+				return
+			}
+
+			if password != confirm {
+				errorState.Set("Passwords do not match")
+				return
+			}
+
+			loadingState.Set(true)
+			errorState.Set("")
+
+			// TODO: Call register API
+			// For now, just show success and redirect to login
+			r.Navigate("/login")
+		}
+
+		// Error alert
+		var errorNode core.Node = core.Frag()
+		if errorState.Get() != "" {
+			errorNode = core.Div(core.Class("mb-4"),
+				ui.Alert(ui.AlertProps{
+					Variant: ui.AlertError,
+					Message: errorState.Get(),
+				}),
+			)
+		}
+
+		return core.Div(core.Class("min-h-screen bg-gray-900 flex items-center justify-center p-4"),
+			core.Div(core.Class("w-full max-w-md"),
+				ui.Card(ui.CardProps{
+					Class: "bg-gray-800 border-gray-700",
+					Children: []core.Node{
+						ui.CardHeader(ui.CardHeaderProps{
+							Children: []core.Node{
+								core.H1(core.Class("text-2xl font-bold text-white text-center"),
+									core.Text("Create Account"),
+								),
+								core.P(core.Class("text-gray-400 text-center mt-2"),
+									core.Text("Sign up to get started"),
+								),
+							},
+						}),
+						ui.CardContent(ui.CardContentProps{
+							Children: []core.Node{
+								errorNode,
+
+								// Name field
+								core.Div(core.Class("mb-4"),
+									core.Label(core.Attrs{
+										Class: "block text-sm font-medium text-gray-300 mb-1",
+										Extra: map[string]string{"for": "name"},
+									}, core.Text("Name"), core.Span(core.Class("text-red-400"), core.Text("*"))),
+									ui.Input(ui.InputProps{
+										ID:          "name",
+										Type:        ui.InputText,
+										Name:        "name",
+										Placeholder: "Your name",
+										Value:       nameState.Get(),
+										Class:       "bg-gray-700 border-gray-600 text-white placeholder-gray-400",
+										OnChange: func(v string) {
+											nameState.Set(v)
+											if errorState.Get() != "" {
+												errorState.Set("")
+											}
+										},
+									}),
+								),
+
+								// Email field
+								core.Div(core.Class("mb-4"),
+									core.Label(core.Attrs{
+										Class: "block text-sm font-medium text-gray-300 mb-1",
+										Extra: map[string]string{"for": "email"},
+									}, core.Text("Email"), core.Span(core.Class("text-red-400"), core.Text("*"))),
+									ui.Input(ui.InputProps{
+										ID:          "email",
+										Type:        ui.InputEmail,
+										Name:        "email",
+										Placeholder: "you@example.com",
+										Value:       emailState.Get(),
+										Class:       "bg-gray-700 border-gray-600 text-white placeholder-gray-400",
+										OnChange: func(v string) {
+											emailState.Set(v)
+											if errorState.Get() != "" {
+												errorState.Set("")
+											}
+										},
+									}),
+								),
+
+								// Password field
+								core.Div(core.Class("mb-4"),
+									core.Label(core.Attrs{
+										Class: "block text-sm font-medium text-gray-300 mb-1",
+										Extra: map[string]string{"for": "password"},
+									}, core.Text("Password"), core.Span(core.Class("text-red-400"), core.Text("*"))),
+									ui.Input(ui.InputProps{
+										ID:          "password",
+										Type:        ui.InputPassword,
+										Name:        "password",
+										Placeholder: "Create a password",
+										Value:       passwordState.Get(),
+										Class:       "bg-gray-700 border-gray-600 text-white placeholder-gray-400",
+										OnChange: func(v string) {
+											passwordState.Set(v)
+											if errorState.Get() != "" {
+												errorState.Set("")
+											}
+										},
+									}),
+								),
+
+								// Confirm password field
+								core.Div(core.Class("mb-4"),
+									core.Label(core.Attrs{
+										Class: "block text-sm font-medium text-gray-300 mb-1",
+										Extra: map[string]string{"for": "confirm"},
+									}, core.Text("Confirm Password"), core.Span(core.Class("text-red-400"), core.Text("*"))),
+									ui.Input(ui.InputProps{
+										ID:          "confirm",
+										Type:        ui.InputPassword,
+										Name:        "confirm",
+										Placeholder: "Confirm your password",
+										Value:       confirmState.Get(),
+										Class:       "bg-gray-700 border-gray-600 text-white placeholder-gray-400",
+										OnChange: func(v string) {
+											confirmState.Set(v)
+											if errorState.Get() != "" {
+												errorState.Set("")
+											}
+										},
+										OnEnter: handleRegister,
+									}),
+								),
+
+								// Submit button
+								core.Div(core.Class("mt-6"),
+									ui.Button(ui.ButtonProps{
+										Variant:  ui.ButtonPrimary,
+										Class:    "w-full",
+										Disabled: loadingState.Get(),
+										OnClick:  handleRegister,
+										Children: []core.Node{
+											core.Text(func() string {
+												if loadingState.Get() {
+													return "Creating account..."
+												}
+												return "Create Account"
+											}()),
+										},
+									}),
+								),
+
+								// Login link
+								core.Div(core.Class("mt-4 text-center"),
+									core.Span(core.Class("text-gray-400"), core.Text("Already have an account? ")),
+									core.A(core.Attrs{
+										Href:     "/login",
+										Class:    "text-blue-400 hover:text-blue-300",
+										External: true,
+									}, core.Text("Sign in")),
+								),
+							},
+						}),
+					},
+				}),
+			),
+		)
+	}
+}

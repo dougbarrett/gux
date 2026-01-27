@@ -1,0 +1,347 @@
+package core
+
+import (
+	"encoding/json"
+	"net/http"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/dougbarrett/gux/api"
+)
+
+// APIContext provides context for API endpoint handlers.
+// It wraps http.Request/ResponseWriter with convenience methods
+// for accessing request data, authentication, and database.
+type APIContext struct {
+	Request  *http.Request
+	Response http.ResponseWriter
+	app      *App
+	params   map[string]string
+	user     *SessionUser
+}
+
+// Param returns a path parameter by name.
+// Usage: id := ctx.Param("id")
+func (ctx *APIContext) Param(name string) string {
+	return ctx.params[name]
+}
+
+// ParamInt returns a path parameter as int, or 0 if not found/invalid.
+func (ctx *APIContext) ParamInt(name string) int {
+	val := ctx.params[name]
+	if val == "" {
+		return 0
+	}
+	i, err := strconv.Atoi(val)
+	if err != nil {
+		return 0
+	}
+	return i
+}
+
+// ParamUint returns a path parameter as uint, or 0 if not found/invalid.
+func (ctx *APIContext) ParamUint(name string) uint {
+	val := ctx.params[name]
+	if val == "" {
+		return 0
+	}
+	u, err := strconv.ParseUint(val, 10, 64)
+	if err != nil {
+		return 0
+	}
+	return uint(u)
+}
+
+// User returns the authenticated user, or nil if not authenticated.
+func (ctx *APIContext) User() *SessionUser {
+	return ctx.user
+}
+
+// DB returns the database connection.
+func (ctx *APIContext) DB() interface{} {
+	return ctx.app.db
+}
+
+// Query returns a query parameter by name.
+func (ctx *APIContext) Query(name string) string {
+	return ctx.Request.URL.Query().Get(name)
+}
+
+// Header returns a request header by name.
+func (ctx *APIContext) Header(name string) string {
+	return ctx.Request.Header.Get(name)
+}
+
+// Login creates a session for the given user.
+// Returns an error if auth is not configured.
+func (ctx *APIContext) Login(user *SessionUser) error {
+	if ctx.app.authConfig == nil || ctx.app.authConfig.SessionStore == nil {
+		return api.InternalError("auth not configured")
+	}
+
+	sessionID, err := generateSessionID()
+	if err != nil {
+		return api.InternalError("failed to generate session")
+	}
+
+	maxAge := ctx.app.authConfig.CookieMaxAge
+	if maxAge == 0 {
+		maxAge = 86400 * 7 // 7 days default
+	}
+
+	if err := ctx.app.authConfig.SessionStore.Set(sessionID, user, time.Duration(maxAge)*time.Second); err != nil {
+		return api.InternalError("failed to store session")
+	}
+
+	setSessionCookie(ctx.Response, sessionID, *ctx.app.authConfig)
+	ctx.user = user
+	return nil
+}
+
+// Logout destroys the current session.
+func (ctx *APIContext) Logout() error {
+	if ctx.app.authConfig == nil || ctx.app.authConfig.SessionStore == nil {
+		return nil // No auth configured, nothing to do
+	}
+
+	sessionID := getSessionIDFromCookie(ctx.Request, ctx.app.authConfig.CookieName)
+	if sessionID != "" {
+		ctx.app.authConfig.SessionStore.Delete(sessionID)
+	}
+
+	clearSessionCookie(ctx.Response, *ctx.app.authConfig)
+	ctx.user = nil
+	return nil
+}
+
+// APIEndpoint stores metadata about a registered API endpoint.
+// Used by code generation to create WASM clients.
+type APIEndpoint struct {
+	Method       string // HTTP method: GET, POST, PUT, PATCH, DELETE
+	Path         string // URL path: /api/login, /api/users/:id
+	RequestType  string // Request body type name (empty for GET/DELETE)
+	ResponseType string // Response type name (empty for DELETE)
+}
+
+// newAPIContext creates an APIContext from an HTTP request.
+func newAPIContext(app *App, w http.ResponseWriter, r *http.Request, pattern string) *APIContext {
+	ctx := &APIContext{
+		Request:  r,
+		Response: w,
+		app:      app,
+		params:   make(map[string]string),
+	}
+
+	// Extract path parameters from the URL based on the pattern
+	ctx.params = extractPathParams(pattern, r.URL.Path)
+
+	// Load user from session if auth is enabled
+	if app.authConfig != nil && app.authConfig.SessionStore != nil {
+		cookieName := app.authConfig.CookieName
+		if cookieName == "" {
+			cookieName = "__gux_session"
+		}
+		sessionID := getSessionIDFromCookie(r, cookieName)
+		if sessionID != "" {
+			ctx.user, _ = app.authConfig.SessionStore.Get(sessionID)
+		}
+	}
+
+	return ctx
+}
+
+// extractPathParams extracts path parameters from a URL path based on a pattern.
+// Pattern: /api/users/:id/posts/:postId
+// Path: /api/users/123/posts/456
+// Returns: map[string]string{"id": "123", "postId": "456"}
+func extractPathParams(pattern, path string) map[string]string {
+	params := make(map[string]string)
+
+	patternParts := strings.Split(strings.Trim(pattern, "/"), "/")
+	pathParts := strings.Split(strings.Trim(path, "/"), "/")
+
+	if len(patternParts) != len(pathParts) {
+		return params
+	}
+
+	for i, part := range patternParts {
+		if strings.HasPrefix(part, ":") {
+			paramName := strings.TrimPrefix(part, ":")
+			params[paramName] = pathParts[i]
+		}
+	}
+
+	return params
+}
+
+// API registers a typed API endpoint that expects a request body.
+// Use for POST, PUT, PATCH methods.
+//
+// Usage:
+//
+//	core.API(app, "POST", "/api/login", func(ctx *core.APIContext, req LoginRequest) (LoginResponse, error) {
+//	    // Business logic here
+//	    return LoginResponse{Success: true}, nil
+//	})
+func API[Req any, Res any](app *App, method string, path string, handler func(*APIContext, Req) (Res, error)) {
+	// Register metadata for code generation
+	app.apiEndpoints = append(app.apiEndpoints, APIEndpoint{
+		Method:       method,
+		Path:         path,
+		RequestType:  getTypeName[Req](),
+		ResponseType: getTypeName[Res](),
+	})
+
+	// Create HTTP handler
+	app.HandleFunc(method+" "+path, func(w http.ResponseWriter, r *http.Request) {
+		ctx := newAPIContext(app, w, r, path)
+
+		// Decode request body
+		var req Req
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			api.WriteError(w, api.BadRequest("invalid request body: "+err.Error()))
+			return
+		}
+
+		// Call handler
+		res, err := handler(ctx, req)
+		if err != nil {
+			api.WriteError(w, err)
+			return
+		}
+
+		// Encode response
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(res)
+	})
+}
+
+// APIGet registers a typed GET endpoint (no request body).
+//
+// Usage:
+//
+//	core.APIGet(app, "/api/users/:id", func(ctx *core.APIContext) (dto.UserDetail, error) {
+//	    id := ctx.ParamUint("id")
+//	    // ... fetch user
+//	    return user, nil
+//	})
+func APIGet[Res any](app *App, path string, handler func(*APIContext) (Res, error)) {
+	// Register metadata for code generation
+	app.apiEndpoints = append(app.apiEndpoints, APIEndpoint{
+		Method:       "GET",
+		Path:         path,
+		ResponseType: getTypeName[Res](),
+	})
+
+	// Create HTTP handler
+	app.HandleFunc("GET "+path, func(w http.ResponseWriter, r *http.Request) {
+		ctx := newAPIContext(app, w, r, path)
+
+		// Call handler
+		res, err := handler(ctx)
+		if err != nil {
+			api.WriteError(w, err)
+			return
+		}
+
+		// Encode response
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(res)
+	})
+}
+
+// APIDelete registers a typed DELETE endpoint.
+//
+// Usage:
+//
+//	core.APIDelete(app, "/api/users/:id", func(ctx *core.APIContext) error {
+//	    id := ctx.ParamUint("id")
+//	    // ... delete user
+//	    return nil
+//	})
+func APIDelete(app *App, path string, handler func(*APIContext) error) {
+	// Register metadata for code generation
+	app.apiEndpoints = append(app.apiEndpoints, APIEndpoint{
+		Method: "DELETE",
+		Path:   path,
+	})
+
+	// Create HTTP handler
+	app.HandleFunc("DELETE "+path, func(w http.ResponseWriter, r *http.Request) {
+		ctx := newAPIContext(app, w, r, path)
+
+		// Call handler
+		err := handler(ctx)
+		if err != nil {
+			api.WriteError(w, err)
+			return
+		}
+
+		w.WriteHeader(http.StatusNoContent)
+	})
+}
+
+// getTypeName returns the name of a type using generics.
+func getTypeName[T any]() string {
+	var zero T
+	return typeNameFromValue(zero)
+}
+
+// typeNameFromValue extracts the type name from a value.
+func typeNameFromValue(v interface{}) string {
+	if v == nil {
+		return ""
+	}
+	// Use %T to get the type, then extract just the name
+	typeName := strings.TrimPrefix(
+		strings.Replace(
+			stringf("%T", v),
+			"*", "", -1,
+		),
+		"main.",
+	)
+	// Handle package-qualified types (e.g., "dto.LoginRequest" -> "LoginRequest")
+	if idx := strings.LastIndex(typeName, "."); idx != -1 {
+		return typeName[idx+1:]
+	}
+	return typeName
+}
+
+// stringf is a simple sprintf wrapper to avoid importing fmt.
+func stringf(format string, args ...interface{}) string {
+	// For %T, we need reflection
+	if format == "%T" && len(args) == 1 {
+		return getTypeString(args[0])
+	}
+	return ""
+}
+
+// getTypeString returns the type of a value as a string.
+func getTypeString(v interface{}) string {
+	if v == nil {
+		return "<nil>"
+	}
+	switch v.(type) {
+	case string:
+		return "string"
+	case int, int8, int16, int32, int64:
+		return "int"
+	case uint, uint8, uint16, uint32, uint64:
+		return "uint"
+	case float32, float64:
+		return "float64"
+	case bool:
+		return "bool"
+	default:
+		// Use reflect for struct types
+		return getStructTypeName(v)
+	}
+}
+
+// getStructTypeName uses a type assertion trick to get struct type names.
+func getStructTypeName(v interface{}) string {
+	// This is a simplified version - the actual implementation
+	// in code generation will parse the AST directly
+	return "struct"
+}

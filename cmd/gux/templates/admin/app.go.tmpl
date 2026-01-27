@@ -1,0 +1,38 @@
+package main
+
+import (
+	"fmt"
+	"os"
+
+	"{{.ModulePath}}/admin"
+
+	"{{.GuxModule}}/core"
+)
+
+func main() {
+	// Load environment variables
+	core.LoadEnv(".env")
+
+	// Initialize app
+	app := core.New()
+	app.SetTitle("{{.AppName}}")
+	app.DarkMode() // Enable dark mode for admin panel
+
+	// Admin routes with sidebar layout (no authentication)
+	app.RouteGroup("/admin", core.WithBundle("admin")).
+		Hybrid("/", admin.AdminLayout(admin.Dashboard)).
+		Hybrid("/users", admin.AdminLayout(admin.Users)).
+		Hybrid("/settings", admin.AdminLayout(admin.Settings))
+
+	// Redirect root to admin
+	app.Routes().
+		Redirect("/", "/admin")
+
+	// Start server
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+	fmt.Printf("{{.AppName}} running at http://localhost:%s\n", port)
+	app.Run(":" + port)
+}

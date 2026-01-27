@@ -1,0 +1,131 @@
+package main
+
+import (
+	"fmt"
+	"log"
+	"os"
+
+	"{{.ModulePath}}/admin"
+	"{{.ModulePath}}/dto"
+	"{{.ModulePath}}/models"
+	"{{.ModulePath}}/pages"
+
+	"{{.GuxModule}}/core"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
+)
+
+func main() {
+	// Load environment variables
+	core.LoadEnv(".env")
+
+	// Set up database
+	db, err := gorm.Open(sqlite.Open("{{.AppName}}.db"), &gorm.Config{})
+	if err != nil {
+		log.Fatal("Failed to connect database:", err)
+	}
+
+	// Auto-migrate models
+	db.AutoMigrate(&models.User{})
+
+	// Seed admin user from environment variables
+	var count int64
+	db.Model(&models.User{}).Count(&count)
+	if count == 0 {
+		adminEmail := os.Getenv("ADMIN_EMAIL")
+		adminPassword := os.Getenv("ADMIN_PASSWORD")
+
+		if adminEmail == "" || adminPassword == "" {
+			log.Println("Warning: ADMIN_EMAIL and ADMIN_PASSWORD not set in environment.")
+			log.Println("Please set these in your .env file to create an admin user.")
+		} else {
+			adminUser := models.User{
+				Email:    adminEmail,
+				Name:     "Admin",
+				Role:     "admin",
+			}
+			adminUser.SetPassword(adminPassword)
+			db.Create(&adminUser)
+			fmt.Println("Seeded admin user:", adminEmail)
+		}
+	}
+
+	// Initialize app
+	app := core.New()
+	app.SetDB(db)
+	app.SetTitle("{{.AppName}}")
+	app.DarkMode() // Enable dark mode for admin panel
+
+	// Configure authentication
+	app.EnableAuth(core.AuthConfig{
+		SessionStore: core.NewMemorySessionStore(),
+		CookieName:   "__{{.AppName}}_session",
+		CookieMaxAge: 86400 * 7, // 7 days
+		LoginPath:    "/login",
+	})
+
+	// Register API endpoints
+	registerAPIEndpoints(app, db)
+
+	// Public routes (login page - standalone, no sidebar)
+	app.Routes().
+		Hybrid("/login", pages.Login)
+{{if .PublicSignup}}
+	// Public registration
+	app.Routes().
+		Hybrid("/register", pages.Register)
+{{end}}
+	// Protected admin routes with sidebar layout
+	app.RouteGroup("/admin", core.WithBundle("admin"), core.WithProtected()).
+		Hybrid("/", admin.AdminLayout(admin.Dashboard)).
+		Hybrid("/users", admin.AdminLayout(admin.Users)).
+		Hybrid("/settings", admin.AdminLayout(admin.Settings))
+
+	// Start server
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+	fmt.Printf("{{.AppName}} running at http://localhost:%s\n", port)
+	fmt.Println("Login with your admin credentials from .env")
+	app.Run(":" + port)
+}
+
+// registerAPIEndpoints sets up typed API endpoints.
+func registerAPIEndpoints(app *core.App, db *gorm.DB) {
+	// Login endpoint
+	core.API(app, "POST", "/api/login", func(ctx *core.APIContext, req dto.LoginRequest) (dto.LoginResponse, error) {
+		// Find user
+		var user models.User
+		if err := db.Where("email = ?", req.Email).First(&user).Error; err != nil {
+			return dto.LoginResponse{Error: "Invalid email or password"}, nil
+		}
+
+		// Check password
+		if !user.CheckPassword(req.Password) {
+			return dto.LoginResponse{Error: "Invalid email or password"}, nil
+		}
+
+		// Create session
+		ctx.Login(&core.SessionUser{
+			ID:    fmt.Sprintf("%d", user.ID),
+			Email: user.Email,
+			Name:  user.Name,
+			Role:  user.Role,
+		})
+
+		return dto.LoginResponse{
+			Success:  true,
+			Redirect: "/admin",
+		}, nil
+	})
+
+	// Logout endpoint
+	core.API(app, "POST", "/api/logout", func(ctx *core.APIContext, _ struct{}) (dto.LogoutResponse, error) {
+		ctx.Logout()
+		return dto.LogoutResponse{
+			Success:  true,
+			Redirect: "/login",
+		}, nil
+	})
+}
