@@ -22,5 +22,5 @@ var wasmAdmin []byte
 func init() {
 	core.SetDefaultAssets(wasmBinary, wasmExecJS, stylesCSS)
 	core.SetDefaultBundle("admin", wasmAdmin)
-	core.SetDefaultAssetHashes("10a4bca1", map[string]string{"app": "78dff0eb", "admin": "db87dcfe", })
+	core.SetDefaultAssetHashes("10a4bca1", map[string]string{"app": "78dff0eb", "admin": "d7a9040e", })
 }

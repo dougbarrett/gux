@@ -799,8 +799,9 @@ func parseRoutesAndBundles(filename string) (map[string]*BundleInfo, map[string]
 				return "", "", false
 			}
 
-			// If it's another Hybrid/GET/etc., keep walking up
-			if chainedSel.Sel.Name == "Hybrid" || chainedSel.Sel.Name == "GET" || chainedSel.Sel.Name == "POST" {
+			// If it's another Hybrid/GET/POST/Protected/etc., keep walking up
+			switch chainedSel.Sel.Name {
+			case "Hybrid", "GET", "POST", "PUT", "PATCH", "DELETE", "Protected", "RequireRole":
 				current = chainedCall
 				continue
 			}
@@ -892,7 +893,17 @@ func parseRoutesAndBundles(filename string) (map[string]*BundleInfo, map[string]
 			Bundle:   bundleName,
 		}
 
-		bundles[bundleName].Routes = append(bundles[bundleName].Routes, route)
+		// Check for duplicate path in this bundle (skip if already exists)
+		isDuplicate := false
+		for _, existing := range bundles[bundleName].Routes {
+			if existing.Path == path {
+				isDuplicate = true
+				break
+			}
+		}
+		if !isDuplicate {
+			bundles[bundleName].Routes = append(bundles[bundleName].Routes, route)
+		}
 
 		// Track import needed for this bundle
 		if pkgAlias != "" {
