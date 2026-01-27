@@ -14,6 +14,35 @@ import (
 	"syscall"
 )
 
+// pluralize converts a singular word to its plural form.
+// Handles common English pluralization rules.
+func pluralize(word string) string {
+	if word == "" {
+		return word
+	}
+
+	lower := strings.ToLower(word)
+
+	// Words ending in s, x, z, ch, sh → add "es"
+	if strings.HasSuffix(lower, "s") || strings.HasSuffix(lower, "x") ||
+		strings.HasSuffix(lower, "z") || strings.HasSuffix(lower, "ch") ||
+		strings.HasSuffix(lower, "sh") {
+		return word + "es"
+	}
+
+	// Words ending in consonant + y → change y to ies
+	if strings.HasSuffix(lower, "y") && len(word) > 1 {
+		prev := lower[len(lower)-2]
+		// Check if previous char is a consonant (not a, e, i, o, u)
+		if prev != 'a' && prev != 'e' && prev != 'i' && prev != 'o' && prev != 'u' {
+			return word[:len(word)-1] + "ies"
+		}
+	}
+
+	// Default: add "s"
+	return word + "s"
+}
+
 // getModulePath uses go list to get the module path for the current directory
 func getModulePath() (string, error) {
 	cmd := exec.Command("go", "list", "-m")
@@ -351,8 +380,8 @@ func parseCRUDModels(filename string) ([]CRUDModel, string, string, error) {
 				return true
 			}
 
-			model.PluralName = model.Name + "s"
-			model.Path = strings.ToLower(model.Name) + "s"
+			model.PluralName = pluralize(model.Name)
+			model.Path = strings.ToLower(pluralize(model.Name))
 
 			// Parse DTO options from remaining arguments
 			for i := 1; i < len(call.Args); i++ {
