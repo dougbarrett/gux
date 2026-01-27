@@ -30,6 +30,7 @@ func main() {
 		withAuth := initCmd.Bool("auth", false, "Include authentication (admin-only, no public signup)")
 		withAuthPublic := initCmd.Bool("auth-public", false, "Include authentication with public signup")
 		withAdmin := initCmd.Bool("admin", false, "Include admin panel with sidebar layout")
+		withClaude := initCmd.Bool("claude", false, "Include Claude Code skills and CLAUDE.md")
 		port := initCmd.String("port", "8080", "Server port (default: 8080)")
 		nonInteractive := initCmd.Bool("yes", false, "Non-interactive mode with defaults (no auth, no admin)")
 		fromConfig := initCmd.Bool("config", false, "Use settings from gux.config.json")
@@ -65,6 +66,9 @@ func main() {
 				if !*withAdmin && config.Admin {
 					*withAdmin = true
 				}
+				if !*withClaude && config.Claude {
+					*withClaude = true
+				}
 				if !*withAuth && !*withAuthPublic {
 					switch config.Auth {
 					case "private":
@@ -79,8 +83,8 @@ func main() {
 		}
 
 		// Determine if we should run interactive mode
-		// Interactive if: no auth flags, no admin flag, and not --yes
-		if ShouldRunInteractive(*withAuth, *withAuthPublic, *withAdmin) && !*nonInteractive {
+		// Interactive if: no auth flags, no admin flag, no claude flag, and not --yes
+		if ShouldRunInteractive(*withAuth, *withAuthPublic, *withAdmin, *withClaude) && !*nonInteractive {
 			RunInteractiveInit(appName, *modulePath, *port)
 		} else {
 			// Non-interactive mode with explicit flags
@@ -90,7 +94,7 @@ func main() {
 			} else if *withAuth {
 				authMode = AuthModePrivate
 			}
-			runInit(appName, *modulePath, authMode, *withAdmin, *port)
+			runInit(appName, *modulePath, authMode, *withAdmin, *withClaude, *port)
 		}
 
 	case "gen", "generate":
@@ -169,7 +173,7 @@ Usage:
     gux build [--go]                              Build WASM and server binary
     gux dev [--go] [--watch]                      Build and run server
     gux clean                                     Remove generated files
-    gux claude                                    Install Claude Code skill
+    gux claude                                    Install Claude Code skill and CLAUDE.md
     gux update [--check]                          Update gux to latest version
     gux version                                   Show version
     gux help                                      Show this help
@@ -180,6 +184,7 @@ Init options:
     --auth              Include authentication (admin-only, no public signup)
     --auth-public       Include authentication with public signup
     --admin             Include admin panel with sidebar layout
+    --claude            Include Claude Code skills and CLAUDE.md
     --port <port>       Server port (default: 8080)
     --yes               Non-interactive mode with defaults (no auth, no admin)
     --config            Use settings from gux.config.json (auto-detected with '.')
@@ -195,6 +200,7 @@ Examples:
     gux init myapp                                # Interactive setup wizard
     gux init --yes myapp                          # Quick start with defaults
     gux init --auth --admin --module github.com/x/y app   # Admin with auth
+    gux init --claude --module github.com/x/y app         # With Claude integration
     gux init --port 3000 myapp                    # Custom port
     gux init --module github.com/myuser/myapp .           # Current directory
     gux init --config .                           # Re-init using gux.config.json
@@ -206,7 +212,7 @@ Examples:
     gux dev                  # Build and run server
     gux dev --watch          # Build, run, and hot reload on changes
     gux clean                # Remove bin/, guxgen/, assets_gen.go
-    gux claude               # Install Claude Code skill
+    gux claude               # Install Claude Code skill and CLAUDE.md
     gux update               # Update gux to latest release
     gux help page            # Show basic page template
     gux help                 # List all available patterns

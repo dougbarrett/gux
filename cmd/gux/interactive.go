@@ -17,6 +17,7 @@ type InitOptions struct {
 	ModulePath    string
 	AuthMode      AuthMode
 	WithAdmin     bool
+	WithClaude    bool
 	AdminEmail    string
 	AdminPassword string
 	Port          string
@@ -87,6 +88,16 @@ func RunInteractiveInit(appName string, providedModule string, providedPort stri
 			Affirmative("Yes").
 			Negative("No").
 			Value(&opts.WithAdmin),
+	))
+
+	// Claude Code integration selection
+	groups = append(groups, huh.NewGroup(
+		huh.NewConfirm().
+			Title("Include Claude Code integration?").
+			Description("Installs .claude/skills and generates CLAUDE.md").
+			Affirmative("Yes").
+			Negative("No").
+			Value(&opts.WithClaude),
 	))
 
 	// Port selection (only if not provided via flag or if default)
@@ -239,7 +250,7 @@ func generateSecurePassword(length int) string {
 // runInitWithEnv runs init and creates .env file with credentials
 func runInitWithEnv(originalAppName string, opts InitOptions) {
 	// Run the standard init
-	runInit(originalAppName, opts.ModulePath, opts.AuthMode, opts.WithAdmin, opts.Port)
+	runInit(originalAppName, opts.ModulePath, opts.AuthMode, opts.WithAdmin, opts.WithClaude, opts.Port)
 
 	targetDir := originalAppName
 	if originalAppName == "." {
@@ -291,6 +302,6 @@ PORT=%s
 
 // ShouldRunInteractive determines if we should run interactive mode
 // Returns true if no feature flags were provided
-func ShouldRunInteractive(withAuth, withAuthPublic, withAdmin bool) bool {
-	return !withAuth && !withAuthPublic && !withAdmin
+func ShouldRunInteractive(withAuth, withAuthPublic, withAdmin, withClaude bool) bool {
+	return !withAuth && !withAuthPublic && !withAdmin && !withClaude
 }

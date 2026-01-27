@@ -1,0 +1,136 @@
+# {{.AppName}}
+
+A Gux application built with Go and WebAssembly.
+
+## Quick Start
+
+```bash
+gux dev          # Run development server (http://localhost:{{.Port}})
+gux build        # Production build
+gux gen          # Regenerate API client
+gux clean        # Remove generated files
+```
+
+## Project Structure
+
+```
+{{.AppName}}/
+├── app.go              # Routes and CRUD registration
+├── models/             # GORM models
+├── dto/                # API response types (DTOs)
+{{- if .WithAdmin}}
+├── admin/              # Admin panel pages
+{{- end}}
+├── pages/              # Public pages
+├── guxgen/             # Generated code (do not edit)
+│   ├── api/            # API client for WASM
+│   └── wasm/           # WASM entry points
+├── gux.config.json     # Project configuration
+└── .gitignore
+```
+
+## Key Files
+
+- **app.go** - Application entry point, route definitions, CRUD setup
+- **models/*.go** - Database models (GORM)
+- **dto/*.go** - Data transfer objects (control API response shape)
+- **pages/*.go** - Page components (loader + render pattern)
+{{- if .WithAdmin}}
+- **admin/*.go** - Admin panel pages with sidebar layout
+{{- end}}
+
+## Development Patterns
+
+### Page Functions
+
+Pages follow the loader + component pattern:
+
+```go
+func MyPage(r *core.Router) func() core.Node {
+    // LOADER: Runs on server (SSR) and client navigation
+    var items []Item
+    r.OnLoad(func() {
+        api.Items.List(func(result []Item, err error) {
+            if err == nil {
+                items = result
+            }
+        })
+    })
+
+    // COMPONENT: Returns UI, re-runs on state changes
+    return func() core.Node {
+        return core.Div(core.Class("container"),
+            renderItemList(items),
+        )
+    }
+}
+```
+
+### State Management
+
+```go
+count := r.StateInt("count", 0)        // int
+name := r.StateString("name", "")      // string
+active := r.StateBool("active", false) // bool
+user := core.UseState(r, "user", User{}) // any type
+
+// Read and update
+current := count.Get()
+count.Set(current + 1)
+name.SetQuiet("value") // Update without re-render
+```
+
+### Router Methods
+
+```go
+r.Param("id")           // Get route parameter
+r.Path()                // Current path
+r.Navigate("/path")     // Programmatic navigation
+r.User()                // Authenticated user (or nil)
+r.IsAuthenticated()     // Check if logged in
+r.HasRole("admin")      // Check user role
+```
+{{if .WithAuth}}
+## Authentication
+
+{{- if .PublicSignup}}
+- Public registration enabled at `/register`
+{{- else}}
+- Admin-only authentication (no public signup)
+{{- end}}
+- Login at `/login`, logout via `/api/logout`
+- Session stored in cookie `__{{.AppName}}_session`
+- Protected routes use `.Protected()` method
+
+### Environment Variables
+
+Copy `.env.example` to `.env` and set:
+```
+ADMIN_EMAIL=admin@example.com
+ADMIN_PASSWORD=your-secure-password
+PORT={{.Port}}
+```
+
+The admin user is created on first run.
+{{end}}
+{{if .WithAdmin}}
+## Admin Panel
+
+- Sidebar layout via `AdminLayout()` wrapper
+- User management at `/admin/users`
+- Dashboard at `/admin`
+- All admin routes are protected (require login)
+{{end}}
+## Development Notes
+
+- **Always use `gux dev`** (not `go run`) - it builds WASM and CSS
+- Use `r.OnLoad()` for data fetching (supports SSR hydration)
+- DTOs hide sensitive fields from API responses
+- Mark cross-bundle links as `External: true`
+
+## Generated Files (Do Not Edit)
+
+- `guxgen/` - API client and WASM entry points
+- `assets_gen.go` - Embedded assets
+
+Run `gux gen` to regenerate after changing models or routes.

@@ -38,19 +38,21 @@ type TemplateData struct {
 
 // GuxConfig is the configuration file format for gux.config.json
 type GuxConfig struct {
-	Module string `json:"module"`          // Go module path
-	Auth   string `json:"auth,omitempty"`  // "none", "private", "public"
-	Admin  bool   `json:"admin,omitempty"` // Include admin panel
-	Port   string `json:"port,omitempty"`  // Server port
+	Module string `json:"module"`           // Go module path
+	Auth   string `json:"auth,omitempty"`   // "none", "private", "public"
+	Admin  bool   `json:"admin,omitempty"`  // Include admin panel
+	Claude bool   `json:"claude,omitempty"` // Include Claude Code integration
+	Port   string `json:"port,omitempty"`   // Server port
 }
 
 const configFileName = "gux.config.json"
 
 // SaveConfig writes the configuration to gux.config.json
-func SaveConfig(targetDir string, modulePath string, authMode AuthMode, withAdmin bool, port string) error {
+func SaveConfig(targetDir string, modulePath string, authMode AuthMode, withAdmin bool, withClaude bool, port string) error {
 	config := GuxConfig{
 		Module: modulePath,
 		Admin:  withAdmin,
+		Claude: withClaude,
 		Port:   port,
 	}
 
@@ -107,7 +109,19 @@ func ParseAuthMode(auth string) AuthMode {
 	}
 }
 
-func runInit(appName, modulePath string, authMode AuthMode, withAdmin bool, port string) {
+// authModeToString converts AuthMode to string for config storage
+func authModeToString(mode AuthMode) string {
+	switch mode {
+	case AuthModePrivate:
+		return "private"
+	case AuthModePublic:
+		return "public"
+	default:
+		return "none"
+	}
+}
+
+func runInit(appName, modulePath string, authMode AuthMode, withAdmin bool, withClaude bool, port string) {
 	// Check if initializing in current directory
 	initHere := appName == "."
 	var targetDir string
@@ -414,10 +428,23 @@ func runInit(appName, modulePath string, authMode AuthMode, withAdmin bool, port
 	}
 
 	// Save configuration for future use
-	if err := SaveConfig(targetDir, modulePath, authMode, withAdmin, port); err != nil {
+	if err := SaveConfig(targetDir, modulePath, authMode, withAdmin, withClaude, port); err != nil {
 		fmt.Printf("Warning: could not save config: %v\n", err)
 	} else {
 		fmt.Println("  saved gux.config.json")
+	}
+
+	// Install Claude Code integration if requested
+	if withClaude {
+		fmt.Println("\nInstalling Claude Code integration...")
+		installClaudeSkill(targetDir)
+		createClaudeMDFromTemplate(targetDir, &GuxConfig{
+			Module: modulePath,
+			Auth:   authModeToString(authMode),
+			Admin:  withAdmin,
+			Claude: withClaude,
+			Port:   port,
+		})
 	}
 
 	printNextStepsWithDir(appName, initHere, authMode)

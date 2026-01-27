@@ -190,11 +190,50 @@ app.RouteGroup("/admin", core.WithBundle("admin")).
     Hybrid("/users", admin.Users).
     Hybrid("/users/:id", admin.UserDetail)
 
+// Protected routes (require authentication)
+app.RouteGroup("/admin", core.WithBundle("admin")).
+    Protected().  // All routes in this group require login
+    Hybrid("/", admin.Dashboard).
+    Hybrid("/users", admin.Users)
+
+// Single route protection
+app.Routes().
+    Hybrid("/profile", pages.Profile).Protected()
+
+// Auth configuration
+app.EnableAuth(core.AuthConfig{
+    SessionStore: core.NewMemorySessionStore(),
+    CookieName:   "__myapp_session",
+    CookieMaxAge: 86400 * 7, // 7 days
+    LoginPath:    "/login",  // Redirect here when unauthorized
+})
+
 // Route parameters
 func UserDetail(r *core.Router) func() core.Node {
     params := r.GetRouteParams() // {"id": "123"}
     userID := params["id"]
+    // Or use the shorthand:
+    userID := r.Param("id")
     // ...
+}
+
+// Current path
+currentPath := r.Path() // e.g., "/admin/users/123"
+
+// Programmatic navigation
+r.Navigate("/admin/users")
+
+// Authenticated user access
+func Dashboard(r *core.Router) func() core.Node {
+    // Check if user is authenticated
+    if user := r.User(); user != nil {
+        fmt.Println(user.ID, user.Email, user.Name, user.Roles)
+    }
+
+    // Helper methods
+    if r.IsAuthenticated() { /* ... */ }
+    if r.HasRole("admin") { /* ... */ }
+    if r.HasAnyRole("admin", "moderator") { /* ... */ }
 }
 
 // External links (cross-bundle navigation)
@@ -245,6 +284,89 @@ app.CRUD(models.User{},
         return user, nil
     }),
 )
+```
+
+### Typed API Endpoints
+
+For custom API endpoints beyond CRUD, use the typed endpoint helpers:
+
+```go
+import "github.com/dougbarrett/gux/core"
+
+// POST endpoint with request body - auto JSON decode/encode
+core.API(app, "POST", "/api/login", func(ctx *core.APIContext, req dto.LoginRequest) (dto.LoginResponse, error) {
+    db := ctx.DB().(*gorm.DB)
+
+    // Validate credentials...
+    var user models.User
+    if err := db.Where("email = ?", req.Email).First(&user).Error; err != nil {
+        return dto.LoginResponse{}, api.Unauthorized("invalid credentials")
+    }
+
+    // Create session
+    ctx.Login(&core.SessionUser{
+        ID:    fmt.Sprint(user.ID),
+        Email: user.Email,
+        Name:  user.Name,
+        Roles: []string{user.Role},
+    })
+
+    return dto.LoginResponse{Success: true, Redirect: "/dashboard"}, nil
+})
+
+// GET endpoint without request body
+core.APIGet(app, "/api/users/:id", func(ctx *core.APIContext) (dto.UserDetail, error) {
+    id := ctx.ParamUint("id")
+
+    var user models.User
+    db := ctx.DB().(*gorm.DB)
+    if err := db.Preload("Posts").First(&user, id).Error; err != nil {
+        return dto.UserDetail{}, api.NotFound("user not found")
+    }
+
+    return dto.UserDetail{
+        ID:    user.ID,
+        Email: user.Email,
+        Name:  user.Name,
+    }, nil
+})
+
+// DELETE endpoint
+core.APIDelete(app, "/api/users/:id", func(ctx *core.APIContext) error {
+    id := ctx.ParamUint("id")
+
+    db := ctx.DB().(*gorm.DB)
+    if err := db.Delete(&models.User{}, id).Error; err != nil {
+        return api.InternalError("failed to delete user")
+    }
+
+    return nil
+})
+```
+
+**APIContext Methods:**
+```go
+ctx.Param("id")       // Get path parameter as string
+ctx.ParamInt("id")    // Get path parameter as int
+ctx.ParamUint("id")   // Get path parameter as uint
+ctx.Query("search")   // Get query parameter
+ctx.Header("X-Key")   // Get request header
+ctx.User()            // Get authenticated user (or nil)
+ctx.DB()              // Get database connection
+ctx.Login(user)       // Create session for user
+ctx.Logout()          // Destroy current session
+```
+
+**Error Responses:**
+```go
+import "github.com/dougbarrett/gux/api"
+
+return nil, api.NotFound("user not found")
+return nil, api.BadRequest("invalid email format")
+return nil, api.Unauthorized("login required")
+return nil, api.Forbidden("access denied")
+return nil, api.Conflict("email already exists")
+return nil, api.InternalError("database error")
 ```
 
 ### DTO Mapping
@@ -341,6 +463,126 @@ app.DisableCSRF()
 - Generated API clients automatically include CSRF tokens
 - No manual token handling required by developers
 
+### UI Components (`ui/` package)
+
+The `ui` package provides styled, accessible components with Tailwind CSS:
+
+```go
+import "github.com/dougbarrett/gux/ui"
+
+// Button variants
+ui.Button(ui.ButtonProps{
+    Variant:  ui.ButtonPrimary,     // Primary, Secondary, Outline, Ghost, Destructive
+    Size:     ui.ButtonMD,          // SM, MD, LG
+    Type:     "submit",             // button, submit, reset
+    Disabled: false,
+    OnClick:  func() { /* ... */ },
+    Children: []core.Node{core.Text("Click me")},
+})
+
+// Input types
+ui.Input(ui.InputProps{
+    Type:        ui.InputText,      // Text, Email, Password, Number, Search, Tel, URL
+    Size:        ui.InputMD,        // SM, MD, LG
+    ID:          "email",
+    Name:        "email",
+    Value:       email.Get(),
+    Placeholder: "Enter your email",
+    Disabled:    false,
+    Required:    true,
+    Error:       "",                // Shows error styling when non-empty
+    OnChange:    func(v string) { email.SetQuiet(v) },
+    OnEnter:     func() { /* submit form */ },
+})
+
+// Select dropdown
+ui.Select(ui.SelectProps{
+    ID:          "role",
+    Name:        "role",
+    Value:       role.Get(),
+    Placeholder: "Select a role",
+    Options: []ui.SelectOption{
+        {Value: "user", Label: "User"},
+        {Value: "admin", Label: "Admin"},
+        {Value: "mod", Label: "Moderator", Disabled: true},
+    },
+    OnChange: func(v string) { role.Set(v) },
+})
+
+// Checkbox
+ui.Checkbox(ui.CheckboxProps{
+    ID:       "remember",
+    Name:     "remember",
+    Label:    "Remember me",
+    Checked:  remember.Get(),
+    OnChange: func(checked bool) { remember.Set(checked) },
+})
+
+// Card component
+ui.Card(ui.CardProps{
+    Class: "max-w-md",
+    Children: []core.Node{
+        ui.CardHeader(ui.CardHeaderProps{
+            Title:       "Account Settings",
+            Description: "Manage your profile",
+        }),
+        ui.CardContent(ui.CardContentProps{
+            Children: []core.Node{ /* form fields */ },
+        }),
+        ui.CardFooter(ui.CardFooterProps{
+            Children: []core.Node{ /* action buttons */ },
+        }),
+    },
+})
+
+// Alert component
+ui.Alert(ui.AlertProps{
+    Variant: ui.AlertSuccess, // Success, Error, Warning, Info
+    Title:   "Success!",
+    Message: "Your changes have been saved.",
+})
+
+// Badge component
+ui.Badge(ui.BadgeProps{
+    Variant: ui.BadgePrimary, // Primary, Secondary, Success, Warning, Error
+    Text:    "New",
+})
+
+// Modal component
+ui.Modal(ui.ModalProps{
+    Open:    showModal.Get(),
+    OnClose: func() { showModal.Set(false) },
+    Title:   "Confirm Delete",
+    Children: []core.Node{
+        core.P(core.Class("mb-4"), core.Text("Are you sure?")),
+        ui.Button(ui.ButtonProps{
+            Variant:  ui.ButtonDestructive,
+            OnClick:  func() { deleteItem(); showModal.Set(false) },
+            Children: []core.Node{core.Text("Delete")},
+        }),
+    },
+})
+
+// DataTable component
+ui.DataTable(ui.DataTableProps{
+    Columns: []ui.DataTableColumn{
+        {Key: "name", Label: "Name", Sortable: true},
+        {Key: "email", Label: "Email"},
+        {Key: "role", Label: "Role"},
+    },
+    Data: users,  // []map[string]any or similar
+    OnRowClick: func(row map[string]any) {
+        r.Navigate(fmt.Sprintf("/users/%v", row["id"]))
+    },
+})
+
+// Available components:
+// Alert, Avatar, Badge, Breadcrumb, Button, Card, Checkbox,
+// DataTable, Dropdown, Form, Icon, Input, List, Modal,
+// Pagination, Radio, Select, Sidebar, SidebarLayout, Switch,
+// Table, Tabs, Textarea, Toast, Tooltip
+```
+
 ### Hydration Flow
 
 1. **Server renders HTML** with initial state
@@ -364,22 +606,53 @@ go install github.com/dougbarrett/gux/cmd/gux@latest
 
 | Command | Description |
 |---------|-------------|
-| `gux init --module <path> <name>` | Create new Gux application |
-| `gux gen [--dir <api-dir>]` | Generate API client/server code from interfaces |
+| `gux init <name>` | Create new Gux application (interactive) |
+| `gux init [--auth\|--auth-public] [--admin] [--claude] <name>` | Create with explicit options |
+| `gux gen [--watch]` | Generate API client/server code and WASM entry points |
 | `gux build [--go]` | Build WASM and server binary with embedded assets |
-| `gux dev [--port <port>] [--go]` | Build and run dev server |
+| `gux dev [--go] [--watch]` | Build and run dev server (with optional hot reload) |
+| `gux clean` | Remove generated files (.gux/, guxgen/, assets_gen.go) |
+| `gux claude` | Install Claude Code skill and CLAUDE.md |
+| `gux update [--check]` | Update gux to latest version |
 | `gux version` | Show version |
-| `gux help` | Show help |
+| `gux help [pattern]` | Show help or boilerplate for a pattern |
 
 ### Project Scaffolding
 
 ```bash
-# Create new project
+# Create new project (interactive)
+gux init myapp
+
+# Create with explicit options
 gux init --module github.com/youruser/myapp myapp
-cd myapp
+gux init --auth --admin --module github.com/user/app myapp
+gux init --auth-public --module github.com/user/app myapp
 
 # Start development server
+cd myapp
 gux dev
+```
+
+### Config File (`gux.config.json`)
+
+Project settings are saved during init and can be reused:
+
+```json
+{
+  "module": "github.com/user/myapp",
+  "auth": "private",   // "none", "private", "public"
+  "admin": true,
+  "claude": true,      // Claude Code integration
+  "port": "8080"
+}
+```
+
+```bash
+# Re-init project from config (regenerate files)
+gux init --config .
+
+# Auto-detected when initializing in existing directory
+gux init .
 ```
 
 Default files (index.html, manifest.json, service-worker.js, wasm_exec.js) are automatically injected at build time. To customize, create a `public/` directory with your own versions.
