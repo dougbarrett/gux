@@ -50,7 +50,7 @@ var buttonSizeClasses = map[ButtonSize]string{
 }
 
 // buttonBaseClasses are the common classes applied to all buttons.
-const buttonBaseClasses = "font-medium rounded-lg transition-colors cursor-pointer inline-flex items-center justify-center"
+const buttonBaseClasses = "font-medium rounded-lg transition-colors cursor-pointer inline-flex items-center justify-center whitespace-nowrap"
 
 // buttonDisabledClasses are applied when button is disabled.
 const buttonDisabledClasses = "opacity-50 cursor-not-allowed"

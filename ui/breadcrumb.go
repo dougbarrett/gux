@@ -61,11 +61,11 @@ func Breadcrumb(props BreadcrumbProps) core.Node {
 		// Icon for first item (home) or custom icon
 		if item.Icon != "" {
 			itemContent = append(itemContent,
-				Icon(IconProps{Name: item.Icon, Size: IconSM, Class: "mr-1"}),
+				Icon(IconProps{Name: item.Icon, Size: IconSM, Class: "mr-1.5"}),
 			)
 		} else if isFirst && props.HomeIcon {
 			itemContent = append(itemContent,
-				Icon(IconProps{Name: "home", Size: IconSM, Class: "mr-1"}),
+				Icon(IconProps{Name: "home", Size: IconSM, Class: "mr-1.5"}),
 			)
 		}
 
