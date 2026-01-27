@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"{{.ModulePath}}/dto"
+	"{{.ModulePath}}/guxgen/api"
 
 	"{{.GuxModule}}/core"
 	"{{.GuxModule}}/ui"
@@ -11,23 +12,24 @@ import (
 
 // Users renders the user management page.
 func Users(r *core.Router) func() core.Node {
-	return func() core.Node {
-		// Sample user data - in real app, fetch from API
-		users := []struct {
-			ID    uint
-			Name  string
-			Email string
-			Role  string
-		}{
-			{1, "Admin User", "admin@example.com", "admin"},
-			{2, "John Doe", "john@example.com", "user"},
-			{3, "Jane Smith", "jane@example.com", "user"},
-			{4, "Bob Wilson", "bob@example.com", "user"},
-		}
+	// State for users list
+	users := core.UseState(r, "users", []dto.UserList{})
+	loading := r.StateBool("loading", true)
 
+	// Fetch users on load
+	r.OnLoad(func() {
+		api.Users.List(func(result []dto.UserList, err error) {
+			loading.Set(false)
+			if err == nil {
+				users.Set(result)
+			}
+		})
+	})
+
+	return func() core.Node {
 		// Build table rows
 		var rows []core.Node
-		for _, user := range users {
+		for _, user := range users.Get() {
 			userID := fmt.Sprintf("%d", user.ID)
 			rows = append(rows, core.Tr(core.Attrs{},
 				core.Td(core.Class("px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400"),
@@ -50,6 +52,26 @@ func Users(r *core.Router) func() core.Node {
 						Class: "text-blue-600 hover:text-blue-800 dark:text-blue-400",
 					}, core.Text("View"))),
 			))
+		}
+
+		// Show loading state or empty state
+		var tableContent core.Node
+		if loading.Get() {
+			tableContent = core.Tr(core.Attrs{},
+				core.Td(core.Attrs{
+					Class: "px-6 py-8 text-center text-gray-500 dark:text-gray-400",
+					Extra: map[string]string{"colspan": "5"},
+				}, core.Text("Loading users...")),
+			)
+		} else if len(users.Get()) == 0 {
+			tableContent = core.Tr(core.Attrs{},
+				core.Td(core.Attrs{
+					Class: "px-6 py-8 text-center text-gray-500 dark:text-gray-400",
+					Extra: map[string]string{"colspan": "5"},
+				}, core.Text("No users found")),
+			)
+		} else {
+			tableContent = core.Frag(rows...)
 		}
 
 		return core.Frag(
@@ -84,7 +106,7 @@ func Users(r *core.Router) func() core.Node {
 								),
 							),
 							core.Tbody(core.Class("bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700"),
-								rows...,
+								tableContent,
 							),
 						),
 					),

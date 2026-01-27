@@ -8,8 +8,10 @@ import (
 )
 
 // Settings renders the settings page.
+// NOTE: This is a demo template. Settings functionality requires implementing
+// a Settings model and corresponding API endpoints for your specific needs.
 func Settings(r *core.Router) func() core.Node {
-	// Form state
+	// Form state (demo only - not persisted)
 	siteName := r.StateString("site_name", "{{.AppName}}")
 	siteEmail := r.StateString("site_email", "admin@example.com")
 	maintenanceMode := r.StateBool("maintenance_mode", false)
@@ -19,6 +21,13 @@ func Settings(r *core.Router) func() core.Node {
 			PageHeader("Settings", "Configure application settings", []dto.Breadcrumb{
 				{Label: "Admin", Href: "/admin"},
 				{Label: "Settings", Href: "/admin/settings"},
+			}),
+
+			// Demo notice
+			ui.Alert(ui.AlertProps{
+				Variant: ui.AlertInfo,
+				Message: "This is a demo settings page. To add real settings, create a Settings model and implement the corresponding API endpoints.",
+				Class:   "mb-6",
 			}),
 
 			// General settings card
@@ -94,8 +103,11 @@ func Settings(r *core.Router) func() core.Node {
 					ui.CardFooter(ui.CardFooterProps{
 						Class: "flex justify-end",
 						Children: []core.Node{
+							core.Span(core.Class("text-sm text-gray-500 dark:text-gray-400 mr-4 self-center"),
+								core.Text("(Demo - changes not saved)")),
 							ui.Button(ui.ButtonProps{
-								Variant: ui.ButtonPrimary,
+								Variant:  ui.ButtonPrimary,
+								Disabled: true,
 								Children: []core.Node{
 									core.Text("Save Changes"),
 								},
@@ -126,7 +138,8 @@ func Settings(r *core.Router) func() core.Node {
 										core.Text("Permanently delete all users and data")),
 								),
 								ui.Button(ui.ButtonProps{
-									Variant: ui.ButtonDestructive,
+									Variant:  ui.ButtonDestructive,
+									Disabled: true,
 									Children: []core.Node{
 										core.Text("Delete All"),
 									},

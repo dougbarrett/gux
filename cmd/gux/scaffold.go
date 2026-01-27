@@ -244,6 +244,10 @@ func runInit(appName, modulePath string, authMode AuthMode, withAdmin bool) {
 					tmplPath string
 					destPath string
 				}{"templates/admin/dto/auth.go.tmpl", "dto/auth.go"},
+				struct {
+					tmplPath string
+					destPath string
+				}{"templates/admin/dto/user.go.tmpl", "dto/user.go"},
 			)
 		} else {
 			// Auth only: use standard auth pages

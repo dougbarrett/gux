@@ -1,0 +1,21 @@
+package dto
+
+import "time"
+
+// UserList is the DTO for user list items.
+type UserList struct {
+	ID        uint      `json:"id" gux:"User.ID"`
+	Email     string    `json:"email" gux:"User.Email"`
+	Name      string    `json:"name" gux:"User.Name"`
+	Role      string    `json:"role" gux:"User.Role"`
+	CreatedAt time.Time `json:"created_at" gux:"User.CreatedAt"`
+}
+
+// UserDetail is the DTO for user detail view.
+type UserDetail struct {
+	ID        uint      `json:"id" gux:"User.ID"`
+	Email     string    `json:"email" gux:"User.Email"`
+	Name      string    `json:"name" gux:"User.Name"`
+	Role      string    `json:"role" gux:"User.Role"`
+	CreatedAt time.Time `json:"created_at" gux:"User.CreatedAt"`
+}

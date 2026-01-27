@@ -1,7 +1,10 @@
 package admin
 
 import (
+	"fmt"
+
 	"{{.ModulePath}}/dto"
+	"{{.ModulePath}}/guxgen/api"
 
 	"{{.GuxModule}}/core"
 	"{{.GuxModule}}/ui"
@@ -9,6 +12,18 @@ import (
 
 // Dashboard renders the admin dashboard page.
 func Dashboard(r *core.Router) func() core.Node {
+	// State for stats
+	userCount := r.StateInt("user_count", 0)
+
+	// Fetch stats on load
+	r.OnLoad(func() {
+		api.Users.List(func(users []dto.UserList, err error) {
+			if err == nil {
+				userCount.Set(len(users))
+			}
+		})
+	})
+
 	return func() core.Node {
 		return core.Frag(
 			PageHeader("Dashboard", "Welcome to the admin panel", []dto.Breadcrumb{
@@ -17,9 +32,9 @@ func Dashboard(r *core.Router) func() core.Node {
 
 			// Stats row
 			core.Div(core.Class("grid grid-cols-1 md:grid-cols-3 gap-6 mb-8"),
-				statCard("Total Users", "1,234", "+12%", "users"),
-				statCard("Active Sessions", "89", "Currently online", "activity"),
-				statCard("Storage Used", "2.4 GB", "of 10 GB", "database"),
+				statCard("Total Users", fmt.Sprintf("%d", userCount.Get()), "Registered users", "users"),
+				statCard("Active Sessions", "-", "Feature coming soon", "activity"),
+				statCard("Storage Used", "-", "Feature coming soon", "database"),
 			),
 
 			// Recent activity
@@ -34,10 +49,8 @@ func Dashboard(r *core.Router) func() core.Node {
 					}),
 					ui.CardContent(ui.CardContentProps{
 						Children: []core.Node{
-							activityItem("User registered", "john@example.com", "2 minutes ago"),
-							activityItem("Settings updated", "Admin", "15 minutes ago"),
-							activityItem("User logged in", "jane@example.com", "1 hour ago"),
-							activityItem("Password reset", "bob@example.com", "3 hours ago"),
+							core.P(core.Class("text-gray-500 dark:text-gray-400 py-4"),
+								core.Text("Activity logging coming soon. This is a demo admin panel template.")),
 						},
 					}),
 				},
@@ -69,14 +82,4 @@ func statCard(title, value, subtitle, icon string) core.Node {
 			}),
 		},
 	})
-}
-
-func activityItem(title, subtitle, time string) core.Node {
-	return core.Div(core.Class("flex items-center justify-between py-3 border-b border-gray-200 dark:border-gray-700 last:border-0"),
-		core.Div(core.Attrs{},
-			core.Div(core.Class("font-medium text-gray-900 dark:text-white"), core.Text(title)),
-			core.Div(core.Class("text-sm text-gray-500 dark:text-gray-400"), core.Text(subtitle)),
-		),
-		core.Div(core.Class("text-sm text-gray-400"), core.Text(time)),
-	)
 }

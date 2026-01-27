@@ -1,7 +1,10 @@
 package admin
 
 import (
+	"strconv"
+
 	"{{.ModulePath}}/dto"
+	"{{.ModulePath}}/guxgen/api"
 
 	"{{.GuxModule}}/core"
 	"{{.GuxModule}}/ui"
@@ -9,37 +12,86 @@ import (
 
 // UserDetail renders the user detail page.
 func UserDetail(r *core.Router) func() core.Node {
+	// State for user data
+	user := core.UseState(r, "user", dto.UserDetail{})
+	loading := r.StateBool("loading", true)
+	errorMsg := r.StateString("error", "")
+
 	// State for editing
 	isEditing := r.StateBool("editing", false)
 	showDeleteConfirm := r.StateBool("delete_confirm", false)
+	saving := r.StateBool("saving", false)
 
 	// Editable fields
 	editName := r.StateString("edit_name", "")
 	editEmail := r.StateString("edit_email", "")
 
+	// Get user ID from route params
+	userIDStr := r.Param("id")
+	userID, _ := strconv.ParseUint(userIDStr, 10, 64)
+
+	// Fetch user on load
+	r.OnLoad(func() {
+		api.Users.Get(uint(userID), func(result *dto.UserDetail, err error) {
+			loading.Set(false)
+			if err != nil {
+				errorMsg.Set("Failed to load user")
+				return
+			}
+			user.Set(*result)
+			editName.Set(result.Name)
+			editEmail.Set(result.Email)
+		})
+	})
+
 	return func() core.Node {
-		// Get user ID from route params
-		userID := r.Param("id")
+		u := user.Get()
 
-		// Sample user data - in real app, fetch from API based on userID
-		user := struct {
-			ID    string
-			Name  string
-			Email string
-			Role  string
-		}{
-			ID:    userID,
-			Name:  "User " + userID,
-			Email: "user" + userID + "@example.com",
-			Role:  "user",
+		// Error state
+		if errorMsg.Get() != "" {
+			return core.Frag(
+				PageHeader("User Details", "View user information", []dto.Breadcrumb{
+					{Label: "Admin", Href: "/admin"},
+					{Label: "Users", Href: "/admin/users"},
+					{Label: "Error", Href: ""},
+				}),
+				ui.Card(ui.CardProps{
+					Children: []core.Node{
+						ui.CardContent(ui.CardContentProps{
+							Class: "py-8 text-center",
+							Children: []core.Node{
+								core.P(core.Class("text-red-500 dark:text-red-400 mb-4"),
+									core.Text(errorMsg.Get())),
+								core.A(core.Attrs{
+									Href:  "/admin/users",
+									Class: "text-blue-600 hover:text-blue-800 dark:text-blue-400",
+								}, core.Text("Back to Users")),
+							},
+						}),
+					},
+				}),
+			)
 		}
 
-		// Initialize edit fields if not set
-		if editName.Get() == "" {
-			editName.Set(user.Name)
-		}
-		if editEmail.Get() == "" {
-			editEmail.Set(user.Email)
+		// Loading state
+		if loading.Get() {
+			return core.Frag(
+				PageHeader("User Details", "View user information", []dto.Breadcrumb{
+					{Label: "Admin", Href: "/admin"},
+					{Label: "Users", Href: "/admin/users"},
+					{Label: "Loading...", Href: ""},
+				}),
+				ui.Card(ui.CardProps{
+					Children: []core.Node{
+						ui.CardContent(ui.CardContentProps{
+							Class: "py-8 text-center text-gray-500 dark:text-gray-400",
+							Children: []core.Node{
+								core.Text("Loading user..."),
+							},
+						}),
+					},
+				}),
+			)
 		}
 
 		// Delete confirmation modal
@@ -58,7 +110,7 @@ func UserDetail(r *core.Router) func() core.Node {
 						ui.CardContent(ui.CardContentProps{
 							Children: []core.Node{
 								core.P(core.Class("text-gray-600 dark:text-gray-400"),
-									core.Text("Are you sure you want to delete "+user.Name+"? This action cannot be undone.")),
+									core.Text("Are you sure you want to delete "+u.Name+"? This action cannot be undone.")),
 							},
 						}),
 						ui.CardFooter(ui.CardFooterProps{
@@ -72,9 +124,12 @@ func UserDetail(r *core.Router) func() core.Node {
 								ui.Button(ui.ButtonProps{
 									Variant: ui.ButtonDestructive,
 									OnClick: func() {
-										// In real app, call delete API here
-										showDeleteConfirm.Set(false)
-										r.Navigate("/admin/users")
+										api.Users.Delete(u.ID, func(err error) {
+											if err == nil {
+												showDeleteConfirm.Set(false)
+												r.Navigate("/admin/users")
+											}
+										})
 									},
 									Children: []core.Node{core.Text("Delete")},
 								}),
@@ -114,39 +169,58 @@ func UserDetail(r *core.Router) func() core.Node {
 								OnChange: func(v string) { editEmail.Set(v) },
 							}),
 						),
-						detailRow("User ID", user.ID),
-						detailRow("Role", user.Role),
+						detailRow("User ID", userIDStr),
+						detailRow("Role", u.Role),
 					),
 				},
 			})
 			footerButtons = core.Div(core.Class("flex gap-2"),
 				ui.Button(ui.ButtonProps{
-					Variant: ui.ButtonSecondary,
+					Variant:  ui.ButtonSecondary,
+					Disabled: saving.Get(),
 					OnClick: func() {
 						// Cancel - reset fields
-						editName.Set(user.Name)
-						editEmail.Set(user.Email)
+						editName.Set(u.Name)
+						editEmail.Set(u.Email)
 						isEditing.Set(false)
 					},
 					Children: []core.Node{core.Text("Cancel")},
 				}),
 				ui.Button(ui.ButtonProps{
-					Variant: ui.ButtonPrimary,
+					Variant:  ui.ButtonPrimary,
+					Disabled: saving.Get(),
 					OnClick: func() {
-						// In real app, call update API here
-						isEditing.Set(false)
+						saving.Set(true)
+						data := map[string]interface{}{
+							"name":  editName.Get(),
+							"email": editEmail.Get(),
+						}
+						api.Users.Update(u.ID, data, func(result *dto.UserDetail, err error) {
+							saving.Set(false)
+							if err == nil {
+								user.Set(*result)
+								isEditing.Set(false)
+							}
+						})
 					},
-					Children: []core.Node{core.Text("Save")},
+					Children: []core.Node{
+						core.Text(func() string {
+							if saving.Get() {
+								return "Saving..."
+							}
+							return "Save"
+						}()),
+					},
 				}),
 			)
 		} else {
 			// View mode
 			cardContent = ui.CardContent(ui.CardContentProps{
 				Children: []core.Node{
-					detailRow("User ID", user.ID),
-					detailRow("Name", editName.Get()),
-					detailRow("Email", editEmail.Get()),
-					detailRow("Role", user.Role),
+					detailRow("User ID", userIDStr),
+					detailRow("Name", u.Name),
+					detailRow("Email", u.Email),
+					detailRow("Role", u.Role),
 				},
 			})
 			footerButtons = core.Div(core.Class("flex gap-2"),
@@ -168,7 +242,7 @@ func UserDetail(r *core.Router) func() core.Node {
 			PageHeader("User Details", "View user information", []dto.Breadcrumb{
 				{Label: "Admin", Href: "/admin"},
 				{Label: "Users", Href: "/admin/users"},
-				{Label: editName.Get(), Href: ""},
+				{Label: u.Name, Href: ""},
 			}),
 
 			// User info card
@@ -178,14 +252,14 @@ func UserDetail(r *core.Router) func() core.Node {
 						Children: []core.Node{
 							core.Div(core.Class("flex items-center gap-4"),
 								ui.Avatar(ui.AvatarProps{
-									Name: editName.Get(),
+									Name: u.Name,
 									Size: ui.AvatarLG,
 								}),
 								core.Div(core.Attrs{},
 									core.H2(core.Class("text-xl font-bold text-gray-900 dark:text-white"),
-										core.Text(editName.Get())),
+										core.Text(u.Name)),
 									core.P(core.Class("text-gray-500 dark:text-gray-400"),
-										core.Text(editEmail.Get())),
+										core.Text(u.Email)),
 								),
 							),
 						},
@@ -197,7 +271,7 @@ func UserDetail(r *core.Router) func() core.Node {
 							core.A(core.Attrs{
 								Href:  "/admin/users",
 								Class: "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200",
-							}, core.Text("← Back to Users")),
+							}, core.Text("\u2190 Back to Users")),
 							footerButtons,
 						},
 					}),

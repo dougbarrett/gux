@@ -1,6 +1,9 @@
 package pages
 
 import (
+	"{{.ModulePath}}/dto"
+	"{{.ModulePath}}/guxgen/api"
+
 	"{{.GuxModule}}/core"
 	"{{.GuxModule}}/ui"
 )
@@ -45,9 +48,20 @@ func Register(r *core.Router) func() core.Node {
 			loadingState.Set(true)
 			errorState.Set("")
 
-			// TODO: Call register API
-			// For now, just show success and redirect to login
-			r.Navigate("/login")
+			// Call register API
+			data := map[string]interface{}{
+				"name":     name,
+				"email":    email,
+				"password": password,
+			}
+			api.Users.Create(data, func(_ *dto.UserDetail, err error) {
+				loadingState.Set(false)
+				if err != nil {
+					errorState.Set("Registration failed: " + err.Error())
+					return
+				}
+				r.Navigate("/login")
+			})
 		}
 
 		// Error alert

@@ -1,12 +1,14 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"os"
 
 	"{{.ModulePath}}/admin"
 	"{{.ModulePath}}/dto"
+	"{{.ModulePath}}/guxgen/api"
 	"{{.ModulePath}}/models"
 	"{{.ModulePath}}/pages"
 
@@ -27,6 +29,9 @@ func main() {
 
 	// Auto-migrate models
 	db.AutoMigrate(&models.User{})
+
+	// Initialize API with database
+	api.Init(db)
 
 	// Seed admin user from environment variables
 	var count int64
@@ -66,6 +71,45 @@ func main() {
 
 	// Register API endpoints
 	registerAPIEndpoints(app, db)
+
+	// Register CRUD for User with DTO and password hooks
+	app.CRUD(models.User{},
+		core.WithListDTO(dto.UserList{}),
+		core.WithDetailDTO(dto.UserDetail{}),
+		core.WithCreateHook(func(data map[string]interface{}) (interface{}, error) {
+			user := &models.User{}
+			if email, ok := data["email"].(string); ok {
+				user.Email = email
+			} else {
+				return nil, errors.New("email is required")
+			}
+			if name, ok := data["name"].(string); ok {
+				user.Name = name
+			}
+			if password, ok := data["password"].(string); ok && password != "" {
+				if err := user.SetPassword(password); err != nil {
+					return nil, errors.New("failed to hash password")
+				}
+			} else {
+				return nil, errors.New("password is required")
+			}
+			user.Role = "user" // Default role for new users
+			return user, nil
+		}),
+		core.WithUpdateHook(func(existing interface{}, data map[string]interface{}) (interface{}, error) {
+			user := existing.(*models.User)
+			if name, ok := data["name"].(string); ok {
+				user.Name = name
+			}
+			if email, ok := data["email"].(string); ok {
+				user.Email = email
+			}
+			if password, ok := data["password"].(string); ok && password != "" {
+				user.SetPassword(password)
+			}
+			return user, nil
+		}),
+	)
 
 	// Redirect homepage to login
 	app.Routes().
