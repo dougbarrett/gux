@@ -169,6 +169,7 @@ func userMenu(name, email string, collapsed, menuOpen bool, onToggle, onLogout f
 			core.Div(core.Class("py-1"),
 				// Logout button
 				core.Button(core.Attrs{
+					Type:    "button",
 					Class:   "w-full px-4 py-2 text-left text-sm text-gray-300 hover:bg-gray-600 hover:text-white flex items-center gap-2",
 					OnClick: onLogout,
 				},
@@ -182,6 +183,7 @@ func userMenu(name, email string, collapsed, menuOpen bool, onToggle, onLogout f
 	return core.Div(core.Class("relative"),
 		dropdown,
 		core.Button(core.Attrs{
+			Type:    "button",
 			Class:   buttonClass,
 			OnClick: onToggle,
 		}, content...),
