@@ -1,0 +1,154 @@
+package admin
+
+import (
+	"{{.ModulePath}}/dto"
+	"{{.ModulePath}}/guxgen/api"
+
+	"{{.GuxModule}}/core"
+	"{{.GuxModule}}/ui"
+)
+
+// UserNew renders the create user page.
+func UserNew(r *core.Router) func() core.Node {
+	// Form fields
+	name := r.StateString("name", "")
+	email := r.StateString("email", "")
+	password := r.StateString("password", "")
+
+	// Form state
+	saving := r.StateBool("saving", false)
+	errorMsg := r.StateString("error", "")
+
+	return func() core.Node {
+		// Error alert
+		var errorNode core.Node = core.Frag()
+		if errorMsg.Get() != "" {
+			errorNode = core.Div(core.Class("mb-6"),
+				ui.Alert(ui.AlertProps{
+					Variant: ui.AlertError,
+					Message: errorMsg.Get(),
+				}),
+			)
+		}
+
+		return core.Frag(
+			PageHeader("New User", "Create a new user account", []dto.Breadcrumb{
+				{Label: "Admin", Href: "/admin"},
+				{Label: "Users", Href: "/admin/users"},
+				{Label: "New User", Href: ""},
+			}),
+
+			ui.Card(ui.CardProps{
+				Class: "max-w-2xl",
+				Children: []core.Node{
+					ui.CardHeader(ui.CardHeaderProps{
+						Children: []core.Node{
+							core.H2(core.Class("text-lg font-semibold text-gray-900 dark:text-white"),
+								core.Text("User Information")),
+							core.P(core.Class("text-sm text-gray-500 dark:text-gray-400 mt-1"),
+								core.Text("Fill in the details to create a new user.")),
+						},
+					}),
+					ui.CardContent(ui.CardContentProps{
+						Children: []core.Node{
+							errorNode,
+							core.Div(core.Class("space-y-4"),
+								// Name field
+								core.Div(core.Attrs{},
+									core.Label(core.Attrs{
+										Class: "block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1",
+									}, core.Text("Name")),
+									ui.Input(ui.InputProps{
+										Type:        ui.InputText,
+										Placeholder: "Enter full name",
+										Value:       name.Get(),
+										OnChange:    func(v string) { name.Set(v) },
+									}),
+								),
+								// Email field
+								core.Div(core.Attrs{},
+									core.Label(core.Attrs{
+										Class: "block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1",
+									}, core.Text("Email")),
+									ui.Input(ui.InputProps{
+										Type:        ui.InputEmail,
+										Placeholder: "Enter email address",
+										Value:       email.Get(),
+										OnChange:    func(v string) { email.Set(v) },
+									}),
+								),
+								// Password field
+								core.Div(core.Attrs{},
+									core.Label(core.Attrs{
+										Class: "block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1",
+									}, core.Text("Password")),
+									ui.Input(ui.InputProps{
+										Type:        ui.InputPassword,
+										Placeholder: "Enter password",
+										Value:       password.Get(),
+										OnChange:    func(v string) { password.Set(v) },
+									}),
+								),
+							),
+						},
+					}),
+					ui.CardFooter(ui.CardFooterProps{
+						Class: "flex justify-between",
+						Children: []core.Node{
+							core.A(core.Attrs{
+								Href:  "/admin/users",
+								Class: "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200",
+							}, core.Text("\u2190 Back to Users")),
+							core.Div(core.Class("flex gap-2"),
+								ui.Button(ui.ButtonProps{
+									Variant:  ui.ButtonSecondary,
+									Disabled: saving.Get(),
+									OnClick: func() {
+										r.Navigate("/admin/users")
+									},
+									Children: []core.Node{core.Text("Cancel")},
+								}),
+								ui.Button(ui.ButtonProps{
+									Variant:  ui.ButtonPrimary,
+									Disabled: saving.Get(),
+									OnClick: func() {
+										// Validate
+										if name.Get() == "" || email.Get() == "" || password.Get() == "" {
+											errorMsg.Set("All fields are required")
+											return
+										}
+
+										saving.Set(true)
+										errorMsg.Set("")
+
+										data := map[string]interface{}{
+											"name":     name.Get(),
+											"email":    email.Get(),
+											"password": password.Get(),
+										}
+										api.Users.Create(data, func(_ *dto.UserDetail, err error) {
+											saving.Set(false)
+											if err != nil {
+												errorMsg.Set("Failed to create user: " + err.Error())
+												return
+											}
+											r.Navigate("/admin/users")
+										})
+									},
+									Children: []core.Node{
+										core.Text(func() string {
+											if saving.Get() {
+												return "Creating..."
+											}
+											return "Create User"
+										}()),
+									},
+								}),
+							),
+						},
+					}),
+				},
+			}),
+		)
+	}
+}
