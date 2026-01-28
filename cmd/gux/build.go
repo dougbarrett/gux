@@ -552,10 +552,19 @@ func getModelFieldTypes(modelName string) (map[string]string, error) {
 		return cached, nil
 	}
 
-	// Parse models directory
-	entries, err := os.ReadDir("models")
+	// Parse models directory (guxgen/models for generated, models for manual)
+	entries, err := os.ReadDir(filepath.Join("guxgen", "models"))
 	if err != nil {
-		return nil, fmt.Errorf("read models dir: %w", err)
+		// Fall back to models/ for backwards compatibility
+		entries, err = os.ReadDir("models")
+		if err != nil {
+			return nil, fmt.Errorf("read models dir: %w", err)
+		}
+	}
+
+	modelsDir := filepath.Join("guxgen", "models")
+	if _, err := os.Stat(modelsDir); os.IsNotExist(err) {
+		modelsDir = "models"
 	}
 
 	for _, entry := range entries {
@@ -564,7 +573,7 @@ func getModelFieldTypes(modelName string) (map[string]string, error) {
 		}
 
 		fset := token.NewFileSet()
-		filename := filepath.Join("models", entry.Name())
+		filename := filepath.Join(modelsDir, entry.Name())
 		node, err := parser.ParseFile(fset, filename, nil, parser.ParseComments)
 		if err != nil {
 			continue
@@ -3696,7 +3705,7 @@ func runBuildNew(tinygo bool) {
 			fmt.Printf("Error getting package path: %v\n", err)
 			os.Exit(1)
 		}
-		modelsImport = pkgPath + "/models"
+		modelsImport = pkgPath + "/guxgen/models"
 	}
 
 	// If no dto import found but we have DTOs, construct it
@@ -3705,7 +3714,7 @@ func runBuildNew(tinygo bool) {
 			if m.ListDTO != "" || m.DetailDTO != "" {
 				pkgPath, err := getCurrentPackagePath()
 				if err == nil {
-					dtoImport = pkgPath + "/dto"
+					dtoImport = pkgPath + "/guxgen/dto"
 				}
 				break
 			}

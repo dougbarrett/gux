@@ -126,7 +126,7 @@ func generateGuxFiles() error {
 		if err != nil {
 			return fmt.Errorf("getting package path: %w", err)
 		}
-		modelsImport = pkgPath + "/models"
+		modelsImport = pkgPath + "/guxgen/models"
 	}
 
 	// If no dto import found but we have DTOs, construct it
@@ -135,7 +135,7 @@ func generateGuxFiles() error {
 			if m.ListDTO != "" || m.DetailDTO != "" {
 				pkgPath, err := getCurrentPackagePath()
 				if err == nil {
-					dtoImport = pkgPath + "/dto"
+					dtoImport = pkgPath + "/guxgen/dto"
 				}
 				break
 			}

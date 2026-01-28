@@ -130,7 +130,7 @@ import (
 	"github.com/dougbarrett/gux/ui"
 {{- end}}
 	"{{.ModulePath}}/guxgen/api"
-	"{{.ModulePath}}/dto"
+	"{{.ModulePath}}/guxgen/dto"
 )
 
 // Hook slots for {{.Name}} list page - set these in init() in a separate file (e.g., {{.NameLower}}_hooks.go)
@@ -425,7 +425,7 @@ import (
 	"github.com/dougbarrett/gux/ui"
 {{- end}}
 	"{{.ModulePath}}/guxgen/api"
-	"{{.ModulePath}}/dto"
+	"{{.ModulePath}}/guxgen/dto"
 )
 
 // Hook slots for {{.Name}} new form - set these in init() in a separate file (e.g., {{.NameLower}}_hooks.go)
@@ -670,7 +670,7 @@ import (
 	"github.com/dougbarrett/gux/ui"
 {{- end}}
 	"{{.ModulePath}}/guxgen/api"
-	"{{.ModulePath}}/dto"
+	"{{.ModulePath}}/guxgen/dto"
 )
 
 // Hook slots for {{.Name}} detail page - set these in init() in a separate file (e.g., {{.NameLower}}_hooks.go)
@@ -981,7 +981,7 @@ import (
 	"github.com/dougbarrett/gux/ui"
 {{- end}}
 	"{{.ModulePath}}/guxgen/api"
-	"{{.ModulePath}}/dto"
+	"{{.ModulePath}}/guxgen/dto"
 )
 
 // {{.Name}}Edit is the form for editing an existing {{.NameLower}}.
@@ -1462,8 +1462,8 @@ func GenerateModelFilesImpl(model *ModelDefinition, optionSets map[string]Option
 	data := prepareModelTemplateData(model, modulePath, displayFields)
 	data.AdminEnabled = adminEnabled
 
-	// Create directories if needed
-	dirs := []string{"models", "dto", "admin"}
+	// Create directories if needed (all generated files go in guxgen/)
+	dirs := []string{"guxgen/models", "guxgen/dto", "guxgen/admin"}
 	for _, dir := range dirs {
 		if err := os.MkdirAll(dir, 0755); err != nil {
 			return fmt.Errorf("create directory %s: %w", dir, err)
@@ -1471,7 +1471,7 @@ func GenerateModelFilesImpl(model *ModelDefinition, optionSets map[string]Option
 	}
 
 	// Generate shared hooks file (only if it doesn't exist - shared across all models)
-	hooksGenPath := filepath.Join("admin", "hooks_gen.go")
+	hooksGenPath := filepath.Join("guxgen", "admin", "hooks_gen.go")
 	if _, err := os.Stat(hooksGenPath); os.IsNotExist(err) {
 		if err := executeSimpleTemplate(ModelGenTemplates.HooksGen, hooksGenPath); err != nil {
 			return fmt.Errorf("generate hooks: %w", err)
@@ -1480,7 +1480,7 @@ func GenerateModelFilesImpl(model *ModelDefinition, optionSets map[string]Option
 	}
 
 	// Generate shared helpers file (only if it doesn't exist - shared across all models)
-	helpersGenPath := filepath.Join("admin", "helpers_gen.go")
+	helpersGenPath := filepath.Join("guxgen", "admin", "helpers_gen.go")
 	if _, err := os.Stat(helpersGenPath); os.IsNotExist(err) {
 		if err := executeSimpleTemplate(ModelGenTemplates.HelpersGen, helpersGenPath); err != nil {
 			return fmt.Errorf("generate helpers: %w", err)
@@ -1488,52 +1488,52 @@ func GenerateModelFilesImpl(model *ModelDefinition, optionSets map[string]Option
 		fmt.Printf("  %s\n", helpersGenPath)
 	}
 
-	// Check if non-generated model file exists
+	// Check if non-generated model file exists (in models/ for backwards compat)
 	manualModelPath := filepath.Join("models", ToSnakeCase(model.Name)+".go")
 	if _, err := os.Stat(manualModelPath); err == nil {
 		fmt.Printf("  Skipping model (manual file exists: %s)\n", manualModelPath)
 	} else {
-		// Generate model file
-		modelPath := filepath.Join("models", ToSnakeCase(model.Name)+"_gen.go")
+		// Generate model file in guxgen/models/
+		modelPath := filepath.Join("guxgen", "models", ToSnakeCase(model.Name)+"_gen.go")
 		if err := executeTemplate(ModelGenTemplates.Model, modelPath, data); err != nil {
 			return fmt.Errorf("generate model: %w", err)
 		}
 		fmt.Printf("  %s\n", modelPath)
 	}
 
-	// Check if non-generated DTO file exists
+	// Check if non-generated DTO file exists (in dto/ for backwards compat)
 	manualDTOPath := filepath.Join("dto", ToSnakeCase(model.Name)+".go")
 	if _, err := os.Stat(manualDTOPath); err == nil {
 		fmt.Printf("  Skipping DTO (manual file exists: %s)\n", manualDTOPath)
 	} else {
-		// Generate DTO file
-		dtoPath := filepath.Join("dto", ToSnakeCase(model.Name)+"_gen.go")
+		// Generate DTO file in guxgen/dto/
+		dtoPath := filepath.Join("guxgen", "dto", ToSnakeCase(model.Name)+"_gen.go")
 		if err := generateDTOFile(dtoPath, data); err != nil {
 			return fmt.Errorf("generate dto: %w", err)
 		}
 		fmt.Printf("  %s\n", dtoPath)
 	}
 
-	// Generate admin pages
-	adminListPath := filepath.Join("admin", ToSnakeCase(model.Name)+"_list_gen.go")
+	// Generate admin pages in guxgen/admin/
+	adminListPath := filepath.Join("guxgen", "admin", ToSnakeCase(model.Name)+"_list_gen.go")
 	if err := executeTemplate(ModelGenTemplates.AdminList, adminListPath, data); err != nil {
 		return fmt.Errorf("generate admin list: %w", err)
 	}
 	fmt.Printf("  %s\n", adminListPath)
 
-	adminNewPath := filepath.Join("admin", ToSnakeCase(model.Name)+"_new_gen.go")
+	adminNewPath := filepath.Join("guxgen", "admin", ToSnakeCase(model.Name)+"_new_gen.go")
 	if err := executeTemplate(ModelGenTemplates.AdminNew, adminNewPath, data); err != nil {
 		return fmt.Errorf("generate admin new: %w", err)
 	}
 	fmt.Printf("  %s\n", adminNewPath)
 
-	adminDetailPath := filepath.Join("admin", ToSnakeCase(model.Name)+"_detail_gen.go")
+	adminDetailPath := filepath.Join("guxgen", "admin", ToSnakeCase(model.Name)+"_detail_gen.go")
 	if err := executeTemplate(ModelGenTemplates.AdminDetail, adminDetailPath, data); err != nil {
 		return fmt.Errorf("generate admin detail: %w", err)
 	}
 	fmt.Printf("  %s\n", adminDetailPath)
 
-	adminEditPath := filepath.Join("admin", ToSnakeCase(model.Name)+"_edit_gen.go")
+	adminEditPath := filepath.Join("guxgen", "admin", ToSnakeCase(model.Name)+"_edit_gen.go")
 	if err := executeTemplate(ModelGenTemplates.AdminEdit, adminEditPath, data); err != nil {
 		return fmt.Errorf("generate admin edit: %w", err)
 	}
@@ -2053,14 +2053,19 @@ type BriefDTOInfo struct {
 	DisplayField string
 }
 
-// GenerateSharedBriefsFile generates dto/briefs_gen.go with all Brief DTOs
+// GenerateSharedBriefsFile generates guxgen/dto/briefs_gen.go with all Brief DTOs
 // This prevents duplicate Brief DTO declarations across model files
 func GenerateSharedBriefsFile(briefs map[string]BriefDTOInfo) error {
 	if len(briefs) == 0 {
 		return nil
 	}
 
-	// Check for existing types in manual files
+	// Ensure guxgen/dto directory exists
+	if err := os.MkdirAll(filepath.Join("guxgen", "dto"), 0755); err != nil {
+		return fmt.Errorf("create guxgen/dto directory: %w", err)
+	}
+
+	// Check for existing types in manual dto/ directory (backwards compat)
 	existingTypes := findExistingDTOTypes("dto")
 
 	var buf bytes.Buffer
@@ -2098,11 +2103,11 @@ func GenerateSharedBriefsFile(briefs map[string]BriefDTOInfo) error {
 
 	if generated == 0 {
 		// All Brief types exist in manual files, remove generated file if it exists
-		os.Remove(filepath.Join("dto", "briefs_gen.go"))
+		os.Remove(filepath.Join("guxgen", "dto", "briefs_gen.go"))
 		return nil
 	}
 
-	return os.WriteFile(filepath.Join("dto", "briefs_gen.go"), buf.Bytes(), 0644)
+	return os.WriteFile(filepath.Join("guxgen", "dto", "briefs_gen.go"), buf.Bytes(), 0644)
 }
 
 // findExistingDTOTypes scans the dto directory for existing type declarations
