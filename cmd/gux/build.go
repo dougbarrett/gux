@@ -1655,6 +1655,8 @@ func main() {
 	navigate := func(path string) {
 		// Clear current component to force reload for new path
 		currentComponent = nil
+		// Clear page-specific state before navigating to avoid stale data
+		router.ClearState()
 		window.Get("history").Call("pushState", nil, "", path)
 		fetchLoader(path, func(state map[string]any) {
 			if state != nil {
@@ -1684,8 +1686,17 @@ func main() {
 	// Handle browser back/forward
 	window.Call("addEventListener", "popstate", js.FuncOf(func(this js.Value, args []js.Value) any {
 		currentComponent = nil // Force reload for history navigation
-		loadPage()
-		render()
+		// Clear page-specific state for browser history navigation
+		router.ClearState()
+		// Fetch fresh data for the new/previous page
+		path := window.Get("location").Get("pathname").String()
+		fetchLoader(path, func(state map[string]any) {
+			if state != nil {
+				router.Hydrate(state)
+			}
+			loadPage()
+			render()
+		})
 		return nil
 	}))
 
@@ -1997,6 +2008,8 @@ func main() {
 		}
 		// Same-bundle navigation - clear component to force reload
 		currentComponent = nil
+		// Clear page-specific state before navigating to avoid stale data
+		router.ClearState()
 		window.Get("history").Call("pushState", nil, "", path)
 		fetchLoader(path, func(state map[string]any) {
 			if state != nil {
@@ -2026,8 +2039,17 @@ func main() {
 	// Handle browser back/forward
 	window.Call("addEventListener", "popstate", js.FuncOf(func(this js.Value, args []js.Value) any {
 		currentComponent = nil // Force reload for history navigation
-		loadPage()
-		render()
+		// Clear page-specific state for browser history navigation
+		router.ClearState()
+		// Fetch fresh data for the new/previous page
+		path := window.Get("location").Get("pathname").String()
+		fetchLoader(path, func(state map[string]any) {
+			if state != nil {
+				router.Hydrate(state)
+			}
+			loadPage()
+			render()
+		})
 		return nil
 	}))
 

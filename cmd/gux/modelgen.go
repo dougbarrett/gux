@@ -1314,6 +1314,7 @@ package admin
 
 import (
 	"strconv"
+	"time"
 )
 
 // parseUint converts a string to uint, returning 0 for empty strings
@@ -1333,6 +1334,24 @@ func parseUintPtr(s string) *uint {
 	v, _ := strconv.ParseUint(s, 10, 64)
 	u := uint(v)
 	return &u
+}
+
+// parseTime converts a date string (YYYY-MM-DD) to time.Time, returning zero time for empty strings
+func parseTime(s string) time.Time {
+	if s == "" {
+		return time.Time{}
+	}
+	t, _ := time.Parse("2006-01-02", s)
+	return t
+}
+
+// parseTimePtr converts a date string (YYYY-MM-DD) to *time.Time, returning nil for empty strings
+func parseTimePtr(s string) *time.Time {
+	if s == "" {
+		return nil
+	}
+	t, _ := time.Parse("2006-01-02", s)
+	return &t
 }
 `,
 }

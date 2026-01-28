@@ -965,6 +965,30 @@ func (r *Router) ClearHydrated() {
 	r.hydrated = false
 }
 
+// ClearState clears all page-specific state while preserving system state.
+// Called during SPA navigation to ensure fresh data is loaded for the new page.
+// Preserves keys starting with "__gux_" (like user session data).
+func (r *Router) ClearState() {
+	// Preserve system state keys
+	preserved := make(map[string]any)
+	for k, v := range r.state {
+		if len(k) > 6 && k[:6] == "__gux_" {
+			preserved[k] = v
+		}
+	}
+
+	// Clear all state
+	r.state = make(map[string]any)
+
+	// Restore preserved keys
+	for k, v := range preserved {
+		r.state[k] = v
+	}
+
+	// Reset hydrated flag so OnLoad will run
+	r.hydrated = false
+}
+
 // OnLoad runs the loader function only if state was NOT hydrated from server.
 // Use this to wrap data loading logic - it will automatically be skipped
 // when the client already has the data from SSR or client-side navigation.
