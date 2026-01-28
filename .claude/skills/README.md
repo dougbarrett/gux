@@ -21,7 +21,9 @@ Comprehensive guide for Gux development including:
 - Tailwind CSS integration
 
 **Development**:
-- CLI commands (`gux init`, `gux gen`, `gux dev`, etc.)
+- CLI commands (`gux init`, `gux gen`, `gux dev`, `gux model`, etc.)
+- Model scaffolding with auth preset (automatic password hashing)
+- Customizable user roles via config
 - API code generation with annotations
 - State management patterns
 - Server utilities

@@ -705,12 +705,40 @@ Project settings are saved during init and can be reused:
 ```json
 {
   "module": "github.com/user/myapp",
-  "auth": "private",   // "none", "private", "public"
+  "auth": "private",
   "admin": true,
-  "claude": true,      // Claude Code integration
-  "port": "8080"
+  "claude": true,
+  "port": "8080",
+  "roles": [
+    {"value": "user", "label": "User"},
+    {"value": "admin", "label": "Admin"}
+  ],
+  "models": {
+    "User": {
+      "preset": "auth",
+      "sections": {
+        "Account": [
+          {"name": "Email", "type": "string", "required": true, "table": true, "input": "email"},
+          {"name": "Name", "type": "string", "required": true, "table": true},
+          {"name": "Role", "type": "string", "table": true, "input": "select"}
+        ]
+      }
+    }
+  }
 }
 ```
+
+**Config fields:**
+
+| Field | Description |
+|-------|-------------|
+| `module` | Go module path |
+| `auth` | Auth mode: `"none"`, `"private"` (admin-only), `"public"` (signup enabled) |
+| `admin` | Include admin panel |
+| `claude` | Include Claude Code integration |
+| `port` | Server port (default: 8080) |
+| `roles` | Top-level roles config (applies to auth preset models on regeneration) |
+| `models` | Model definitions for scaffolding |
 
 ### Model Scaffolding
 
@@ -760,6 +788,7 @@ gux model regen Client
 
 | Property | Description |
 |----------|-------------|
+| `preset` | Special model preset: `"auth"` for User models with password hashing |
 | `formLayout` | Form field layout: `"stacked"` (default, vertical) or `"grid"` (two-column responsive) |
 | `preloads` | Relations to preload for detail view |
 | `public` | CRUD is public (no auth required) |
@@ -784,6 +813,79 @@ gux model regen Client
 | `optionsRef` | Reference to optionSets |
 | `badge` | Badge display for booleans: `{true, false, trueLabel, falseLabel}` |
 | `many2many` | Join table name for M2M relations |
+
+#### Auth Preset
+
+When `gux init --auth` or `gux init --auth-public` is used, a User model is automatically created with `"preset": "auth"`. This preset:
+
+1. **Auto-adds authentication fields**:
+   - `PasswordHash string` with `json:"-"` tag (excluded from JSON)
+   - `Verified bool` for email verification
+
+2. **Generates password methods** in `models/user_gen.go`:
+   ```go
+   func (u *User) SetPassword(password string) error {
+       hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+       if err != nil {
+           return err
+       }
+       u.PasswordHash = string(hash)
+       return nil
+   }
+
+   func (u *User) CheckPassword(password string) bool {
+       return bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(password)) == nil
+   }
+   ```
+
+3. **Excludes PasswordHash from DTOs** - only safe fields exposed
+
+4. **Generates Password field in admin forms** - mapped to PasswordHash via SetPassword
+
+#### Customizable Roles
+
+User roles are defined at the top level of `gux.config.json`:
+
+```json
+{
+  "roles": [
+    {"value": "user", "label": "User"},
+    {"value": "moderator", "label": "Moderator"},
+    {"value": "admin", "label": "Admin"}
+  ],
+  "models": {
+    "User": {
+      "preset": "auth",
+      "sections": {
+        "Account": [
+          {"name": "Email", "type": "string", "required": true, "table": true, "input": "email"},
+          {"name": "Name", "type": "string", "required": true, "table": true},
+          {"name": "Role", "type": "string", "table": true, "input": "select"}
+        ]
+      }
+    }
+  }
+}
+```
+
+**To customize roles:**
+
+1. Edit the top-level `roles` array in `gux.config.json`
+2. Run `gux model regen User`
+3. Generated admin pages will have updated role dropdown options
+
+The top-level `roles` is the source of truth - it overrides inline options in auth preset models during regeneration.
+
+**Generated files for auth preset User model:**
+
+| File | Description |
+|------|-------------|
+| `models/user_gen.go` | GORM model with SetPassword/CheckPassword methods |
+| `dto/user_gen.go` | UserList and UserDetail DTOs (excludes PasswordHash) |
+| `admin/user_list_gen.go` | Admin list page |
+| `admin/user_new_gen.go` | Admin create form with Password field |
+| `admin/user_detail_gen.go` | Admin detail view |
+| `admin/user_edit_gen.go` | Admin edit form with Password field |
 
 **Generated admin page features** (when `admin: true` in config):
 

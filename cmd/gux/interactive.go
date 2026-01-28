@@ -21,6 +21,8 @@ type InitOptions struct {
 	AdminEmail    string
 	AdminPassword string
 	Port          string
+	Roles         []SelectOption             // Available user roles (used by auth preset)
+	Models        map[string]ModelDefinition // Model definitions for scaffolding
 }
 
 // RunInteractiveInit runs the interactive prompts for gux init
@@ -148,7 +150,7 @@ func RunInteractiveInit(appName string, providedModule string, providedPort stri
 		opts.AuthMode = AuthModeNone
 	}
 
-	// If auth is enabled, prompt for credentials
+	// If auth is enabled, prompt for credentials and add User model
 	if opts.AuthMode != AuthModeNone {
 		if err := promptForCredentials(&opts); err != nil {
 			if err == huh.ErrUserAborted {
@@ -157,6 +159,26 @@ func RunInteractiveInit(appName string, providedModule string, providedPort stri
 			}
 			fmt.Printf("Error: %v\n", err)
 			os.Exit(1)
+		}
+
+		// Default roles for auth
+		opts.Roles = []SelectOption{
+			{Value: "user", Label: "User"},
+			{Value: "admin", Label: "Admin"},
+		}
+
+		// Add User model with auth preset (uses roles from config)
+		opts.Models = map[string]ModelDefinition{
+			"User": {
+				Preset: "auth",
+				Sections: map[string][]ModelField{
+					"Account": {
+						{Name: "Email", Type: "string", Required: true, Table: true, Input: "email"},
+						{Name: "Name", Type: "string", Required: true, Table: true},
+						{Name: "Role", Type: "string", Table: true, Input: "select", Options: opts.Roles},
+					},
+				},
+			},
 		}
 	}
 
@@ -250,7 +272,7 @@ func generateSecurePassword(length int) string {
 // runInitWithEnv runs init and creates .env file with credentials
 func runInitWithEnv(originalAppName string, opts InitOptions) {
 	// Run the standard init
-	runInit(originalAppName, opts.ModulePath, opts.AuthMode, opts.WithAdmin, opts.WithClaude, opts.Port)
+	runInit(originalAppName, opts.ModulePath, opts.AuthMode, opts.WithAdmin, opts.WithClaude, opts.Port, opts.Roles, opts.Models)
 
 	targetDir := originalAppName
 	if originalAppName == "." {

@@ -38,22 +38,26 @@ type TemplateData struct {
 
 // GuxConfig is the configuration file format for gux.config.json
 type GuxConfig struct {
-	Module string `json:"module"`           // Go module path
-	Auth   string `json:"auth,omitempty"`   // "none", "private", "public"
-	Admin  bool   `json:"admin,omitempty"`  // Include admin panel
-	Claude bool   `json:"claude,omitempty"` // Include Claude Code integration
-	Port   string `json:"port,omitempty"`   // Server port
+	Module string                     `json:"module"`           // Go module path
+	Auth   string                     `json:"auth,omitempty"`   // "none", "private", "public"
+	Admin  bool                       `json:"admin,omitempty"`  // Include admin panel
+	Claude bool                       `json:"claude,omitempty"` // Include Claude Code integration
+	Port   string                     `json:"port,omitempty"`   // Server port
+	Roles  []SelectOption             `json:"roles,omitempty"`  // Available user roles (used by auth preset)
+	Models map[string]ModelDefinition `json:"models,omitempty"` // Model definitions for scaffolding
 }
 
 const configFileName = "gux.config.json"
 
 // SaveConfig writes the configuration to gux.config.json
-func SaveConfig(targetDir string, modulePath string, authMode AuthMode, withAdmin bool, withClaude bool, port string) error {
+func SaveConfig(targetDir string, modulePath string, authMode AuthMode, withAdmin bool, withClaude bool, port string, roles []SelectOption, models map[string]ModelDefinition) error {
 	config := GuxConfig{
 		Module: modulePath,
 		Admin:  withAdmin,
 		Claude: withClaude,
 		Port:   port,
+		Roles:  roles,
+		Models: models,
 	}
 
 	switch authMode {
@@ -121,7 +125,7 @@ func authModeToString(mode AuthMode) string {
 	}
 }
 
-func runInit(appName, modulePath string, authMode AuthMode, withAdmin bool, withClaude bool, port string) {
+func runInit(appName, modulePath string, authMode AuthMode, withAdmin bool, withClaude bool, port string, roles []SelectOption, models map[string]ModelDefinition) {
 	// Check if initializing in current directory
 	initHere := appName == "."
 	var targetDir string
@@ -282,24 +286,24 @@ func runInit(appName, modulePath string, authMode AuthMode, withAdmin bool, with
 			struct {
 				tmplPath string
 				destPath string
-			}{"templates/admin/admin/users.go.tmpl", "admin/users.go"},
-			struct {
-				tmplPath string
-				destPath string
-			}{"templates/admin/admin/user_new.go.tmpl", "admin/user_new.go"},
-			struct {
-				tmplPath string
-				destPath string
-			}{"templates/admin/admin/user_detail.go.tmpl", "admin/user_detail.go"},
-			struct {
-				tmplPath string
-				destPath string
 			}{"templates/admin/admin/settings.go.tmpl", "admin/settings.go"},
 		)
 
-		// Add dto/breadcrumb.go for admin-only (no auth)
+		// Add user admin pages only if auth is NOT enabled (no User model to scaffold)
 		if authMode == AuthModeNone {
 			filesToCreate = append(filesToCreate,
+				struct {
+					tmplPath string
+					destPath string
+				}{"templates/admin/admin/users.go.tmpl", "admin/users.go"},
+				struct {
+					tmplPath string
+					destPath string
+				}{"templates/admin/admin/user_new.go.tmpl", "admin/user_new.go"},
+				struct {
+					tmplPath string
+					destPath string
+				}{"templates/admin/admin/user_detail.go.tmpl", "admin/user_detail.go"},
 				struct {
 					tmplPath string
 					destPath string
@@ -309,16 +313,9 @@ func runInit(appName, modulePath string, authMode AuthMode, withAdmin bool, with
 	}
 
 	// Add auth-specific files
+	// Note: models/user.go and dto/user.go are now generated via scaffolding with auth preset
 	if authMode != AuthModeNone {
 		filesToCreate = append(filesToCreate,
-			struct {
-				tmplPath string
-				destPath string
-			}{"templates/auth/models/user.go.tmpl", "models/user.go"},
-			struct {
-				tmplPath string
-				destPath string
-			}{"templates/auth/dto/user.go.tmpl", "dto/user.go"},
 			struct {
 				tmplPath string
 				destPath string
@@ -341,10 +338,6 @@ func runInit(appName, modulePath string, authMode AuthMode, withAdmin bool, with
 					tmplPath string
 					destPath string
 				}{"templates/admin/dto/auth.go.tmpl", "dto/auth.go"},
-				struct {
-					tmplPath string
-					destPath string
-				}{"templates/admin/dto/user.go.tmpl", "dto/user.go"},
 			)
 		} else {
 			// Auth only: use standard auth pages
@@ -401,6 +394,25 @@ func runInit(appName, modulePath string, authMode AuthMode, withAdmin bool, with
 		fmt.Println("  updated .gitignore")
 	}
 
+	// Generate User model via scaffolding if auth is enabled
+	if authMode != AuthModeNone && models != nil {
+		if userModel, ok := models["User"]; ok {
+			fmt.Println("\nGenerating User model via scaffolding...")
+			// Change to target directory for scaffolding
+			originalDir, _ := os.Getwd()
+			if targetDir != "." {
+				os.Chdir(targetDir)
+			}
+			userModel.Name = "User"
+			if err := GenerateModelFilesImpl(&userModel, nil, modulePath, withAdmin); err != nil {
+				fmt.Printf("Warning: could not scaffold User model: %v\n", err)
+			}
+			if targetDir != "." {
+				os.Chdir(originalDir)
+			}
+		}
+	}
+
 	// Run gux gen to generate API client (must run before go mod tidy)
 	fmt.Println("\nRunning gux gen...")
 	genCmd := exec.Command("gux", "gen")
@@ -428,7 +440,7 @@ func runInit(appName, modulePath string, authMode AuthMode, withAdmin bool, with
 	}
 
 	// Save configuration for future use
-	if err := SaveConfig(targetDir, modulePath, authMode, withAdmin, withClaude, port); err != nil {
+	if err := SaveConfig(targetDir, modulePath, authMode, withAdmin, withClaude, port, roles, models); err != nil {
 		fmt.Printf("Warning: could not save config: %v\n", err)
 	} else {
 		fmt.Println("  saved gux.config.json")

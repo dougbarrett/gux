@@ -22,7 +22,7 @@ func main() {
 	}
 
 	// Auto-migrate models
-	db.AutoMigrate(&models.Counter{}, &models.User{}, &models.Post{})
+	db.AutoMigrate(&models.Counter{}, &models.User{}, &models.Post{}, &models.Client{})
 
 	// Create initial counter if none exists
 	var count int64

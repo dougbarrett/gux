@@ -94,7 +94,32 @@ func main() {
 			} else if *withAuth {
 				authMode = AuthModePrivate
 			}
-			runInit(appName, *modulePath, authMode, *withAdmin, *withClaude, *port)
+
+			// If auth is enabled, add User model with auth preset
+			var roles []SelectOption
+			var models map[string]ModelDefinition
+			if authMode != AuthModeNone {
+				// Default roles for auth
+				roles = []SelectOption{
+					{Value: "user", Label: "User"},
+					{Value: "admin", Label: "Admin"},
+				}
+
+				models = map[string]ModelDefinition{
+					"User": {
+						Preset: "auth",
+						Sections: map[string][]ModelField{
+							"Account": {
+								{Name: "Email", Type: "string", Required: true, Table: true, Input: "email"},
+								{Name: "Name", Type: "string", Required: true, Table: true},
+								{Name: "Role", Type: "string", Table: true, Input: "select", Options: roles},
+							},
+						},
+					},
+				}
+			}
+
+			runInit(appName, *modulePath, authMode, *withAdmin, *withClaude, *port, roles, models)
 		}
 
 	case "gen", "generate":

@@ -52,6 +52,7 @@ type ModelField struct {
 // ModelDefinition represents a complete model configuration
 type ModelDefinition struct {
 	Name       string                  `json:"-"`                      // Model name (from map key)
+	Preset     string                  `json:"preset,omitempty"`       // Preset: "auth" for authentication models
 	Sections   map[string][]ModelField `json:"sections"`               // Fields grouped by section
 	Preloads   []string                `json:"preloads,omitempty"`     // Relations to preload
 	Public     bool                    `json:"public,omitempty"`       // CRUD is public (no auth)
@@ -66,6 +67,7 @@ type OptionSet map[string]string // value -> label
 type ModelsConfig struct {
 	Models     map[string]ModelDefinition `json:"models,omitempty"`
 	OptionSets map[string]OptionSet       `json:"optionSets,omitempty"`
+	Roles      []SelectOption             `json:"roles,omitempty"` // Top-level roles config
 }
 
 // LoadModelsConfig reads model definitions from gux.config.json
@@ -438,6 +440,11 @@ func runModelRegen(name string) {
 		os.Exit(1)
 	}
 
+	// If model uses auth preset and top-level roles are defined, apply them to Role field
+	if model.Preset == "auth" && len(config.Roles) > 0 {
+		applyRolesToAuthModel(&model, config.Roles)
+	}
+
 	model.Name = name
 	fmt.Printf("Regenerating %s...\n", name)
 	if err := GenerateModelFiles(&model, config.OptionSets); err != nil {
@@ -446,6 +453,17 @@ func runModelRegen(name string) {
 	}
 
 	fmt.Println("Done. Run 'gux gen' to update API client.")
+}
+
+// applyRolesToAuthModel updates the Role field options from top-level roles config
+func applyRolesToAuthModel(model *ModelDefinition, roles []SelectOption) {
+	for sectionName, fields := range model.Sections {
+		for i, field := range fields {
+			if field.Name == "Role" && field.Input == "select" {
+				model.Sections[sectionName][i].Options = roles
+			}
+		}
+	}
 }
 
 func runModelExport(name string) {

@@ -135,6 +135,7 @@ func main() {
 		Hybrid("/users", admin.AdminLayout(admin.Users)).
 		Hybrid("/users/new", admin.AdminLayout(admin.UserNew)).
 		Hybrid("/users/:id", admin.AdminLayout(admin.UserDetail)).
+		Hybrid("/users/:id/edit", admin.AdminLayout(admin.UserEdit)).
 		Hybrid("/settings", admin.AdminLayout(admin.Settings))
 
 	// Start server
