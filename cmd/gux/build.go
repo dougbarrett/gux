@@ -146,6 +146,72 @@ func isPrimitiveType(t string) bool {
 	return primitives[t]
 }
 
+// modelFieldTypesCache caches parsed model field types
+var modelFieldTypesCache = make(map[string]map[string]string)
+
+// getModelFieldTypes parses a model file and returns a map of field name -> field type
+// This is used to determine if foreign key fields are pointers
+func getModelFieldTypes(modelName string) (map[string]string, error) {
+	// Check cache first
+	if cached, ok := modelFieldTypesCache[modelName]; ok {
+		return cached, nil
+	}
+
+	// Parse models directory
+	entries, err := os.ReadDir("models")
+	if err != nil {
+		return nil, fmt.Errorf("read models dir: %w", err)
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".go") {
+			continue
+		}
+
+		fset := token.NewFileSet()
+		filename := filepath.Join("models", entry.Name())
+		node, err := parser.ParseFile(fset, filename, nil, parser.ParseComments)
+		if err != nil {
+			continue
+		}
+
+		// Look for the target struct
+		for _, decl := range node.Decls {
+			genDecl, ok := decl.(*ast.GenDecl)
+			if !ok || genDecl.Tok != token.TYPE {
+				continue
+			}
+
+			for _, spec := range genDecl.Specs {
+				typeSpec, ok := spec.(*ast.TypeSpec)
+				if !ok || typeSpec.Name.Name != modelName {
+					continue
+				}
+
+				structType, ok := typeSpec.Type.(*ast.StructType)
+				if !ok {
+					continue
+				}
+
+				fieldTypes := make(map[string]string)
+				for _, field := range structType.Fields.List {
+					if len(field.Names) == 0 {
+						continue
+					}
+					fieldName := field.Names[0].Name
+					fieldTypes[fieldName] = formatType(field.Type)
+				}
+
+				// Cache and return
+				modelFieldTypesCache[modelName] = fieldTypes
+				return fieldTypes, nil
+			}
+		}
+	}
+
+	return nil, fmt.Errorf("model %s not found", modelName)
+}
+
 // splitParamRoute splits a parameterized route into prefix and suffix around the parameter.
 // "/admin/users/:id" -> ("/admin/users/", "")
 // "/admin/users/:id/posts/new" -> ("/admin/users/", "/posts/new")
@@ -1825,6 +1891,9 @@ func generateNestedDTOMapping(info *DTOInfo, resultVar, itemVar string, forList 
 		return ""
 	}
 
+	// Get model field types to determine if FK fields are pointers
+	modelFieldTypes, _ := getModelFieldTypes(info.ModelName)
+
 	var sb strings.Builder
 	for _, f := range info.Fields {
 		if !f.IsNestedDTO {
@@ -1841,6 +1910,22 @@ func generateNestedDTOMapping(info *DTOInfo, resultVar, itemVar string, forList 
 			fkField = f.ModelField + "ID"
 		}
 
+		// Check if the FK field is a pointer type in the model
+		fkIsPointer := false
+		if modelFieldTypes != nil {
+			if fkType, ok := modelFieldTypes[fkField]; ok {
+				fkIsPointer = strings.HasPrefix(fkType, "*")
+			}
+		}
+
+		// Generate the appropriate nil/zero check based on FK field type
+		var fkCheck string
+		if fkIsPointer {
+			fkCheck = fmt.Sprintf("%s.%s != nil", itemVar, fkField)
+		} else {
+			fkCheck = fmt.Sprintf("%s.%s != 0", itemVar, fkField)
+		}
+
 		// Parse nested DTO type to get field mappings (e.g., UserBrief -> ID, Name)
 		nestedInfo, err := parseDTOFile("dto", dtoTypeName)
 		if err != nil {
@@ -1851,31 +1936,29 @@ func generateNestedDTOMapping(info *DTOInfo, resultVar, itemVar string, forList 
 				dtoAssign = fmt.Sprintf("&dto.%s{ID: %s.%s.ID}", dtoTypeName, itemVar, f.ModelField)
 			}
 			if forList {
-				sb.WriteString(fmt.Sprintf("\t\tif %s.%s != 0 {\n", itemVar, fkField))
+				sb.WriteString(fmt.Sprintf("\t\tif %s {\n", fkCheck))
 				sb.WriteString(fmt.Sprintf("\t\t\t%s.%s = %s\n", resultVar, f.DTOField, dtoAssign))
 				sb.WriteString("\t\t}\n")
 			} else {
-				sb.WriteString(fmt.Sprintf("\tif %s.%s != 0 {\n", itemVar, fkField))
+				sb.WriteString(fmt.Sprintf("\tif %s {\n", fkCheck))
 				sb.WriteString(fmt.Sprintf("\t\t%s.%s = %s\n", resultVar, f.DTOField, dtoAssign))
 				sb.WriteString("\t}\n")
 			}
 			continue
 		}
 
-		// Generate check for loaded relationship (works for both pointer and non-pointer)
-		// For non-pointer structs, check if the foreign key ID is non-zero
-		// For pointer structs, the ID check still works (0 means not loaded)
+		// Generate check for loaded relationship
 		dtoPrefix := "dto."
 		if isPointer {
 			dtoPrefix = "&dto."
 		}
 		if forList {
 			// For list: result[i].Author = dto.UserBrief{...}
-			sb.WriteString(fmt.Sprintf("\t\tif %s.%s != 0 {\n", itemVar, fkField))
+			sb.WriteString(fmt.Sprintf("\t\tif %s {\n", fkCheck))
 			sb.WriteString(fmt.Sprintf("\t\t\t%s.%s = %s%s{\n", resultVar, f.DTOField, dtoPrefix, dtoTypeName))
 		} else {
 			// For single: result.Author = dto.UserBrief{...}
-			sb.WriteString(fmt.Sprintf("\tif %s.%s != 0 {\n", itemVar, fkField))
+			sb.WriteString(fmt.Sprintf("\tif %s {\n", fkCheck))
 			sb.WriteString(fmt.Sprintf("\t\t%s.%s = %s%s{\n", resultVar, f.DTOField, dtoPrefix, dtoTypeName))
 		}
 
