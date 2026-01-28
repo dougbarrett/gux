@@ -3,6 +3,7 @@
 package core
 
 import (
+	"fmt"
 	"syscall/js"
 )
 
@@ -11,6 +12,18 @@ var (
 	scheduledRouter   *Router
 	inChangeEvent     = false // When true, ScheduleRerender is suppressed
 )
+
+func init() {
+	// Enable state debug logging in WASM mode
+	StateDebugLog = func(action, key string, value any, router *Router) {
+		// Get router address for debugging
+		routerAddr := fmt.Sprintf("%p", router)
+		stateMapLen := len(router.state)
+		js.Global().Get("console").Call("log",
+			fmt.Sprintf("[Gux State] %s key=%q value=%v router=%s state_size=%d",
+				action, key, value, routerAddr, stateMapLen))
+	}
+}
 
 // SetInChangeEvent sets the change event flag.
 // When true, ScheduleRerender calls are ignored to prevent

@@ -984,6 +984,11 @@ func (r *Router) OnLoad(loader func()) {
 	}
 }
 
+// StateDebugLog is a debug callback for tracing state changes.
+// Set this in WASM code to enable state debugging.
+// Parameters: action ("SET" or "GET"), key, value, router
+var StateDebugLog func(action, key string, value any, router *Router)
+
 // State represents a reactive state value.
 type State[T any] struct {
 	key    string
@@ -992,6 +997,10 @@ type State[T any] struct {
 
 // Get returns the current state value.
 func (s *State[T]) Get() T {
+	// Debug: log state access (use StateDebugLog if set)
+	if StateDebugLog != nil {
+		StateDebugLog("GET", s.key, s.router.state[s.key], s.router)
+	}
 	if val, ok := s.router.state[s.key]; ok {
 		// Handle JSON unmarshaling: numbers come as float64
 		if result, ok := val.(T); ok {
@@ -1029,6 +1038,10 @@ func (s *State[T]) Get() T {
 // to avoid losing focus on every keystroke. This is similar to how React and Vue
 // automatically batch state updates during input events.
 func (s *State[T]) Set(val T) {
+	// Debug: log state change (use StateDebugLog if set)
+	if StateDebugLog != nil {
+		StateDebugLog("SET", s.key, val, s.router)
+	}
 	s.router.state[s.key] = val
 	if !s.router.suppressRender {
 		ScheduleRerender(s.router)
