@@ -1526,9 +1526,15 @@ func generateFormFieldCode(field *ModelField, tf TemplateField, modelNameLower s
 	var buf strings.Builder
 	indent := "\t\t\t\t\t\t"
 
+	// Base wrapper class - add col-span-2 for full width fields in grid layout
+	wrapperClass := "mb-4"
+	if field.FullWidth {
+		wrapperClass = "mb-4 md:col-span-2"
+	}
+
 	switch {
 	case field.Input == "textarea":
-		buf.WriteString(fmt.Sprintf(`%score.Div(core.Class("mb-4"),
+		buf.WriteString(fmt.Sprintf(`%score.Div(core.Class("%s"),
 %s	core.Label(core.Class("block text-gray-300 text-sm font-medium mb-2"),
 %s		core.Text("%s"),
 %s	),
@@ -1539,11 +1545,11 @@ func generateFormFieldCode(field *ModelField, tf TemplateField, modelNameLower s
 %s		OnChange: func(v string) { %s.Set(v) },
 %s	}),
 %s),
-`, indent, indent, indent, tf.Label, indent, indent, indent, tf.StateName, indent, tf.StateVar, indent, indent, tf.StateVar, indent, indent))
+`, indent, wrapperClass, indent, indent, tf.Label, indent, indent, indent, tf.StateName, indent, tf.StateVar, indent, indent, tf.StateVar, indent, indent))
 
 	case field.Input == "select" || (field.Type == "*uint" && field.Relation != ""):
 		// Select dropdown
-		buf.WriteString(fmt.Sprintf(`%score.Div(core.Class("mb-4"),
+		buf.WriteString(fmt.Sprintf(`%score.Div(core.Class("%s"),
 %s	core.Label(core.Class("block text-gray-300 text-sm font-medium mb-2"),
 %s		core.Text("%s"),
 %s	),
@@ -1553,7 +1559,7 @@ func generateFormFieldCode(field *ModelField, tf TemplateField, modelNameLower s
 %s			Class: "w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500",
 %s			OnChange: func(v string) { %s.Set(v) },
 %s		},
-`, indent, indent, indent, tf.Label, indent, indent, indent, indent, tf.StateName, indent, indent, tf.StateVar, indent))
+`, indent, wrapperClass, indent, indent, tf.Label, indent, indent, indent, indent, tf.StateName, indent, indent, tf.StateVar, indent))
 
 		if field.Relation != "" {
 			// Dynamic options from relation - generate inline by building slice
@@ -1584,7 +1590,11 @@ func generateFormFieldCode(field *ModelField, tf TemplateField, modelNameLower s
 `, indent, indent))
 
 	case field.Type == "bool":
-		buf.WriteString(fmt.Sprintf(`%score.Div(core.Class("mb-4 flex items-center"),
+		boolWrapperClass := "mb-4 flex items-center"
+		if field.FullWidth {
+			boolWrapperClass = "mb-4 flex items-center md:col-span-2"
+		}
+		buf.WriteString(fmt.Sprintf(`%score.Div(core.Class("%s"),
 %s	core.Input(func() core.Attrs {
 %s		attrs := core.Attrs{
 %s			Type:    "checkbox",
@@ -1601,7 +1611,7 @@ func generateFormFieldCode(field *ModelField, tf TemplateField, modelNameLower s
 %s		core.Text("%s"),
 %s	),
 %s),
-`, indent, indent, indent, indent, indent, tf.StateName, indent, indent, tf.StateVar, indent, indent, tf.StateVar, indent, indent, indent, indent, indent, indent, tf.Label, indent, indent))
+`, indent, boolWrapperClass, indent, indent, indent, indent, tf.StateName, indent, indent, tf.StateVar, indent, indent, tf.StateVar, indent, indent, indent, indent, indent, indent, tf.Label, indent, indent))
 
 	default:
 		// Standard input field

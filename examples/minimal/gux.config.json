@@ -19,7 +19,7 @@
         ],
         "Business": [
           { "name": "State", "type": "string", "input": "select", "options": [{"value": "CA", "label": "California"}, {"value": "NY", "label": "New York"}, {"value": "TX", "label": "Texas"}] },
-          { "name": "Description", "type": "string", "input": "textarea" }
+          { "name": "Description", "type": "string", "input": "textarea", "fullWidth": true }
         ]
       },
       "preloads": ["Salesperson"]

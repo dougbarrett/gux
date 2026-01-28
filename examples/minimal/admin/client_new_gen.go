@@ -26,14 +26,14 @@ func ClientNew(r *core.Router) func() core.Node {
 
 	return func() core.Node {
 		// Form state
-		firstNameState := r.StateString("first_name", "")
-		lastNameState := r.StateString("last_name", "")
-		emailState := r.StateString("email", "")
-		phoneState := r.StateString("phone", "")
 		salespersonIDState := r.StateString("salesperson_id", "")
 		closedLeadState := r.StateBool("closed_lead", false)
 		stateState := r.StateString("state", "")
 		descriptionState := r.StateString("description", "")
+		firstNameState := r.StateString("first_name", "")
+		lastNameState := r.StateString("last_name", "")
+		emailState := r.StateString("email", "")
+		phoneState := r.StateString("phone", "")
 		errorState := r.StateString("error", "")
 		successState := r.StateString("success", "")
 		// Salesperson state
@@ -66,14 +66,14 @@ func ClientNew(r *core.Router) func() core.Node {
 			}
 
 			data := map[string]any{
-				"first_name": firstNameState.Get(),
-				"last_name": lastNameState.Get(),
-				"email": emailState.Get(),
-				"phone": phoneState.Get(),
 				"salesperson_id": parseUintPtr(salespersonIDState.Get()),
 				"closed_lead": closedLeadState.Get(),
 				"state": stateState.Get(),
 				"description": descriptionState.Get(),
+				"first_name": firstNameState.Get(),
+				"last_name": lastNameState.Get(),
+				"email": emailState.Get(),
+				"phone": phoneState.Get(),
 			}
 
 			api.Clients.Create(data, func(result *dto.ClientDetail, err error) {
@@ -121,7 +121,7 @@ func ClientNew(r *core.Router) func() core.Node {
 								core.Option(core.Attrs{Value: "TX"}, core.Text("Texas")),
 							),
 						),
-						core.Div(core.Class("mb-4"),
+						core.Div(core.Class("mb-4 md:col-span-2"),
 							core.Label(core.Class("block text-gray-300 text-sm font-medium mb-2"),
 								core.Text("Description"),
 							),

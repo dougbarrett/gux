@@ -71,11 +71,11 @@ func Clients(r *core.Router) func() core.Node {
 func ClientTableHeaders() []core.Node {
 	return []core.Node{
 		tableHeaderClient("ID"),
+		tableHeaderClient("Salesperson"),
+		tableHeaderClient("Closed Lead"),
 		tableHeaderClient("First Name"),
 		tableHeaderClient("Last Name"),
 		tableHeaderClient("Email"),
-		tableHeaderClient("Salesperson"),
-		tableHeaderClient("Closed Lead"),
 		tableHeaderClient("Actions"),
 	}
 }
@@ -101,11 +101,11 @@ func ClientTableRows(items []dto.ClientList, r *core.Router) []core.Node {
 	for _, item := range items {
 		rows = append(rows, core.Tr(core.Class("border-t border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750"),
 			tableCellClient(fmt.Sprintf("%d", item.ID)),
+			ClientCellSalespersonID(item),
+			ClientCellClosedLead(item),
 			ClientCellFirstName(item),
 			ClientCellLastName(item),
 			ClientCellEmail(item),
-			ClientCellSalespersonID(item),
-			ClientCellClosedLead(item),
 			ClientActionsCell(item.ID, r),
 		))
 	}
@@ -129,27 +129,6 @@ func ClientActionsCell(id uint, r *core.Router) core.Node {
 	)
 }
 
-
-func ClientCellFirstName(item dto.ClientList) core.Node {
-	// Display field is clickable - links to detail page
-	return core.Td(core.Class("px-6 py-4 whitespace-nowrap text-sm"),
-		core.A(
-			core.Attrs{
-				Href:  fmt.Sprintf("/admin/clients/%d", item.ID),
-				Class: "text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium",
-			},
-			core.Text(item.FirstName),
-		),
-	)
-}
-
-func ClientCellLastName(item dto.ClientList) core.Node {
-	return tableCellClient(item.LastName)
-}
-
-func ClientCellEmail(item dto.ClientList) core.Node {
-	return tableCellClient(item.Email)
-}
 
 func ClientCellSalespersonID(item dto.ClientList) core.Node {
 	text := "-"
@@ -177,6 +156,27 @@ func ClientCellClosedLead(item dto.ClientList) core.Node {
 			core.Text(label),
 		),
 	)
+}
+
+func ClientCellFirstName(item dto.ClientList) core.Node {
+	// Display field is clickable - links to detail page
+	return core.Td(core.Class("px-6 py-4 whitespace-nowrap text-sm"),
+		core.A(
+			core.Attrs{
+				Href:  fmt.Sprintf("/admin/clients/%d", item.ID),
+				Class: "text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium",
+			},
+			core.Text(item.FirstName),
+		),
+	)
+}
+
+func ClientCellLastName(item dto.ClientList) core.Node {
+	return tableCellClient(item.LastName)
+}
+
+func ClientCellEmail(item dto.ClientList) core.Node {
+	return tableCellClient(item.Email)
 }
 
 
