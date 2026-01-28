@@ -37,6 +37,24 @@ func generateGuxFiles() error {
 		return fmt.Errorf("getting module path: %w", err)
 	}
 
+	// Regenerate models from gux.config.json if it exists
+	if config, err := LoadModelsConfig("."); err == nil && len(config.Models) > 0 {
+		fmt.Printf("Regenerating %d model(s) from config...\n", len(config.Models))
+		for name, model := range config.Models {
+			// Apply roles to auth preset models
+			if model.Preset == "auth" && len(config.Roles) > 0 {
+				applyRolesToAuthModel(&model, config.Roles)
+			}
+			model.Name = name
+			if err := GenerateModelFiles(&model, config.OptionSets); err != nil {
+				fmt.Printf("  %s: error - %v\n", name, err)
+			} else {
+				fmt.Printf("  %s: done\n", name)
+			}
+		}
+		fmt.Println()
+	}
+
 	// Find main app file
 	appFile, err := findMainAppFile()
 	if err != nil {
