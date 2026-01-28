@@ -1679,12 +1679,28 @@ func convertToTemplateField(field *ModelField, modelName string) TemplateField {
 		tf.EmptyValue = `""`
 		tf.DataValue = tf.StateVar + ".Get()"
 		tf.EditStateInit = fmt.Sprintf("displayItem.%s", tf.DTOFieldName)
-	case "int", "uint":
+	case "int":
 		tf.StateType = "String"
 		tf.StateDefault = `""`
 		tf.EmptyValue = `""`
 		tf.DataValue = fmt.Sprintf("parseUint(%s.Get())", tf.StateVar)
 		tf.EditStateInit = fmt.Sprintf("fmt.Sprintf(\"%%d\", displayItem.%s)", tf.DTOFieldName)
+	case "uint":
+		tf.StateType = "String"
+		tf.StateDefault = `""`
+		tf.EmptyValue = `""`
+		tf.DataValue = fmt.Sprintf("parseUint(%s.Get())", tf.StateVar)
+		if field.Relation != "" {
+			// FK relation (required) - set up relation struct field
+			tf.DTOType = fmt.Sprintf("*%sBrief", field.Relation)
+			tf.Preload = strings.TrimSuffix(field.Name, "ID")
+			tf.DTOFieldName = tf.Preload
+			tf.RelationType = "*" + field.Relation
+			preloadName := strings.TrimSuffix(field.Name, "ID")
+			tf.EditStateInit = fmt.Sprintf("func() string { if displayItem.%s != nil { return fmt.Sprintf(\"%%d\", displayItem.%s.ID) }; return \"\" }()", preloadName, preloadName)
+		} else {
+			tf.EditStateInit = fmt.Sprintf("fmt.Sprintf(\"%%d\", displayItem.%s)", tf.DTOFieldName)
+		}
 	case "*uint":
 		tf.StateType = "String"
 		tf.StateDefault = `""`
