@@ -1042,11 +1042,11 @@ func promptForAttributes(field *ModelField) error {
 
 // GenerateModelFiles generates all files for a model definition
 func GenerateModelFiles(model *ModelDefinition, optionSets map[string]OptionSet) error {
-	// Get module path from config
+	// Get module path and admin config
 	config, err := LoadConfig(".")
 	if err != nil {
 		return fmt.Errorf("load config for module path: %w (run from a gux project directory)", err)
 	}
 
-	return GenerateModelFilesImpl(model, optionSets, config.Module)
+	return GenerateModelFilesImpl(model, optionSets, config.Module, config.Admin)
 }

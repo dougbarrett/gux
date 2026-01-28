@@ -149,6 +149,401 @@ func isPrimitiveType(t string) bool {
 // modelFieldTypesCache caches parsed model field types
 var modelFieldTypesCache = make(map[string]map[string]string)
 
+// ModelFieldInfo holds information about a model field for code generation
+type ModelFieldInfo struct {
+	Name     string
+	Type     string
+	JSONName string
+}
+
+// getModelFields returns the fields of a model (excluding gorm.Model embedded fields)
+func getModelFields(modelName string) ([]ModelFieldInfo, error) {
+	fieldTypes, err := getModelFieldTypes(modelName)
+	if err != nil {
+		return nil, err
+	}
+
+	// Fields to exclude (from gorm.Model)
+	excludedFields := map[string]bool{
+		"ID":        true,
+		"CreatedAt": true,
+		"UpdatedAt": true,
+		"DeletedAt": true,
+		"Model":     true, // embedded gorm.Model
+	}
+
+	var fields []ModelFieldInfo
+	for name, typ := range fieldTypes {
+		if excludedFields[name] {
+			continue
+		}
+		// Skip embedded structs and relation fields (non-primitive pointer types)
+		if strings.Contains(typ, ".") || (strings.HasPrefix(typ, "*") && !isPrimitiveType(strings.TrimPrefix(typ, "*"))) {
+			// Check if it's a simple FK pointer like *uint - those we keep
+			trimmed := strings.TrimPrefix(typ, "*")
+			if trimmed != "uint" && trimmed != "int" && trimmed != "string" {
+				continue
+			}
+		}
+		// Skip slice types (M2M relations)
+		if strings.HasPrefix(typ, "[]") {
+			continue
+		}
+
+		fields = append(fields, ModelFieldInfo{
+			Name:     name,
+			Type:     typ,
+			JSONName: toSnakeCase(name),
+		})
+	}
+
+	return fields, nil
+}
+
+// toSnakeCase converts CamelCase to snake_case
+func toSnakeCase(s string) string {
+	var result strings.Builder
+	for i, r := range s {
+		if i > 0 && r >= 'A' && r <= 'Z' {
+			result.WriteRune('_')
+		}
+		result.WriteRune(r)
+	}
+	return strings.ToLower(result.String())
+}
+
+// generateDTOStructCode generates a DTO struct definition from model fields
+func generateDTOStructCode(modelName string, fields []ModelFieldInfo) string {
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf(`
+// %s is the API DTO for %s.
+type %s struct {
+	ID          uint   `+"`json:\"id\"`"+`
+	CreatedAt   string `+"`json:\"created_at,omitempty\"`"+`
+	UpdatedAt   string `+"`json:\"updated_at,omitempty\"`"+`
+`, modelName, modelName, modelName))
+
+	for _, f := range fields {
+		// Map Go types to JSON-safe types for the DTO
+		dtoType := f.Type
+		switch f.Type {
+		case "int", "int64", "int32":
+			dtoType = "int"
+		case "uint", "uint64", "uint32":
+			dtoType = "uint"
+		case "*uint", "*int":
+			dtoType = "*uint"
+		case "float64", "float32":
+			dtoType = "float64"
+		case "bool":
+			dtoType = "bool"
+		case "time.Time", "*time.Time":
+			dtoType = "string" // Times are serialized as strings
+		default:
+			dtoType = "string"
+		}
+		sb.WriteString(fmt.Sprintf("\t%s %s `json:\"%s,omitempty\"`\n", f.Name, dtoType, f.JSONName))
+	}
+
+	sb.WriteString("}\n")
+	return sb.String()
+}
+
+// generateFieldAssignments generates field assignment code for DTO conversion
+func generateFieldAssignments(fields []ModelFieldInfo, sourceVar string, indent string) string {
+	var sb strings.Builder
+	for _, f := range fields {
+		switch f.Type {
+		case "time.Time":
+			sb.WriteString(fmt.Sprintf("%s%s: %s.%s.Format(time.RFC3339),\n", indent, f.Name, sourceVar, f.Name))
+		case "*time.Time":
+			sb.WriteString(fmt.Sprintf("%sif %s.%s != nil { result.%s = %s.%s.Format(time.RFC3339) }\n", indent, sourceVar, f.Name, f.Name, sourceVar, f.Name))
+		default:
+			sb.WriteString(fmt.Sprintf("%s%s: %s.%s,\n", indent, f.Name, sourceVar, f.Name))
+		}
+	}
+	return sb.String()
+}
+
+// generateModelAssignments generates field assignment code for model update
+func generateModelAssignments(fields []ModelFieldInfo, sourceVar, targetVar string, indent string) string {
+	var sb strings.Builder
+	for _, f := range fields {
+		sb.WriteString(fmt.Sprintf("%s%s.%s = %s.%s\n", indent, targetVar, f.Name, sourceVar, f.Name))
+	}
+	return sb.String()
+}
+
+// generateServerAPICode generates server-side API code for models without DTOs
+// using the actual model fields instead of assuming Name/Description
+func generateServerAPICode(modelName, pluralName string) string {
+	// Get actual fields from the model
+	fields, err := getModelFields(modelName)
+	if err != nil || len(fields) == 0 {
+		// Fallback: generate minimal API with just ID
+		return generateMinimalServerAPICode(modelName, pluralName)
+	}
+
+	var sb strings.Builder
+
+	// Generate field assignments for model-to-DTO conversion
+	var listFieldAssignments strings.Builder
+	var getFieldAssignments strings.Builder
+	var createModelAssignments strings.Builder
+	var createResultAssignments strings.Builder
+	var updateModelAssignments strings.Builder
+	var updateResultAssignments strings.Builder
+
+	for _, f := range fields {
+		// For List/Get: DTO field = model field
+		listFieldAssignments.WriteString(fmt.Sprintf("\t\t\t%s: item.%s,\n", f.Name, f.Name))
+		getFieldAssignments.WriteString(fmt.Sprintf("\t\t%s: item.%s,\n", f.Name, f.Name))
+		createResultAssignments.WriteString(fmt.Sprintf("\t\t%s: model.%s,\n", f.Name, f.Name))
+		updateResultAssignments.WriteString(fmt.Sprintf("\t\t%s: model.%s,\n", f.Name, f.Name))
+
+		// For Create: model field = DTO field
+		createModelAssignments.WriteString(fmt.Sprintf("\t\t%s: item.%s,\n", f.Name, f.Name))
+
+		// For Update: model.field = DTO.field
+		updateModelAssignments.WriteString(fmt.Sprintf("\tmodel.%s = item.%s\n", f.Name, f.Name))
+	}
+
+	sb.WriteString(fmt.Sprintf(`
+// %sAPI provides CRUD operations for %s.
+type %sAPI struct{}
+
+// %s is the API client for %s operations.
+var %s = &%sAPI{}
+
+// List returns all %s records.
+func (a *%sAPI) List(callback func([]%s, error)) {
+	if db == nil {
+		callback(nil, nil)
+		return
+	}
+	var items []models.%s
+	if err := db.Find(&items).Error; err != nil {
+		callback(nil, err)
+		return
+	}
+	// Convert to DTOs
+	result := make([]%s, len(items))
+	for i, item := range items {
+		result[i] = %s{
+			ID: item.ID,
+%s		}
+	}
+	callback(result, nil)
+}
+
+// Get returns a single %s by ID.
+func (a *%sAPI) Get(id uint, callback func(*%s, error)) {
+	if db == nil {
+		callback(nil, nil)
+		return
+	}
+	var item models.%s
+	if err := db.First(&item, id).Error; err != nil {
+		callback(nil, err)
+		return
+	}
+	result := &%s{
+		ID: item.ID,
+%s	}
+	callback(result, nil)
+}
+
+// Create creates a new %s.
+func (a *%sAPI) Create(item *%s, callback func(*%s, error)) {
+	if db == nil {
+		callback(nil, nil)
+		return
+	}
+	model := models.%s{
+%s	}
+	if err := db.Create(&model).Error; err != nil {
+		callback(nil, err)
+		return
+	}
+	result := &%s{
+		ID: model.ID,
+%s	}
+	callback(result, nil)
+}
+
+// Update updates an existing %s.
+func (a *%sAPI) Update(item *%s, callback func(*%s, error)) {
+	if db == nil {
+		callback(nil, nil)
+		return
+	}
+	var model models.%s
+	if err := db.First(&model, item.ID).Error; err != nil {
+		callback(nil, err)
+		return
+	}
+%s	if err := db.Save(&model).Error; err != nil {
+		callback(nil, err)
+		return
+	}
+	result := &%s{
+		ID: model.ID,
+%s	}
+	callback(result, nil)
+}
+
+// Delete deletes a %s by ID.
+func (a *%sAPI) Delete(id uint, callback func(error)) {
+	if db == nil {
+		callback(nil)
+		return
+	}
+	callback(db.Delete(&models.%s{}, id).Error)
+}
+`,
+		pluralName, modelName, // type comment
+		pluralName,            // type name
+		pluralName, modelName, // var comment
+		pluralName, pluralName, // var declaration
+		modelName,                  // List comment
+		pluralName, modelName,      // List signature
+		modelName,                  // List query
+		modelName, modelName,       // List convert type
+		listFieldAssignments.String(), // List field assignments
+		modelName,                  // Get comment
+		pluralName, modelName,      // Get signature
+		modelName,                  // Get query
+		modelName,                  // Get result type
+		getFieldAssignments.String(), // Get field assignments
+		modelName,                      // Create comment
+		pluralName, modelName, modelName, // Create signature
+		modelName,                      // Create model type
+		createModelAssignments.String(), // Create model assignments
+		modelName,                       // Create result type
+		createResultAssignments.String(), // Create result assignments
+		modelName,                        // Update comment
+		pluralName, modelName, modelName, // Update signature
+		modelName,                       // Update query
+		updateModelAssignments.String(), // Update model assignments
+		modelName,                        // Update result type
+		updateResultAssignments.String(), // Update result assignments
+		modelName,                        // Delete comment
+		pluralName,                       // Delete signature
+		modelName,                        // Delete model
+	))
+
+	return sb.String()
+}
+
+// generateMinimalServerAPICode generates server-side API code with only ID field
+// Used as fallback when model fields cannot be parsed
+func generateMinimalServerAPICode(modelName, pluralName string) string {
+	return fmt.Sprintf(`
+// %sAPI provides CRUD operations for %s.
+type %sAPI struct{}
+
+// %s is the API client for %s operations.
+var %s = &%sAPI{}
+
+// List returns all %s records.
+func (a *%sAPI) List(callback func([]%s, error)) {
+	if db == nil {
+		callback(nil, nil)
+		return
+	}
+	var items []models.%s
+	if err := db.Find(&items).Error; err != nil {
+		callback(nil, err)
+		return
+	}
+	result := make([]%s, len(items))
+	for i, item := range items {
+		result[i] = %s{ID: item.ID}
+	}
+	callback(result, nil)
+}
+
+// Get returns a single %s by ID.
+func (a *%sAPI) Get(id uint, callback func(*%s, error)) {
+	if db == nil {
+		callback(nil, nil)
+		return
+	}
+	var item models.%s
+	if err := db.First(&item, id).Error; err != nil {
+		callback(nil, err)
+		return
+	}
+	callback(&%s{ID: item.ID}, nil)
+}
+
+// Create creates a new %s.
+func (a *%sAPI) Create(item *%s, callback func(*%s, error)) {
+	if db == nil {
+		callback(nil, nil)
+		return
+	}
+	model := models.%s{}
+	if err := db.Create(&model).Error; err != nil {
+		callback(nil, err)
+		return
+	}
+	callback(&%s{ID: model.ID}, nil)
+}
+
+// Update updates an existing %s.
+func (a *%sAPI) Update(item *%s, callback func(*%s, error)) {
+	if db == nil {
+		callback(nil, nil)
+		return
+	}
+	var model models.%s
+	if err := db.First(&model, item.ID).Error; err != nil {
+		callback(nil, err)
+		return
+	}
+	if err := db.Save(&model).Error; err != nil {
+		callback(nil, err)
+		return
+	}
+	callback(&%s{ID: model.ID}, nil)
+}
+
+// Delete deletes a %s by ID.
+func (a *%sAPI) Delete(id uint, callback func(error)) {
+	if db == nil {
+		callback(nil)
+		return
+	}
+	callback(db.Delete(&models.%s{}, id).Error)
+}
+`,
+		pluralName, modelName, // type comment
+		pluralName,            // type name
+		pluralName, modelName, // var comment
+		pluralName, pluralName, // var declaration
+		modelName,             // List comment
+		pluralName, modelName, // List signature
+		modelName,             // List query
+		modelName, modelName,  // List convert
+		modelName,             // Get comment
+		pluralName, modelName, // Get signature
+		modelName,             // Get query
+		modelName,             // Get result
+		modelName,                    // Create comment
+		pluralName, modelName, modelName, // Create signature
+		modelName, // Create model
+		modelName, // Create result
+		modelName,                    // Update comment
+		pluralName, modelName, modelName, // Update signature
+		modelName, // Update query
+		modelName, // Update result
+		modelName, // Delete comment
+		pluralName,
+		modelName, // Delete model
+	)
+}
+
 // getModelFieldTypes parses a model file and returns a map of field name -> field type
 // This is used to determine if foreign key fields are pointers
 func getModelFieldTypes(modelName string) (map[string]string, error) {
@@ -1904,7 +2299,17 @@ func generateNestedDTOMapping(info *DTOInfo, resultVar, itemVar string, forList 
 		dtoTypeName := strings.TrimPrefix(f.DTOType, "*")
 		isPointer := strings.HasPrefix(f.DTOType, "*")
 
-		// Build the foreign key field name - don't duplicate ID if already ends with ID
+		// Determine the relation field name in the model
+		// Use Preload if set, otherwise derive from ModelField by removing "ID" suffix
+		relationField := f.Preload
+		if relationField == "" {
+			relationField = strings.TrimSuffix(f.ModelField, "ID")
+			if relationField == "" {
+				relationField = f.ModelField
+			}
+		}
+
+		// Build the foreign key field name - this is what we check for nil/zero
 		fkField := f.ModelField
 		if !strings.HasSuffix(fkField, "ID") {
 			fkField = f.ModelField + "ID"
@@ -1929,11 +2334,11 @@ func generateNestedDTOMapping(info *DTOInfo, resultVar, itemVar string, forList 
 		// Parse nested DTO type to get field mappings (e.g., UserBrief -> ID, Name)
 		nestedInfo, err := parseDTOFile("dto", dtoTypeName)
 		if err != nil {
-			// Can't parse nested DTO - generate simple direct mapping
+			// Can't parse nested DTO - generate simple direct mapping using relation field
 			// This handles cases where the nested DTO isn't in the dto/ directory
-			dtoAssign := fmt.Sprintf("dto.%s{ID: %s.%s.ID}", dtoTypeName, itemVar, f.ModelField)
+			dtoAssign := fmt.Sprintf("dto.%s{ID: %s.%s.ID}", dtoTypeName, itemVar, relationField)
 			if isPointer {
-				dtoAssign = fmt.Sprintf("&dto.%s{ID: %s.%s.ID}", dtoTypeName, itemVar, f.ModelField)
+				dtoAssign = fmt.Sprintf("&dto.%s{ID: %s.%s.ID}", dtoTypeName, itemVar, relationField)
 			}
 			if forList {
 				sb.WriteString(fmt.Sprintf("\t\tif %s {\n", fkCheck))
@@ -1953,24 +2358,24 @@ func generateNestedDTOMapping(info *DTOInfo, resultVar, itemVar string, forList 
 			dtoPrefix = "&dto."
 		}
 		if forList {
-			// For list: result[i].Author = dto.UserBrief{...}
+			// For list: result[i].Salesperson = dto.UserBrief{...}
 			sb.WriteString(fmt.Sprintf("\t\tif %s {\n", fkCheck))
 			sb.WriteString(fmt.Sprintf("\t\t\t%s.%s = %s%s{\n", resultVar, f.DTOField, dtoPrefix, dtoTypeName))
 		} else {
-			// For single: result.Author = dto.UserBrief{...}
+			// For single: result.Salesperson = dto.UserBrief{...}
 			sb.WriteString(fmt.Sprintf("\tif %s {\n", fkCheck))
 			sb.WriteString(fmt.Sprintf("\t\t%s.%s = %s%s{\n", resultVar, f.DTOField, dtoPrefix, dtoTypeName))
 		}
 
-		// Add nested field mappings
+		// Add nested field mappings - use relationField to access the relation object
 		for _, nf := range nestedInfo.Fields {
 			if nf.IsSlice || nf.IsNestedDTO {
 				continue // Skip complex nested fields for now
 			}
 			if forList {
-				sb.WriteString(fmt.Sprintf("\t\t\t\t%s: %s.%s.%s,\n", nf.DTOField, itemVar, f.ModelField, nf.ModelField))
+				sb.WriteString(fmt.Sprintf("\t\t\t\t%s: %s.%s.%s,\n", nf.DTOField, itemVar, relationField, nf.ModelField))
 			} else {
-				sb.WriteString(fmt.Sprintf("\t\t\t%s: %s.%s.%s,\n", nf.DTOField, itemVar, f.ModelField, nf.ModelField))
+				sb.WriteString(fmt.Sprintf("\t\t\t%s: %s.%s.%s,\n", nf.DTOField, itemVar, relationField, nf.ModelField))
 			}
 		}
 
@@ -2002,16 +2407,22 @@ func generateAPIClient(modelsImport string, dtoImport string, models []CRUDModel
 		if m.ListDTO != "" || m.DetailDTO != "" {
 			continue
 		}
-		dtoCode.WriteString(fmt.Sprintf(`
+		// Parse actual model fields
+		fields, err := getModelFields(m.Name)
+		if err != nil || len(fields) == 0 {
+			// Fallback to minimal DTO with just ID
+			dtoCode.WriteString(fmt.Sprintf(`
 // %s is a WASM-compatible DTO for %s.
 type %s struct {
-	ID          uint   `+"`json:\"ID\"`"+`
-	CreatedAt   string `+"`json:\"CreatedAt,omitempty\"`"+`
-	UpdatedAt   string `+"`json:\"UpdatedAt,omitempty\"`"+`
-	Name        string `+"`json:\"name,omitempty\"`"+`
-	Description string `+"`json:\"description,omitempty\"`"+`
+	ID          uint   `+"`json:\"id\"`"+`
+	CreatedAt   string `+"`json:\"created_at,omitempty\"`"+`
+	UpdatedAt   string `+"`json:\"updated_at,omitempty\"`"+`
 }
 `, m.Name, m.Name, m.Name))
+		} else {
+			// Generate DTO with actual fields
+			dtoCode.WriteString(generateDTOStructCode(m.Name, fields))
+		}
 	}
 
 	// Generate model-specific API code
@@ -2386,16 +2797,21 @@ func Post[T any](url string, data any, callback func(T, error)) {
 		if m.ListDTO != "" || m.DetailDTO != "" {
 			continue
 		}
-		stubDtoCode.WriteString(fmt.Sprintf(`
+		// Parse actual model fields instead of hardcoding Name/Description
+		fields, err := getModelFields(m.Name)
+		if err != nil {
+			// If we can't parse the model, generate empty DTO
+			stubDtoCode.WriteString(fmt.Sprintf(`
 // %s is the API DTO for %s.
 type %s struct {
-	ID          uint   `+"`json:\"ID\"`"+`
-	CreatedAt   string `+"`json:\"CreatedAt,omitempty\"`"+`
-	UpdatedAt   string `+"`json:\"UpdatedAt,omitempty\"`"+`
-	Name        string `+"`json:\"name,omitempty\"`"+`
-	Description string `+"`json:\"description,omitempty\"`"+`
+	ID          uint   `+"`json:\"id\"`"+`
+	CreatedAt   string `+"`json:\"created_at,omitempty\"`"+`
+	UpdatedAt   string `+"`json:\"updated_at,omitempty\"`"+`
 }
 `, m.Name, m.Name, m.Name))
+			continue
+		}
+		stubDtoCode.WriteString(generateDTOStructCode(m.Name, fields))
 	}
 
 	var stubCode strings.Builder
@@ -2406,139 +2822,11 @@ type %s struct {
 			continue
 		}
 
-		// Models WITHOUT DTOs get hardcoded Counter-like code
+		// Models WITHOUT DTOs get dynamically generated code based on actual model fields
 		if m.ListDTO != "" || m.DetailDTO != "" {
 			continue // Skip - no parsed info available
 		}
-		stubCode.WriteString(fmt.Sprintf(`
-// %sAPI provides CRUD operations for %s.
-type %sAPI struct{}
-
-// %s is the API client for %s operations.
-var %s = &%sAPI{}
-
-// List returns all %s records.
-func (a *%sAPI) List(callback func([]%s, error)) {
-	if db == nil {
-		callback(nil, nil)
-		return
-	}
-	var items []models.%s
-	if err := db.Find(&items).Error; err != nil {
-		callback(nil, err)
-		return
-	}
-	// Convert to DTOs
-	result := make([]%s, len(items))
-	for i, item := range items {
-		result[i] = %s{
-			ID:          item.ID,
-			Name:        item.Name,
-			Description: item.Description,
-		}
-	}
-	callback(result, nil)
-}
-
-// Get returns a single %s by ID.
-func (a *%sAPI) Get(id uint, callback func(*%s, error)) {
-	if db == nil {
-		callback(nil, nil)
-		return
-	}
-	var item models.%s
-	if err := db.First(&item, id).Error; err != nil {
-		callback(nil, err)
-		return
-	}
-	result := &%s{
-		ID:          item.ID,
-		Name:        item.Name,
-		Description: item.Description,
-	}
-	callback(result, nil)
-}
-
-// Create creates a new %s.
-func (a *%sAPI) Create(item *%s, callback func(*%s, error)) {
-	if db == nil {
-		callback(nil, nil)
-		return
-	}
-	model := models.%s{
-		Name:        item.Name,
-		Description: item.Description,
-	}
-	if err := db.Create(&model).Error; err != nil {
-		callback(nil, err)
-		return
-	}
-	result := &%s{
-		ID:          model.ID,
-		Name:        model.Name,
-		Description: model.Description,
-	}
-	callback(result, nil)
-}
-
-// Update updates an existing %s.
-func (a *%sAPI) Update(item *%s, callback func(*%s, error)) {
-	if db == nil {
-		callback(nil, nil)
-		return
-	}
-	var model models.%s
-	if err := db.First(&model, item.ID).Error; err != nil {
-		callback(nil, err)
-		return
-	}
-	model.Name = item.Name
-	model.Description = item.Description
-	if err := db.Save(&model).Error; err != nil {
-		callback(nil, err)
-		return
-	}
-	result := &%s{
-		ID:          model.ID,
-		Name:        model.Name,
-		Description: model.Description,
-	}
-	callback(result, nil)
-}
-
-// Delete deletes a %s by ID.
-func (a *%sAPI) Delete(id uint, callback func(error)) {
-	if db == nil {
-		callback(nil)
-		return
-	}
-	callback(db.Delete(&models.%s{}, id).Error)
-}
-`,
-			m.PluralName, m.Name,       // type comment
-			m.PluralName,               // type name
-			m.PluralName, m.Name,       // var comment
-			m.PluralName, m.PluralName, // var declaration
-			m.Name,                     // List comment
-			m.PluralName, m.Name,       // List signature
-			m.Name,                     // List query
-			m.Name, m.Name,             // List convert
-			m.Name,                     // Get comment
-			m.PluralName, m.Name,       // Get signature
-			m.Name,                     // Get query
-			m.Name,                     // Get result
-			m.Name,                     // Create comment
-			m.PluralName, m.Name, m.Name, // Create signature
-			m.Name,                     // Create model
-			m.Name,                     // Create result
-			m.Name,                     // Update comment
-			m.PluralName, m.Name, m.Name, // Update signature
-			m.Name,                     // Update query
-			m.Name,                     // Update result
-			m.Name,                     // Delete comment
-			m.PluralName,               // Delete signature
-			m.Name,                     // Delete model
-		))
+		stubCode.WriteString(generateServerAPICode(m.Name, m.PluralName))
 	}
 
 	// Build server-side imports

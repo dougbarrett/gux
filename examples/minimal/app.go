@@ -5,7 +5,7 @@ import (
 	"log"
 
 	"github.com/dougbarrett/gux/core"
-	"github.com/dougbarrett/gux/examples/minimal/.gux/api"
+	"github.com/dougbarrett/gux/examples/minimal/guxgen/api"
 	"github.com/dougbarrett/gux/examples/minimal/admin"
 	"github.com/dougbarrett/gux/examples/minimal/dto"
 	"github.com/dougbarrett/gux/examples/minimal/models"
@@ -119,6 +119,12 @@ func main() {
 		core.WithDetailDTO(dto.PostDetail{}, "User"),
 	)
 
+	// Register CRUD for Client with DTOs
+	app.CRUD(models.Client{},
+		core.WithListDTO(dto.ClientList{}, "Salesperson"),
+		core.WithDetailDTO(dto.ClientDetail{}, "Salesperson"),
+	)
+
 	// Public routes (default bundle)
 	app.Routes().
 		Hybrid("/", pages.Home).
@@ -135,6 +141,10 @@ func main() {
 		Hybrid("/posts", admin.Posts).
 		Hybrid("/posts/:id", admin.PostDetail).
 		Hybrid("/posts/:id/edit", admin.PostEdit).
+		Hybrid("/clients", admin.Clients).
+		Hybrid("/clients/new", admin.ClientNew).
+		Hybrid("/clients/:id", admin.ClientDetail).
+		Hybrid("/clients/:id/edit", admin.ClientEdit).
 		Hybrid("/account", admin.Account)
 
 	app.Run(":8081")

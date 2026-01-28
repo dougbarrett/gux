@@ -9,7 +9,7 @@ type ClientList struct {
 	FirstName string `json:"first_name" gux:"Client.FirstName"`
 	LastName string `json:"last_name" gux:"Client.LastName"`
 	Email string `json:"email" gux:"Client.Email"`
-	SalespersonID *UserBrief `json:"salesperson_id" gux:"Client.SalespersonID" preload:"Salesperson"`
+	Salesperson *UserBrief `json:"salesperson_id" gux:"Client.SalespersonID" preload:"Salesperson"`
 	ClosedLead bool `json:"closed_lead" gux:"Client.ClosedLead"`
 }
 
@@ -20,7 +20,7 @@ type ClientDetail struct {
 	LastName string `json:"last_name" gux:"Client.LastName"`
 	Email string `json:"email" gux:"Client.Email"`
 	Phone string `json:"phone" gux:"Client.Phone"`
-	SalespersonID *UserBrief `json:"salesperson_id" gux:"Client.SalespersonID" preload:"Salesperson"`
+	Salesperson *UserBrief `json:"salesperson_id" gux:"Client.SalespersonID" preload:"Salesperson"`
 	ClosedLead bool `json:"closed_lead" gux:"Client.ClosedLead"`
 	State string `json:"state" gux:"Client.State"`
 	Description string `json:"description" gux:"Client.Description"`

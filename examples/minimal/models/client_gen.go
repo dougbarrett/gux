@@ -17,6 +17,7 @@ type Client struct {
 
 	// Lead Info
 	SalespersonID *uint `json:"salesperson_id"`
+	Salesperson User
 	ClosedLead bool `json:"closed_lead"`
 
 	// Business

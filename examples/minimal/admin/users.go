@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/dougbarrett/gux/core"
-	"github.com/dougbarrett/gux/examples/minimal/.gux/api"
+	"github.com/dougbarrett/gux/examples/minimal/guxgen/api"
 	"github.com/dougbarrett/gux/examples/minimal/dto"
 )
 
