@@ -5,6 +5,7 @@
 
 - **Core Concepts**
   - [API Generation](api-generation.md)
+  - [Model Scaffolding](model-scaffolding.md)
   - [Templates](templates.md)
 
 - **Features**

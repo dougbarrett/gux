@@ -129,6 +129,9 @@ func main() {
 	case "clean":
 		runClean()
 
+	case "model":
+		runModelCommand(os.Args[2:])
+
 	case "claude":
 		runClaude()
 
@@ -170,6 +173,9 @@ Usage:
     gux init [options] <appname>                  Create with explicit options (non-interactive)
     gux init --module <module-path> .             Initialize in current directory
     gux gen [--watch]                             Generate guxgen files (API, WASM entry points)
+    gux model add                                 Interactive model builder
+    gux model add --from-config                   Generate models from gux.config.json
+    gux model list                                List models in config
     gux build [--go]                              Build WASM and server binary
     gux dev [--go] [--watch]                      Build and run server
     gux clean                                     Remove generated files

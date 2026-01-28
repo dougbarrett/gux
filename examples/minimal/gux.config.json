@@ -1,0 +1,27 @@
+{
+  "module": "github.com/dougbarrett/gux/examples/minimal",
+  "auth": "none",
+  "admin": true,
+  "port": "8080",
+  "models": {
+    "Client": {
+      "sections": {
+        "Contact": [
+          { "name": "FirstName", "type": "string", "required": true, "table": true, "priority": 1 },
+          { "name": "LastName", "type": "string", "required": true, "table": true, "priority": 1 },
+          { "name": "Email", "type": "string", "input": "email", "table": true, "priority": 2 },
+          { "name": "Phone", "type": "string", "input": "tel" }
+        ],
+        "Lead Info": [
+          { "name": "SalespersonID", "type": "*uint", "relation": "User", "label": "Salesperson", "table": true, "priority": 2 },
+          { "name": "ClosedLead", "type": "bool", "table": true, "badge": { "true": "success", "false": "secondary", "trueLabel": "Closed", "falseLabel": "Open" } }
+        ],
+        "Business": [
+          { "name": "State", "type": "string", "input": "select", "options": [{"value": "CA", "label": "California"}, {"value": "NY", "label": "New York"}, {"value": "TX", "label": "Texas"}] },
+          { "name": "Description", "type": "string", "input": "textarea" }
+        ]
+      },
+      "preloads": ["Salesperson"]
+    }
+  }
+}

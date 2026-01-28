@@ -22,6 +22,7 @@ gux version
 | `gux gen` | Generate API client and server code |
 | `gux build` | Build WASM and server binary with embedded assets |
 | `gux dev` | Build and run development server |
+| `gux model` | Scaffold models, DTOs, and admin pages |
 | `gux version` | Show version |
 | `gux help` | Show help |
 
@@ -326,6 +327,82 @@ Starting dev server on http://localhost:8080
 |------|---------|--------------|---------------|
 | Dev | `gux dev` | Filesystem (`public/`) | None (reload to update) |
 | Prod | `./server` | Embedded in binary | Runtime hash injection |
+
+---
+
+## gux model
+
+Scaffolds complete CRUD functionality including GORM models, DTOs, and admin pages.
+
+```bash
+gux model <subcommand> [options]
+```
+
+### Subcommands
+
+| Subcommand | Description |
+|------------|-------------|
+| `add` | Interactive model builder |
+| `add <Name>` | Start with model name pre-filled |
+| `add --from-config` | Generate all models from gux.config.json |
+| `list` | List models defined in config |
+| `regen <Name>` | Regenerate files for a model |
+
+### Examples
+
+```bash
+# Interactive model creation
+gux model add
+
+# Pre-fill model name
+gux model add Product
+
+# Generate all models from config
+gux model add --from-config
+
+# Regenerate after config changes
+gux model regen Client
+
+# List configured models
+gux model list
+```
+
+### Generated Files
+
+For a model named `Client`:
+
+```
+models/client_gen.go          # GORM model
+dto/client_gen.go             # List and Detail DTOs
+admin/clients_gen.go          # List page
+admin/client_new_gen.go       # Create form
+admin/client_detail_gen.go    # Detail view
+```
+
+### Config-Based Models
+
+Define models in `gux.config.json`:
+
+```json
+{
+  "models": {
+    "Client": {
+      "sections": {
+        "Contact": [
+          { "name": "FirstName", "type": "string", "required": true, "table": true },
+          { "name": "Email", "type": "string", "input": "email" }
+        ],
+        "Lead Info": [
+          { "name": "SalespersonID", "type": "*uint", "relation": "User", "label": "Salesperson" }
+        ]
+      },
+      "preloads": ["Salesperson"]
+    }
+  }
+}
+```
+
+See [Model Scaffolding](model-scaffolding.md) for complete documentation.
 
 ---
 

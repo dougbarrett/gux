@@ -672,6 +672,10 @@ go install github.com/dougbarrett/gux/cmd/gux@latest
 | `gux gen [--watch]` | Generate API client/server code and WASM entry points |
 | `gux build [--go]` | Build WASM and server binary with embedded assets |
 | `gux dev [--go] [--watch]` | Build and run dev server (with optional hot reload) |
+| `gux model add` | Interactive model builder |
+| `gux model add --from-config` | Generate all models from gux.config.json |
+| `gux model regen <Name>` | Regenerate files for a model |
+| `gux model list` | List models defined in config |
 | `gux clean` | Remove generated files (.gux/, guxgen/, assets_gen.go) |
 | `gux claude` | Install Claude Code skill and CLAUDE.md |
 | `gux update [--check]` | Update gux to latest version |
@@ -706,6 +710,76 @@ Project settings are saved during init and can be reused:
   "claude": true,      // Claude Code integration
   "port": "8080"
 }
+```
+
+### Model Scaffolding
+
+Generate complete CRUD scaffolding for models:
+
+```bash
+# Interactive model builder
+gux model add
+
+# Generate from config
+gux model add --from-config
+
+# Regenerate after changes
+gux model regen Client
+```
+
+**Config-based models** in `gux.config.json`:
+
+```json
+{
+  "models": {
+    "Client": {
+      "sections": {
+        "Contact": [
+          { "name": "FirstName", "type": "string", "required": true, "table": true, "priority": 1 },
+          { "name": "Email", "type": "string", "input": "email", "table": true }
+        ],
+        "Lead Info": [
+          { "name": "SalespersonID", "type": "*uint", "relation": "User", "label": "Salesperson", "table": true },
+          { "name": "ClosedLead", "type": "bool", "table": true, "badge": { "true": "success", "false": "secondary", "trueLabel": "Closed", "falseLabel": "Open" } }
+        ],
+        "Business": [
+          { "name": "State", "type": "string", "input": "select", "options": [{"value": "CA", "label": "California"}] },
+          { "name": "Description", "type": "string", "input": "textarea" }
+        ]
+      },
+      "preloads": ["Salesperson"]
+    }
+  }
+}
+```
+
+**Field configuration options**:
+
+| Property | Description |
+|----------|-------------|
+| `name` | Field name (PascalCase) |
+| `type` | Go type: `string`, `int`, `uint`, `bool`, `*uint` (FK), `time.Time`, `[]string` |
+| `required` | Not null constraint |
+| `input` | Input type: `text`, `email`, `tel`, `textarea`, `select`, `multiselect` |
+| `relation` | Related model for FK fields |
+| `label` | Display label |
+| `table` | Show in list view |
+| `priority` | Column priority (1=high, shown first) |
+| `sortable` | Column is sortable |
+| `filterable` | Can filter by field |
+| `options` | Static select options: `[{value, label}]` |
+| `optionsRef` | Reference to optionSets |
+| `badge` | Badge display for booleans: `{true, false, trueLabel, falseLabel}` |
+| `many2many` | Join table name for M2M relations |
+
+**Generated files** for model `Client`:
+
+```
+models/client_gen.go          # GORM model
+dto/client_gen.go             # List and Detail DTOs
+admin/clients_gen.go          # List page
+admin/client_new_gen.go       # Create form
+admin/client_detail_gen.go    # Detail view
 ```
 
 ```bash

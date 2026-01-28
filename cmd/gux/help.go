@@ -872,6 +872,66 @@ func hasPrefix(path, prefix string) bool {
 // - help-circle, info, external-link
 `,
 	},
+	"model:config": {
+		Name:        "model:config",
+		Description: "Model configuration for gux.config.json",
+		FilePath:    "gux.config.json (models section)",
+		Template: `// gux.config.json (models section)
+// Define models in your config file for scaffolding with 'gux model add --from-config'
+{
+  "models": {
+    "Client": {
+      "sections": {
+        "Contact": [
+          { "name": "FirstName", "type": "string", "required": true, "table": true, "priority": 1 },
+          { "name": "LastName", "type": "string", "required": true, "table": true, "priority": 1 },
+          { "name": "Email", "type": "string", "input": "email", "table": true, "priority": 2 },
+          { "name": "Phone", "type": "string", "input": "tel" }
+        ],
+        "Lead Info": [
+          { "name": "SalespersonID", "type": "*uint", "relation": "User", "label": "Salesperson", "table": true },
+          { "name": "ClosedLead", "type": "bool", "table": true, "badge": { "true": "success", "false": "secondary", "trueLabel": "Closed", "falseLabel": "Open" } }
+        ],
+        "Business": [
+          { "name": "State", "type": "string", "input": "select", "options": [{"value": "CA", "label": "California"}, {"value": "NY", "label": "New York"}] },
+          { "name": "Description", "type": "string", "input": "textarea" }
+        ]
+      },
+      "preloads": ["Salesperson"]
+    }
+  },
+  "optionSets": {
+    "priorities": {
+      "low": "Low",
+      "medium": "Medium",
+      "high": "High"
+    }
+  }
+}
+
+// Field configuration reference:
+//   name        - Field name (PascalCase)
+//   type        - Go type: string, int, uint, bool, *uint (FK), time.Time, []string
+//   required    - Not null constraint
+//   input       - Input type: text, email, tel, textarea, select, multiselect
+//   relation    - Related model for FK fields
+//   label       - Display label
+//   table       - Show in list view
+//   priority    - Column priority (1=high)
+//   sortable    - Column is sortable
+//   filterable  - Can filter by field
+//   options     - Static select options: [{value, label}]
+//   optionsRef  - Reference to optionSets
+//   badge       - Badge display for bools: {true, false, trueLabel, falseLabel}
+//   many2many   - Join table name for M2M relations
+
+// Commands:
+//   gux model add              - Interactive model builder
+//   gux model add --from-config - Generate all models from config
+//   gux model regen <Name>     - Regenerate files for a model
+//   gux model list             - List configured models
+`,
+	},
 	"breadcrumb": {
 		Name:        "breadcrumb",
 		Description: "Breadcrumb navigation with page header",
