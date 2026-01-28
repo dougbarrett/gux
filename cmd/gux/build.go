@@ -278,9 +278,19 @@ func parseDTOFile(dtoDir string, dtoName string) (*DTOInfo, error) {
 					if arrayType, ok := field.Type.(*ast.ArrayType); ok {
 						mapping.IsSlice = true
 						mapping.SliceDTO = formatType(arrayType.Elt)
+						// Auto-detect preload from model field name if not explicitly set
+						if preloadTag == "" && modelField != "" {
+							mapping.Preload = modelField
+							info.Preloads = append(info.Preloads, modelField)
+						}
 					} else if !isPrimitiveType(mapping.DTOType) {
 						// Non-primitive, non-slice type is a nested DTO
 						mapping.IsNestedDTO = true
+						// Auto-detect preload from model field name if not explicitly set
+						if preloadTag == "" && modelField != "" {
+							mapping.Preload = modelField
+							info.Preloads = append(info.Preloads, modelField)
+						}
 					}
 
 					info.Fields = append(info.Fields, mapping)
