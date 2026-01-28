@@ -1068,5 +1068,58 @@ func GenerateModelFiles(model *ModelDefinition, optionSets map[string]OptionSet)
 		return fmt.Errorf("load config for module path: %w (run from a gux project directory)", err)
 	}
 
-	return GenerateModelFilesImpl(model, optionSets, config.Module, config.Admin)
+	// Build display fields map from all models in config
+	displayFields := BuildDisplayFieldsMap(".")
+
+	return GenerateModelFilesImpl(model, optionSets, config.Module, config.Admin, displayFields)
+}
+
+// BuildDisplayFieldsMap creates a map of model name -> display field from the config
+func BuildDisplayFieldsMap(dir string) map[string]string {
+	displayFields := make(map[string]string)
+	modelsConfig, err := LoadModelsConfig(dir)
+	if err != nil {
+		return displayFields // Return empty map if config not found
+	}
+	for name, model := range modelsConfig.Models {
+		// Use same logic as detectDisplayField in modelgen.go
+		candidates := []string{"Name", "Title", "FirstName", "Label"}
+		found := false
+
+		// Check for candidate fields first
+		for _, candidate := range candidates {
+			for _, fields := range model.Sections {
+				for _, f := range fields {
+					if f.Name == candidate && f.Type == "string" {
+						displayFields[name] = candidate
+						found = true
+						break
+					}
+				}
+				if found {
+					break
+				}
+			}
+			if found {
+				break
+			}
+		}
+
+		// Fallback to first string field
+		if !found {
+			for _, fields := range model.Sections {
+				for _, field := range fields {
+					if field.Type == "string" {
+						displayFields[name] = field.Name
+						found = true
+						break
+					}
+				}
+				if found {
+					break
+				}
+			}
+		}
+	}
+	return displayFields
 }

@@ -404,7 +404,7 @@ func runInit(appName, modulePath string, authMode AuthMode, withAdmin bool, with
 				os.Chdir(targetDir)
 			}
 			userModel.Name = "User"
-			if err := GenerateModelFilesImpl(&userModel, nil, modulePath, withAdmin); err != nil {
+			if err := GenerateModelFilesImpl(&userModel, nil, modulePath, withAdmin, nil); err != nil {
 				fmt.Printf("Warning: could not scaffold User model: %v\n", err)
 			}
 			if targetDir != "." {

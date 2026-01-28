@@ -1412,10 +1412,11 @@ type TemplateSection struct {
 
 // TemplateRelation represents a relation for template rendering
 type TemplateRelation struct {
-	VarName     string
-	Model       string
-	ModelPlural string
-	Label       string
+	VarName      string
+	Model        string
+	ModelPlural  string
+	Label        string
+	DisplayField string // The related model's display field (defaults to "Name")
 }
 
 // ModelTemplateData holds all data for model template rendering
@@ -1454,9 +1455,10 @@ type AuthField struct {
 }
 
 // GenerateModelFilesImpl generates all files for a model definition
-func GenerateModelFilesImpl(model *ModelDefinition, optionSets map[string]OptionSet, modulePath string, adminEnabled bool) error {
+// displayFields maps model names to their display field names (for Brief DTOs)
+func GenerateModelFilesImpl(model *ModelDefinition, optionSets map[string]OptionSet, modulePath string, adminEnabled bool, displayFields map[string]string) error {
 	// Prepare template data
-	data := prepareModelTemplateData(model, modulePath)
+	data := prepareModelTemplateData(model, modulePath, displayFields)
 	data.AdminEnabled = adminEnabled
 
 	// Create directories if needed
@@ -1567,7 +1569,7 @@ func detectDisplayField(model *ModelDefinition) string {
 	return "" // Will use ID as fallback in template
 }
 
-func prepareModelTemplateData(model *ModelDefinition, modulePath string) *ModelTemplateData {
+func prepareModelTemplateData(model *ModelDefinition, modulePath string, displayFields map[string]string) *ModelTemplateData {
 	// Default form layout is "stacked" for simplicity
 	formLayout := model.FormLayout
 	if formLayout == "" {
@@ -1622,11 +1624,19 @@ func prepareModelTemplateData(model *ModelDefinition, modulePath string) *ModelT
 
 			if field.Relation != "" {
 				data.HasRelations = true
+				// Look up the related model's display field, default to "Name"
+				relDisplayField := "Name"
+				if displayFields != nil {
+					if df, ok := displayFields[field.Relation]; ok && df != "" {
+						relDisplayField = df
+					}
+				}
 				data.Relations = append(data.Relations, TemplateRelation{
-					VarName:     strings.ToLower(field.Relation) + "s",
-					Model:       field.Relation,
-					ModelPlural: ToPlural(field.Relation),
-					Label:       getLabel(field),
+					VarName:      strings.ToLower(field.Relation) + "s",
+					Model:        field.Relation,
+					ModelPlural:  ToPlural(field.Relation),
+					Label:        getLabel(field),
+					DisplayField: relDisplayField,
 				})
 			}
 
@@ -2039,10 +2049,14 @@ func generateDTOFile(path string, data *ModelTemplateData) error {
 		if existingTypes[briefTypeName] {
 			continue // Skip - already exists in another file
 		}
+		displayField := rel.DisplayField
+		if displayField == "" {
+			displayField = "Name" // Fallback
+		}
 		buf.WriteString(fmt.Sprintf("\n// %sBrief is a simplified %s DTO for embedding.\n", rel.Model, strings.ToLower(rel.Model)))
 		buf.WriteString(fmt.Sprintf("type %sBrief struct {\n", rel.Model))
 		buf.WriteString(fmt.Sprintf("\tID   uint   `json:\"id\" gux:\"%s.ID\"`\n", rel.Model))
-		buf.WriteString(fmt.Sprintf("\tName string `json:\"name\" gux:\"%s.Name\"`\n", rel.Model))
+		buf.WriteString(fmt.Sprintf("\t%s string `json:\"%s\" gux:\"%s.%s\"`\n", displayField, ToSnakeCase(displayField), rel.Model, displayField))
 		buf.WriteString("}\n")
 	}
 
