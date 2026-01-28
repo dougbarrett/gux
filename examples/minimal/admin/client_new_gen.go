@@ -26,14 +26,14 @@ func ClientNew(r *core.Router) func() core.Node {
 
 	return func() core.Node {
 		// Form state
-		stateState := r.StateString("state", "")
-		descriptionState := r.StateString("description", "")
 		firstNameState := r.StateString("first_name", "")
 		lastNameState := r.StateString("last_name", "")
 		emailState := r.StateString("email", "")
 		phoneState := r.StateString("phone", "")
 		salespersonIDState := r.StateString("salesperson_id", "")
 		closedLeadState := r.StateBool("closed_lead", false)
+		stateState := r.StateString("state", "")
+		descriptionState := r.StateString("description", "")
 		errorState := r.StateString("error", "")
 		successState := r.StateString("success", "")
 		// Salesperson state
@@ -66,14 +66,14 @@ func ClientNew(r *core.Router) func() core.Node {
 			}
 
 			data := map[string]any{
-				"state": stateState.Get(),
-				"description": descriptionState.Get(),
 				"first_name": firstNameState.Get(),
 				"last_name": lastNameState.Get(),
 				"email": emailState.Get(),
 				"phone": phoneState.Get(),
 				"salesperson_id": parseUintPtr(salespersonIDState.Get()),
 				"closed_lead": closedLeadState.Get(),
+				"state": stateState.Get(),
+				"description": descriptionState.Get(),
 			}
 
 			api.Clients.Create(data, func(result *dto.ClientDetail, err error) {

@@ -485,8 +485,12 @@ func {{.Name}}New(r *core.Router) func() core.Node {
 								core.H3(core.Class("text-lg font-semibold text-gray-900 dark:text-white mb-4"),
 									core.Text("{{$sectionName}}"),
 								),
+{{- if eq $.FormLayout "grid"}}
 								core.Div(core.Class("grid grid-cols-1 md:grid-cols-2 gap-4"),
 {{range $fields}}{{.FormField}}{{end}}								),
+{{- else}}
+{{range $fields}}{{.FormField}}{{end}}
+{{- end}}
 							),
 {{end}}
 							// Submit
@@ -776,8 +780,12 @@ func {{.Name}}Detail(r *core.Router) func() core.Node {
 								core.H3(core.Class("text-lg font-semibold text-gray-900 dark:text-white mb-4"),
 									core.Text("{{$sectionName}}"),
 								),
+{{- if eq $.FormLayout "grid"}}
 								core.Div(core.Class("grid grid-cols-1 md:grid-cols-2 gap-4"),
 {{range $fields}}{{.DetailField}}{{end}}								),
+{{- else}}
+{{range $fields}}{{.DetailField}}{{end}}
+{{- end}}
 							),
 {{end}}
 							// Timestamps
@@ -1031,8 +1039,12 @@ func {{.Name}}Edit(r *core.Router) func() core.Node {
 								core.H3(core.Class("text-lg font-semibold text-gray-900 dark:text-white mb-4"),
 									core.Text("{{$sectionName}}"),
 								),
+{{- if eq $.FormLayout "grid"}}
 								core.Div(core.Class("grid grid-cols-1 md:grid-cols-2 gap-4"),
 {{range $fields}}{{.FormField}}{{end}}								),
+{{- else}}
+{{range $fields}}{{.FormField}}{{end}}
+{{- end}}
 							),
 {{end}}
 							// Submit
@@ -1161,6 +1173,7 @@ type TemplateField struct {
 	IsTime         bool
 	IsSlice        bool
 	IsDisplayField bool // True if this is the display field (should be clickable link)
+	FullWidth      bool // Span full width in grid layout
 	Badge          *BadgeConfig
 }
 
@@ -1198,8 +1211,9 @@ type ModelTemplateData struct {
 	HasJSON           bool
 	HasRelations      bool
 	DisplayField      string
-	AdminEnabled      bool // From config.Admin - use ui components instead of inline styles
-	FieldCount        int  // Number of fields for layout decisions
+	AdminEnabled      bool   // From config.Admin - use ui components instead of inline styles
+	FieldCount        int    // Number of fields for layout decisions
+	FormLayout        string // "stacked" (default) or "grid" for two-column layout
 }
 
 // GenerateModelFilesImpl generates all files for a model definition
@@ -1299,6 +1313,12 @@ func detectDisplayField(model *ModelDefinition) string {
 }
 
 func prepareModelTemplateData(model *ModelDefinition, modulePath string) *ModelTemplateData {
+	// Default form layout is "stacked" for simplicity
+	formLayout := model.FormLayout
+	if formLayout == "" {
+		formLayout = "stacked"
+	}
+
 	data := &ModelTemplateData{
 		Name:              model.Name,
 		NameLower:         strings.ToLower(model.Name),
@@ -1310,6 +1330,7 @@ func prepareModelTemplateData(model *ModelDefinition, modulePath string) *ModelT
 		ModulePath:        modulePath,
 		SectionedFields:   make(map[string][]TemplateField),
 		DisplayField:      detectDisplayField(model),
+		FormLayout:        formLayout,
 	}
 
 	// Process sections and fields
@@ -1322,6 +1343,8 @@ func prepareModelTemplateData(model *ModelDefinition, modulePath string) *ModelT
 			if tf.Name == data.DisplayField {
 				tf.IsDisplayField = true
 			}
+			// Set full width from field config
+			tf.FullWidth = field.FullWidth
 			sectionFields = append(sectionFields, tf)
 			data.AllFields = append(data.AllFields, tf)
 

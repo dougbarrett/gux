@@ -75,14 +75,14 @@ func ClientEdit(r *core.Router) func() core.Node {
 		}
 
 		// Form state - initialize with current values
-		stateState := r.StateString("state", displayItem.State)
-		descriptionState := r.StateString("description", displayItem.Description)
 		firstNameState := r.StateString("first_name", displayItem.FirstName)
 		lastNameState := r.StateString("last_name", displayItem.LastName)
 		emailState := r.StateString("email", displayItem.Email)
 		phoneState := r.StateString("phone", displayItem.Phone)
 		salespersonIDState := r.StateString("salesperson_id", func() string { if displayItem.Salesperson != nil { return fmt.Sprintf("%d", displayItem.Salesperson.ID) }; return "" }())
 		closedLeadState := r.StateBool("closed_lead", displayItem.ClosedLead)
+		stateState := r.StateString("state", displayItem.State)
+		descriptionState := r.StateString("description", displayItem.Description)
 		errorState := r.StateString("error", "")
 		successState := r.StateString("success", "")
 
@@ -111,14 +111,14 @@ func ClientEdit(r *core.Router) func() core.Node {
 			}
 
 			data := map[string]any{
-				"state": stateState.Get(),
-				"description": descriptionState.Get(),
 				"first_name": firstNameState.Get(),
 				"last_name": lastNameState.Get(),
 				"email": emailState.Get(),
 				"phone": phoneState.Get(),
 				"salesperson_id": parseUintPtr(salespersonIDState.Get()),
 				"closed_lead": closedLeadState.Get(),
+				"state": stateState.Get(),
+				"description": descriptionState.Get(),
 			}
 
 			api.Clients.Update(displayItem.ID, data, func(result *dto.ClientDetail, err error) {

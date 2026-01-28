@@ -5,6 +5,7 @@
   "port": "8080",
   "models": {
     "Client": {
+      "formLayout": "grid",
       "sections": {
         "Contact": [
           { "name": "FirstName", "type": "string", "required": true, "table": true, "priority": 1 },

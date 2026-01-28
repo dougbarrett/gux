@@ -45,16 +45,18 @@ type ModelField struct {
 	Default    string         `json:"default,omitempty"`    // Default value
 	Badge      *BadgeConfig   `json:"badge,omitempty"`      // Badge display config for booleans
 	Many2Many  string         `json:"many2many,omitempty"`  // Join table name for M2M relations
+	FullWidth  bool           `json:"fullWidth,omitempty"`  // Span full width in grid layout
 	Section    string         `json:"-"`                    // Form section (set during parsing)
 }
 
 // ModelDefinition represents a complete model configuration
 type ModelDefinition struct {
-	Name     string                  `json:"-"`                    // Model name (from map key)
-	Sections map[string][]ModelField `json:"sections"`             // Fields grouped by section
-	Preloads []string                `json:"preloads,omitempty"`   // Relations to preload
-	Public   bool                    `json:"public,omitempty"`     // CRUD is public (no auth)
-	Roles    []string                `json:"roles,omitempty"`      // Required roles for CRUD
+	Name       string                  `json:"-"`                      // Model name (from map key)
+	Sections   map[string][]ModelField `json:"sections"`               // Fields grouped by section
+	Preloads   []string                `json:"preloads,omitempty"`     // Relations to preload
+	Public     bool                    `json:"public,omitempty"`       // CRUD is public (no auth)
+	Roles      []string                `json:"roles,omitempty"`        // Required roles for CRUD
+	FormLayout string                  `json:"formLayout,omitempty"`   // Form layout: "stacked" (default) or "grid"
 }
 
 // OptionSet defines a reusable set of select options
