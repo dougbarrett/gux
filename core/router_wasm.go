@@ -18,32 +18,31 @@ var debugRouter *Router
 
 // SetDebugRouter sets the router for debugging (called from generated WASM code)
 func SetDebugRouter(r *Router) {
+	println("[Gux] SetDebugRouter called")
 	debugRouter = r
 	// Expose debug function to JavaScript console
 	js.Global().Set("__guxDebugState", js.FuncOf(func(this js.Value, args []js.Value) any {
 		if debugRouter == nil {
-			js.Global().Get("console").Call("log", "[Gux Debug] No router set")
+			println("[Gux Debug] No router set")
 			return nil
 		}
-		js.Global().Get("console").Call("log", "[Gux Debug] Router:", fmt.Sprintf("%p", debugRouter))
-		js.Global().Get("console").Call("log", "[Gux Debug] State keys:")
+		println("[Gux Debug] Router:", fmt.Sprintf("%p", debugRouter))
+		println("[Gux Debug] State keys:")
 		for k, v := range debugRouter.state {
-			js.Global().Get("console").Call("log", "  ", k, "=", fmt.Sprintf("%v", v))
+			println("  ", k, "=", fmt.Sprintf("%v", v))
 		}
 		return nil
 	}))
-	js.Global().Get("console").Call("log", "[Gux] Debug enabled - call __guxDebugState() to inspect state")
+	println("[Gux] Debug enabled - call __guxDebugState() to inspect state")
 }
 
 func init() {
+	println("[Gux] router_wasm.go init() called")
 	// Enable state debug logging in WASM mode
 	StateDebugLog = func(action, key string, value any, router *Router) {
-		// Get router address for debugging
-		routerAddr := fmt.Sprintf("%p", router)
-		stateMapLen := len(router.state)
-		js.Global().Get("console").Call("log",
-			fmt.Sprintf("[Gux State] %s key=%q value=%v router=%s state_size=%d",
-				action, key, value, routerAddr, stateMapLen))
+		// Get router address for debugging - use println for TinyGo compatibility
+		println(fmt.Sprintf("[Gux State] %s key=%q value=%v router=%p state_size=%d",
+			action, key, value, router, len(router.state)))
 	}
 }
 
