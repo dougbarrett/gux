@@ -455,16 +455,48 @@ func (a *App) convertSingleToDTO(model interface{}, dtoType reflect.Type) interf
 				srcVal = srcVal.Elem()
 			}
 
+			// Get the actual DTO field type (dereference if pointer)
+			dtoFieldType := dtoField.Type
+			dtoFieldIsPtr := dtoFieldType.Kind() == reflect.Ptr
+			if dtoFieldIsPtr {
+				dtoFieldType = dtoFieldType.Elem()
+			}
+
 			// First check if types are directly assignable (handles time.Time, etc.)
 			if modelField.Type().AssignableTo(dtoField.Type) {
 				dtoVal.Field(i).Set(modelField)
-			} else if srcVal.Kind() == reflect.Struct && dtoField.Type.Kind() == reflect.Struct {
-				// Only recursively convert if the types are different (custom structs)
+			} else if srcVal.Kind() == reflect.Struct && dtoFieldType.Kind() == reflect.Struct {
+				// Handle struct-to-struct conversion (including pointer DTO fields)
 				// Skip standard library types like time.Time which have unexported fields
 				srcType := srcVal.Type()
 				if srcType.PkgPath() != "" && !strings.HasPrefix(srcType.PkgPath(), "time") {
-					nestedDTO := a.convertSingleToDTO(srcVal.Interface(), dtoField.Type)
-					dtoVal.Field(i).Set(reflect.ValueOf(nestedDTO))
+					nestedDTO := a.convertSingleToDTO(srcVal.Interface(), dtoFieldType)
+					if dtoFieldIsPtr {
+						// DTO field is a pointer - create a pointer to the converted value
+						nestedPtr := reflect.New(dtoFieldType)
+						nestedPtr.Elem().Set(reflect.ValueOf(nestedDTO))
+						dtoVal.Field(i).Set(nestedPtr)
+					} else {
+						dtoVal.Field(i).Set(reflect.ValueOf(nestedDTO))
+					}
+				}
+			} else if srcVal.Kind() == reflect.Slice && dtoFieldType.Kind() == reflect.Slice {
+				// Handle slice conversion (e.g., []Post -> []PostDTO)
+				srcElemType := srcVal.Type().Elem()
+				dtoElemType := dtoFieldType.Elem()
+
+				// Check if it's a slice of structs
+				if srcElemType.Kind() == reflect.Struct && dtoElemType.Kind() == reflect.Struct {
+					if srcElemType.PkgPath() != "" && !strings.HasPrefix(srcElemType.PkgPath(), "time") {
+						convertedSlice := a.convertToDTO(srcVal.Interface(), dtoElemType)
+						if dtoFieldIsPtr {
+							slicePtr := reflect.New(dtoFieldType)
+							slicePtr.Elem().Set(reflect.ValueOf(convertedSlice))
+							dtoVal.Field(i).Set(slicePtr)
+						} else {
+							dtoVal.Field(i).Set(reflect.ValueOf(convertedSlice))
+						}
+					}
 				}
 			}
 		}
