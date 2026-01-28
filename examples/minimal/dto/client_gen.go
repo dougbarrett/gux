@@ -27,9 +27,3 @@ type ClientDetail struct {
 	CreatedAt time.Time `json:"created_at" gux:"Client.CreatedAt"`
 	UpdatedAt time.Time `json:"updated_at" gux:"Client.UpdatedAt"`
 }
-
-// UserBrief is a simplified user DTO for embedding.
-type UserBrief struct {
-	ID   uint   `json:"id" gux:"User.ID"`
-	Name string `json:"name" gux:"User.Name"`
-}

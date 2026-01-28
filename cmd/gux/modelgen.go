@@ -891,6 +891,9 @@ func generateDetailFieldCode(field *ModelField, tf TemplateField) string {
 }
 
 func generateDTOFile(path string, data *ModelTemplateData) error {
+	// Check which Brief types already exist in the dto package
+	existingTypes := findExistingDTOTypes(filepath.Dir(path))
+
 	var buf bytes.Buffer
 
 	// Write header
@@ -929,8 +932,12 @@ func generateDTOFile(path string, data *ModelTemplateData) error {
 	buf.WriteString(fmt.Sprintf("\tUpdatedAt time.Time `json:\"updated_at\" gux:\"%s.UpdatedAt\"`\n", data.Name))
 	buf.WriteString("}\n")
 
-	// Write Brief DTOs for relations
+	// Write Brief DTOs for relations (only if they don't already exist)
 	for _, rel := range data.Relations {
+		briefTypeName := rel.Model + "Brief"
+		if existingTypes[briefTypeName] {
+			continue // Skip - already exists in another file
+		}
 		buf.WriteString(fmt.Sprintf("\n// %sBrief is a simplified %s DTO for embedding.\n", rel.Model, strings.ToLower(rel.Model)))
 		buf.WriteString(fmt.Sprintf("type %sBrief struct {\n", rel.Model))
 		buf.WriteString(fmt.Sprintf("\tID   uint   `json:\"id\" gux:\"%s.ID\"`\n", rel.Model))
@@ -939,6 +946,46 @@ func generateDTOFile(path string, data *ModelTemplateData) error {
 	}
 
 	return os.WriteFile(path, buf.Bytes(), 0644)
+}
+
+// findExistingDTOTypes scans the dto directory for existing type declarations
+func findExistingDTOTypes(dtoDir string) map[string]bool {
+	types := make(map[string]bool)
+
+	files, err := os.ReadDir(dtoDir)
+	if err != nil {
+		return types // Directory may not exist yet
+	}
+
+	for _, file := range files {
+		if file.IsDir() || !strings.HasSuffix(file.Name(), ".go") {
+			continue
+		}
+		// Skip generated files (we'll regenerate them)
+		if strings.HasSuffix(file.Name(), "_gen.go") {
+			continue
+		}
+
+		content, err := os.ReadFile(filepath.Join(dtoDir, file.Name()))
+		if err != nil {
+			continue
+		}
+
+		// Simple regex to find type declarations
+		// Matches: type TypeName struct
+		lines := strings.Split(string(content), "\n")
+		for _, line := range lines {
+			line = strings.TrimSpace(line)
+			if strings.HasPrefix(line, "type ") && strings.Contains(line, " struct") {
+				parts := strings.Fields(line)
+				if len(parts) >= 2 {
+					types[parts[1]] = true
+				}
+			}
+		}
+	}
+
+	return types
 }
 
 func executeTemplate(tmplText, path string, data *ModelTemplateData) error {
