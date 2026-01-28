@@ -271,8 +271,8 @@ package admin
 import (
 {{- if .HasRelations}}
 	"encoding/json"
-{{- end}}
 	"fmt"
+{{- end}}
 	"strconv"
 
 	"github.com/dougbarrett/gux/core"
