@@ -26,14 +26,14 @@ func ClientNew(r *core.Router) func() core.Node {
 
 	return func() core.Node {
 		// Form state
+		stateState := r.StateString("state", "")
+		descriptionState := r.StateString("description", "")
 		firstNameState := r.StateString("first_name", "")
 		lastNameState := r.StateString("last_name", "")
 		emailState := r.StateString("email", "")
 		phoneState := r.StateString("phone", "")
 		salespersonIDState := r.StateString("salesperson_id", "")
 		closedLeadState := r.StateBool("closed_lead", false)
-		stateState := r.StateString("state", "")
-		descriptionState := r.StateString("description", "")
 		errorState := r.StateString("error", "")
 		successState := r.StateString("success", "")
 		// Salesperson state
@@ -66,14 +66,14 @@ func ClientNew(r *core.Router) func() core.Node {
 			}
 
 			data := map[string]any{
+				"state": stateState.Get(),
+				"description": descriptionState.Get(),
 				"first_name": firstNameState.Get(),
 				"last_name": lastNameState.Get(),
 				"email": emailState.Get(),
 				"phone": phoneState.Get(),
 				"salesperson_id": parseUintPtr(salespersonIDState.Get()),
 				"closed_lead": closedLeadState.Get(),
-				"state": stateState.Get(),
-				"description": descriptionState.Get(),
 			}
 
 			api.Clients.Create(data, func(result *dto.ClientDetail, err error) {
@@ -105,6 +105,7 @@ func ClientNew(r *core.Router) func() core.Node {
 								core.H3(core.Class("text-lg font-semibold text-gray-900 dark:text-white mb-4"),
 									core.Text("Business"),
 								),
+								core.Div(core.Class("grid grid-cols-1 md:grid-cols-2 gap-4"),
 						core.Div(core.Class("mb-4"),
 							core.Label(core.Class("block text-gray-300 text-sm font-medium mb-2"),
 								core.Text("State"),
@@ -131,6 +132,7 @@ func ClientNew(r *core.Router) func() core.Node {
 								OnChange: func(v string) { descriptionState.Set(v) },
 							}),
 						),
+								),
 							),
 
 							// Contact
@@ -138,10 +140,12 @@ func ClientNew(r *core.Router) func() core.Node {
 								core.H3(core.Class("text-lg font-semibold text-gray-900 dark:text-white mb-4"),
 									core.Text("Contact"),
 								),
+								core.Div(core.Class("grid grid-cols-1 md:grid-cols-2 gap-4"),
 						clientFormField("First Name", "text", "first_name", firstNameState.Get(), func(v string) { firstNameState.Set(v) }, save),
 						clientFormField("Last Name", "text", "last_name", lastNameState.Get(), func(v string) { lastNameState.Set(v) }, save),
 						clientFormField("Email", "email", "email", emailState.Get(), func(v string) { emailState.Set(v) }, save),
 						clientFormField("Phone", "tel", "phone", phoneState.Get(), func(v string) { phoneState.Set(v) }, save),
+								),
 							),
 
 							// Lead Info
@@ -149,6 +153,7 @@ func ClientNew(r *core.Router) func() core.Node {
 								core.H3(core.Class("text-lg font-semibold text-gray-900 dark:text-white mb-4"),
 									core.Text("Lead Info"),
 								),
+								core.Div(core.Class("grid grid-cols-1 md:grid-cols-2 gap-4"),
 						core.Div(core.Class("mb-4"),
 							core.Label(core.Class("block text-gray-300 text-sm font-medium mb-2"),
 								core.Text("Salesperson"),
@@ -190,12 +195,13 @@ func ClientNew(r *core.Router) func() core.Node {
 								core.Text("Closed Lead"),
 							),
 						),
+								),
 							),
 
 							// Submit
 							ui.Button(ui.ButtonProps{
 								Variant:  ui.ButtonPrimary,
-								Class:    "w-full",
+								Class:    "w-full mt-4",
 								OnClick:  save,
 								Children: []core.Node{core.Text("Create Client")},
 							}),

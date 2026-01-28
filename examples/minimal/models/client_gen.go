@@ -9,6 +9,10 @@ import (
 type Client struct {
 	gorm.Model
 
+	// Business
+	State string `json:"state"`
+	Description string `json:"description"`
+
 	// Contact
 	FirstName string `json:"first_name" gorm:"not null"`
 	LastName string `json:"last_name" gorm:"not null"`
@@ -19,9 +23,5 @@ type Client struct {
 	SalespersonID *uint `json:"salesperson_id"`
 	Salesperson User
 	ClosedLead bool `json:"closed_lead"`
-
-	// Business
-	State string `json:"state"`
-	Description string `json:"description"`
 
 }

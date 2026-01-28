@@ -16,14 +16,14 @@ type ClientList struct {
 // ClientDetail is the DTO for single client responses.
 type ClientDetail struct {
 	ID uint `json:"id" gux:"Client.ID"`
+	State string `json:"state" gux:"Client.State"`
+	Description string `json:"description" gux:"Client.Description"`
 	FirstName string `json:"first_name" gux:"Client.FirstName"`
 	LastName string `json:"last_name" gux:"Client.LastName"`
 	Email string `json:"email" gux:"Client.Email"`
 	Phone string `json:"phone" gux:"Client.Phone"`
 	Salesperson *UserBrief `json:"salesperson_id" gux:"Client.SalespersonID" preload:"Salesperson"`
 	ClosedLead bool `json:"closed_lead" gux:"Client.ClosedLead"`
-	State string `json:"state" gux:"Client.State"`
-	Description string `json:"description" gux:"Client.Description"`
 	CreatedAt time.Time `json:"created_at" gux:"Client.CreatedAt"`
 	UpdatedAt time.Time `json:"updated_at" gux:"Client.UpdatedAt"`
 }

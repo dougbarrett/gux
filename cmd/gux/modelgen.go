@@ -132,15 +132,19 @@ func {{.NamePlural}}(r *core.Router) func() core.Node {
 			ui.PageHeader(ui.PageHeaderProps{
 				Breadcrumbs: []ui.BreadcrumbItem{
 					{Label: "Admin", Href: "/admin"},
-					{Label: "{{.NamePlural}}"},
+					{Label: "{{.NamePluralDisplay}}"},
 				},
-				Title: "{{.NamePlural}}",
+				Title:    "{{.NamePluralDisplay}}",
+				Subtitle: fmt.Sprintf("%d total", len(displayItems)),
 				Actions: []core.Node{
-					ui.Button(ui.ButtonProps{
-						Variant:  ui.ButtonPrimary,
-						Children: []core.Node{core.Text("+ Add {{.Name}}")},
-						OnClick:  func() { r.Navigate("/admin/{{.RoutePlural}}/new") },
-					}),
+					core.A(
+						core.Attrs{
+							Href:  "/admin/{{.RoutePlural}}/new",
+							Class: "inline-flex items-center gap-2 text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium",
+						},
+						core.Span(core.Class("text-lg"), core.Text("+")),
+						core.Text("Add {{.NameDisplay}}"),
+					),
 				},
 			}),
 			ui.Card(ui.CardProps{
@@ -317,6 +321,29 @@ func {{$.Name}}Cell{{.Name}}(item dto.{{$.Name}}List) core.Node {
 	{{- end}}
 {{- else if .IsTime}}
 	return tableCell{{$.Name}}(item.{{.DTOFieldName}}.Format("Jan 2, 2006"))
+{{- else if .IsDisplayField}}
+	// Display field is clickable - links to detail page
+{{- if $.AdminEnabled}}
+	return core.Td(core.Class("px-6 py-4 whitespace-nowrap text-sm"),
+		core.A(
+			core.Attrs{
+				Href:  fmt.Sprintf("/admin/{{$.RoutePlural}}/%d", item.ID),
+				Class: "text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium",
+			},
+			core.Text({{if eq .Type "int" "uint" "float64"}}fmt.Sprintf("%v", item.{{.DTOFieldName}}){{else}}item.{{.DTOFieldName}}{{end}}),
+		),
+	)
+{{- else}}
+	return core.Td(core.Class("px-6 py-4 whitespace-nowrap text-sm"),
+		core.A(
+			core.Attrs{
+				Href:  fmt.Sprintf("/admin/{{$.RoutePlural}}/%d", item.ID),
+				Class: "text-blue-400 hover:text-blue-300 font-medium",
+			},
+			core.Text({{if eq .Type "int" "uint" "float64"}}fmt.Sprintf("%v", item.{{.DTOFieldName}}){{else}}item.{{.DTOFieldName}}{{end}}),
+		),
+	)
+{{- end}}
 {{- else}}
 	return tableCell{{$.Name}}({{if eq .Type "int" "uint" "float64"}}fmt.Sprintf("%v", item.{{.DTOFieldName}}){{else}}item.{{.DTOFieldName}}{{end}})
 {{- end}}
@@ -431,7 +458,7 @@ func {{.Name}}New(r *core.Router) func() core.Node {
 				if err != nil {
 					errorState.Set(err.Error())
 				} else {
-					successState.Set("{{.Name}} created successfully!")
+					successState.Set("{{.NameDisplay}} created successfully!")
 					r.Navigate("/admin/{{.RoutePlural}}")
 				}
 			})
@@ -442,10 +469,10 @@ func {{.Name}}New(r *core.Router) func() core.Node {
 			ui.PageHeader(ui.PageHeaderProps{
 				Breadcrumbs: []ui.BreadcrumbItem{
 					{Label: "Admin", Href: "/admin"},
-					{Label: "{{.NamePlural}}", Href: "/admin/{{.RoutePlural}}"},
+					{Label: "{{.NamePluralDisplay}}", Href: "/admin/{{.RoutePlural}}"},
 					{Label: "Create New"},
 				},
-				Title: "Create New {{.Name}}",
+				Title: "Create New {{.NameDisplay}}",
 			}),
 			messageNode,
 			ui.Card(ui.CardProps{
@@ -458,14 +485,16 @@ func {{.Name}}New(r *core.Router) func() core.Node {
 								core.H3(core.Class("text-lg font-semibold text-gray-900 dark:text-white mb-4"),
 									core.Text("{{$sectionName}}"),
 								),
-{{range $fields}}{{.FormField}}{{end}}							),
+								core.Div(core.Class("grid grid-cols-1 md:grid-cols-2 gap-4"),
+{{range $fields}}{{.FormField}}{{end}}								),
+							),
 {{end}}
 							// Submit
 							ui.Button(ui.ButtonProps{
 								Variant:  ui.ButtonPrimary,
-								Class:    "w-full",
+								Class:    "w-full mt-4",
 								OnClick:  save,
-								Children: []core.Node{core.Text("Create {{.Name}}")},
+								Children: []core.Node{core.Text("Create {{.NameDisplay}}")},
 							}),
 						},
 					}),
@@ -575,6 +604,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/dougbarrett/gux/core"
 {{- if .AdminEnabled}}
@@ -614,8 +644,8 @@ func {{.Name}}Detail(r *core.Router) func() core.Node {
 		json.Unmarshal([]byte(itemState.Get()), &displayItem)
 
 {{- if .AdminEnabled}}
-		// Delete confirmation state
-		confirmDelete := r.StateBool("confirm_delete", false)
+		// Delete confirmation modal state
+		showDeleteModal := r.StateBool("show_delete_modal", false)
 		errorState := r.StateString("error", "")
 
 		if displayItem.ID == 0 {
@@ -623,10 +653,10 @@ func {{.Name}}Detail(r *core.Router) func() core.Node {
 				ui.PageHeader(ui.PageHeaderProps{
 					Breadcrumbs: []ui.BreadcrumbItem{
 						{Label: "Admin", Href: "/admin"},
-						{Label: "{{.NamePlural}}", Href: "/admin/{{.RoutePlural}}"},
+						{Label: "{{.NamePluralDisplay}}", Href: "/admin/{{.RoutePlural}}"},
 						{Label: "Not Found"},
 					},
-					Title: "{{.Name}} Not Found",
+					Title: "{{.NameDisplay}} Not Found",
 				}),
 				ui.Alert(ui.AlertProps{
 					Variant: ui.AlertError,
@@ -638,53 +668,36 @@ func {{.Name}}Detail(r *core.Router) func() core.Node {
 		// Build display name from display field
 		displayName := {{if .DisplayField}}displayItem.{{.DisplayField}}{{else}}""{{end}}
 		if displayName == "" {
-			displayName = fmt.Sprintf("{{.Name}} #%d", displayItem.ID)
+			displayName = fmt.Sprintf("{{.NameDisplay}} #%d", displayItem.ID)
 		}
 
-		// Delete handler
-		handleDelete := func() {
-			if confirmDelete.Get() {
-				api.{{.NamePlural}}.Delete(displayItem.ID, func(err error) {
-					if err != nil {
-						errorState.Set(err.Error())
-						confirmDelete.Set(false)
-					} else {
-						r.Navigate("/admin/{{.RoutePlural}}")
-					}
-				})
-			} else {
-				confirmDelete.Set(true)
-			}
+		// Get initials for avatar
+		initials := {{.NameLower}}GetInitials(displayName)
+
+		// Delete handler - called when confirming in modal
+		confirmDelete := func() {
+			api.{{.NamePlural}}.Delete(displayItem.ID, func(err error) {
+				if err != nil {
+					errorState.Set(err.Error())
+					showDeleteModal.Set(false)
+				} else {
+					r.Navigate("/admin/{{.RoutePlural}}")
+				}
+			})
 		}
 
-		// Build action buttons
-		var actions []core.Node
-		if confirmDelete.Get() {
-			actions = []core.Node{
-				ui.Button(ui.ButtonProps{
-					Variant:  ui.ButtonGhost,
-					Children: []core.Node{core.Text("Cancel")},
-					OnClick:  func() { confirmDelete.Set(false) },
-				}),
-				ui.Button(ui.ButtonProps{
-					Variant:  ui.ButtonDestructive,
-					Children: []core.Node{core.Text("Confirm Delete")},
-					OnClick:  handleDelete,
-				}),
-			}
-		} else {
-			actions = []core.Node{
-				ui.Button(ui.ButtonProps{
-					Variant:  ui.ButtonPrimary,
-					Children: []core.Node{core.Text("Edit")},
-					OnClick:  func() { r.Navigate(fmt.Sprintf("/admin/{{.RoutePlural}}/%d/edit", displayItem.ID)) },
-				}),
-				ui.Button(ui.ButtonProps{
-					Variant:  ui.ButtonDestructive,
-					Children: []core.Node{core.Text("Delete")},
-					OnClick:  handleDelete,
-				}),
-			}
+		// Action buttons - always show Edit and Delete
+		actions := []core.Node{
+			ui.Button(ui.ButtonProps{
+				Variant:  ui.ButtonPrimary,
+				Children: []core.Node{core.Text("Edit")},
+				OnClick:  func() { r.Navigate(fmt.Sprintf("/admin/{{.RoutePlural}}/%d/edit", displayItem.ID)) },
+			}),
+			ui.Button(ui.ButtonProps{
+				Variant:  ui.ButtonDestructive,
+				Children: []core.Node{core.Text("Delete")},
+				OnClick:  func() { showDeleteModal.Set(true) },
+			}),
 		}
 
 		var errorNode core.Node = core.Frag()
@@ -695,11 +708,43 @@ func {{.Name}}Detail(r *core.Router) func() core.Node {
 			})
 		}
 
+		// Delete confirmation modal
+		deleteModal := ui.Modal(ui.ModalProps{
+			Open:    showDeleteModal.Get(),
+			OnClose: func() { showDeleteModal.Set(false) },
+			Title:   "Delete {{.NameDisplay}}?",
+			Size:    ui.ModalSM,
+			Children: []core.Node{
+				ui.ModalContent(ui.ModalContentProps{
+					Children: []core.Node{
+						core.P(core.Class("text-gray-600 dark:text-gray-300"),
+							core.Text(fmt.Sprintf("Are you sure you want to delete %s? This action cannot be undone.", displayName)),
+						),
+					},
+				}),
+				ui.ModalFooter(ui.ModalFooterProps{
+					Children: []core.Node{
+						ui.Button(ui.ButtonProps{
+							Variant:  ui.ButtonGhost,
+							Children: []core.Node{core.Text("Cancel")},
+							OnClick:  func() { showDeleteModal.Set(false) },
+						}),
+						ui.Button(ui.ButtonProps{
+							Variant:  ui.ButtonDestructive,
+							Children: []core.Node{core.Text("Delete")},
+							OnClick:  confirmDelete,
+						}),
+					},
+				}),
+			},
+		})
+
 		return core.Frag(
+			deleteModal,
 			ui.PageHeader(ui.PageHeaderProps{
 				Breadcrumbs: []ui.BreadcrumbItem{
 					{Label: "Admin", Href: "/admin"},
-					{Label: "{{.NamePlural}}", Href: "/admin/{{.RoutePlural}}"},
+					{Label: "{{.NamePluralDisplay}}", Href: "/admin/{{.RoutePlural}}"},
 					{Label: displayName},
 				},
 				Title:   displayName,
@@ -710,13 +755,30 @@ func {{.Name}}Detail(r *core.Router) func() core.Node {
 				Children: []core.Node{
 					ui.CardContent(ui.CardContentProps{
 						Children: []core.Node{
+							// Avatar and basic info header
+							core.Div(core.Class("flex items-center gap-4 mb-6 pb-6 border-b border-gray-200 dark:border-gray-700"),
+								// Avatar circle with initials
+								core.Div(core.Class("w-16 h-16 rounded-full bg-blue-600 flex items-center justify-center text-white text-xl font-bold"),
+									core.Text(initials),
+								),
+								core.Div(core.Attrs{},
+									core.H2(core.Class("text-xl font-semibold text-gray-900 dark:text-white"),
+										core.Text(displayName),
+									),
+									core.P(core.Class("text-gray-500 dark:text-gray-400"),
+										core.Text(fmt.Sprintf("{{.NameDisplay}} #%d", displayItem.ID)),
+									),
+								),
+							),
 {{range $sectionName, $fields := .SectionedFields}}
 							// {{$sectionName}}
 							core.Div(core.Class("mb-6"),
 								core.H3(core.Class("text-lg font-semibold text-gray-900 dark:text-white mb-4"),
 									core.Text("{{$sectionName}}"),
 								),
-{{range $fields}}{{.DetailField}}{{end}}							),
+								core.Div(core.Class("grid grid-cols-1 md:grid-cols-2 gap-4"),
+{{range $fields}}{{.DetailField}}{{end}}								),
+							),
 {{end}}
 							// Timestamps
 							core.Div(core.Class("mt-6 pt-4 border-t border-gray-200 dark:border-gray-700"),
@@ -773,11 +835,11 @@ func {{.Name}}Detail(r *core.Router) func() core.Node {
 
 func {{.NameLower}}DetailRow(label, value string) core.Node {
 {{- if .AdminEnabled}}
-	return core.Div(core.Class("flex py-2"),
-		core.Div(core.Class("w-1/3 text-gray-500 dark:text-gray-400"),
+	return core.Div(core.Class("py-2"),
+		core.Div(core.Class("text-sm text-gray-500 dark:text-gray-400"),
 			core.Text(label),
 		),
-		core.Div(core.Class("w-2/3 text-gray-900 dark:text-white"),
+		core.Div(core.Class("text-gray-900 dark:text-white font-medium"),
 			core.Text(value),
 		),
 	)
@@ -791,6 +853,34 @@ func {{.NameLower}}DetailRow(label, value string) core.Node {
 		),
 	)
 {{- end}}
+}
+
+// {{.NameLower}}GetInitials extracts initials from a name for avatar display
+func {{.NameLower}}GetInitials(name string) string {
+	if name == "" {
+		return "?"
+	}
+	words := strings.Fields(name)
+	if len(words) == 0 {
+		runes := []rune(name)
+		if len(runes) > 0 {
+			return strings.ToUpper(string(runes[0]))
+		}
+		return "?"
+	}
+	if len(words) == 1 {
+		runes := []rune(words[0])
+		if len(runes) > 0 {
+			return strings.ToUpper(string(runes[0]))
+		}
+		return "?"
+	}
+	first := []rune(words[0])
+	last := []rune(words[len(words)-1])
+	if len(first) > 0 && len(last) > 0 {
+		return strings.ToUpper(string(first[0]) + string(last[0]))
+	}
+	return "?"
 }
 `,
 
@@ -863,10 +953,10 @@ func {{.Name}}Edit(r *core.Router) func() core.Node {
 				ui.PageHeader(ui.PageHeaderProps{
 					Breadcrumbs: []ui.BreadcrumbItem{
 						{Label: "Admin", Href: "/admin"},
-						{Label: "{{.NamePlural}}", Href: "/admin/{{.RoutePlural}}"},
+						{Label: "{{.NamePluralDisplay}}", Href: "/admin/{{.RoutePlural}}"},
 						{Label: "Not Found"},
 					},
-					Title: "{{.Name}} Not Found",
+					Title: "{{.NameDisplay}} Not Found",
 				}),
 				ui.Alert(ui.AlertProps{
 					Variant: ui.AlertError,
@@ -914,7 +1004,7 @@ func {{.Name}}Edit(r *core.Router) func() core.Node {
 				if err != nil {
 					errorState.Set(err.Error())
 				} else {
-					successState.Set("{{.Name}} updated successfully!")
+					successState.Set("{{.NameDisplay}} updated successfully!")
 					r.Navigate(fmt.Sprintf("/admin/{{.RoutePlural}}/%d", displayItem.ID))
 				}
 			})
@@ -924,7 +1014,7 @@ func {{.Name}}Edit(r *core.Router) func() core.Node {
 			ui.PageHeader(ui.PageHeaderProps{
 				Breadcrumbs: []ui.BreadcrumbItem{
 					{Label: "Admin", Href: "/admin"},
-					{Label: "{{.NamePlural}}", Href: "/admin/{{.RoutePlural}}"},
+					{Label: "{{.NamePluralDisplay}}", Href: "/admin/{{.RoutePlural}}"},
 					{Label: displayName, Href: fmt.Sprintf("/admin/{{.RoutePlural}}/%d", displayItem.ID)},
 					{Label: "Edit"},
 				},
@@ -941,12 +1031,14 @@ func {{.Name}}Edit(r *core.Router) func() core.Node {
 								core.H3(core.Class("text-lg font-semibold text-gray-900 dark:text-white mb-4"),
 									core.Text("{{$sectionName}}"),
 								),
-{{range $fields}}{{.FormField}}{{end}}							),
+								core.Div(core.Class("grid grid-cols-1 md:grid-cols-2 gap-4"),
+{{range $fields}}{{.FormField}}{{end}}								),
+							),
 {{end}}
 							// Submit
 							ui.Button(ui.ButtonProps{
 								Variant:  ui.ButtonPrimary,
-								Class:    "w-full",
+								Class:    "w-full mt-4",
 								OnClick:  save,
 								Children: []core.Node{core.Text("Save Changes")},
 							}),
@@ -996,7 +1088,7 @@ func {{.Name}}Edit(r *core.Router) func() core.Node {
 				if err != nil {
 					errorState.Set(err.Error())
 				} else {
-					successState.Set("{{.Name}} updated successfully!")
+					successState.Set("{{.NameDisplay}} updated successfully!")
 					r.Navigate(fmt.Sprintf("/admin/{{.RoutePlural}}/%d", displayItem.ID))
 				}
 			})
@@ -1045,30 +1137,31 @@ func {{.Name}}Edit(r *core.Router) func() core.Node {
 
 // TemplateField represents a field for template rendering
 type TemplateField struct {
-	Name          string
-	Type          string
-	GoType        string
-	DTOType       string
-	DTOFieldName  string // Name of field in DTO (uses Preload name for relations)
-	RelationType  string // GORM relation model type (e.g., "User" for FK relation)
-	JSONName      string
-	Label         string
-	GormTag       string
-	StateVar      string
-	StateType     string
-	StateName     string
-	StateDefault  string
-	EditStateInit string // Initial state value for edit form (reads from displayItem)
-	DataValue     string
-	EmptyValue    string
-	FormField     string
-	DetailField   string
-	Preload       string
-	IsRelation    bool
-	IsBool        bool
-	IsTime        bool
-	IsSlice       bool
-	Badge         *BadgeConfig
+	Name           string
+	Type           string
+	GoType         string
+	DTOType        string
+	DTOFieldName   string // Name of field in DTO (uses Preload name for relations)
+	RelationType   string // GORM relation model type (e.g., "User" for FK relation)
+	JSONName       string
+	Label          string
+	GormTag        string
+	StateVar       string
+	StateType      string
+	StateName      string
+	StateDefault   string
+	EditStateInit  string // Initial state value for edit form (reads from displayItem)
+	DataValue      string
+	EmptyValue     string
+	FormField      string
+	DetailField    string
+	Preload        string
+	IsRelation     bool
+	IsBool         bool
+	IsTime         bool
+	IsSlice        bool
+	IsDisplayField bool // True if this is the display field (should be clickable link)
+	Badge          *BadgeConfig
 }
 
 // TemplateSection represents a section for template rendering
@@ -1087,23 +1180,26 @@ type TemplateRelation struct {
 
 // ModelTemplateData holds all data for model template rendering
 type ModelTemplateData struct {
-	Name            string
-	NameLower       string
-	NamePlural      string
-	NamePluralLower string
-	RoutePlural     string
-	ModulePath      string
-	Sections        []TemplateSection
-	TableFields     []TemplateField
-	AllFields       []TemplateField
-	RequiredFields  []TemplateField
-	Relations       []TemplateRelation
-	SectionedFields map[string][]TemplateField
-	HasTime         bool
-	HasJSON         bool
-	HasRelations    bool
-	DisplayField    string
-	AdminEnabled    bool // From config.Admin - use ui components instead of inline styles
+	Name              string
+	NameLower         string
+	NamePlural        string
+	NamePluralLower   string
+	NameDisplay       string // Human-readable: "Lead Source"
+	NamePluralDisplay string // Human-readable: "Lead Sources"
+	RoutePlural       string
+	ModulePath        string
+	Sections          []TemplateSection
+	TableFields       []TemplateField
+	AllFields         []TemplateField
+	RequiredFields    []TemplateField
+	Relations         []TemplateRelation
+	SectionedFields   map[string][]TemplateField
+	HasTime           bool
+	HasJSON           bool
+	HasRelations      bool
+	DisplayField      string
+	AdminEnabled      bool // From config.Admin - use ui components instead of inline styles
+	FieldCount        int  // Number of fields for layout decisions
 }
 
 // GenerateModelFilesImpl generates all files for a model definition
@@ -1204,14 +1300,16 @@ func detectDisplayField(model *ModelDefinition) string {
 
 func prepareModelTemplateData(model *ModelDefinition, modulePath string) *ModelTemplateData {
 	data := &ModelTemplateData{
-		Name:            model.Name,
-		NameLower:       strings.ToLower(model.Name),
-		NamePlural:      ToPlural(model.Name),
-		NamePluralLower: strings.ToLower(ToPlural(model.Name)),
-		RoutePlural:     ToKebabCase(ToPlural(model.Name)),
-		ModulePath:      modulePath,
-		SectionedFields: make(map[string][]TemplateField),
-		DisplayField:    detectDisplayField(model),
+		Name:              model.Name,
+		NameLower:         strings.ToLower(model.Name),
+		NamePlural:        ToPlural(model.Name),
+		NamePluralLower:   strings.ToLower(ToPlural(model.Name)),
+		NameDisplay:       toDisplayName(model.Name),
+		NamePluralDisplay: toDisplayName(ToPlural(model.Name)),
+		RoutePlural:       ToKebabCase(ToPlural(model.Name)),
+		ModulePath:        modulePath,
+		SectionedFields:   make(map[string][]TemplateField),
+		DisplayField:      detectDisplayField(model),
 	}
 
 	// Process sections and fields
@@ -1220,6 +1318,10 @@ func prepareModelTemplateData(model *ModelDefinition, modulePath string) *ModelT
 
 		for _, field := range fields {
 			tf := convertToTemplateField(&field, model.Name)
+			// Mark display field for clickable links in list tables
+			if tf.Name == data.DisplayField {
+				tf.IsDisplayField = true
+			}
 			sectionFields = append(sectionFields, tf)
 			data.AllFields = append(data.AllFields, tf)
 
@@ -1256,6 +1358,7 @@ func prepareModelTemplateData(model *ModelDefinition, modulePath string) *ModelT
 		data.SectionedFields[sectionName] = sectionFields
 	}
 
+	data.FieldCount = len(data.AllFields)
 	return data
 }
 
@@ -1643,8 +1746,53 @@ func findExistingDTOTypes(dtoDir string) map[string]bool {
 	return types
 }
 
+// toDisplayName converts CamelCase/PascalCase to human-readable format
+// "LeadSources" -> "Lead Sources", "UserID" -> "User ID"
+func toDisplayName(s string) string {
+	if s == "" {
+		return s
+	}
+	var result strings.Builder
+	for i, r := range s {
+		if i > 0 && r >= 'A' && r <= 'Z' {
+			result.WriteRune(' ')
+		}
+		result.WriteRune(r)
+	}
+	return result.String()
+}
+
+// getInitials extracts up to 2 initials from a name
+// "John Doe" -> "JD", "Alice" -> "A", "john smith" -> "JS"
+func getInitials(name string) string {
+	if name == "" {
+		return "?"
+	}
+	words := strings.Fields(name)
+	if len(words) == 0 {
+		return string([]rune(name)[0])
+	}
+	if len(words) == 1 {
+		runes := []rune(words[0])
+		if len(runes) > 0 {
+			return strings.ToUpper(string(runes[0]))
+		}
+		return "?"
+	}
+	first := []rune(words[0])
+	last := []rune(words[len(words)-1])
+	if len(first) > 0 && len(last) > 0 {
+		return strings.ToUpper(string(first[0]) + string(last[0]))
+	}
+	return "?"
+}
+
 func executeTemplate(tmplText, path string, data *ModelTemplateData) error {
-	tmpl, err := template.New("").Parse(tmplText)
+	funcMap := template.FuncMap{
+		"toDisplayName": toDisplayName,
+		"getInitials":   getInitials,
+	}
+	tmpl, err := template.New("").Funcs(funcMap).Parse(tmplText)
 	if err != nil {
 		return fmt.Errorf("parse template: %w", err)
 	}

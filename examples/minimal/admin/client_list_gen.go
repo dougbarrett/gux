@@ -37,13 +37,17 @@ func Clients(r *core.Router) func() core.Node {
 					{Label: "Admin", Href: "/admin"},
 					{Label: "Clients"},
 				},
-				Title: "Clients",
+				Title:    "Clients",
+				Subtitle: fmt.Sprintf("%d total", len(displayItems)),
 				Actions: []core.Node{
-					ui.Button(ui.ButtonProps{
-						Variant:  ui.ButtonPrimary,
-						Children: []core.Node{core.Text("+ Add Client")},
-						OnClick:  func() { r.Navigate("/admin/clients/new") },
-					}),
+					core.A(
+						core.Attrs{
+							Href:  "/admin/clients/new",
+							Class: "inline-flex items-center gap-2 text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium",
+						},
+						core.Span(core.Class("text-lg"), core.Text("+")),
+						core.Text("Add Client"),
+					),
 				},
 			}),
 			ui.Card(ui.CardProps{
@@ -127,7 +131,16 @@ func ClientActionsCell(id uint, r *core.Router) core.Node {
 
 
 func ClientCellFirstName(item dto.ClientList) core.Node {
-	return tableCellClient(item.FirstName)
+	// Display field is clickable - links to detail page
+	return core.Td(core.Class("px-6 py-4 whitespace-nowrap text-sm"),
+		core.A(
+			core.Attrs{
+				Href:  fmt.Sprintf("/admin/clients/%d", item.ID),
+				Class: "text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium",
+			},
+			core.Text(item.FirstName),
+		),
+	)
 }
 
 func ClientCellLastName(item dto.ClientList) core.Node {

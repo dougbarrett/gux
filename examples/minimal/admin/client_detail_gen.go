@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/dougbarrett/gux/core"
 	"github.com/dougbarrett/gux/ui"
@@ -40,8 +41,8 @@ func ClientDetail(r *core.Router) func() core.Node {
 
 		var displayItem dto.ClientDetail
 		json.Unmarshal([]byte(itemState.Get()), &displayItem)
-		// Delete confirmation state
-		confirmDelete := r.StateBool("confirm_delete", false)
+		// Delete confirmation modal state
+		showDeleteModal := r.StateBool("show_delete_modal", false)
 		errorState := r.StateString("error", "")
 
 		if displayItem.ID == 0 {
@@ -67,50 +68,33 @@ func ClientDetail(r *core.Router) func() core.Node {
 			displayName = fmt.Sprintf("Client #%d", displayItem.ID)
 		}
 
-		// Delete handler
-		handleDelete := func() {
-			if confirmDelete.Get() {
-				api.Clients.Delete(displayItem.ID, func(err error) {
-					if err != nil {
-						errorState.Set(err.Error())
-						confirmDelete.Set(false)
-					} else {
-						r.Navigate("/admin/clients")
-					}
-				})
-			} else {
-				confirmDelete.Set(true)
-			}
+		// Get initials for avatar
+		initials := clientGetInitials(displayName)
+
+		// Delete handler - called when confirming in modal
+		confirmDelete := func() {
+			api.Clients.Delete(displayItem.ID, func(err error) {
+				if err != nil {
+					errorState.Set(err.Error())
+					showDeleteModal.Set(false)
+				} else {
+					r.Navigate("/admin/clients")
+				}
+			})
 		}
 
-		// Build action buttons
-		var actions []core.Node
-		if confirmDelete.Get() {
-			actions = []core.Node{
-				ui.Button(ui.ButtonProps{
-					Variant:  ui.ButtonGhost,
-					Children: []core.Node{core.Text("Cancel")},
-					OnClick:  func() { confirmDelete.Set(false) },
-				}),
-				ui.Button(ui.ButtonProps{
-					Variant:  ui.ButtonDestructive,
-					Children: []core.Node{core.Text("Confirm Delete")},
-					OnClick:  handleDelete,
-				}),
-			}
-		} else {
-			actions = []core.Node{
-				ui.Button(ui.ButtonProps{
-					Variant:  ui.ButtonPrimary,
-					Children: []core.Node{core.Text("Edit")},
-					OnClick:  func() { r.Navigate(fmt.Sprintf("/admin/clients/%d/edit", displayItem.ID)) },
-				}),
-				ui.Button(ui.ButtonProps{
-					Variant:  ui.ButtonDestructive,
-					Children: []core.Node{core.Text("Delete")},
-					OnClick:  handleDelete,
-				}),
-			}
+		// Action buttons - always show Edit and Delete
+		actions := []core.Node{
+			ui.Button(ui.ButtonProps{
+				Variant:  ui.ButtonPrimary,
+				Children: []core.Node{core.Text("Edit")},
+				OnClick:  func() { r.Navigate(fmt.Sprintf("/admin/clients/%d/edit", displayItem.ID)) },
+			}),
+			ui.Button(ui.ButtonProps{
+				Variant:  ui.ButtonDestructive,
+				Children: []core.Node{core.Text("Delete")},
+				OnClick:  func() { showDeleteModal.Set(true) },
+			}),
 		}
 
 		var errorNode core.Node = core.Frag()
@@ -121,7 +105,39 @@ func ClientDetail(r *core.Router) func() core.Node {
 			})
 		}
 
+		// Delete confirmation modal
+		deleteModal := ui.Modal(ui.ModalProps{
+			Open:    showDeleteModal.Get(),
+			OnClose: func() { showDeleteModal.Set(false) },
+			Title:   "Delete Client?",
+			Size:    ui.ModalSM,
+			Children: []core.Node{
+				ui.ModalContent(ui.ModalContentProps{
+					Children: []core.Node{
+						core.P(core.Class("text-gray-600 dark:text-gray-300"),
+							core.Text(fmt.Sprintf("Are you sure you want to delete %s? This action cannot be undone.", displayName)),
+						),
+					},
+				}),
+				ui.ModalFooter(ui.ModalFooterProps{
+					Children: []core.Node{
+						ui.Button(ui.ButtonProps{
+							Variant:  ui.ButtonGhost,
+							Children: []core.Node{core.Text("Cancel")},
+							OnClick:  func() { showDeleteModal.Set(false) },
+						}),
+						ui.Button(ui.ButtonProps{
+							Variant:  ui.ButtonDestructive,
+							Children: []core.Node{core.Text("Delete")},
+							OnClick:  confirmDelete,
+						}),
+					},
+				}),
+			},
+		})
+
 		return core.Frag(
+			deleteModal,
 			ui.PageHeader(ui.PageHeaderProps{
 				Breadcrumbs: []ui.BreadcrumbItem{
 					{Label: "Admin", Href: "/admin"},
@@ -136,14 +152,31 @@ func ClientDetail(r *core.Router) func() core.Node {
 				Children: []core.Node{
 					ui.CardContent(ui.CardContentProps{
 						Children: []core.Node{
+							// Avatar and basic info header
+							core.Div(core.Class("flex items-center gap-4 mb-6 pb-6 border-b border-gray-200 dark:border-gray-700"),
+								// Avatar circle with initials
+								core.Div(core.Class("w-16 h-16 rounded-full bg-blue-600 flex items-center justify-center text-white text-xl font-bold"),
+									core.Text(initials),
+								),
+								core.Div(core.Attrs{},
+									core.H2(core.Class("text-xl font-semibold text-gray-900 dark:text-white"),
+										core.Text(displayName),
+									),
+									core.P(core.Class("text-gray-500 dark:text-gray-400"),
+										core.Text(fmt.Sprintf("Client #%d", displayItem.ID)),
+									),
+								),
+							),
 
 							// Business
 							core.Div(core.Class("mb-6"),
 								core.H3(core.Class("text-lg font-semibold text-gray-900 dark:text-white mb-4"),
 									core.Text("Business"),
 								),
+								core.Div(core.Class("grid grid-cols-1 md:grid-cols-2 gap-4"),
 						clientDetailRow("State", displayItem.State),
 						clientDetailRow("Description", displayItem.Description),
+								),
 							),
 
 							// Contact
@@ -151,10 +184,12 @@ func ClientDetail(r *core.Router) func() core.Node {
 								core.H3(core.Class("text-lg font-semibold text-gray-900 dark:text-white mb-4"),
 									core.Text("Contact"),
 								),
+								core.Div(core.Class("grid grid-cols-1 md:grid-cols-2 gap-4"),
 						clientDetailRow("First Name", displayItem.FirstName),
 						clientDetailRow("Last Name", displayItem.LastName),
 						clientDetailRow("Email", displayItem.Email),
 						clientDetailRow("Phone", displayItem.Phone),
+								),
 							),
 
 							// Lead Info
@@ -162,6 +197,7 @@ func ClientDetail(r *core.Router) func() core.Node {
 								core.H3(core.Class("text-lg font-semibold text-gray-900 dark:text-white mb-4"),
 									core.Text("Lead Info"),
 								),
+								core.Div(core.Class("grid grid-cols-1 md:grid-cols-2 gap-4"),
 						clientDetailRow("Salesperson", func() string {
 							if displayItem.Salesperson != nil {
 								return displayItem.Salesperson.Name
@@ -174,6 +210,7 @@ func ClientDetail(r *core.Router) func() core.Node {
 							}
 							return "No"
 						}()),
+								),
 							),
 
 							// Timestamps
@@ -190,12 +227,40 @@ func ClientDetail(r *core.Router) func() core.Node {
 }
 
 func clientDetailRow(label, value string) core.Node {
-	return core.Div(core.Class("flex py-2"),
-		core.Div(core.Class("w-1/3 text-gray-500 dark:text-gray-400"),
+	return core.Div(core.Class("py-2"),
+		core.Div(core.Class("text-sm text-gray-500 dark:text-gray-400"),
 			core.Text(label),
 		),
-		core.Div(core.Class("w-2/3 text-gray-900 dark:text-white"),
+		core.Div(core.Class("text-gray-900 dark:text-white font-medium"),
 			core.Text(value),
 		),
 	)
+}
+
+// clientGetInitials extracts initials from a name for avatar display
+func clientGetInitials(name string) string {
+	if name == "" {
+		return "?"
+	}
+	words := strings.Fields(name)
+	if len(words) == 0 {
+		runes := []rune(name)
+		if len(runes) > 0 {
+			return strings.ToUpper(string(runes[0]))
+		}
+		return "?"
+	}
+	if len(words) == 1 {
+		runes := []rune(words[0])
+		if len(runes) > 0 {
+			return strings.ToUpper(string(runes[0]))
+		}
+		return "?"
+	}
+	first := []rune(words[0])
+	last := []rune(words[len(words)-1])
+	if len(first) > 0 && len(last) > 0 {
+		return strings.ToUpper(string(first[0]) + string(last[0]))
+	}
+	return "?"
 }
