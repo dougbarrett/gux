@@ -392,8 +392,8 @@ import (
 {{- if .HasRelations}}
 	"encoding/json"
 	"fmt"
-{{- end}}
 	"strconv"
+{{- end}}
 
 	"github.com/dougbarrett/gux/core"
 {{- if .AdminEnabled}}
