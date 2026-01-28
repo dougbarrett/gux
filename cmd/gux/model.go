@@ -202,6 +202,12 @@ func ToSnakeCase(s string) string {
 	return strings.ToLower(result.String())
 }
 
+// ToKebabCase converts PascalCase to kebab-case (for URL routes)
+func ToKebabCase(s string) string {
+	snake := ToSnakeCase(s)
+	return strings.ReplaceAll(snake, "_", "-")
+}
+
 // ToPlural returns a simple English plural form
 func ToPlural(s string) string {
 	if s == "" {

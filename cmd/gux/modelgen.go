@@ -97,7 +97,7 @@ import (
 {{- end}}
 
 	"github.com/dougbarrett/gux/core"
-	"{{.ModulePath}}/.gux/api"
+	"{{.ModulePath}}/guxgen/api"
 	"{{.ModulePath}}/dto"
 )
 
@@ -263,7 +263,7 @@ import (
 	"strconv"
 
 	"github.com/dougbarrett/gux/core"
-	"{{.ModulePath}}/.gux/api"
+	"{{.ModulePath}}/guxgen/api"
 	"{{.ModulePath}}/dto"
 )
 
@@ -395,7 +395,7 @@ import (
 	"fmt"
 
 	"github.com/dougbarrett/gux/core"
-	"{{.ModulePath}}/.gux/api"
+	"{{.ModulePath}}/guxgen/api"
 	"{{.ModulePath}}/dto"
 )
 
@@ -554,40 +554,35 @@ func GenerateModelFilesImpl(model *ModelDefinition, optionSets map[string]Option
 		}
 	}
 
-	// Generate model file
-	modelPath := filepath.Join("models", ToSnakeCase(model.Name)+"_gen.go")
-	if err := executeTemplate(ModelGenTemplates.Model, modelPath, data); err != nil {
-		return fmt.Errorf("generate model: %w", err)
+	// Check if non-generated model file exists
+	manualModelPath := filepath.Join("models", ToSnakeCase(model.Name)+".go")
+	if _, err := os.Stat(manualModelPath); err == nil {
+		fmt.Printf("  Skipping model (manual file exists: %s)\n", manualModelPath)
+	} else {
+		// Generate model file
+		modelPath := filepath.Join("models", ToSnakeCase(model.Name)+"_gen.go")
+		if err := executeTemplate(ModelGenTemplates.Model, modelPath, data); err != nil {
+			return fmt.Errorf("generate model: %w", err)
+		}
+		fmt.Printf("  %s\n", modelPath)
 	}
-	fmt.Printf("  %s\n", modelPath)
 
-	// Generate DTO file
-	dtoPath := filepath.Join("dto", ToSnakeCase(model.Name)+"_gen.go")
-	if err := generateDTOFile(dtoPath, data); err != nil {
-		return fmt.Errorf("generate dto: %w", err)
+	// Check if non-generated DTO file exists
+	manualDTOPath := filepath.Join("dto", ToSnakeCase(model.Name)+".go")
+	if _, err := os.Stat(manualDTOPath); err == nil {
+		fmt.Printf("  Skipping DTO (manual file exists: %s)\n", manualDTOPath)
+	} else {
+		// Generate DTO file
+		dtoPath := filepath.Join("dto", ToSnakeCase(model.Name)+"_gen.go")
+		if err := generateDTOFile(dtoPath, data); err != nil {
+			return fmt.Errorf("generate dto: %w", err)
+		}
+		fmt.Printf("  %s\n", dtoPath)
 	}
-	fmt.Printf("  %s\n", dtoPath)
 
-	// Generate admin list page
-	listPath := filepath.Join("admin", ToSnakeCase(ToPlural(model.Name))+"_gen.go")
-	if err := executeTemplate(ModelGenTemplates.AdminList, listPath, data); err != nil {
-		return fmt.Errorf("generate admin list: %w", err)
-	}
-	fmt.Printf("  %s\n", listPath)
-
-	// Generate admin new page
-	newPath := filepath.Join("admin", ToSnakeCase(model.Name)+"_new_gen.go")
-	if err := executeTemplate(ModelGenTemplates.AdminNew, newPath, data); err != nil {
-		return fmt.Errorf("generate admin new: %w", err)
-	}
-	fmt.Printf("  %s\n", newPath)
-
-	// Generate admin detail page
-	detailPath := filepath.Join("admin", ToSnakeCase(model.Name)+"_detail_gen.go")
-	if err := executeTemplate(ModelGenTemplates.AdminDetail, detailPath, data); err != nil {
-		return fmt.Errorf("generate admin detail: %w", err)
-	}
-	fmt.Printf("  %s\n", detailPath)
+	// Skip admin page generation for now - templates need more work
+	// TODO: Fix admin templates to generate working code
+	fmt.Printf("  Skipping admin pages (templates under development)\n")
 
 	return nil
 }
@@ -598,7 +593,7 @@ func prepareModelTemplateData(model *ModelDefinition, modulePath string) *ModelT
 		NameLower:       strings.ToLower(model.Name),
 		NamePlural:      ToPlural(model.Name),
 		NamePluralLower: strings.ToLower(ToPlural(model.Name)),
-		RoutePlural:     ToSnakeCase(ToPlural(model.Name)),
+		RoutePlural:     ToKebabCase(ToPlural(model.Name)),
 		ModulePath:      modulePath,
 		SectionedFields: make(map[string][]TemplateField),
 		DisplayField:    "Name", // Default display field
