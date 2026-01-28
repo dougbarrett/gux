@@ -1191,6 +1191,7 @@ func main() {
 
 	router = core.NewRouter(render)
 	router.SetNavigate(navigate)
+	core.SetDebugRouter(router) // Enable state debugging
 
 	// Hydrate state from SSR
 	stateEl := document.Call("getElementById", "__gux_state")
@@ -1527,6 +1528,7 @@ func main() {
 
 	router = core.NewRouter(render)
 	router.SetNavigate(navigate)
+	core.SetDebugRouter(router) // Enable state debugging
 
 	// Hydrate state from SSR
 	stateEl := document.Call("getElementById", "__gux_state")

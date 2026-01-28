@@ -13,6 +13,28 @@ var (
 	inChangeEvent     = false // When true, ScheduleRerender is suppressed
 )
 
+// debugRouter holds reference to the current router for debugging
+var debugRouter *Router
+
+// SetDebugRouter sets the router for debugging (called from generated WASM code)
+func SetDebugRouter(r *Router) {
+	debugRouter = r
+	// Expose debug function to JavaScript console
+	js.Global().Set("__guxDebugState", js.FuncOf(func(this js.Value, args []js.Value) any {
+		if debugRouter == nil {
+			js.Global().Get("console").Call("log", "[Gux Debug] No router set")
+			return nil
+		}
+		js.Global().Get("console").Call("log", "[Gux Debug] Router:", fmt.Sprintf("%p", debugRouter))
+		js.Global().Get("console").Call("log", "[Gux Debug] State keys:")
+		for k, v := range debugRouter.state {
+			js.Global().Get("console").Call("log", "  ", k, "=", fmt.Sprintf("%v", v))
+		}
+		return nil
+	}))
+	js.Global().Get("console").Call("log", "[Gux] Debug enabled - call __guxDebugState() to inspect state")
+}
+
 func init() {
 	// Enable state debug logging in WASM mode
 	StateDebugLog = func(action, key string, value any, router *Router) {

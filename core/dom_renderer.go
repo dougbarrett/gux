@@ -145,7 +145,9 @@ func (r *DOMRenderer) RenderElement(tag string, attrs Attrs, children []Node) Re
 			// The re-render will happen after the click handler's side effects
 			// (like navigation or showing success messages).
 			SetInChangeEvent(true)
+			js.Global().Get("console").Call("log", "[Gux OnChange] BEFORE callback")
 			attrs.OnChange(value)
+			js.Global().Get("console").Call("log", "[Gux OnChange] AFTER callback")
 			SetInChangeEvent(false)
 			js.Global().Get("console").Call("log", "[Gux OnChange] callback completed for:", value)
 			return nil

@@ -997,8 +997,10 @@ type State[T any] struct {
 
 // Get returns the current state value.
 func (s *State[T]) Get() T {
-	// Debug: log state access (direct call, no callback dependency)
-	debugStateLog("GET", s.key, s.router.state[s.key], s.router)
+	// Debug: log state access (uses callback if set in WASM mode)
+	if StateDebugLog != nil {
+		StateDebugLog("GET", s.key, s.router.state[s.key], s.router)
+	}
 	if val, ok := s.router.state[s.key]; ok {
 		// Handle JSON unmarshaling: numbers come as float64
 		if result, ok := val.(T); ok {
@@ -1036,8 +1038,10 @@ func (s *State[T]) Get() T {
 // to avoid losing focus on every keystroke. This is similar to how React and Vue
 // automatically batch state updates during input events.
 func (s *State[T]) Set(val T) {
-	// Debug: log state change (direct call, no callback dependency)
-	debugStateLog("SET", s.key, val, s.router)
+	// Debug: log state change (uses callback if set in WASM mode)
+	if StateDebugLog != nil {
+		StateDebugLog("SET", s.key, val, s.router)
+	}
 	s.router.state[s.key] = val
 	if !s.router.suppressRender {
 		ScheduleRerender(s.router)
@@ -1057,7 +1061,9 @@ func (s *State[T]) SetQuiet(val T) {
 func UseState[T any](r *Router, key string, initial T) *State[T] {
 	if _, ok := r.state[key]; !ok {
 		r.state[key] = initial
-		debugStateLog("INIT", key, initial, r)
+		if StateDebugLog != nil {
+			StateDebugLog("INIT", key, initial, r)
+		}
 	}
 	return &State[T]{key: key, router: r}
 }
