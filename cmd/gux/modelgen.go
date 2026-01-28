@@ -1353,6 +1353,24 @@ func parseTimePtr(s string) *time.Time {
 	t, _ := time.Parse("2006-01-02", s)
 	return &t
 }
+
+// parseFloat converts a string to float64, returning 0 for empty strings
+func parseFloat(s string) float64 {
+	if s == "" {
+		return 0
+	}
+	v, _ := strconv.ParseFloat(s, 64)
+	return v
+}
+
+// parseFloatPtr converts a string to *float64, returning nil for empty strings
+func parseFloatPtr(s string) *float64 {
+	if s == "" {
+		return nil
+	}
+	v, _ := strconv.ParseFloat(s, 64)
+	return &v
+}
 `,
 }
 
@@ -1685,6 +1703,18 @@ func convertToTemplateField(field *ModelField, modelName string) TemplateField {
 		tf.EmptyValue = "false"
 		tf.DataValue = tf.StateVar + ".Get()"
 		tf.EditStateInit = fmt.Sprintf("displayItem.%s", tf.DTOFieldName)
+	case "float64":
+		tf.StateType = "String"
+		tf.StateDefault = `""`
+		tf.EmptyValue = `""`
+		tf.DataValue = fmt.Sprintf("parseFloat(%s.Get())", tf.StateVar)
+		tf.EditStateInit = fmt.Sprintf("fmt.Sprintf(\"%%v\", displayItem.%s)", tf.DTOFieldName)
+	case "*float64":
+		tf.StateType = "String"
+		tf.StateDefault = `""`
+		tf.EmptyValue = `""`
+		tf.DataValue = fmt.Sprintf("parseFloatPtr(%s.Get())", tf.StateVar)
+		tf.EditStateInit = fmt.Sprintf("func() string { if displayItem.%s != nil { return fmt.Sprintf(\"%%v\", *displayItem.%s) }; return \"\" }()", tf.DTOFieldName, tf.DTOFieldName)
 	case "time.Time":
 		tf.StateType = "String"
 		tf.StateDefault = `""`
