@@ -1832,18 +1832,30 @@ func generateNestedDTOMapping(info *DTOInfo, resultVar, itemVar string, forList 
 		// Parse nested DTO type to get field mappings (e.g., UserBrief -> ID, Name)
 		nestedInfo, err := parseDTOFile("dto", f.DTOType)
 		if err != nil {
-			// Fall back to simple assignment if we can't parse nested DTO
+			// Can't parse nested DTO - generate simple direct mapping
+			// This handles cases where the nested DTO isn't in the dto/ directory
+			if forList {
+				sb.WriteString(fmt.Sprintf("\t\tif %s.%sID != 0 {\n", itemVar, f.ModelField))
+				sb.WriteString(fmt.Sprintf("\t\t\t%s.%s = dto.%s{ID: %s.%s.ID}\n", resultVar, f.DTOField, f.DTOType, itemVar, f.ModelField))
+				sb.WriteString("\t\t}\n")
+			} else {
+				sb.WriteString(fmt.Sprintf("\tif %s.%sID != 0 {\n", itemVar, f.ModelField))
+				sb.WriteString(fmt.Sprintf("\t\t%s.%s = dto.%s{ID: %s.%s.ID}\n", resultVar, f.DTOField, f.DTOType, itemVar, f.ModelField))
+				sb.WriteString("\t}\n")
+			}
 			continue
 		}
 
-		// Generate null check and nested mapping
+		// Generate check for loaded relationship (works for both pointer and non-pointer)
+		// For non-pointer structs, check if the foreign key ID is non-zero
+		// For pointer structs, the ID check still works (0 means not loaded)
 		if forList {
 			// For list: result[i].Author = dto.UserBrief{...}
-			sb.WriteString(fmt.Sprintf("\t\tif %s.%s != nil {\n", itemVar, f.ModelField))
+			sb.WriteString(fmt.Sprintf("\t\tif %s.%sID != 0 {\n", itemVar, f.ModelField))
 			sb.WriteString(fmt.Sprintf("\t\t\t%s.%s = dto.%s{\n", resultVar, f.DTOField, f.DTOType))
 		} else {
 			// For single: result.Author = dto.UserBrief{...}
-			sb.WriteString(fmt.Sprintf("\tif %s.%s != nil {\n", itemVar, f.ModelField))
+			sb.WriteString(fmt.Sprintf("\tif %s.%sID != 0 {\n", itemVar, f.ModelField))
 			sb.WriteString(fmt.Sprintf("\t\t%s.%s = dto.%s{\n", resultVar, f.DTOField, f.DTOType))
 		}
 
