@@ -40,18 +40,50 @@ func generateGuxFiles() error {
 	// Regenerate models from gux.config.json if it exists
 	if config, err := LoadModelsConfig("."); err == nil && len(config.Models) > 0 {
 		fmt.Printf("Regenerating %d model(s) from config...\n", len(config.Models))
+
+		// Build display fields map for all models
+		displayFields := BuildDisplayFieldsMap(".")
+
+		// Collect Brief DTOs needed across all models
+		briefDTOs := make(map[string]BriefDTOInfo)
+
 		for name, model := range config.Models {
 			// Apply roles to auth preset models
 			if model.Preset == "auth" && len(config.Roles) > 0 {
 				applyRolesToAuthModel(&model, config.Roles)
 			}
 			model.Name = name
+
+			// Collect relations for Brief DTO generation
+			for _, fields := range model.Sections {
+				for _, field := range fields {
+					if field.Relation != "" {
+						if _, exists := briefDTOs[field.Relation]; !exists {
+							briefDTOs[field.Relation] = BriefDTOInfo{
+								Model:        field.Relation,
+								DisplayField: displayFields[field.Relation],
+							}
+						}
+					}
+				}
+			}
+
 			if err := GenerateModelFiles(&model, config.OptionSets); err != nil {
 				fmt.Printf("  %s: error - %v\n", name, err)
 			} else {
 				fmt.Printf("  %s: done\n", name)
 			}
 		}
+
+		// Generate shared Brief DTOs file
+		if len(briefDTOs) > 0 {
+			if err := GenerateSharedBriefsFile(briefDTOs); err != nil {
+				fmt.Printf("  briefs_gen.go: error - %v\n", err)
+			} else {
+				fmt.Printf("  dto/briefs_gen.go: done\n")
+			}
+		}
+
 		fmt.Println()
 	}
 
