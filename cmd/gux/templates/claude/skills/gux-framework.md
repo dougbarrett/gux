@@ -541,50 +541,33 @@ ui.Button(ui.ButtonProps{
     Children: []core.Node{core.Text("Click me")},
 })
 
-// Input with state binding (recommended)
-ui.Input(ui.InputProps{
-    Type:        ui.InputEmail,
-    Name:        "email",
-    Bind:        r.StateString("email", ""),  // Direct state binding
-    Placeholder: "Enter your email",
-    Required:    true,
-})
-
-// Input with manual Value/OnChange (legacy)
+// Input types
 ui.Input(ui.InputProps{
     Type:        ui.InputText,      // Text, Email, Password, Number, Search, Tel, URL
     Size:        ui.InputMD,        // SM, MD, LG
-    ID:          "username",
-    Name:        "username",
-    Value:       username.Get(),
-    Placeholder: "Enter username",
+    ID:          "email",
+    Name:        "email",
+    Value:       email.Get(),
+    Placeholder: "Enter your email",
     Disabled:    false,
     Required:    true,
     Error:       "",                // Shows error styling when non-empty
-    OnChange:    func(v string) { username.SetQuiet(v) },
+    OnChange:    func(v string) { email.SetQuiet(v) },
     OnEnter:     func() { /* submit form */ },
 })
 
-// Select dropdown with state binding (recommended)
+// Select dropdown
 ui.Select(ui.SelectProps{
     ID:          "role",
     Name:        "role",
-    Bind:        r.StateString("role", ""),  // Direct state binding
+    Value:       role.Get(),
     Placeholder: "Select a role",
     Options: []ui.SelectOption{
         {Value: "user", Label: "User"},
         {Value: "admin", Label: "Admin"},
         {Value: "mod", Label: "Moderator", Disabled: true},
     },
-})
-
-// Select with manual Value/OnChange (legacy)
-ui.Select(ui.SelectProps{
-    Name:        "country",
-    Value:       country.Get(),
-    Placeholder: "Select a country",
-    Options:     countryOptions,
-    OnChange:    func(v string) { country.Set(v) },
+    OnChange: func(v string) { role.Set(v) },
 })
 
 // Checkbox
@@ -689,6 +672,10 @@ go install github.com/dougbarrett/gux/cmd/gux@latest
 | `gux gen [--watch]` | Generate API client/server code and WASM entry points |
 | `gux build [--go]` | Build WASM and server binary with embedded assets |
 | `gux dev [--go] [--watch]` | Build and run dev server (with optional hot reload) |
+| `gux model add` | Interactive model builder |
+| `gux model add --from-config` | Generate all models from gux.config.json |
+| `gux model regen <Name>` | Regenerate files for a model |
+| `gux model list` | List models defined in config |
 | `gux clean` | Remove generated files (.gux/, guxgen/, assets_gen.go) |
 | `gux claude` | Install Claude Code skill and CLAUDE.md |
 | `gux update [--check]` | Update gux to latest version |
@@ -723,6 +710,97 @@ Project settings are saved during init and can be reused:
   "claude": true,      // Claude Code integration
   "port": "8080"
 }
+```
+
+### Model Scaffolding
+
+Generate complete CRUD scaffolding for models:
+
+```bash
+# Interactive model builder
+gux model add
+
+# Generate from config
+gux model add --from-config
+
+# Regenerate after changes
+gux model regen Client
+```
+
+**Config-based models** in `gux.config.json`:
+
+```json
+{
+  "models": {
+    "Client": {
+      "formLayout": "grid",
+      "sections": {
+        "Contact": [
+          { "name": "FirstName", "type": "string", "required": true, "table": true, "priority": 1 },
+          { "name": "Email", "type": "string", "input": "email", "table": true }
+        ],
+        "Lead Info": [
+          { "name": "SalespersonID", "type": "*uint", "relation": "User", "label": "Salesperson", "table": true },
+          { "name": "ClosedLead", "type": "bool", "table": true, "badge": { "true": "success", "false": "secondary", "trueLabel": "Closed", "falseLabel": "Open" } }
+        ],
+        "Business": [
+          { "name": "State", "type": "string", "input": "select", "options": [{"value": "CA", "label": "California"}] },
+          { "name": "Description", "type": "string", "input": "textarea", "fullWidth": true }
+        ]
+      },
+      "preloads": ["Salesperson"],
+      "public": false,
+      "roles": ["admin"]
+    }
+  }
+}
+```
+
+**Model configuration options**:
+
+| Property | Description |
+|----------|-------------|
+| `formLayout` | Form field layout: `"stacked"` (default, vertical) or `"grid"` (two-column responsive) |
+| `preloads` | Relations to preload for detail view |
+| `public` | CRUD is public (no auth required) |
+| `roles` | Required roles for CRUD access |
+
+**Field configuration options**:
+
+| Property | Description |
+|----------|-------------|
+| `name` | Field name (PascalCase) |
+| `type` | Go type: `string`, `int`, `uint`, `bool`, `*uint` (FK), `time.Time`, `[]string` |
+| `required` | Not null constraint |
+| `input` | Input type: `text`, `email`, `tel`, `textarea`, `select`, `multiselect` |
+| `relation` | Related model for FK fields |
+| `label` | Display label |
+| `table` | Show in list view |
+| `priority` | Column priority (1=high, shown first) |
+| `sortable` | Column is sortable |
+| `filterable` | Can filter by field |
+| `fullWidth` | Span full width in grid layout (useful for textareas) |
+| `options` | Static select options: `[{value, label}]` |
+| `optionsRef` | Reference to optionSets |
+| `badge` | Badge display for booleans: `{true, false, trueLabel, falseLabel}` |
+| `many2many` | Join table name for M2M relations |
+
+**Generated admin page features** (when `admin: true` in config):
+
+- Human-readable labels ("LeadSource" → "Lead Source")
+- List pages with record count subtitle and link-style add button
+- Clickable display field (Name/Title) linking to detail page
+- Detail pages with avatar initials and delete confirmation modal
+- Form pages respect `formLayout` setting for field arrangement
+
+**Generated files** for model `Client`:
+
+```
+models/client_gen.go          # GORM model
+dto/client_gen.go             # List and Detail DTOs
+admin/clients_gen.go          # List page
+admin/client_new_gen.go       # Create form
+admin/client_detail_gen.go    # Detail view
 ```
 
 ```bash

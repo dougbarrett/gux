@@ -733,6 +733,7 @@ gux model regen Client
 {
   "models": {
     "Client": {
+      "formLayout": "grid",
       "sections": {
         "Contact": [
           { "name": "FirstName", "type": "string", "required": true, "table": true, "priority": 1 },
@@ -744,14 +745,25 @@ gux model regen Client
         ],
         "Business": [
           { "name": "State", "type": "string", "input": "select", "options": [{"value": "CA", "label": "California"}] },
-          { "name": "Description", "type": "string", "input": "textarea" }
+          { "name": "Description", "type": "string", "input": "textarea", "fullWidth": true }
         ]
       },
-      "preloads": ["Salesperson"]
+      "preloads": ["Salesperson"],
+      "public": false,
+      "roles": ["admin"]
     }
   }
 }
 ```
+
+**Model configuration options**:
+
+| Property | Description |
+|----------|-------------|
+| `formLayout` | Form field layout: `"stacked"` (default, vertical) or `"grid"` (two-column responsive) |
+| `preloads` | Relations to preload for detail view |
+| `public` | CRUD is public (no auth required) |
+| `roles` | Required roles for CRUD access |
 
 **Field configuration options**:
 
@@ -767,10 +779,19 @@ gux model regen Client
 | `priority` | Column priority (1=high, shown first) |
 | `sortable` | Column is sortable |
 | `filterable` | Can filter by field |
+| `fullWidth` | Span full width in grid layout (useful for textareas) |
 | `options` | Static select options: `[{value, label}]` |
 | `optionsRef` | Reference to optionSets |
 | `badge` | Badge display for booleans: `{true, false, trueLabel, falseLabel}` |
 | `many2many` | Join table name for M2M relations |
+
+**Generated admin page features** (when `admin: true` in config):
+
+- Human-readable labels ("LeadSource" → "Lead Source")
+- List pages with record count subtitle and link-style add button
+- Clickable display field (Name/Title) linking to detail page
+- Detail pages with avatar initials and delete confirmation modal
+- Form pages respect `formLayout` setting for field arrangement
 
 **Generated files** for model `Client`:
 
