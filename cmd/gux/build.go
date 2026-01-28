@@ -1099,6 +1099,10 @@ func fetchLoader(path string, callback func(map[string]any)) {
 }
 
 func main() {
+	// Debug: verify JS interop is working
+	js.Global().Set("__guxWasmLoaded", true)
+	js.Global().Get("console").Call("log", "[Gux WASM] main() started")
+
 	document := js.Global().Get("document")
 	window := js.Global()
 	container := document.Call("getElementById", "app")
@@ -1191,7 +1195,9 @@ func main() {
 
 	router = core.NewRouter(render)
 	router.SetNavigate(navigate)
+	js.Global().Get("console").Call("log", "[Gux WASM] Calling SetDebugRouter")
 	core.SetDebugRouter(router) // Enable state debugging
+	js.Global().Get("console").Call("log", "[Gux WASM] SetDebugRouter completed")
 
 	// Hydrate state from SSR
 	stateEl := document.Call("getElementById", "__gux_state")
@@ -1429,6 +1435,10 @@ func fetchLoader(path string, callback func(map[string]any)) {
 }
 
 func main() {
+	// Debug: verify JS interop is working
+	js.Global().Set("__guxWasmLoaded", true)
+	js.Global().Get("console").Call("log", "[Gux WASM] main() started")
+
 	document := js.Global().Get("document")
 	window := js.Global()
 	container := document.Call("getElementById", "app")
@@ -1528,7 +1538,9 @@ func main() {
 
 	router = core.NewRouter(render)
 	router.SetNavigate(navigate)
+	js.Global().Get("console").Call("log", "[Gux WASM] Calling SetDebugRouter")
 	core.SetDebugRouter(router) // Enable state debugging
+	js.Global().Get("console").Call("log", "[Gux WASM] SetDebugRouter completed")
 
 	// Hydrate state from SSR
 	stateEl := document.Call("getElementById", "__gux_state")
