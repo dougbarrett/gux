@@ -640,14 +640,14 @@ func {{.NameLower}}FormField(label, inputType, name, value string, onChange func
 		Type:     inputType,
 		Name:     name,
 		Value:    value,
-		Class:    "w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500",
+		Class:    "w-full px-4 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:border-blue-500",
 		OnChange: onChange,
 	}
 	if len(onEnter) > 0 {
 		attrs.OnEnter = onEnter[0]
 	}
 	return core.Div(core.Class("mb-4"),
-		core.Label(core.Class("block text-gray-300 text-sm font-medium mb-2"),
+		core.Label(core.Class("block text-gray-700 dark:text-gray-300 text-sm font-medium mb-2"),
 			core.Text(label),
 		),
 		core.Input(attrs),
@@ -1838,13 +1838,13 @@ func generateFormFieldCode(field *ModelField, tf TemplateField, modelNameLower s
 	switch {
 	case field.Input == "textarea":
 		buf.WriteString(fmt.Sprintf(`%score.Div(core.Class("%s"),
-%s	core.Label(core.Class("block text-gray-300 text-sm font-medium mb-2"),
+%s	core.Label(core.Class("block text-gray-700 dark:text-gray-300 text-sm font-medium mb-2"),
 %s		core.Text("%s"),
 %s	),
 %s	core.Textarea(core.Attrs{
 %s		Name:     "%s",
 %s		Value:    %s.Get(),
-%s		Class:    "w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500",
+%s		Class:    "w-full px-4 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:border-blue-500",
 %s		OnChange: func(v string) { %s.Set(v) },
 %s	}),
 %s),
@@ -1853,13 +1853,13 @@ func generateFormFieldCode(field *ModelField, tf TemplateField, modelNameLower s
 	case field.Input == "select" || (field.Type == "*uint" && field.Relation != ""):
 		// Select dropdown
 		buf.WriteString(fmt.Sprintf(`%score.Div(core.Class("%s"),
-%s	core.Label(core.Class("block text-gray-300 text-sm font-medium mb-2"),
+%s	core.Label(core.Class("block text-gray-700 dark:text-gray-300 text-sm font-medium mb-2"),
 %s		core.Text("%s"),
 %s	),
 %s	core.Select(
 %s		core.Attrs{
 %s			Name:  "%s",
-%s			Class: "w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500",
+%s			Class: "w-full px-4 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:border-blue-500",
 %s			OnChange: func(v string) { %s.Set(v) },
 %s		},
 `, indent, wrapperClass, indent, indent, tf.Label, indent, indent, indent, indent, tf.StateName, indent, indent, tf.StateVar, indent))
@@ -1902,7 +1902,7 @@ func generateFormFieldCode(field *ModelField, tf TemplateField, modelNameLower s
 %s		attrs := core.Attrs{
 %s			Type:    "checkbox",
 %s			Name:    "%s",
-%s			Class:   "h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-600 rounded bg-gray-700",
+%s			Class:   "h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700",
 %s			OnChange: func(v string) { %s.Set(v == "true") },
 %s		}
 %s		if %s.Get() {
@@ -1910,7 +1910,7 @@ func generateFormFieldCode(field *ModelField, tf TemplateField, modelNameLower s
 %s		}
 %s		return attrs
 %s	}()),
-%s	core.Label(core.Class("ml-2 block text-gray-300 text-sm"),
+%s	core.Label(core.Class("ml-2 block text-gray-700 dark:text-gray-300 text-sm"),
 %s		core.Text("%s"),
 %s	),
 %s),
