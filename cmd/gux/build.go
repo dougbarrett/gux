@@ -135,6 +135,8 @@ type APIEndpointInfo struct {
 
 // isPrimitiveType checks if a type string represents a primitive Go type
 func isPrimitiveType(t string) bool {
+	// Strip pointer prefix for checking
+	t = strings.TrimPrefix(t, "*")
 	primitives := map[string]bool{
 		"string": true, "int": true, "int8": true, "int16": true, "int32": true, "int64": true,
 		"uint": true, "uint8": true, "uint16": true, "uint32": true, "uint64": true,
@@ -1829,18 +1831,32 @@ func generateNestedDTOMapping(info *DTOInfo, resultVar, itemVar string, forList 
 			continue
 		}
 
+		// Handle pointer types - strip * prefix for parsing, track for assignment
+		dtoTypeName := strings.TrimPrefix(f.DTOType, "*")
+		isPointer := strings.HasPrefix(f.DTOType, "*")
+
+		// Build the foreign key field name - don't duplicate ID if already ends with ID
+		fkField := f.ModelField
+		if !strings.HasSuffix(fkField, "ID") {
+			fkField = f.ModelField + "ID"
+		}
+
 		// Parse nested DTO type to get field mappings (e.g., UserBrief -> ID, Name)
-		nestedInfo, err := parseDTOFile("dto", f.DTOType)
+		nestedInfo, err := parseDTOFile("dto", dtoTypeName)
 		if err != nil {
 			// Can't parse nested DTO - generate simple direct mapping
 			// This handles cases where the nested DTO isn't in the dto/ directory
+			dtoAssign := fmt.Sprintf("dto.%s{ID: %s.%s.ID}", dtoTypeName, itemVar, f.ModelField)
+			if isPointer {
+				dtoAssign = fmt.Sprintf("&dto.%s{ID: %s.%s.ID}", dtoTypeName, itemVar, f.ModelField)
+			}
 			if forList {
-				sb.WriteString(fmt.Sprintf("\t\tif %s.%sID != 0 {\n", itemVar, f.ModelField))
-				sb.WriteString(fmt.Sprintf("\t\t\t%s.%s = dto.%s{ID: %s.%s.ID}\n", resultVar, f.DTOField, f.DTOType, itemVar, f.ModelField))
+				sb.WriteString(fmt.Sprintf("\t\tif %s.%s != 0 {\n", itemVar, fkField))
+				sb.WriteString(fmt.Sprintf("\t\t\t%s.%s = %s\n", resultVar, f.DTOField, dtoAssign))
 				sb.WriteString("\t\t}\n")
 			} else {
-				sb.WriteString(fmt.Sprintf("\tif %s.%sID != 0 {\n", itemVar, f.ModelField))
-				sb.WriteString(fmt.Sprintf("\t\t%s.%s = dto.%s{ID: %s.%s.ID}\n", resultVar, f.DTOField, f.DTOType, itemVar, f.ModelField))
+				sb.WriteString(fmt.Sprintf("\tif %s.%s != 0 {\n", itemVar, fkField))
+				sb.WriteString(fmt.Sprintf("\t\t%s.%s = %s\n", resultVar, f.DTOField, dtoAssign))
 				sb.WriteString("\t}\n")
 			}
 			continue
@@ -1849,14 +1865,18 @@ func generateNestedDTOMapping(info *DTOInfo, resultVar, itemVar string, forList 
 		// Generate check for loaded relationship (works for both pointer and non-pointer)
 		// For non-pointer structs, check if the foreign key ID is non-zero
 		// For pointer structs, the ID check still works (0 means not loaded)
+		dtoPrefix := "dto."
+		if isPointer {
+			dtoPrefix = "&dto."
+		}
 		if forList {
 			// For list: result[i].Author = dto.UserBrief{...}
-			sb.WriteString(fmt.Sprintf("\t\tif %s.%sID != 0 {\n", itemVar, f.ModelField))
-			sb.WriteString(fmt.Sprintf("\t\t\t%s.%s = dto.%s{\n", resultVar, f.DTOField, f.DTOType))
+			sb.WriteString(fmt.Sprintf("\t\tif %s.%s != 0 {\n", itemVar, fkField))
+			sb.WriteString(fmt.Sprintf("\t\t\t%s.%s = %s%s{\n", resultVar, f.DTOField, dtoPrefix, dtoTypeName))
 		} else {
 			// For single: result.Author = dto.UserBrief{...}
-			sb.WriteString(fmt.Sprintf("\tif %s.%sID != 0 {\n", itemVar, f.ModelField))
-			sb.WriteString(fmt.Sprintf("\t\t%s.%s = dto.%s{\n", resultVar, f.DTOField, f.DTOType))
+			sb.WriteString(fmt.Sprintf("\tif %s.%s != 0 {\n", itemVar, fkField))
+			sb.WriteString(fmt.Sprintf("\t\t%s.%s = %s%s{\n", resultVar, f.DTOField, dtoPrefix, dtoTypeName))
 		}
 
 		// Add nested field mappings
