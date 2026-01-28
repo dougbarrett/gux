@@ -12,24 +12,49 @@ type SelectOption struct {
 	Disabled bool   // Disabled state for this option
 }
 
+// StringState allows form components to directly bind to state.
+// Implemented by *core.State[string] from r.StateString().
+type StringState interface {
+	Get() string
+	Set(string)
+}
+
 // SelectProps configures the Select component.
 type SelectProps struct {
 	Size        InputSize      // Size variant (default: md)
 	ID          string         // Element ID for label association
 	Name        string         // Select name attribute
-	Value       string         // Currently selected value
+	Value       string         // Currently selected value (use Bind instead for cleaner code)
 	Options     []SelectOption // Available options
 	Placeholder string         // Placeholder option text (e.g., "Select...")
 	Class       string         // Additional classes
 	Disabled    bool           // Disabled state
 	Required    bool           // Required indicator
 	Error       string         // Error message (adds aria-invalid when non-empty)
-	OnChange    func(string)   // Selection change handler (WASM only)
+	OnChange    func(string)   // Selection change handler (use Bind instead for cleaner code)
+
+	// Bind directly binds this select to a state value.
+	// When set, Value and OnChange are automatically handled.
+	// Usage: Bind: r.StateString("country", "")
+	Bind StringState
 }
 
 // Select creates a styled dropdown select component.
 //
-// Example:
+// Example with state binding (recommended):
+//
+//	Select(SelectProps{
+//	    Name:        "country",
+//	    Bind:        r.StateString("country", ""),
+//	    Placeholder: "Select a country",
+//	    Options: []SelectOption{
+//	        {Value: "us", Label: "United States"},
+//	        {Value: "uk", Label: "United Kingdom"},
+//	        {Value: "ca", Label: "Canada"},
+//	    },
+//	})
+//
+// Example with manual value/onChange (legacy):
 //
 //	Select(SelectProps{
 //	    Name:        "country",
@@ -43,6 +68,14 @@ type SelectProps struct {
 //	    OnChange: func(v string) { countryState.Set(v) },
 //	})
 func Select(props SelectProps) core.Node {
+	// Handle state binding - auto-wire Value and OnChange
+	value := props.Value
+	onChange := props.OnChange
+	if props.Bind != nil {
+		value = props.Bind.Get()
+		onChange = props.Bind.Set
+	}
+
 	// Apply defaults
 	size := props.Size
 	if size == "" {
@@ -65,7 +98,7 @@ func Select(props SelectProps) core.Node {
 		ID:       props.ID,
 		Name:     props.Name,
 		Class:    class,
-		OnChange: props.OnChange,
+		OnChange: onChange,
 	}
 
 	// Build extra attributes
@@ -96,7 +129,7 @@ func Select(props SelectProps) core.Node {
 			"disabled": "disabled",
 		}
 		// Select placeholder if no value is set
-		if props.Value == "" {
+		if value == "" {
 			placeholderExtra["selected"] = "selected"
 		}
 		placeholderAttrs.Extra = placeholderExtra
@@ -111,7 +144,7 @@ func Select(props SelectProps) core.Node {
 
 		// Build option extra attributes
 		optExtra := make(map[string]string)
-		if opt.Value == props.Value {
+		if opt.Value == value {
 			optExtra["selected"] = "selected"
 		}
 		if opt.Disabled {

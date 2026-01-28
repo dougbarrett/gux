@@ -46,19 +46,33 @@ type InputProps struct {
 	Size        InputSize    // Size variant (default: md)
 	ID          string       // Element ID for label association
 	Name        string       // Input name attribute
-	Value       string       // Current value
+	Value       string       // Current value (use Bind instead for cleaner code)
 	Placeholder string       // Placeholder text
 	Class       string       // Additional classes
 	Disabled    bool         // Disabled state
 	Required    bool         // Required indicator
 	Error       string       // Error message (adds aria-invalid when non-empty)
-	OnChange    func(string) // Value change handler (WASM only)
+	OnChange    func(string) // Value change handler (use Bind instead for cleaner code)
 	OnEnter     func()       // Enter key handler (WASM only)
+
+	// Bind directly binds this input to a state value.
+	// When set, Value and OnChange are automatically handled.
+	// Usage: Bind: r.StateString("email", "")
+	Bind StringState
 }
 
 // Input creates a styled text input component.
 //
-// Example:
+// Example with state binding (recommended):
+//
+//	Input(InputProps{
+//	    Type:        InputEmail,
+//	    Name:        "email",
+//	    Bind:        r.StateString("email", ""),
+//	    Placeholder: "you@example.com",
+//	})
+//
+// Example with manual value/onChange (legacy):
 //
 //	Input(InputProps{
 //	    Type:        InputEmail,
@@ -68,6 +82,14 @@ type InputProps struct {
 //	    OnChange:    func(v string) { emailState.Set(v) },
 //	})
 func Input(props InputProps) core.Node {
+	// Handle state binding - auto-wire Value and OnChange
+	value := props.Value
+	onChange := props.OnChange
+	if props.Bind != nil {
+		value = props.Bind.Get()
+		onChange = props.Bind.Set
+	}
+
 	// Apply defaults
 	inputType := props.Type
 	if inputType == "" {
@@ -93,9 +115,9 @@ func Input(props InputProps) core.Node {
 		ID:       props.ID,
 		Type:     string(inputType),
 		Name:     props.Name,
-		Value:    props.Value,
+		Value:    value,
 		Class:    class,
-		OnChange: props.OnChange,
+		OnChange: onChange,
 		OnEnter:  props.OnEnter,
 	}
 

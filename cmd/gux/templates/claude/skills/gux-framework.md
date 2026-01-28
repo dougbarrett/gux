@@ -541,33 +541,50 @@ ui.Button(ui.ButtonProps{
     Children: []core.Node{core.Text("Click me")},
 })
 
-// Input types
+// Input with state binding (recommended)
+ui.Input(ui.InputProps{
+    Type:        ui.InputEmail,
+    Name:        "email",
+    Bind:        r.StateString("email", ""),  // Direct state binding
+    Placeholder: "Enter your email",
+    Required:    true,
+})
+
+// Input with manual Value/OnChange (legacy)
 ui.Input(ui.InputProps{
     Type:        ui.InputText,      // Text, Email, Password, Number, Search, Tel, URL
     Size:        ui.InputMD,        // SM, MD, LG
-    ID:          "email",
-    Name:        "email",
-    Value:       email.Get(),
-    Placeholder: "Enter your email",
+    ID:          "username",
+    Name:        "username",
+    Value:       username.Get(),
+    Placeholder: "Enter username",
     Disabled:    false,
     Required:    true,
     Error:       "",                // Shows error styling when non-empty
-    OnChange:    func(v string) { email.SetQuiet(v) },
+    OnChange:    func(v string) { username.SetQuiet(v) },
     OnEnter:     func() { /* submit form */ },
 })
 
-// Select dropdown
+// Select dropdown with state binding (recommended)
 ui.Select(ui.SelectProps{
     ID:          "role",
     Name:        "role",
-    Value:       role.Get(),
+    Bind:        r.StateString("role", ""),  // Direct state binding
     Placeholder: "Select a role",
     Options: []ui.SelectOption{
         {Value: "user", Label: "User"},
         {Value: "admin", Label: "Admin"},
         {Value: "mod", Label: "Moderator", Disabled: true},
     },
-    OnChange: func(v string) { role.Set(v) },
+})
+
+// Select with manual Value/OnChange (legacy)
+ui.Select(ui.SelectProps{
+    Name:        "country",
+    Value:       country.Get(),
+    Placeholder: "Select a country",
+    Options:     countryOptions,
+    OnChange:    func(v string) { country.Set(v) },
 })
 
 // Checkbox

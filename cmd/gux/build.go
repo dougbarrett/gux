@@ -963,13 +963,14 @@ func generateWasmEntryPoint(modulePath, pagesImport string, routes []PageRoute) 
 	}
 
 	// Build the router/page matching code (same logic as bundle version)
+	// Note: 'path' is already declared in loadPage(), so we just use it here
 	var routeCode strings.Builder
 	if len(routes) == 1 && !strings.Contains(routes[0].Path, ":") {
 		// Single non-parameterized route - simple case
 		routeCode.WriteString(fmt.Sprintf("\t\tcomponent := %s(router)\n", routes[0].Handler))
 	} else {
 		// Multiple routes or parameterized routes - need pattern matching
-		routeCode.WriteString("\t\tpath := js.Global().Get(\"location\").Get(\"pathname\").String()\n")
+		// Note: 'path' is already declared in loadPage()
 		routeCode.WriteString("\t\tvar component func() core.Node\n")
 
 		// Separate exact routes from parameterized routes
@@ -1105,6 +1106,24 @@ func main() {
 	var router *core.Router
 	var render func()
 
+	// Cached page component - persists across re-renders within same page
+	// This ensures closures (like OnChange handlers) reference stable state objects
+	var currentComponent func() core.Node
+	var currentPath string
+
+	// loadPage creates the page component for the current path
+	// Called on navigation and initial load, NOT on state-triggered re-renders
+	loadPage := func() {
+		path := js.Global().Get("location").Get("pathname").String()
+		// Only reload component if path changed (handles state-triggered re-renders)
+		if currentComponent != nil && path == currentPath {
+			return
+		}
+		currentPath = path
+%s
+		currentComponent = component
+	}
+
 	render = func() {
 		// Save focus state before re-render
 		activeElement := document.Get("activeElement")
@@ -1114,11 +1133,14 @@ func main() {
 		}
 
 		container.Set("innerHTML", "")
-%s
-		node := component()
-		result := node.Render(core.DOM())
-		if domVal := result.DOMValue(); domVal != nil {
-			container.Call("appendChild", domVal.(js.Value))
+
+		// Use cached component - closures remain stable across re-renders
+		if currentComponent != nil {
+			node := currentComponent()
+			result := node.Render(core.DOM())
+			if domVal := result.DOMValue(); domVal != nil {
+				container.Call("appendChild", domVal.(js.Value))
+			}
 		}
 
 		// Intercept link clicks for client-side navigation
@@ -1155,11 +1177,14 @@ func main() {
 
 	// Navigate fetches page data then renders
 	navigate := func(path string) {
+		// Clear current component to force reload for new path
+		currentComponent = nil
 		window.Get("history").Call("pushState", nil, "", path)
 		fetchLoader(path, func(state map[string]any) {
 			if state != nil {
 				router.Hydrate(state)
 			}
+			loadPage()
 			render()
 		})
 	}
@@ -1179,10 +1204,14 @@ func main() {
 
 	// Handle browser back/forward
 	window.Call("addEventListener", "popstate", js.FuncOf(func(this js.Value, args []js.Value) any {
+		currentComponent = nil // Force reload for history navigation
+		loadPage()
 		render()
 		return nil
 	}))
 
+	// Initial load
+	loadPage()
 	render()
 
 	select {}
@@ -1207,13 +1236,14 @@ func generateBundleWasmEntryPoint(bundleName string, bundle *BundleInfo) error {
 	imports := bundle.Imports
 
 	// Build the router/page matching code
+	// Note: 'path' is already declared in loadPage(), so we just use it here
 	var routeCode strings.Builder
 	if len(routes) == 1 && !strings.Contains(routes[0].Path, ":") {
 		// Single non-parameterized route - simple case
 		routeCode.WriteString(fmt.Sprintf("\t\tcomponent := %s(router)\n", routes[0].Handler))
 	} else {
 		// Multiple routes or parameterized routes - need pattern matching
-		routeCode.WriteString("\t\tpath := js.Global().Get(\"location\").Get(\"pathname\").String()\n")
+		// Note: 'path' is already declared in loadPage()
 		routeCode.WriteString("\t\tvar component func() core.Node\n")
 
 		// Separate exact routes from parameterized routes
@@ -1405,6 +1435,24 @@ func main() {
 	var router *core.Router
 	var render func()
 
+	// Cached page component - persists across re-renders within same page
+	// This ensures closures (like OnChange handlers) reference stable state objects
+	var currentComponent func() core.Node
+	var currentPath string
+
+	// loadPage creates the page component for the current path
+	// Called on navigation and initial load, NOT on state-triggered re-renders
+	loadPage := func() {
+		path := js.Global().Get("location").Get("pathname").String()
+		// Only reload component if path changed (handles state-triggered re-renders)
+		if currentComponent != nil && path == currentPath {
+			return
+		}
+		currentPath = path
+%s
+		currentComponent = component
+	}
+
 	render = func() {
 		// Save focus state before re-render
 		activeElement := document.Get("activeElement")
@@ -1414,11 +1462,14 @@ func main() {
 		}
 
 		container.Set("innerHTML", "")
-%s
-		node := component()
-		result := node.Render(core.DOM())
-		if domVal := result.DOMValue(); domVal != nil {
-			container.Call("appendChild", domVal.(js.Value))
+
+		// Use cached component - closures remain stable across re-renders
+		if currentComponent != nil {
+			node := currentComponent()
+			result := node.Render(core.DOM())
+			if domVal := result.DOMValue(); domVal != nil {
+				container.Call("appendChild", domVal.(js.Value))
+			}
 		}
 
 		// Intercept link clicks for client-side navigation
@@ -1462,12 +1513,14 @@ func main() {
 			window.Get("location").Set("href", path)
 			return
 		}
-		// Same-bundle navigation - client-side routing
+		// Same-bundle navigation - clear component to force reload
+		currentComponent = nil
 		window.Get("history").Call("pushState", nil, "", path)
 		fetchLoader(path, func(state map[string]any) {
 			if state != nil {
 				router.Hydrate(state)
 			}
+			loadPage()
 			render()
 		})
 	}
@@ -1487,10 +1540,14 @@ func main() {
 
 	// Handle browser back/forward
 	window.Call("addEventListener", "popstate", js.FuncOf(func(this js.Value, args []js.Value) any {
+		currentComponent = nil // Force reload for history navigation
+		loadPage()
 		render()
 		return nil
 	}))
 
+	// Initial load
+	loadPage()
 	render()
 
 	select {}

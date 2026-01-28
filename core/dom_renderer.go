@@ -85,7 +85,9 @@ func (r *DOMRenderer) RenderElement(tag string, attrs Attrs, children []Node) Re
 
 	// Set attributes
 	setAttr := func(name, value string) {
-		if value != "" {
+		// For value attribute, always set it (including empty string for placeholder options)
+		// For other attributes, skip empty strings
+		if value != "" || name == "value" {
 			el.Call("setAttribute", name, value)
 		}
 	}
