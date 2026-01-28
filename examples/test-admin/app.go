@@ -88,7 +88,7 @@ func seedAdminUser(db *gorm.DB) {
 
 // registerAPIEndpoints sets up typed API endpoints.
 func registerAPIEndpoints(app *core.App, db *gorm.DB) {
-	// Login endpoint
+	// Login endpoint - must be Public() since users aren't authenticated yet
 	core.API(app, "POST", "/api/login", func(ctx *core.APIContext, req dto.LoginRequest) (dto.LoginResponse, error) {
 		// Find user
 		var user models.User
@@ -112,7 +112,7 @@ func registerAPIEndpoints(app *core.App, db *gorm.DB) {
 		}
 
 		return dto.LoginResponse{Success: true, Redirect: "/admin"}, nil
-	})
+	}).Public()
 
 	// Logout endpoint
 	core.API(app, "POST", "/api/logout", func(ctx *core.APIContext, req struct{}) (dto.LogoutResponse, error) {

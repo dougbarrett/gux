@@ -92,6 +92,7 @@ func main() {
 	)
 
 	// Login API endpoint - typed with automatic JSON handling
+	// Must be marked Public() since users aren't authenticated yet
 	core.API(app, "POST", "/api/login", func(ctx *core.APIContext, req dto.LoginRequest) (dto.LoginResponse, error) {
 		db := ctx.DB().(*gorm.DB)
 
@@ -117,7 +118,7 @@ func main() {
 		}
 
 		return dto.LoginResponse{Success: true, Redirect: "/dashboard"}, nil
-	})
+	}).Public()
 
 	// Logout API endpoint - typed with automatic JSON handling
 	core.API(app, "POST", "/api/logout", func(ctx *core.APIContext, _ struct{}) (dto.LogoutResponse, error) {
