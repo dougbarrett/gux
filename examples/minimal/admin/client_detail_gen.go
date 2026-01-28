@@ -13,6 +13,10 @@ import (
 	"github.com/dougbarrett/gux/examples/minimal/dto"
 )
 
+// Hook slots for Client detail page - set these in init() in a separate file (e.g., client_hooks.go)
+var ClientDetailActions DetailActionsHook[dto.ClientDetail]
+var ClientDetailSections DetailSectionsHook[dto.ClientDetail]
+
 // ClientDetail shows a single client.
 func ClientDetail(r *core.Router) func() core.Node {
 	var item *dto.ClientDetail
@@ -95,6 +99,9 @@ func ClientDetail(r *core.Router) func() core.Node {
 				Children: []core.Node{core.Text("Delete")},
 				OnClick:  func() { showDeleteModal.Set(true) },
 			}),
+		}
+		if ClientDetailActions != nil {
+			actions = append(actions, ClientDetailActions(HookContext{Router: r}, displayItem)...)
 		}
 
 		var errorNode core.Node = core.Frag()
@@ -218,6 +225,13 @@ func ClientDetail(r *core.Router) func() core.Node {
 								clientDetailRow("Created", displayItem.CreatedAt.Format("Jan 2, 2006 3:04 PM")),
 								clientDetailRow("Updated", displayItem.UpdatedAt.Format("Jan 2, 2006 3:04 PM")),
 							),
+							// Custom sections from hooks
+							func() core.Node {
+								if ClientDetailSections != nil {
+									return core.Frag(ClientDetailSections(HookContext{Router: r}, displayItem)...)
+								}
+								return core.Frag()
+							}(),
 						},
 					}),
 				},

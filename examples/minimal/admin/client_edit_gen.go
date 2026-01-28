@@ -75,14 +75,14 @@ func ClientEdit(r *core.Router) func() core.Node {
 		}
 
 		// Form state - initialize with current values
-		salespersonIDState := r.StateString("salesperson_id", func() string { if displayItem.Salesperson != nil { return fmt.Sprintf("%d", displayItem.Salesperson.ID) }; return "" }())
-		closedLeadState := r.StateBool("closed_lead", displayItem.ClosedLead)
 		stateState := r.StateString("state", displayItem.State)
 		descriptionState := r.StateString("description", displayItem.Description)
 		firstNameState := r.StateString("first_name", displayItem.FirstName)
 		lastNameState := r.StateString("last_name", displayItem.LastName)
 		emailState := r.StateString("email", displayItem.Email)
 		phoneState := r.StateString("phone", displayItem.Phone)
+		salespersonIDState := r.StateString("salesperson_id", func() string { if displayItem.Salesperson != nil { return fmt.Sprintf("%d", displayItem.Salesperson.ID) }; return "" }())
+		closedLeadState := r.StateBool("closed_lead", displayItem.ClosedLead)
 		errorState := r.StateString("error", "")
 		successState := r.StateString("success", "")
 
@@ -111,20 +111,32 @@ func ClientEdit(r *core.Router) func() core.Node {
 			}
 
 			data := map[string]any{
-				"salesperson_id": parseUintPtr(salespersonIDState.Get()),
-				"closed_lead": closedLeadState.Get(),
 				"state": stateState.Get(),
 				"description": descriptionState.Get(),
 				"first_name": firstNameState.Get(),
 				"last_name": lastNameState.Get(),
 				"email": emailState.Get(),
 				"phone": phoneState.Get(),
+				"salesperson_id": parseUintPtr(salespersonIDState.Get()),
+				"closed_lead": closedLeadState.Get(),
+			}
+
+			// Call BeforeSave hook if set
+			if ClientBeforeSave != nil {
+				if err := ClientBeforeSave(HookContext{Router: r}, data, true); err != nil {
+					errorState.Set(err.Error())
+					return
+				}
 			}
 
 			api.Clients.Update(displayItem.ID, data, func(result *dto.ClientDetail, err error) {
 				if err != nil {
 					errorState.Set(err.Error())
 				} else {
+					// Call AfterSave hook if set
+					if ClientAfterSave != nil {
+						ClientAfterSave(HookContext{Router: r}, result.ID, true)
+					}
 					successState.Set("Client updated successfully!")
 					r.Navigate(fmt.Sprintf("/admin/clients/%d", displayItem.ID))
 				}
@@ -245,6 +257,13 @@ func ClientEdit(r *core.Router) func() core.Node {
 								),
 							),
 
+							// Custom form sections from hooks
+							func() core.Node {
+								if ClientFormSections != nil {
+									return core.Frag(ClientFormSections(HookContext{Router: r}, true)...)
+								}
+								return core.Frag()
+							}(),
 							// Submit
 							ui.Button(ui.ButtonProps{
 								Variant:  ui.ButtonPrimary,

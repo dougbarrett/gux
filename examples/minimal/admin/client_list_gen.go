@@ -11,6 +11,10 @@ import (
 	"github.com/dougbarrett/gux/examples/minimal/dto"
 )
 
+// Hook slots for Client list page - set these in init() in a separate file (e.g., client_hooks.go)
+var ClientListActions ListActionsHook
+var ClientListRowActions ListRowActionsHook[dto.ClientList]
+
 // Clients is the admin clients list page.
 func Clients(r *core.Router) func() core.Node {
 	var items []dto.ClientList
@@ -31,6 +35,21 @@ func Clients(r *core.Router) func() core.Node {
 		// Parse from state
 		var displayItems []dto.ClientList
 		json.Unmarshal([]byte(itemsState.Get()), &displayItems)
+		// Build actions list with optional hook
+		pageActions := []core.Node{
+			core.A(
+				core.Attrs{
+					Href:  "/admin/clients/new",
+					Class: "inline-flex items-center gap-2 text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium",
+				},
+				core.Span(core.Class("text-lg"), core.Text("+")),
+				core.Text("Add Client"),
+			),
+		}
+		if ClientListActions != nil {
+			pageActions = append(pageActions, ClientListActions(HookContext{Router: r})...)
+		}
+
 		return core.Frag(
 			ui.PageHeader(ui.PageHeaderProps{
 				Breadcrumbs: []ui.BreadcrumbItem{
@@ -39,16 +58,7 @@ func Clients(r *core.Router) func() core.Node {
 				},
 				Title:    "Clients",
 				Subtitle: fmt.Sprintf("%d total", len(displayItems)),
-				Actions: []core.Node{
-					core.A(
-						core.Attrs{
-							Href:  "/admin/clients/new",
-							Class: "inline-flex items-center gap-2 text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium",
-						},
-						core.Span(core.Class("text-lg"), core.Text("+")),
-						core.Text("Add Client"),
-					),
-				},
+				Actions:  pageActions,
 			}),
 			ui.Card(ui.CardProps{
 				Children: []core.Node{
@@ -71,11 +81,11 @@ func Clients(r *core.Router) func() core.Node {
 func ClientTableHeaders() []core.Node {
 	return []core.Node{
 		tableHeaderClient("ID"),
-		tableHeaderClient("Salesperson"),
-		tableHeaderClient("Closed Lead"),
 		tableHeaderClient("First Name"),
 		tableHeaderClient("Last Name"),
 		tableHeaderClient("Email"),
+		tableHeaderClient("Salesperson"),
+		tableHeaderClient("Closed Lead"),
 		tableHeaderClient("Actions"),
 	}
 }
@@ -101,12 +111,12 @@ func ClientTableRows(items []dto.ClientList, r *core.Router) []core.Node {
 	for _, item := range items {
 		rows = append(rows, core.Tr(core.Class("border-t border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750"),
 			tableCellClient(fmt.Sprintf("%d", item.ID)),
-			ClientCellSalespersonID(item),
-			ClientCellClosedLead(item),
 			ClientCellFirstName(item),
 			ClientCellLastName(item),
 			ClientCellEmail(item),
-			ClientActionsCell(item.ID, r),
+			ClientCellSalespersonID(item),
+			ClientCellClosedLead(item),
+			ClientActionsCell(item, r),
 		))
 	}
 	return rows
@@ -118,17 +128,44 @@ func tableCellClient(text string) core.Node {
 	)
 }
 
-func ClientActionsCell(id uint, r *core.Router) core.Node {
-	return core.Td(core.Class("px-6 py-4 whitespace-nowrap text-sm"),
+func ClientActionsCell(item dto.ClientList, r *core.Router) core.Node {
+	actions := []core.Node{
 		ui.Button(ui.ButtonProps{
 			Variant:  ui.ButtonGhost,
 			Size:     ui.ButtonSM,
 			Children: []core.Node{core.Text("View")},
-			OnClick:  func() { r.Navigate(fmt.Sprintf("/admin/clients/%d", id)) },
+			OnClick:  func() { r.Navigate(fmt.Sprintf("/admin/clients/%d", item.ID)) },
 		}),
+	}
+	if ClientListRowActions != nil {
+		actions = append(actions, ClientListRowActions(HookContext{Router: r}, item)...)
+	}
+	return core.Td(core.Class("px-6 py-4 whitespace-nowrap text-sm"),
+		core.Frag(actions...),
 	)
 }
 
+
+func ClientCellFirstName(item dto.ClientList) core.Node {
+	// Display field is clickable - links to detail page
+	return core.Td(core.Class("px-6 py-4 whitespace-nowrap text-sm"),
+		core.A(
+			core.Attrs{
+				Href:  fmt.Sprintf("/admin/clients/%d", item.ID),
+				Class: "text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium",
+			},
+			core.Text(item.FirstName),
+		),
+	)
+}
+
+func ClientCellLastName(item dto.ClientList) core.Node {
+	return tableCellClient(item.LastName)
+}
+
+func ClientCellEmail(item dto.ClientList) core.Node {
+	return tableCellClient(item.Email)
+}
 
 func ClientCellSalespersonID(item dto.ClientList) core.Node {
 	text := "-"
@@ -156,27 +193,6 @@ func ClientCellClosedLead(item dto.ClientList) core.Node {
 			core.Text(label),
 		),
 	)
-}
-
-func ClientCellFirstName(item dto.ClientList) core.Node {
-	// Display field is clickable - links to detail page
-	return core.Td(core.Class("px-6 py-4 whitespace-nowrap text-sm"),
-		core.A(
-			core.Attrs{
-				Href:  fmt.Sprintf("/admin/clients/%d", item.ID),
-				Class: "text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium",
-			},
-			core.Text(item.FirstName),
-		),
-	)
-}
-
-func ClientCellLastName(item dto.ClientList) core.Node {
-	return tableCellClient(item.LastName)
-}
-
-func ClientCellEmail(item dto.ClientList) core.Node {
-	return tableCellClient(item.Email)
 }
 
 

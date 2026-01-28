@@ -12,6 +12,11 @@ import (
 	"github.com/dougbarrett/gux/examples/minimal/dto"
 )
 
+// Hook slots for Client new form - set these in init() in a separate file (e.g., client_hooks.go)
+var ClientFormSections FormSectionsHook
+var ClientBeforeSave BeforeSaveHook
+var ClientAfterSave AfterSaveHook
+
 // ClientNew is the form for creating a new client.
 func ClientNew(r *core.Router) func() core.Node {
 	var users []dto.UserList
@@ -26,14 +31,14 @@ func ClientNew(r *core.Router) func() core.Node {
 
 	return func() core.Node {
 		// Form state
-		salespersonIDState := r.StateString("salesperson_id", "")
-		closedLeadState := r.StateBool("closed_lead", false)
 		stateState := r.StateString("state", "")
 		descriptionState := r.StateString("description", "")
 		firstNameState := r.StateString("first_name", "")
 		lastNameState := r.StateString("last_name", "")
 		emailState := r.StateString("email", "")
 		phoneState := r.StateString("phone", "")
+		salespersonIDState := r.StateString("salesperson_id", "")
+		closedLeadState := r.StateBool("closed_lead", false)
 		errorState := r.StateString("error", "")
 		successState := r.StateString("success", "")
 		// Salesperson state
@@ -66,20 +71,32 @@ func ClientNew(r *core.Router) func() core.Node {
 			}
 
 			data := map[string]any{
-				"salesperson_id": parseUintPtr(salespersonIDState.Get()),
-				"closed_lead": closedLeadState.Get(),
 				"state": stateState.Get(),
 				"description": descriptionState.Get(),
 				"first_name": firstNameState.Get(),
 				"last_name": lastNameState.Get(),
 				"email": emailState.Get(),
 				"phone": phoneState.Get(),
+				"salesperson_id": parseUintPtr(salespersonIDState.Get()),
+				"closed_lead": closedLeadState.Get(),
+			}
+
+			// Call BeforeSave hook if set
+			if ClientBeforeSave != nil {
+				if err := ClientBeforeSave(HookContext{Router: r}, data, false); err != nil {
+					errorState.Set(err.Error())
+					return
+				}
 			}
 
 			api.Clients.Create(data, func(result *dto.ClientDetail, err error) {
 				if err != nil {
 					errorState.Set(err.Error())
 				} else {
+					// Call AfterSave hook if set
+					if ClientAfterSave != nil {
+						ClientAfterSave(HookContext{Router: r}, result.ID, false)
+					}
 					successState.Set("Client created successfully!")
 					r.Navigate("/admin/clients")
 				}
@@ -198,6 +215,13 @@ func ClientNew(r *core.Router) func() core.Node {
 								),
 							),
 
+							// Custom form sections from hooks
+							func() core.Node {
+								if ClientFormSections != nil {
+									return core.Frag(ClientFormSections(HookContext{Router: r}, false)...)
+								}
+								return core.Frag()
+							}(),
 							// Submit
 							ui.Button(ui.ButtonProps{
 								Variant:  ui.ButtonPrimary,
@@ -230,21 +254,4 @@ func clientFormField(label, inputType, name, value string, onChange func(string)
 		),
 		core.Input(attrs),
 	)
-}
-
-func parseUint(s string) uint {
-	if s == "" {
-		return 0
-	}
-	v, _ := strconv.ParseUint(s, 10, 64)
-	return uint(v)
-}
-
-func parseUintPtr(s string) *uint {
-	if s == "" {
-		return nil
-	}
-	v, _ := strconv.ParseUint(s, 10, 64)
-	u := uint(v)
-	return &u
 }
