@@ -230,6 +230,17 @@ Available: `Set{Model}ListActions`, `ListRowActions`, `DetailActions`, `DetailSe
 
 Configure child models with `"parent"`, `"parentField"`, and `"sidebar": false` in `gux.config.json`. This generates inline child tables on the parent detail page.
 
+## Audit Logging
+
+Enable automatic audit trailing for CRUD models:
+
+```go
+app.CRUD(models.Document{}, core.WithAuditLog())
+app.CRUD(models.User{}, core.WithAuditLog("PasswordHash"))
+```
+
+View logs: register `app.CRUD(core.AuditEntry{}, core.WithRoles("admin"))` and build an admin page.
+
 ## CRUD Filtering
 
 List endpoints accept query params: `GET /__gux_api/crud/orderitems?order_id=2`. Use `api.OrderItems.ListFiltered(params, callback)` in code.

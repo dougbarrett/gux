@@ -10,6 +10,7 @@
 
 - **Features**
   - [Server Utilities](server.md)
+  - [Audit Logging](audit-logging.md)
 
 - **Reference**
   - [Accessibility](accessibility.md)

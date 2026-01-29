@@ -542,6 +542,25 @@ type OrderBrief struct {
 
 The display field is determined by the `"display"` model config option, or auto-detected from `Name`, `Title`, `FirstName`, or `Label`.
 
+## Audit Logging
+
+Track who changed what and when for regulatory compliance. Enable per-model with `WithAuditLog()`:
+
+```go
+app.CRUD(models.Document{}, core.WithAuditLog())
+app.CRUD(models.User{}, core.WithAuditLog("PasswordHash"))
+
+// View audit logs (admin only)
+app.CRUD(core.AuditEntry{}, core.WithRoles("admin"))
+```
+
+- Auto-logs create/update/delete operations
+- Field-level diffs for updates
+- Captures user ID, email, IP address, timestamp
+- Auto-migrates `audit_entries` table
+- Async logging (never blocks responses)
+- Configurable field exclusion
+
 ## CRUD Query Parameter Filtering
 
 CRUD list endpoints support URL query parameter filtering:

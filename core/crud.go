@@ -69,6 +69,7 @@ type CRUDModel struct {
 	OnUpdate       UpdateHook   // Optional hook for custom update logic
 	Public         bool         // If true, no authentication required
 	Roles          []string     // Roles required to access (any of these roles)
+	AuditConfig    *AuditConfig // Audit logging config (nil = disabled)
 }
 
 // WithListDTO sets a DTO type for list responses.
@@ -247,6 +248,16 @@ func (a *App) CRUD(model interface{}, opts ...CRUDOption) *App {
 
 // registerCRUDHandlers registers HTTP handlers for all CRUD models
 func (a *App) registerCRUDHandlers(mux *http.ServeMux) {
+	// Auto-migrate audit_entries table if any model uses audit logging
+	if !a.auditMigrated {
+		for _, model := range a.crudModels {
+			if model.AuditConfig != nil && model.AuditConfig.Enabled {
+				a.autoMigrateAudit()
+				a.auditMigrated = true
+				break
+			}
+		}
+	}
 	for _, model := range a.crudModels {
 		a.registerModelHandlers(mux, model)
 	}
@@ -593,6 +604,23 @@ func (a *App) handleCreate(w http.ResponseWriter, r *http.Request, model CRUDMod
 		}
 	}
 
+	// Audit logging for create
+	if model.AuditConfig != nil && model.AuditConfig.Enabled {
+		user := a.getUserFromRequest(r)
+		entry := AuditEntry{
+			Action:     AuditActionCreate,
+			EntityType: model.Name,
+			EntityID:   extractEntityID(item),
+			IPAddress:  getClientIP(r),
+			Changes:    snapshotForAudit(item, model.AuditConfig.IgnoreFields),
+		}
+		if user != nil {
+			entry.UserID = user.ID
+			entry.UserEmail = user.Email
+		}
+		go a.writeAuditLog(entry)
+	}
+
 	// Convert response to DTO if configured
 	output := reflect.ValueOf(item).Elem().Interface()
 	if model.DetailDTO != nil {
@@ -611,6 +639,7 @@ func (a *App) handleUpdate(w http.ResponseWriter, r *http.Request, model CRUDMod
 	}
 
 	var item interface{}
+	var auditBeforeJSON []byte // snapshot for audit diff
 	dbVal := reflect.ValueOf(a.db)
 
 	if model.OnUpdate != nil {
@@ -629,6 +658,11 @@ func (a *App) handleUpdate(w http.ResponseWriter, r *http.Request, model CRUDMod
 					}
 				}
 			}
+		}
+
+		// Capture before-state for audit diff
+		if model.AuditConfig != nil && model.AuditConfig.Enabled {
+			auditBeforeJSON, _ = json.Marshal(reflect.ValueOf(existing).Elem().Interface())
 		}
 
 		// Decode JSON as map and call hook
@@ -661,6 +695,12 @@ func (a *App) handleUpdate(w http.ResponseWriter, r *http.Request, model CRUDMod
 				}
 			}
 		}
+
+		// Capture before-state for audit diff
+		if model.AuditConfig != nil && model.AuditConfig.Enabled {
+			auditBeforeJSON, _ = json.Marshal(reflect.ValueOf(item).Elem().Interface())
+		}
+
 		// Decode JSON onto the existing record — only overwrites fields present in the request
 		if err := json.NewDecoder(r.Body).Decode(item); err != nil {
 			http.Error(w, "Invalid JSON", http.StatusBadRequest)
@@ -685,6 +725,28 @@ func (a *App) handleUpdate(w http.ResponseWriter, r *http.Request, model CRUDMod
 				return
 			}
 		}
+	}
+
+	// Audit logging for update
+	if model.AuditConfig != nil && model.AuditConfig.Enabled && auditBeforeJSON != nil {
+		var beforeMap map[string]interface{}
+		json.Unmarshal(auditBeforeJSON, &beforeMap)
+		afterMap := structToMapAudit(item)
+		changes := computeFieldDiffFromMaps(beforeMap, afterMap, model.AuditConfig.IgnoreFields)
+
+		user := a.getUserFromRequest(r)
+		entry := AuditEntry{
+			Action:     AuditActionUpdate,
+			EntityType: model.Name,
+			EntityID:   id,
+			IPAddress:  getClientIP(r),
+			Changes:    changes,
+		}
+		if user != nil {
+			entry.UserID = user.ID
+			entry.UserEmail = user.Email
+		}
+		go a.writeAuditLog(entry)
 	}
 
 	// Convert response to DTO if configured
@@ -729,6 +791,23 @@ func (a *App) handleDelete(w http.ResponseWriter, r *http.Request, model CRUDMod
 				return
 			}
 		}
+	}
+
+	// Audit logging for delete
+	if model.AuditConfig != nil && model.AuditConfig.Enabled {
+		user := a.getUserFromRequest(r)
+		entry := AuditEntry{
+			Action:     AuditActionDelete,
+			EntityType: model.Name,
+			EntityID:   id,
+			IPAddress:  getClientIP(r),
+			Changes:    "{}",
+		}
+		if user != nil {
+			entry.UserID = user.ID
+			entry.UserEmail = user.Email
+		}
+		go a.writeAuditLog(entry)
 	}
 
 	w.WriteHeader(http.StatusNoContent)

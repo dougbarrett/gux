@@ -40,6 +40,7 @@ type App struct {
 	authConfig     *AuthConfig                  // Authentication configuration (nil = disabled)
 	customHandlers map[string]http.HandlerFunc // Custom HTTP handlers
 	apiEndpoints   []APIEndpoint                // Registered typed API endpoints
+	auditMigrated  bool                         // Whether audit_entries table has been auto-migrated
 	// Cache busting hashes
 	stylesHash     string            // Hash for styles.css
 	wasmHashes     map[string]string // Hash for each WASM bundle

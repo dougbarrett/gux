@@ -990,6 +990,62 @@ api.OrderItems.ListFiltered(map[string]string{
 }, func(result []dto.OrderItemList, err error) { ... })
 ```
 
+### Audit Logging
+
+Enable automatic audit logging for any CRUD model to track who changed what and when.
+
+**Enable Audit Logging:**
+
+```go
+// Audit all fields
+app.CRUD(models.Document{}, core.WithAuditLog())
+
+// Ignore sensitive fields in audit diffs
+app.CRUD(models.User{},
+    core.WithAuditLog("PasswordHash"),
+    core.WithRoles("admin"),
+)
+```
+
+**What Gets Logged:**
+
+| Action | Changes Field |
+|--------|--------------|
+| Create | Full snapshot of created entity (minus ignored fields) |
+| Update | Field-level diff: `{"name": {"old": "Alice", "new": "Bob"}}` |
+| Delete | Entity type and ID |
+
+**AuditEntry Model:**
+
+```go
+type AuditEntry struct {
+    ID         uint        `json:"id"`
+    CreatedAt  time.Time   `json:"created_at"`
+    Action     AuditAction `json:"action"`      // "create", "update", "delete"
+    EntityType string      `json:"entity_type"` // Model name
+    EntityID   uint        `json:"entity_id"`
+    UserID     string      `json:"user_id"`
+    UserEmail  string      `json:"user_email"`
+    IPAddress  string      `json:"ip_address"`
+    Changes    string      `json:"changes"`     // JSON
+}
+```
+
+**Viewing Audit Logs:**
+
+Register `AuditEntry` as a read-only CRUD endpoint:
+
+```go
+app.CRUD(core.AuditEntry{}, core.WithRoles("admin"))
+```
+
+**Behavior:**
+- Audit entries auto-migrate when any model enables audit
+- Logging is async (goroutine) — never blocks the response
+- Failures are logged to stderr, never cause request errors
+- Public endpoints log with empty UserID/UserEmail
+- `UpdatedAt` and `DeletedAt` are always excluded from diffs
+
 ### Router.Query() Method
 
 Access URL query parameters in page functions:

@@ -36,3 +36,4 @@ __debug_bin*
 
 # Deployment
 fly.toml
+/gux

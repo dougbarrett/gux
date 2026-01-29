@@ -20,6 +20,7 @@ COPY --chown=tinygo:tinygo . .
 
 # Build everything: WASM + server binary with embedded assets
 # TinyGo is the default compiler, wasm_exec.js injected automatically
+RUN gux gen
 RUN gux build
 
 # Stage 2: Minimal production image

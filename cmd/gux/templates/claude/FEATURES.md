@@ -38,6 +38,16 @@ Keep this list updated when adding new features to ensure Claude Code has accura
 - [x] CRUD query parameter filtering (?order_id=2)
 - [x] ListFiltered API client method
 
+## Audit Logging
+
+- [x] WithAuditLog() CRUD option
+- [x] AuditEntry GORM model
+- [x] Field-level change diffs for updates
+- [x] Auto-migration of audit_entries table
+- [x] Async write (non-blocking)
+- [x] IP address capture (X-Forwarded-For aware)
+- [x] Configurable field exclusion
+
 ## Authentication
 
 - [x] Session management
