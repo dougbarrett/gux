@@ -1084,6 +1084,19 @@ func extractTypeName(expr ast.Expr) (typeName, pkg string) {
 
 // extractPathParams extracts path parameter names from a path pattern
 // e.g., "/api/users/:id/posts/:postId" -> ["id", "postId"]
+// formatDTOImport builds an import statement with alias if needed.
+// If pkgAlias differs from the last segment of importPath, an alias is added.
+func formatDTOImport(pkgAlias, importPath string) string {
+	// Get the default package name from the import path
+	parts := strings.Split(importPath, "/")
+	defaultPkg := parts[len(parts)-1]
+
+	if pkgAlias != "" && pkgAlias != defaultPkg {
+		return fmt.Sprintf("%s \"%s\"", pkgAlias, importPath)
+	}
+	return fmt.Sprintf("\"%s\"", importPath)
+}
+
 func extractPathParams(path string) []string {
 	var params []string
 	parts := strings.Split(path, "/")
@@ -2944,17 +2957,19 @@ func generateEndpointClient(endpoints []APIEndpointInfo, dtoImport string) error
 	guxfetch "github.com/dougbarrett/gux/fetch"`
 	}
 
-	// Check if we need dto import
+	// Check if we need dto import and find the package alias
 	hasDTOTypes := false
+	dtoPkgAlias := ""
 	for _, ep := range endpoints {
 		if ep.Package != "" && ep.Package != "main" {
 			hasDTOTypes = true
+			dtoPkgAlias = ep.Package
 			break
 		}
 	}
 
 	if hasDTOTypes && dtoImport != "" {
-		imports += fmt.Sprintf("\n\n\t\"%s\"", dtoImport)
+		imports += "\n\n\t" + formatDTOImport(dtoPkgAlias, dtoImport)
 	}
 
 	// Generate endpoint functions
@@ -3024,7 +3039,15 @@ func apiEndpointFetch(method, url string, body []byte) ([]byte, error) {
 	"os"`
 
 	if needsDTOImport && dtoImport != "" {
-		serverImports += fmt.Sprintf("\n\n\t\"%s\"", dtoImport)
+		// Find the package alias used by endpoints
+		serverDTOAlias := ""
+		for _, ep := range endpoints {
+			if ep.Package != "" && ep.Package != "main" {
+				serverDTOAlias = ep.Package
+				break
+			}
+		}
+		serverImports += "\n\n\t" + formatDTOImport(serverDTOAlias, dtoImport)
 	}
 
 	serverCode := fmt.Sprintf(`//go:build !js || !wasm
