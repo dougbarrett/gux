@@ -9,7 +9,7 @@ Keep this list updated when adding new features to ensure Claude Code has accura
 - [x] Page functions pattern (loader + component)
 - [x] State management (StateInt, StateString, StateBool)
 - [x] Generic state (core.UseState[T])
-- [x] Router methods (Param, Path, User, Navigate)
+- [x] Router methods (Param, Path, Query, User, Navigate)
 - [x] OnLoad for data fetching
 - [x] Hydration flow (SSR + WASM)
 - [x] Fragment (core.Frag)
@@ -21,6 +21,7 @@ Keep this list updated when adding new features to ensure Claude Code has accura
 - [x] Hybrid routes (SSR + WASM)
 - [x] Route groups with bundles
 - [x] Route parameters (:id)
+- [x] URL query parameters (r.Query("name"))
 - [x] External links (cross-bundle navigation)
 - [x] Protected routes (.Protected())
 
@@ -29,10 +30,13 @@ Keep this list updated when adding new features to ensure Claude Code has accura
 - [x] CRUD generation (app.CRUD)
 - [x] DTO mapping (gux tags)
 - [x] List/Detail DTOs with preloading
+- [x] Brief DTOs (auto-generated for relations in briefs_gen.go)
 - [x] Create/Update hooks
 - [x] Typed API endpoints (core.API, APIGet, APIDelete)
 - [x] APIContext methods
 - [x] Error responses (api.NotFound, etc.)
+- [x] CRUD query parameter filtering (?order_id=2)
+- [x] ListFiltered API client method
 
 ## Authentication
 
@@ -75,13 +79,24 @@ Keep this list updated when adding new features to ensure Claude Code has accura
 - [x] Breadcrumb
 - [x] Form
 
+## Model Scaffolding
+
+- [x] gux.config.json model definitions
+- [x] Field types: string, int, uint, float64, bool, *uint (FK), time.Time, []string
+- [x] display config option (controls Brief DTO display field)
+- [x] Parent-child entity management (parent, parentField, sidebar)
+- [x] Admin page hooks (Set{Model}ListActions, DetailActions, etc.)
+- [x] Hook regeneration safety (user hook files preserved)
+- [x] Auth preset (password hashing, verification)
+- [x] Customizable roles
+
 ## CLI Commands
 
 - [x] gux init (interactive and non-interactive)
 - [x] gux init --auth, --auth-public, --admin
 - [x] gux init --claude
 - [x] gux dev (with --go, --watch)
-- [x] gux build (with --go)
+- [x] gux build (with --go) — always runs gux gen first
 - [x] gux gen (with --watch)
 - [x] gux clean
 - [x] gux claude
@@ -97,9 +112,11 @@ Keep this list updated when adding new features to ensure Claude Code has accura
 
 ## Generated Code (guxgen/)
 
-- [x] API client generation
+- [x] API client generation (List, ListFiltered, Get, Create, Update, Delete)
 - [x] WASM entry points
 - [x] Bundle separation (app, admin)
+- [x] Brief DTOs (briefs_gen.go)
+- [x] Build regeneration behavior (gux build always runs gux gen)
 
 ## Templates
 

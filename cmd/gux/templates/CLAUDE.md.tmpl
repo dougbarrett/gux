@@ -101,6 +101,7 @@ name.SetQuiet("value") // Update without re-render
 ```go
 r.Param("id")           // Get route parameter
 r.Path()                // Current path
+r.Query("order_id")     // Get URL query parameter (?order_id=X)
 r.Navigate("/path")     // Programmatic navigation
 r.User()                // Authenticated user (or nil)
 r.IsAuthenticated()     // Check if logged in
@@ -210,18 +211,42 @@ Define models in `gux.config.json`:
 }
 ```
 
-Generated files: `models/*_gen.go`, `dto/*_gen.go`, `admin/*_gen.go`
+Generated files: `guxgen/models/*_gen.go`, `guxgen/dto/*_gen.go`, `guxgen/admin/*_gen.go`, `admin/hooks_gen.go`
+
+## Admin Page Hooks
+
+Customize generated admin pages without editing generated code. Create hook files in `admin/` (e.g., `admin/order_hooks.go`):
+
+```go
+func init() {
+    SetOrderDetailActions(func(ctx HookContext, item dto.OrderDetail) []core.Node { ... })
+    SetOrderBeforeSave(func(ctx HookContext, data map[string]any, isEdit bool) error { ... })
+}
+```
+
+Available: `Set{Model}ListActions`, `ListRowActions`, `DetailActions`, `DetailSections`, `FormSections`, `BeforeSave`, `AfterSave`. See the skill file for full signatures.
+
+## Parent-Child Models
+
+Configure child models with `"parent"`, `"parentField"`, and `"sidebar": false` in `gux.config.json`. This generates inline child tables on the parent detail page.
+
+## CRUD Filtering
+
+List endpoints accept query params: `GET /__gux_api/crud/orderitems?order_id=2`. Use `api.OrderItems.ListFiltered(params, callback)` in code.
 
 ## Development Notes
 
 - **Always use `gux dev`** (not `go run`) - it builds WASM and CSS
+- **`gux build` always runs `gux gen` first** - never manually edit `guxgen/` files
 - Use `r.OnLoad()` for data fetching (supports SSR hydration)
 - DTOs hide sensitive fields from API responses
 - Mark cross-bundle links as `External: true`
+- Hook files in `admin/` (e.g., `order_hooks.go`) are never overwritten by regeneration
 
 ## Generated Files (Do Not Edit)
 
-- `guxgen/` - API client and WASM entry points
+- `guxgen/` - API client, WASM entry points, models, DTOs, admin pages
+- `admin/hooks_gen.go` - Hook setter functions (regenerated, but user hook files are preserved)
 - `assets_gen.go` - Embedded assets
 
 Run `gux gen` to regenerate after changing models or routes.

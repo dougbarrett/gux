@@ -155,9 +155,11 @@ goquery/
 
 ```bash
 gux dev           # Build and run with hot reload
-gux build         # Production build
+gux build         # Production build (always runs gux gen first)
 gux gen           # Generate API client/server code
 ```
+
+**Note**: `gux build` always runs `gux gen` first, regenerating all files in `guxgen/`. Never manually edit files in `guxgen/` — they will be overwritten.
 
 ## Examples/Minimal
 
@@ -507,6 +509,63 @@ OnClick: func() {
 - Generated files (`*_gen.go`) are regenerated on each `gux model regen`
 - Hook files (e.g., `client_hooks.go`) in `admin/` are user-owned and never overwritten
 - Running `gux model regen` preserves all custom hooks
+
+## Parent-Child Entity Management
+
+Child models are displayed as inline tables on the parent's detail page. Configure in `gux.config.json`:
+
+```json
+"OrderItem": {
+    "parent": "Order",
+    "parentField": "OrderID",
+    "sidebar": false,
+    "sections": { ... }
+}
+```
+
+- `parent`: Parent model name
+- `parentField`: FK field linking to parent (e.g., `"OrderID"`)
+- `sidebar`: Set to `false` to exclude child model from sidebar navigation
+
+This generates inline child tables on the parent detail page with "Add" links that pre-fill the parent FK via query parameter.
+
+## Brief DTOs
+
+Brief DTOs are auto-generated in `guxgen/dto/briefs_gen.go` for all relation fields. They provide lightweight representations used in list/detail DTOs:
+
+```go
+type OrderBrief struct {
+    ID          uint   `json:"id" gux:"Order.ID"`
+    OrderNumber string `json:"order_number" gux:"Order.OrderNumber"`
+}
+```
+
+The display field is determined by the `"display"` model config option, or auto-detected from `Name`, `Title`, `FirstName`, or `Label`.
+
+## CRUD Query Parameter Filtering
+
+CRUD list endpoints support URL query parameter filtering:
+
+```
+GET /__gux_api/crud/orderitems?order_id=2
+GET /__gux_api/crud/clients?active=true
+```
+
+Generated API clients also have a `ListFiltered` method:
+
+```go
+api.OrderItems.ListFiltered(map[string]string{"order_id": "2"}, func(result []dto.OrderItemList, err error) {
+    // filtered results
+})
+```
+
+## Router.Query()
+
+Access URL query parameters in page functions (works on both server and WASM):
+
+```go
+orderID := r.Query("order_id") // reads ?order_id=X from URL
+```
 
 ## Development Notes
 

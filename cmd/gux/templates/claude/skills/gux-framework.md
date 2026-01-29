@@ -220,6 +220,9 @@ func UserDetail(r *core.Router) func() core.Node {
 // Current path
 currentPath := r.Path() // e.g., "/admin/users/123"
 
+// URL query parameters (works on server and WASM)
+orderID := r.Query("order_id") // reads ?order_id=X from URL
+
 // Programmatic navigation
 r.Navigate("/admin/users")
 
@@ -761,16 +764,20 @@ gux model regen Client
 | Property | Description |
 |----------|-------------|
 | `formLayout` | Form field layout: `"stacked"` (default, vertical) or `"grid"` (two-column responsive) |
+| `display` | Display field name for Brief DTOs, breadcrumbs, and page titles (auto-detects Name/Title/FirstName if omitted) |
 | `preloads` | Relations to preload for detail view |
 | `public` | CRUD is public (no auth required) |
 | `roles` | Required roles for CRUD access |
+| `parent` | Parent model name for child entities (e.g., `"Order"`) |
+| `parentField` | FK field linking to parent (e.g., `"OrderID"`) |
+| `sidebar` | Set to `false` to exclude child model from sidebar navigation |
 
 **Field configuration options**:
 
 | Property | Description |
 |----------|-------------|
 | `name` | Field name (PascalCase) |
-| `type` | Go type: `string`, `int`, `uint`, `bool`, `*uint` (FK), `time.Time`, `[]string` |
+| `type` | Go type: `string`, `int`, `uint`, `float64`, `bool`, `*uint` (FK), `time.Time`, `[]string` |
 | `required` | Not null constraint |
 | `input` | Input type: `text`, `email`, `tel`, `textarea`, `select`, `multiselect` |
 | `relation` | Related model for FK fields |
@@ -796,12 +803,17 @@ gux model regen Client
 **Generated files** for model `Client`:
 
 ```
-models/client_gen.go          # GORM model
-dto/client_gen.go             # List and Detail DTOs
-admin/clients_gen.go          # List page
-admin/client_new_gen.go       # Create form
-admin/client_detail_gen.go    # Detail view
+guxgen/models/client_gen.go       # GORM model
+guxgen/dto/client_gen.go          # List and Detail DTOs
+guxgen/dto/briefs_gen.go          # Brief DTOs for all relations (shared)
+guxgen/admin/client_list_gen.go   # List page
+guxgen/admin/client_new_gen.go    # Create form
+guxgen/admin/client_detail_gen.go # Detail view
+guxgen/admin/client_edit_gen.go   # Edit form
+admin/hooks_gen.go                # Hook setter functions (all models, in user-owned admin/)
 ```
+
+**Important**: All `guxgen/` files are regenerated on every `gux build` and `gux gen`. Do not manually edit them — changes will be overwritten. The `admin/hooks_gen.go` file is also regenerated, but user-created hook files (e.g., `admin/client_hooks.go`) are never overwritten.
 
 ```bash
 # Re-init project from config (regenerate files)
@@ -829,6 +841,179 @@ myapp/
 ├── go.mod                    # Go module file
 └── Dockerfile                # Multi-stage Docker build
 ```
+
+### Brief DTOs
+
+When a field has `"relation"` in the config, the generator automatically creates Brief DTOs in `guxgen/dto/briefs_gen.go`. These are lightweight representations used in list/detail DTOs instead of raw FK uint fields.
+
+```go
+// Auto-generated in guxgen/dto/briefs_gen.go
+type OrderBrief struct {
+    ID          uint   `json:"id" gux:"Order.ID"`
+    OrderNumber string `json:"order_number" gux:"Order.OrderNumber"` // Uses display field
+}
+```
+
+The display field is determined by the `display` config option, or auto-detected from `Name`, `Title`, `FirstName`, or `Label`. List/Detail DTOs then use pointer fields:
+
+```go
+type OrderItemList struct {
+    ID      uint        `json:"id"`
+    Order   *OrderBrief `json:"order"`    // Not OrderID uint
+    Product *ProductBrief `json:"product"` // Not ProductID uint
+}
+```
+
+### Parent-Child Entity Management
+
+Child models are displayed as inline tables on the parent's detail page. Configure in `gux.config.json`:
+
+```json
+{
+  "models": {
+    "Order": {
+      "display": "OrderNumber",
+      "sections": {
+        "Details": [
+          { "name": "OrderNumber", "type": "string", "table": true }
+        ]
+      }
+    },
+    "OrderItem": {
+      "parent": "Order",
+      "parentField": "OrderID",
+      "sidebar": false,
+      "sections": {
+        "Item Details": [
+          { "name": "OrderID", "type": "uint", "relation": "Order" },
+          { "name": "ProductID", "type": "uint", "relation": "Product", "table": true },
+          { "name": "Quantity", "type": "int", "table": true }
+        ]
+      }
+    }
+  }
+}
+```
+
+This generates:
+- **Inline child table** on Order's detail page showing OrderItem records
+- **"+ Add Order Item" link** with pre-filled FK query param (`?order_id=2`)
+- **`ListFiltered` calls** to load child records by parent FK
+- **Sidebar exclusion** — child models with `"sidebar": false` are not added to the admin sidebar
+
+### Admin Page Hooks
+
+Generated admin pages support **view hooks** for customization without modifying generated code. Hook setter functions are generated in `admin/hooks_gen.go`.
+
+**Available hooks** (for each model):
+
+| Setter Function | Purpose | Signature |
+|-----------------|---------|-----------|
+| `Set{Model}ListActions` | Add buttons to list page header | `func(ctx HookContext) []core.Node` |
+| `Set{Model}ListRowActions` | Add buttons per table row | `func(ctx HookContext, item T) []core.Node` |
+| `Set{Model}DetailActions` | Add buttons to detail page header | `func(ctx HookContext, item T) []core.Node` |
+| `Set{Model}DetailSections` | Add sections to detail page body | `func(ctx HookContext, item T) []core.Node` |
+| `Set{Model}FormSections` | Add sections to create/edit forms | `func(ctx HookContext, bool) []core.Node` |
+| `Set{Model}BeforeSave` | Validate/transform before API call | `func(ctx HookContext, data map[string]any, isEdit bool) error` |
+| `Set{Model}AfterSave` | Run after successful save | `func(ctx HookContext, id uint, isEdit bool)` |
+
+**Usage**: Create a hooks file in `admin/` (e.g., `admin/order_hooks.go`). This file is user-owned and never overwritten:
+
+```go
+package admin
+
+import (
+    "github.com/dougbarrett/gux/core"
+    "github.com/dougbarrett/gux/ui"
+    "myapp/guxgen/dto"
+)
+
+func init() {
+    // Add "Export CSV" button to list page header
+    SetOrderListActions(func(ctx HookContext) []core.Node {
+        return []core.Node{
+            ui.Button(ui.ButtonProps{
+                Variant:  ui.ButtonSecondary,
+                Children: []core.Node{core.Text("Export CSV")},
+                OnClick:  func() { /* export logic */ },
+            }),
+        }
+    })
+
+    // Add custom section to detail page
+    SetOrderDetailSections(func(ctx HookContext, item dto.OrderDetail) []core.Node {
+        return []core.Node{
+            core.Div(core.Class("mt-6 pt-4 border-t border-gray-200 dark:border-gray-700"),
+                core.H3(core.Class("text-lg font-semibold text-gray-900 dark:text-white mb-4"),
+                    core.Text("Activity Log"),
+                ),
+                // ... custom content
+            ),
+        }
+    })
+
+    // Validate before save (return error to cancel)
+    SetOrderBeforeSave(func(ctx HookContext, data map[string]any, isEdit bool) error {
+        if data["order_number"] == "" {
+            return fmt.Errorf("order number is required")
+        }
+        return nil
+    })
+}
+```
+
+`HookContext` provides `Router *core.Router` for navigation and state access.
+
+### CRUD Query Parameter Filtering
+
+All CRUD list endpoints support URL query parameter filtering:
+
+```
+GET /__gux_api/crud/orderitems?order_id=2
+GET /__gux_api/crud/clients?active=true
+GET /__gux_api/crud/products?name=Widget
+```
+
+- Filters by any field on the model (matched by JSON tag or snake_case field name)
+- Supports `uint`, `int`, `float64`, `bool`, `string`, and pointer types
+- Unknown parameters are silently ignored
+
+**Generated API client method**:
+
+```go
+// List all records
+api.OrderItems.List(func(result []dto.OrderItemList, err error) { ... })
+
+// List with filters (WASM client appends query params to URL)
+api.OrderItems.ListFiltered(map[string]string{
+    "order_id": "2",
+}, func(result []dto.OrderItemList, err error) { ... })
+```
+
+### Router.Query() Method
+
+Access URL query parameters in page functions:
+
+```go
+func OrderItemNew(r *core.Router) func() core.Node {
+    // Read query parameter (works on both server and WASM)
+    parentID := r.Query("order_id") // reads ?order_id=X from URL
+
+    return func() core.Node {
+        // Pre-fill form with parent FK if present
+        // ...
+    }
+}
+```
+
+### Build Regeneration
+
+`gux build` always runs `gux gen` first, which regenerates all files in `guxgen/`. This means:
+
+- **Never manually edit** files in `guxgen/` — they will be overwritten
+- **Custom code** belongs in `admin/` (hooks), `models/` (custom methods), `dto/` (custom DTOs)
+- After changing `gux.config.json`, run `gux model regen <Name>` to update generated files
+- If generated code appears stale, run `gux clean && gux gen` for a fresh build
 
 ## API Code Generation
 
