@@ -59,13 +59,17 @@ func generateGuxFiles() error {
 			modelNames = append(modelNames, name)
 
 			// Collect relations for Brief DTO generation
+			// Only generate briefs for models that are ALSO in gux.config.json
 			for _, fields := range model.Sections {
 				for _, field := range fields {
 					if field.Relation != "" {
-						if _, exists := briefDTOs[field.Relation]; !exists {
-							briefDTOs[field.Relation] = BriefDTOInfo{
-								Model:        field.Relation,
-								DisplayField: displayFields[field.Relation],
+						// Check if the related model is in gux.config.json
+						if _, inConfig := config.Models[field.Relation]; inConfig {
+							if _, exists := briefDTOs[field.Relation]; !exists {
+								briefDTOs[field.Relation] = BriefDTOInfo{
+									Model:        field.Relation,
+									DisplayField: displayFields[field.Relation],
+								}
 							}
 						}
 					}

@@ -1071,7 +1071,23 @@ func GenerateModelFiles(model *ModelDefinition, optionSets map[string]OptionSet)
 	// Build display fields map from all models in config
 	displayFields := BuildDisplayFieldsMap(".")
 
-	return GenerateModelFilesImpl(model, optionSets, config.Module, config.Admin, displayFields)
+	// Build set of models defined in gux.config.json (for detecting external relations)
+	configModels := BuildConfigModelsSet(".")
+
+	return GenerateModelFilesImpl(model, optionSets, config.Module, config.Admin, displayFields, configModels)
+}
+
+// BuildConfigModelsSet returns a set of model names defined in gux.config.json
+func BuildConfigModelsSet(dir string) map[string]bool {
+	configModels := make(map[string]bool)
+	modelsConfig, err := LoadModelsConfig(dir)
+	if err != nil {
+		return configModels // Return empty map if config not found
+	}
+	for name := range modelsConfig.Models {
+		configModels[name] = true
+	}
+	return configModels
 }
 
 // BuildDisplayFieldsMap creates a map of model name -> display field from the config
