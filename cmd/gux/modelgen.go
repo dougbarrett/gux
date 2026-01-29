@@ -1656,8 +1656,13 @@ func GenerateHooksBridgeFile(modelNames []string, modulePath string) error {
 }
 
 // detectDisplayField auto-detects the best field to use for display name
-// Priority: Name > Title > FirstName > Label > first string field
+// Priority: explicit Display > Name > Title > FirstName > Label > first string field
 func detectDisplayField(model *ModelDefinition) string {
+	// Check explicit display field from config
+	if model.Display != "" {
+		return model.Display
+	}
+
 	candidates := []string{"Name", "Title", "FirstName", "Label"}
 
 	// Check for candidate fields

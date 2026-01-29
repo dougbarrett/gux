@@ -53,6 +53,7 @@ type ModelField struct {
 type ModelDefinition struct {
 	Name       string                  `json:"-"`                      // Model name (from map key)
 	Preset     string                  `json:"preset,omitempty"`       // Preset: "auth" for authentication models
+	Display    string                  `json:"display,omitempty"`      // Display field name (for Brief DTOs and relation labels)
 	Sections   map[string][]ModelField `json:"sections"`               // Fields grouped by section
 	Preloads   []string                `json:"preloads,omitempty"`     // Relations to preload
 	Public     bool                    `json:"public,omitempty"`       // CRUD is public (no auth)
@@ -1098,11 +1099,16 @@ func BuildDisplayFieldsMap(dir string) map[string]string {
 		return displayFields // Return empty map if config not found
 	}
 	for name, model := range modelsConfig.Models {
-		// Use same logic as detectDisplayField in modelgen.go
+		// Check explicit display field from config first
+		if model.Display != "" {
+			displayFields[name] = model.Display
+			continue
+		}
+
+		// Auto-detect: check candidate fields
 		candidates := []string{"Name", "Title", "FirstName", "Label"}
 		found := false
 
-		// Check for candidate fields first
 		for _, candidate := range candidates {
 			for _, fields := range model.Sections {
 				for _, f := range fields {
