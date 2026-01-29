@@ -3731,6 +3731,13 @@ func buildBinary() error {
 
 // runBuildNew is the new build command for the simplified architecture
 func runBuildNew(tinygo bool) {
+	// Run full generation pipeline first (models, DTOs, admin, API client, etc.)
+	// This ensures guxgen/models/, guxgen/dto/, guxgen/admin/ are created from gux.config.json
+	if err := generateGuxFiles(); err != nil {
+		fmt.Printf("Error generating files: %v\n", err)
+		os.Exit(1)
+	}
+
 	// Get module path
 	modulePath, err := getModulePath()
 	if err != nil {
@@ -3778,6 +3785,13 @@ func runBuildNew(tinygo bool) {
 	hasGuxConfig := false
 	if config, err := LoadModelsConfig("."); err == nil && len(config.Models) > 0 {
 		hasGuxConfig = true
+
+		// Mark CRUD models that are NOT in gux.config.json as external
+		for i := range crudModels {
+			if _, inConfig := config.Models[crudModels[i].Name]; !inConfig {
+				crudModels[i].IsExternal = true
+			}
+		}
 	}
 
 	// For projects with gux.config.json, always use guxgen/ paths
