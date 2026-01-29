@@ -59,17 +59,14 @@ func generateGuxFiles() error {
 			modelNames = append(modelNames, name)
 
 			// Collect relations for Brief DTO generation
-			// Only generate briefs for models that are ALSO in gux.config.json
+			// Generate briefs for ALL relations (including external models not in config)
 			for _, fields := range model.Sections {
 				for _, field := range fields {
 					if field.Relation != "" {
-						// Check if the related model is in gux.config.json
-						if _, inConfig := config.Models[field.Relation]; inConfig {
-							if _, exists := briefDTOs[field.Relation]; !exists {
-								briefDTOs[field.Relation] = BriefDTOInfo{
-									Model:        field.Relation,
-									DisplayField: displayFields[field.Relation],
-								}
+						if _, exists := briefDTOs[field.Relation]; !exists {
+							briefDTOs[field.Relation] = BriefDTOInfo{
+								Model:        field.Relation,
+								DisplayField: displayFields[field.Relation],
 							}
 						}
 					}
@@ -137,6 +134,13 @@ func generateGuxFiles() error {
 	hasGuxConfig := false
 	if config, err := LoadModelsConfig("."); err == nil && len(config.Models) > 0 {
 		hasGuxConfig = true
+
+		// Mark CRUD models that are NOT in gux.config.json as external
+		for i := range crudModels {
+			if _, inConfig := config.Models[crudModels[i].Name]; !inConfig {
+				crudModels[i].IsExternal = true
+			}
+		}
 	}
 
 	// For projects with gux.config.json, always use guxgen/ paths

@@ -99,6 +99,7 @@ type CRUDModel struct {
 	ListDTO    string // e.g., "UserList" - DTO type for list responses
 	DetailDTO  string // e.g., "UserDetail" - DTO type for detail responses
 	DTOPackage string // e.g., "dto" - package name for DTOs
+	IsExternal bool   // True if model is NOT in gux.config.json (manually defined)
 	ListDTOInfo   *DTOInfo // Parsed DTO info for list responses
 	DetailDTOInfo *DTOInfo // Parsed DTO info for detail responses
 }
@@ -2135,6 +2136,14 @@ func buildWasmBundle(bundleName string, tinygo bool) error {
 func generateServerDTOCode(m CRUDModel) string {
 	var sb strings.Builder
 
+	// Use correct package prefix for external models
+	modelPkg := "models"
+	dtoPkg := "dto"
+	if m.IsExternal {
+		modelPkg = "extmodels"
+		dtoPkg = "extdto"
+	}
+
 	// Determine which DTO to use for list and detail
 	listDTO := m.ListDTO
 	detailDTO := m.DetailDTO
@@ -2181,50 +2190,50 @@ func generateServerDTOCode(m CRUDModel) string {
 		// Use FromModel pattern for DTOs with relationships (if implemented)
 		// Uses type assertion to check if FromModel exists at runtime
 		getMethodBody = fmt.Sprintf(`// Get returns a single %s by ID.
-func (a *%sAPI) Get(id uint, callback func(*dto.%s, error)) {
+func (a *%sAPI) Get(id uint, callback func(*%s.%s, error)) {
 	if db == nil {
 		callback(nil, nil)
 		return
 	}
-	var item models.%s
+	var item %s.%s
 	if err := db%s.First(&item, id).Error; err != nil {
 		callback(nil, err)
 		return
 	}
 	// Try DTOMapper.FromModel if implemented (for complex relationships)
-	empty := &dto.%s{}
+	empty := &%s.%s{}
 	if mapper, ok := interface{}(empty).(interface{ FromModel(interface{}) interface{} }); ok {
 		mapped := mapper.FromModel(item)
-		if result, ok := mapped.(dto.%s); ok {
+		if result, ok := mapped.(%s.%s); ok {
 			callback(&result, nil)
 			return
 		}
 	}
 	// Fallback to basic mapping
-	result := &dto.%s{
+	result := &%s.%s{
 %s	}
 %s	callback(result, nil)
 }`,
-			m.Name, m.PluralName, detailDTO, modelName, detailPreloads,
-			detailDTO, detailDTO, detailDTO, detailFieldMapping, detailNestedMapping)
+			m.Name, m.PluralName, dtoPkg, detailDTO, modelPkg, modelName, detailPreloads,
+			dtoPkg, detailDTO, dtoPkg, detailDTO, dtoPkg, detailDTO, detailFieldMapping, detailNestedMapping)
 	} else {
 		// Use simple field mapping for DTOs without relationships
 		getMethodBody = fmt.Sprintf(`// Get returns a single %s by ID.
-func (a *%sAPI) Get(id uint, callback func(*dto.%s, error)) {
+func (a *%sAPI) Get(id uint, callback func(*%s.%s, error)) {
 	if db == nil {
 		callback(nil, nil)
 		return
 	}
-	var item models.%s
+	var item %s.%s
 	if err := db%s.First(&item, id).Error; err != nil {
 		callback(nil, err)
 		return
 	}
-	result := &dto.%s{
+	result := &%s.%s{
 %s	}
 %s	callback(result, nil)
 }`,
-			m.Name, m.PluralName, detailDTO, modelName, detailPreloads, detailDTO, detailFieldMapping, detailNestedMapping)
+			m.Name, m.PluralName, dtoPkg, detailDTO, modelPkg, modelName, detailPreloads, dtoPkg, detailDTO, detailFieldMapping, detailNestedMapping)
 	}
 
 	sb.WriteString(fmt.Sprintf(`
@@ -2235,20 +2244,20 @@ type %sAPI struct{}
 var %s = &%sAPI{}
 
 // List returns all %s records.
-func (a *%sAPI) List(callback func([]dto.%s, error)) {
+func (a *%sAPI) List(callback func([]%s.%s, error)) {
 	if db == nil {
 		callback(nil, nil)
 		return
 	}
-	var items []models.%s
+	var items []%s.%s
 	if err := db%s.Find(&items).Error; err != nil {
 		callback(nil, err)
 		return
 	}
 	// Convert to DTOs using field mappings from gux tags
-	result := make([]dto.%s, len(items))
+	result := make([]%s.%s, len(items))
 	for i, item := range items {
-		result[i] = dto.%s{
+		result[i] = %s.%s{
 %s		}
 %s	}
 	callback(result, nil)
@@ -2257,14 +2266,14 @@ func (a *%sAPI) List(callback func([]dto.%s, error)) {
 %s
 
 // Create creates a new %s (server-side stub - actual creation handled by CRUD endpoint).
-func (a *%sAPI) Create(data map[string]interface{}, callback func(*dto.%s, error)) {
+func (a *%sAPI) Create(data map[string]interface{}, callback func(*%s.%s, error)) {
 	// Server-side: this is typically not called directly
 	// The CRUD endpoint handles creation with hooks
 	callback(nil, nil)
 }
 
 // Update updates an existing %s (server-side stub).
-func (a *%sAPI) Update(id uint, data map[string]interface{}, callback func(*dto.%s, error)) {
+func (a *%sAPI) Update(id uint, data map[string]interface{}, callback func(*%s.%s, error)) {
 	// Server-side: this is typically not called directly
 	callback(nil, nil)
 }
@@ -2280,18 +2289,18 @@ func (a *%sAPI) Delete(id uint, callback func(error)) {
 		m.PluralName, m.Name,                    // var comment
 		m.PluralName, m.PluralName,              // var declaration
 		m.Name,                                  // List comment
-		m.PluralName, listDTO,                   // List signature
-		modelName,                               // List query model
+		m.PluralName, dtoPkg, listDTO,           // List signature
+		modelPkg, modelName,                     // List query model
 		listPreloads,                            // List preloads
-		listDTO,                                 // List result make
-		listDTO,                                 // List DTO type
+		dtoPkg, listDTO,                         // List result make
+		dtoPkg, listDTO,                         // List DTO type
 		listFieldMapping,                        // List field mapping
 		listNestedMapping,                       // List nested DTO mapping
 		getMethodBody,                           // Get method (generated above)
 		m.Name,                                  // Create comment
-		m.PluralName, detailDTO,                 // Create signature
+		m.PluralName, dtoPkg, detailDTO,         // Create signature
 		m.Name,                                  // Update comment
-		m.PluralName, detailDTO,                 // Update signature
+		m.PluralName, dtoPkg, detailDTO,         // Update signature
 		m.Name,                                  // Delete comment
 		m.PluralName,                            // Delete signature
 	))
@@ -2489,6 +2498,9 @@ type %s struct {
 			dtoPkg := m.DTOPackage
 			if dtoPkg == "" {
 				dtoPkg = "dto"
+			}
+			if m.IsExternal {
+				dtoPkg = "extdto"
 			}
 
 			modelCode.WriteString(fmt.Sprintf(`
@@ -2720,11 +2732,23 @@ func (a *%sAPI) Delete(id uint, callback func(error)) {
 
 	// Add dto import if any model uses DTOs
 	if dtoImport != "" {
+		needsDTO := false
+		needsExtDTO := false
 		for _, m := range models {
 			if m.ListDTO != "" || m.DetailDTO != "" {
-				imports += fmt.Sprintf("\n\n\t\"%s\"", dtoImport)
-				break
+				if m.IsExternal {
+					needsExtDTO = true
+				} else {
+					needsDTO = true
+				}
 			}
+		}
+		if needsDTO {
+			imports += fmt.Sprintf("\n\n\t\"%s\"", dtoImport)
+		}
+		if needsExtDTO {
+			extDTOPath := strings.TrimSuffix(dtoImport, "/guxgen/dto") + "/dto"
+			imports += fmt.Sprintf("\n\textdto \"%s\"", extDTOPath)
 		}
 	}
 
@@ -2877,19 +2901,44 @@ type %s struct {
 		stubCode.WriteString(generateServerAPICode(m.Name, m.PluralName))
 	}
 
+	// Check if any CRUD models are external (not in gux.config.json)
+	hasExternalCRUD := false
+	for _, m := range models {
+		if m.IsExternal {
+			hasExternalCRUD = true
+			break
+		}
+	}
+
 	// Build server-side imports
 	serverImports := fmt.Sprintf(`"gorm.io/gorm"
 
 	"%s"`, modelsImport)
 
+	// Add external models import if needed
+	if hasExternalCRUD {
+		extModelsPath := strings.TrimSuffix(modelsImport, "/guxgen/models") + "/models"
+		serverImports += fmt.Sprintf(`
+	extmodels "%s"`, extModelsPath)
+	}
+
 	// Add dto import if any models use DTOs with parsed info
+	hasDTOs := false
 	for _, m := range models {
 		if m.ListDTOInfo != nil || m.DetailDTOInfo != nil {
+			hasDTOs = true
 			serverImports += fmt.Sprintf(`
 
 	"%s"`, dtoImport)
 			break
 		}
+	}
+
+	// Add external dto import if needed
+	if hasExternalCRUD && hasDTOs {
+		extDTOPath := strings.TrimSuffix(dtoImport, "/guxgen/dto") + "/dto"
+		serverImports += fmt.Sprintf(`
+	extdto "%s"`, extDTOPath)
 	}
 
 	stubFile := fmt.Sprintf(`//go:build !js || !wasm
