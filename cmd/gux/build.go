@@ -53,16 +53,6 @@ func getModulePath() (string, error) {
 	return strings.TrimSpace(string(out)), nil
 }
 
-// getCurrentPackagePath gets the import path for the current directory
-func getCurrentPackagePath() (string, error) {
-	cmd := exec.Command("go", "list", ".")
-	out, err := cmd.Output()
-	if err != nil {
-		return "", fmt.Errorf("failed to get package path: %w", err)
-	}
-	return strings.TrimSpace(string(out)), nil
-}
-
 // findMainAppFile finds the main app file (app.go or main.go with core.New())
 func findMainAppFile() (string, error) {
 	// Check app.go first
@@ -3795,34 +3785,22 @@ func runBuildNew(tinygo bool) {
 	}
 
 	// For projects with gux.config.json, always use guxgen/ paths
-	// This ensures generated DTOs and models are correctly imported
+	// Use modulePath (from go.mod) instead of getCurrentPackagePath() (go list .)
+	// because go list fails when generated packages don't exist yet (e.g., after gux clean)
 	if hasGuxConfig {
-		pkgPath, err := getCurrentPackagePath()
-		if err != nil {
-			fmt.Printf("Error getting package path: %v\n", err)
-			os.Exit(1)
-		}
-		modelsImport = pkgPath + "/guxgen/models"
-		dtoImport = pkgPath + "/guxgen/dto"
+		modelsImport = modulePath + "/guxgen/models"
+		dtoImport = modulePath + "/guxgen/dto"
 	} else {
-		// Legacy: If no models import found, construct it from current package path
+		// Legacy: If no models import found, construct it from module path
 		if modelsImport == "" && len(crudModels) > 0 {
-			pkgPath, err := getCurrentPackagePath()
-			if err != nil {
-				fmt.Printf("Error getting package path: %v\n", err)
-				os.Exit(1)
-			}
-			modelsImport = pkgPath + "/guxgen/models"
+			modelsImport = modulePath + "/guxgen/models"
 		}
 
 		// Legacy: If no dto import found but we have DTOs, construct it
 		if dtoImport == "" {
 			for _, m := range crudModels {
 				if m.ListDTO != "" || m.DetailDTO != "" {
-					pkgPath, err := getCurrentPackagePath()
-					if err == nil {
-						dtoImport = pkgPath + "/guxgen/dto"
-					}
+					dtoImport = modulePath + "/guxgen/dto"
 					break
 				}
 			}

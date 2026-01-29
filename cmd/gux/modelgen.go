@@ -421,6 +421,8 @@ package admin
 import (
 {{- if .HasRelations}}
 	"encoding/json"
+{{- end}}
+{{- if .HasSelectRelations}}
 	"fmt"
 	"strconv"
 {{- end}}
@@ -1507,7 +1509,8 @@ type ModelTemplateData struct {
 	SectionedFields   map[string][]TemplateField
 	HasTime           bool
 	HasJSON           bool
-	HasRelations      bool
+	HasRelations         bool
+	HasSelectRelations   bool   // True if any relation uses a select dropdown (*uint or input:"select")
 	HasExternalRelations bool   // True if any relations are to models not in gux.config.json
 	DisplayField      string
 	AdminEnabled      bool   // From config.Admin - use ui components instead of inline styles
@@ -1726,6 +1729,10 @@ func prepareModelTemplateData(model *ModelDefinition, modulePath string, display
 			// Handle relations - must be done BEFORE appending to slices
 			if field.Relation != "" {
 				data.HasRelations = true
+				// Track if this relation generates a select dropdown (needs fmt/strconv)
+				if field.Type == "*uint" || field.Input == "select" {
+					data.HasSelectRelations = true
+				}
 				// Check if the related model is external (not in gux.config.json)
 				isExternal := configModels != nil && !configModels[field.Relation]
 				if isExternal {
