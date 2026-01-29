@@ -47,12 +47,16 @@ func generateGuxFiles() error {
 		// Collect Brief DTOs needed across all models
 		briefDTOs := make(map[string]BriefDTOInfo)
 
+		// Collect model names for hooks bridge generation
+		var modelNames []string
+
 		for name, model := range config.Models {
 			// Apply roles to auth preset models
 			if model.Preset == "auth" && len(config.Roles) > 0 {
 				applyRolesToAuthModel(&model, config.Roles)
 			}
 			model.Name = name
+			modelNames = append(modelNames, name)
 
 			// Collect relations for Brief DTO generation
 			for _, fields := range model.Sections {
@@ -80,8 +84,13 @@ func generateGuxFiles() error {
 			if err := GenerateSharedBriefsFile(briefDTOs); err != nil {
 				fmt.Printf("  briefs_gen.go: error - %v\n", err)
 			} else {
-				fmt.Printf("  dto/briefs_gen.go: done\n")
+				fmt.Printf("  guxgen/dto/briefs_gen.go: done\n")
 			}
+		}
+
+		// Generate consolidated hooks bridge file
+		if err := GenerateHooksBridgeFile(modelNames, modulePath); err != nil {
+			fmt.Printf("  hooks_gen.go: error - %v\n", err)
 		}
 
 		fmt.Println()

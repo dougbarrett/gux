@@ -400,7 +400,7 @@ For a model named `User` with auth preset:
 | `guxgen/admin/user_new_gen.go` | Admin create form (includes Password field) |
 | `guxgen/admin/user_detail_gen.go` | Admin detail view |
 | `guxgen/admin/user_edit_gen.go` | Admin edit form (includes Password field) |
-| `admin/user_hooks_gen.go` | Hook setter functions for customization |
+| `admin/hooks_gen.go` | Hook setter functions for all models |
 
 ## Admin Page Hooks
 
@@ -497,12 +497,10 @@ OnClick: func() {
 
 ### Generated Files
 
-For each model, the following hooks-related files are generated:
-
 | File | Location | Purpose |
 |------|----------|---------|
 | `{model}_*_gen.go` | `guxgen/admin/` | Admin pages with hook slot variables |
-| `{model}_hooks_gen.go` | `admin/` | Hook setter functions (`Set*` functions) |
+| `hooks_gen.go` | `admin/` | All hook setter functions (`Set*` functions) for all models |
 
 ### Regeneration Safety
 
