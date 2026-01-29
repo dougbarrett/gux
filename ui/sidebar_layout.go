@@ -28,7 +28,7 @@ type SidebarLayoutProps struct {
 //	})
 func SidebarLayout(props SidebarLayoutProps) core.Node {
 	class := MergeClasses(
-		"flex min-h-screen bg-gray-900",
+		"flex min-h-screen bg-gray-50 dark:bg-gray-900",
 		props.Class,
 	)
 
@@ -87,12 +87,12 @@ func SidebarMain(props SidebarMainProps) core.Node {
 	}
 
 	if showHeader && props.OnOpenMobile != nil {
-		headerClass := "md:hidden flex items-center gap-4 p-4 bg-gray-800 border-b border-gray-700"
+		headerClass := "md:hidden flex items-center gap-4 p-4 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700"
 
 		headerContent := []core.Node{
 			// Hamburger button
 			core.Button(core.Attrs{
-				Class:   "p-2 text-gray-400 hover:text-white rounded-lg hover:bg-gray-700 transition-colors cursor-pointer",
+				Class:   "p-2 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer",
 				OnClick: props.OnOpenMobile,
 				Extra: map[string]string{
 					"aria-label":    "Open sidebar",
@@ -104,7 +104,7 @@ func SidebarMain(props SidebarMainProps) core.Node {
 		// Optional title
 		if props.HeaderTitle != "" {
 			headerContent = append(headerContent,
-				core.Span(core.Class("font-semibold text-white"),
+				core.Span(core.Class("font-semibold text-gray-900 dark:text-white"),
 					core.Text(props.HeaderTitle),
 				),
 			)
@@ -145,7 +145,7 @@ type MobileMenuButtonProps struct {
 // MobileMenuButton creates a hamburger menu button for mobile.
 func MobileMenuButton(props MobileMenuButtonProps) core.Node {
 	class := MergeClasses(
-		"md:hidden p-2 text-gray-400 hover:text-white rounded-lg hover:bg-gray-700 transition-colors cursor-pointer",
+		"md:hidden p-2 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer",
 		props.Class,
 	)
 
