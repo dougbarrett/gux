@@ -1357,6 +1357,7 @@ func parseRoutesAndBundles(filename string) (map[string]*BundleInfo, map[string]
 		// Get handler - handles direct handlers (pages.Home) and wrapped handlers (pages.Layout(pages.Home))
 		handler := ""
 		pkgAlias := ""
+		innerPkgAlias := "" // For wrapped handlers that reference a second package
 		switch h := call.Args[1].(type) {
 		case *ast.SelectorExpr:
 			if ident, ok := h.X.(*ast.Ident); ok {
@@ -1367,7 +1368,7 @@ func parseRoutesAndBundles(filename string) (map[string]*BundleInfo, map[string]
 			handler = h.Name
 		case *ast.CallExpr:
 			// Wrapped handler like pages.AdminLayout(pages.Dashboard)
-			// Extract the outer function: pages.AdminLayout
+			// or tdsadmin.AdminLayout(admin.ClientNew) — two different packages
 			if sel, ok := h.Fun.(*ast.SelectorExpr); ok {
 				if ident, ok := sel.X.(*ast.Ident); ok {
 					pkgAlias = ident.Name
@@ -1377,6 +1378,10 @@ func parseRoutesAndBundles(filename string) (map[string]*BundleInfo, map[string]
 						if innerSel, ok := h.Args[0].(*ast.SelectorExpr); ok {
 							if innerIdent, ok := innerSel.X.(*ast.Ident); ok {
 								handler += "(" + innerIdent.Name + "." + innerSel.Sel.Name + ")"
+								// Track inner package if it differs from the outer one
+								if innerIdent.Name != ident.Name {
+									innerPkgAlias = innerIdent.Name
+								}
 							}
 						}
 					}
@@ -1426,9 +1431,14 @@ func parseRoutesAndBundles(filename string) (map[string]*BundleInfo, map[string]
 			bundles[bundleName].Routes = append(bundles[bundleName].Routes, route)
 		}
 
-		// Track import needed for this bundle (with alias)
-		if pkgAlias != "" {
-			if importPath, ok := imports[pkgAlias]; ok {
+		// Track imports needed for this bundle (with alias)
+		// For wrapped handlers like tdsadmin.AdminLayout(admin.ClientNew),
+		// we need to track both the outer (tdsadmin) and inner (admin) packages.
+		for _, alias := range []string{pkgAlias, innerPkgAlias} {
+			if alias == "" {
+				continue
+			}
+			if importPath, ok := imports[alias]; ok {
 				found := false
 				for _, imp := range bundles[bundleName].Imports {
 					if imp.Path == importPath {
@@ -1440,12 +1450,12 @@ func parseRoutesAndBundles(filename string) (map[string]*BundleInfo, map[string]
 					// Determine if alias differs from the default package name
 					parts := strings.Split(importPath, "/")
 					defaultPkg := parts[len(parts)-1]
-					alias := ""
-					if pkgAlias != defaultPkg {
-						alias = pkgAlias
+					importAlias := ""
+					if alias != defaultPkg {
+						importAlias = alias
 					}
 					bundles[bundleName].Imports = append(bundles[bundleName].Imports, BundleImport{
-						Alias: alias,
+						Alias: importAlias,
 						Path:  importPath,
 					})
 				}
