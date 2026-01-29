@@ -75,10 +75,16 @@ type PageRoute struct {
 }
 
 // BundleInfo represents a WASM bundle with its routes and imports
+// BundleImport represents an import with optional alias
+type BundleImport struct {
+	Alias string // Import alias (e.g., "tdsadmin"), empty if using default
+	Path  string // Import path (e.g., "github.com/.../admin")
+}
+
 type BundleInfo struct {
-	Name    string      // Bundle name (e.g., "admin")
-	Routes  []PageRoute // Routes in this bundle
-	Imports []string    // Package imports needed (e.g., "github.com/.../admin")
+	Name    string         // Bundle name (e.g., "admin")
+	Routes  []PageRoute    // Routes in this bundle
+	Imports []BundleImport // Package imports needed with aliases
 }
 
 // CRUDModel represents a registered CRUD model
@@ -1420,18 +1426,28 @@ func parseRoutesAndBundles(filename string) (map[string]*BundleInfo, map[string]
 			bundles[bundleName].Routes = append(bundles[bundleName].Routes, route)
 		}
 
-		// Track import needed for this bundle
+		// Track import needed for this bundle (with alias)
 		if pkgAlias != "" {
 			if importPath, ok := imports[pkgAlias]; ok {
 				found := false
 				for _, imp := range bundles[bundleName].Imports {
-					if imp == importPath {
+					if imp.Path == importPath {
 						found = true
 						break
 					}
 				}
 				if !found {
-					bundles[bundleName].Imports = append(bundles[bundleName].Imports, importPath)
+					// Determine if alias differs from the default package name
+					parts := strings.Split(importPath, "/")
+					defaultPkg := parts[len(parts)-1]
+					alias := ""
+					if pkgAlias != defaultPkg {
+						alias = pkgAlias
+					}
+					bundles[bundleName].Imports = append(bundles[bundleName].Imports, BundleImport{
+						Alias: alias,
+						Path:  importPath,
+					})
 				}
 			}
 		}
@@ -1811,10 +1827,11 @@ func generateBundleWasmEntryPoint(bundleName string, bundle *BundleInfo) error {
 	// Build imports section
 	var importSection strings.Builder
 	for _, imp := range imports {
-		parts := strings.Split(imp, "/")
-		alias := parts[len(parts)-1]
-		importSection.WriteString(fmt.Sprintf("\t\"%s\"\n", imp))
-		_ = alias // Alias inferred from path
+		if imp.Alias != "" {
+			importSection.WriteString(fmt.Sprintf("\t%s \"%s\"\n", imp.Alias, imp.Path))
+		} else {
+			importSection.WriteString(fmt.Sprintf("\t\"%s\"\n", imp.Path))
+		}
 	}
 
 	// Build route patterns for cross-bundle navigation detection
