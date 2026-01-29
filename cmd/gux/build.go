@@ -3702,25 +3702,43 @@ func runBuildNew(tinygo bool) {
 		os.Exit(1)
 	}
 
-	// If no models import found, construct it from current package path
-	if modelsImport == "" && len(crudModels) > 0 {
+	// Check if we have a gux.config.json - if so, use guxgen/ paths
+	hasGuxConfig := false
+	if config, err := LoadModelsConfig("."); err == nil && len(config.Models) > 0 {
+		hasGuxConfig = true
+	}
+
+	// For projects with gux.config.json, always use guxgen/ paths
+	// This ensures generated DTOs and models are correctly imported
+	if hasGuxConfig {
 		pkgPath, err := getCurrentPackagePath()
 		if err != nil {
 			fmt.Printf("Error getting package path: %v\n", err)
 			os.Exit(1)
 		}
 		modelsImport = pkgPath + "/guxgen/models"
-	}
+		dtoImport = pkgPath + "/guxgen/dto"
+	} else {
+		// Legacy: If no models import found, construct it from current package path
+		if modelsImport == "" && len(crudModels) > 0 {
+			pkgPath, err := getCurrentPackagePath()
+			if err != nil {
+				fmt.Printf("Error getting package path: %v\n", err)
+				os.Exit(1)
+			}
+			modelsImport = pkgPath + "/guxgen/models"
+		}
 
-	// If no dto import found but we have DTOs, construct it
-	if dtoImport == "" {
-		for _, m := range crudModels {
-			if m.ListDTO != "" || m.DetailDTO != "" {
-				pkgPath, err := getCurrentPackagePath()
-				if err == nil {
-					dtoImport = pkgPath + "/guxgen/dto"
+		// Legacy: If no dto import found but we have DTOs, construct it
+		if dtoImport == "" {
+			for _, m := range crudModels {
+				if m.ListDTO != "" || m.DetailDTO != "" {
+					pkgPath, err := getCurrentPackagePath()
+					if err == nil {
+						dtoImport = pkgPath + "/guxgen/dto"
+					}
+					break
 				}
-				break
 			}
 		}
 	}
