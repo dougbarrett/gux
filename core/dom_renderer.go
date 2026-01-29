@@ -136,9 +136,19 @@ func (r *DOMRenderer) RenderElement(tag string, attrs Attrs, children []Node) Re
 
 	if attrs.OnChange != nil {
 		cb := js.FuncOf(func(this js.Value, args []js.Value) any {
-			value := args[0].Get("target").Get("value").String()
+			target := args[0].Get("target")
+			var value string
+			if target.Get("type").String() == "checkbox" {
+				if target.Get("checked").Bool() {
+					value = "true"
+				} else {
+					value = "false"
+				}
+			} else {
+				value = target.Get("value").String()
+			}
 			// Debug: log the change event
-			js.Global().Get("console").Call("log", "[Gux OnChange] value:", value, "element:", args[0].Get("target").Get("name").String())
+			js.Global().Get("console").Call("log", "[Gux OnChange] value:", value, "element:", target.Get("name").String())
 			// Suppress re-renders during change events.
 			// This allows button clicks to work - the state is updated but
 			// the DOM isn't replaced, so the click event completes normally.

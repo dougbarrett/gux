@@ -674,8 +674,27 @@ func (a *App) handleUpdate(w http.ResponseWriter, r *http.Request, model CRUDMod
 		}
 	}
 
+	// Reload from DB to get accurate timestamps (CreatedAt, UpdatedAt)
+	reloaded := reflect.New(model.ModelType).Interface()
+	firstMethod := dbVal.MethodByName("First")
+	if firstMethod.IsValid() {
+		ret = firstMethod.Call([]reflect.Value{reflect.ValueOf(reloaded), reflect.ValueOf(id)})
+		if len(ret) > 0 {
+			errField := ret[0].MethodByName("Error")
+			if errField.IsValid() {
+				errVal := errField.Call(nil)
+				if len(errVal) > 0 && !errVal[0].IsNil() {
+					// Fallback to saved item if reload fails
+					reloaded = item
+				}
+			}
+		}
+	} else {
+		reloaded = item
+	}
+
 	// Convert response to DTO if configured
-	output := reflect.ValueOf(item).Elem().Interface()
+	output := reflect.ValueOf(reloaded).Elem().Interface()
 	if model.DetailDTO != nil {
 		output = a.convertSingleToDTO(output, model.DetailDTO)
 	}

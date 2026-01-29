@@ -1699,7 +1699,7 @@ func prepareModelTemplateData(model *ModelDefinition, modulePath string, display
 		Name:              model.Name,
 		NameLower:         strings.ToLower(model.Name),
 		NamePlural:        ToPlural(model.Name),
-		NamePluralLower:   strings.ToLower(ToPlural(model.Name)),
+		NamePluralLower:   strings.ToLower(toDisplayName(ToPlural(model.Name))),
 		NameDisplay:       toDisplayName(model.Name),
 		NamePluralDisplay: toDisplayName(ToPlural(model.Name)),
 		RoutePlural:       ToKebabCase(ToPlural(model.Name)),
@@ -1735,7 +1735,7 @@ func prepareModelTemplateData(model *ModelDefinition, modulePath string, display
 			if field.Relation != "" {
 				data.HasRelations = true
 				// Track if this relation generates a select dropdown (needs fmt/strconv)
-				if field.Type == "*uint" || field.Input == "select" {
+				if field.Type == "*uint" || field.Type == "uint" || field.Input == "select" {
 					data.HasSelectRelations = true
 				}
 				// Check if the related model is external (not in gux.config.json)
@@ -2001,7 +2001,7 @@ func generateFormFieldCode(field *ModelField, tf TemplateField, modelNameLower s
 %s),
 `, indent, wrapperClass, indent, indent, tf.Label, indent, indent, indent, tf.StateName, indent, tf.StateVar, indent, indent, tf.StateVar, indent, indent))
 
-	case field.Input == "select" || (field.Type == "*uint" && field.Relation != ""):
+	case field.Input == "select" || ((field.Type == "*uint" || field.Type == "uint") && field.Relation != ""):
 		// Select dropdown
 		buf.WriteString(fmt.Sprintf(`%score.Div(core.Class("%s"),
 %s	core.Label(core.Class("block text-gray-700 dark:text-gray-300 text-sm font-medium mb-2"),
@@ -2026,7 +2026,7 @@ func generateFormFieldCode(field *ModelField, tf TemplateField, modelNameLower s
 %s				if idStr == %s.Get() {
 %s					attrs.Extra = map[string]string{"selected": "selected"}
 %s				}
-%s				opts = append(opts, core.Option(attrs, core.Text(fmt.Sprintf("#%%d", item.ID))))
+%s				opts = append(opts, core.Option(attrs, core.Text(item.Name)))
 %s			}
 %s			return opts
 %s		}()...,
