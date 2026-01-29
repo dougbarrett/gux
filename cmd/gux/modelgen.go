@@ -331,7 +331,7 @@ func {{$.Name}}Cell{{.Name}}(item dto.{{$.Name}}List) core.Node {
 {{- if .IsRelation}}
 	text := "-"
 	if item.{{.DTOFieldName}} != nil {
-		text = item.{{.DTOFieldName}}.Name
+		text = item.{{.DTOFieldName}}.{{.RelationDisplayField}}
 	}
 	return tableCell{{$.Name}}(text)
 {{- else if .IsBool}}
@@ -416,8 +416,6 @@ package admin
 import (
 {{- if .HasRelations}}
 	"encoding/json"
-	"fmt"
-	"strconv"
 {{- end}}
 
 	"github.com/dougbarrett/gux/core"
@@ -1377,31 +1375,32 @@ func parseFloatPtr(s string) *float64 {
 
 // TemplateField represents a field for template rendering
 type TemplateField struct {
-	Name           string
-	Type           string
-	GoType         string
-	DTOType        string
-	DTOFieldName   string // Name of field in DTO (uses Preload name for relations)
-	RelationType   string // GORM relation model type (e.g., "User" for FK relation)
-	JSONName       string
-	Label          string
-	GormTag        string
-	StateVar       string
-	StateType      string
-	StateName      string
-	StateDefault   string
-	EditStateInit  string // Initial state value for edit form (reads from displayItem)
-	DataValue      string
-	EmptyValue     string
-	FormField      string
-	DetailField    string
-	Preload        string
-	IsRelation     bool
-	IsBool         bool
-	IsTime         bool
-	IsSlice        bool
-	IsDisplayField bool // True if this is the display field (should be clickable link)
-	FullWidth      bool // Span full width in grid layout
+	Name                 string
+	Type                 string
+	GoType               string
+	DTOType              string
+	DTOFieldName         string // Name of field in DTO (uses Preload name for relations)
+	RelationType         string // GORM relation model type (e.g., "User" for FK relation)
+	RelationDisplayField string // Display field of the related model (e.g., "FirstName" instead of "Name")
+	JSONName             string
+	Label                string
+	GormTag              string
+	StateVar             string
+	StateType            string
+	StateName            string
+	StateDefault         string
+	EditStateInit        string // Initial state value for edit form (reads from displayItem)
+	DataValue            string
+	EmptyValue           string
+	FormField            string
+	DetailField          string
+	Preload              string
+	IsRelation           bool
+	IsBool               bool
+	IsTime               bool
+	IsSlice              bool
+	IsDisplayField       bool // True if this is the display field (should be clickable link)
+	FullWidth            bool // Span full width in grid layout
 	Badge          *BadgeConfig
 }
 
@@ -1605,7 +1604,7 @@ func prepareModelTemplateData(model *ModelDefinition, modulePath string, display
 		var sectionFields []TemplateField
 
 		for _, field := range fields {
-			tf := convertToTemplateField(&field, model.Name)
+			tf := convertToTemplateField(&field, model.Name, displayFields)
 			// Mark display field for clickable links in list tables
 			if tf.Name == data.DisplayField {
 				tf.IsDisplayField = true
@@ -1660,7 +1659,7 @@ func prepareModelTemplateData(model *ModelDefinition, modulePath string, display
 	return data
 }
 
-func convertToTemplateField(field *ModelField, modelName string) TemplateField {
+func convertToTemplateField(field *ModelField, modelName string, displayFields map[string]string) TemplateField {
 	tf := TemplateField{
 		Name:         field.Name,
 		Type:         field.Type,
@@ -1674,6 +1673,16 @@ func convertToTemplateField(field *ModelField, modelName string) TemplateField {
 		IsTime:       field.Type == "time.Time" || field.Type == "*time.Time",
 		IsSlice:      IsSliceType(field.Type),
 		Badge:        field.Badge,
+	}
+
+	// Set display field for relations
+	if field.Relation != "" {
+		tf.RelationDisplayField = "Name" // Default
+		if displayFields != nil {
+			if df, ok := displayFields[field.Relation]; ok && df != "" {
+				tf.RelationDisplayField = df
+			}
+		}
 	}
 
 	// Generate GORM tag
@@ -1941,15 +1950,19 @@ func generateDetailFieldCode(field *ModelField, tf TemplateField, modelNameLower
 
 	switch {
 	case field.Relation != "" && !IsSliceType(field.Type):
-		// FK relation - show related name with nil check
+		// FK relation - show related display field with nil check
 		preloadName := strings.TrimSuffix(field.Name, "ID")
+		displayField := tf.RelationDisplayField
+		if displayField == "" {
+			displayField = "Name" // Fallback
+		}
 		return fmt.Sprintf(`%s%sDetailRow("%s", func() string {
 %s	if displayItem.%s != nil {
-%s		return displayItem.%s.Name
+%s		return displayItem.%s.%s
 %s	}
 %s	return "-"
 %s}()),
-`, indent, modelNameLower, tf.Label, indent, preloadName, indent, preloadName, indent, indent, indent)
+`, indent, modelNameLower, tf.Label, indent, preloadName, indent, preloadName, displayField, indent, indent, indent)
 
 	case field.Type == "bool":
 		return fmt.Sprintf(`%s%sDetailRow("%s", func() string {
