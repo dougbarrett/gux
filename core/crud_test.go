@@ -13,14 +13,15 @@ func TestToSnakeCase(t *testing.T) {
 		input string
 		want  string
 	}{
-		{"ID", "i_d"}, // Note: GORM uses "id" for ID, but our function splits on caps
-		{"OrderID", "order_i_d"},
+		{"ID", "id"},
+		{"OrderID", "order_id"},
 		{"Name", "name"},
 		{"FirstName", "first_name"},
 		{"CreatedAt", "created_at"},
-		{"UserID", "user_i_d"},
+		{"UserID", "user_id"},
 		{"Active", "active"},
 		{"OrderNumber", "order_number"},
+		{"HTMLParser", "html_parser"},
 	}
 
 	for _, tt := range tests {

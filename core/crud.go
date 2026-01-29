@@ -852,11 +852,23 @@ func applyQueryFilters(dbVal reflect.Value, r *http.Request, modelType reflect.T
 }
 
 // toSnakeCase converts a Go field name to snake_case for DB column names.
+// Handles consecutive uppercase letters (abbreviations) correctly:
+// OrderID → order_id, UserID → user_id, HTMLParser → html_parser
 func toSnakeCase(s string) string {
 	var result strings.Builder
 	for i, r := range s {
 		if i > 0 && r >= 'A' && r <= 'Z' {
-			result.WriteByte('_')
+			prev := rune(s[i-1])
+			if prev >= 'a' && prev <= 'z' {
+				// Lowercase→Uppercase boundary: Order|ID
+				result.WriteByte('_')
+			} else if i+1 < len(s) {
+				next := rune(s[i+1])
+				if next >= 'a' && next <= 'z' {
+					// Uppercase→Lowercase with preceding uppercase: HTM|L→P|arser
+					result.WriteByte('_')
+				}
+			}
 		}
 		result.WriteRune(r)
 	}

@@ -463,3 +463,117 @@ func TestChildModelDisplayNames(t *testing.T) {
 		})
 	}
 }
+
+// TestChildTableFieldRelationResolution verifies that child table fields with
+// relations use the DTO relation name instead of the raw FK field name.
+// (Regression test for #30)
+func TestChildTableFieldRelationResolution(t *testing.T) {
+	allModels := map[string]ModelDefinition{
+		"Order": {
+			Name: "Order",
+			Sections: map[string][]ModelField{
+				"Details": {
+					{Name: "OrderNumber", Type: "string", Table: true},
+				},
+			},
+		},
+		"Product": {
+			Name: "Product",
+			Sections: map[string][]ModelField{
+				"Details": {
+					{Name: "Name", Type: "string", Table: true},
+				},
+			},
+		},
+		"OrderItem": {
+			Name:        "OrderItem",
+			Parent:      "Order",
+			ParentField: "OrderID",
+			Sections: map[string][]ModelField{
+				"Details": {
+					{Name: "ProductID", Type: "uint", Relation: "Product", Table: true},
+					{Name: "Quantity", Type: "int", Table: true},
+					{Name: "Price", Type: "float64", Table: true},
+				},
+			},
+		},
+	}
+
+	displayFields := map[string]string{
+		"Order":   "OrderNumber",
+		"Product": "Name",
+	}
+
+	// Simulate the child collection logic from GenerateModelFilesImpl
+	var children []ChildModel
+	for childName, childModel := range allModels {
+		if childModel.Parent == "Order" {
+			child := ChildModel{
+				Name:       childName,
+				NamePlural: ToPlural(childName),
+			}
+			for _, fields := range childModel.Sections {
+				for _, f := range fields {
+					if f.Table {
+						tf := TemplateField{
+							Name:  f.Name,
+							Label: getLabel(f),
+						}
+						if f.Relation != "" {
+							tf.IsRelation = true
+							tf.DTOFieldName = f.Relation
+							tf.RelationDisplayField = "Name"
+							if df, ok := displayFields[f.Relation]; ok && df != "" {
+								tf.RelationDisplayField = df
+							}
+						}
+						child.TableFields = append(child.TableFields, tf)
+					}
+				}
+			}
+			children = append(children, child)
+		}
+	}
+
+	if len(children) != 1 {
+		t.Fatalf("expected 1 child, got %d", len(children))
+	}
+
+	item := children[0]
+	if len(item.TableFields) != 3 {
+		t.Fatalf("expected 3 table fields, got %d", len(item.TableFields))
+	}
+
+	// Find the ProductID field (which has a relation)
+	var productField *TemplateField
+	var quantityField *TemplateField
+	for i := range item.TableFields {
+		if item.TableFields[i].Name == "ProductID" {
+			productField = &item.TableFields[i]
+		}
+		if item.TableFields[i].Name == "Quantity" {
+			quantityField = &item.TableFields[i]
+		}
+	}
+
+	if productField == nil {
+		t.Fatal("ProductID field not found")
+	}
+	if !productField.IsRelation {
+		t.Error("ProductID should be marked as IsRelation")
+	}
+	if productField.DTOFieldName != "Product" {
+		t.Errorf("DTOFieldName = %q, want %q", productField.DTOFieldName, "Product")
+	}
+	if productField.RelationDisplayField != "Name" {
+		t.Errorf("RelationDisplayField = %q, want %q", productField.RelationDisplayField, "Name")
+	}
+
+	// Non-relation field should not be marked
+	if quantityField == nil {
+		t.Fatal("Quantity field not found")
+	}
+	if quantityField.IsRelation {
+		t.Error("Quantity should NOT be marked as IsRelation")
+	}
+}

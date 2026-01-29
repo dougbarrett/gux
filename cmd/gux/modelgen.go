@@ -960,7 +960,11 @@ func {{.Name}}Detail(r *core.Router) func() core.Node {
 										rows = append(rows, core.Tr(core.Class("border-t border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750"),
 											core.Td(core.Class("px-6 py-4 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300"), core.Text(fmt.Sprintf("%d", child.ID))),
 {{- range .TableFields}}
+{{- if .IsRelation}}
+											core.Td(core.Class("px-6 py-4 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300"), core.Text(func() string { if child.{{.DTOFieldName}} != nil { return child.{{.DTOFieldName}}.{{.RelationDisplayField}} }; return "" }())),
+{{- else}}
 											core.Td(core.Class("px-6 py-4 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300"), core.Text(fmt.Sprintf("%v", child.{{.Name}}))),
+{{- end}}
 {{- end}}
 											core.Td(core.Class("px-6 py-4 whitespace-nowrap text-sm"),
 												ui.Button(ui.ButtonProps{
@@ -1688,10 +1692,21 @@ func GenerateModelFilesImpl(model *ModelDefinition, optionSets map[string]Option
 				for _, fields := range childModel.Sections {
 					for _, f := range fields {
 						if f.Table {
-							child.TableFields = append(child.TableFields, TemplateField{
+							tf := TemplateField{
 								Name:  f.Name,
 								Label: getLabel(f),
-							})
+							}
+							// For relation fields (e.g., OrderID with relation "Order"),
+							// the DTO uses the relation name (Order *OrderBrief), not the FK name.
+							if f.Relation != "" {
+								tf.IsRelation = true
+								tf.DTOFieldName = f.Relation
+								tf.RelationDisplayField = "Name" // default
+								if df, ok := displayFields[f.Relation]; ok && df != "" {
+									tf.RelationDisplayField = df
+								}
+							}
+							child.TableFields = append(child.TableFields, tf)
 						}
 					}
 				}
