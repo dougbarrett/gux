@@ -423,7 +423,6 @@ import (
 	"encoding/json"
 {{- end}}
 {{- if .HasSelectRelations}}
-	"fmt"
 	"strconv"
 {{- end}}
 
@@ -2026,11 +2025,11 @@ func generateFormFieldCode(field *ModelField, tf TemplateField, modelNameLower s
 %s				if idStr == %s.Get() {
 %s					attrs.Extra = map[string]string{"selected": "selected"}
 %s				}
-%s				opts = append(opts, core.Option(attrs, core.Text(item.Name)))
+%s				opts = append(opts, core.Option(attrs, core.Text(item.%s)))
 %s			}
 %s			return opts
 %s		}()...,
-`, indent, indent, tf.Label, indent, varName, indent, indent, indent, tf.StateVar, indent, indent, indent, indent, indent, indent))
+`, indent, indent, tf.Label, indent, varName, indent, indent, indent, tf.StateVar, indent, indent, indent, tf.RelationDisplayField, indent, indent, indent))
 		} else {
 			// Static options
 			for _, opt := range field.Options {
