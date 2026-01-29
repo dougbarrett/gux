@@ -641,17 +641,27 @@ func (a *App) handleUpdate(w http.ResponseWriter, r *http.Request, model CRUDMod
 			return
 		}
 	} else {
-		// Default behavior
+		// Default behavior: fetch existing record first, then merge JSON fields.
+		// This preserves CreatedAt and other fields not included in the request.
 		item = reflect.New(model.ModelType).Interface()
+		firstMethod := dbVal.MethodByName("First")
+		if firstMethod.IsValid() {
+			ret := firstMethod.Call([]reflect.Value{reflect.ValueOf(item), reflect.ValueOf(id)})
+			if len(ret) > 0 {
+				errField := ret[0].MethodByName("Error")
+				if errField.IsValid() {
+					errVal := errField.Call(nil)
+					if len(errVal) > 0 && !errVal[0].IsNil() {
+						http.Error(w, "Not found", http.StatusNotFound)
+						return
+					}
+				}
+			}
+		}
+		// Decode JSON onto the existing record — only overwrites fields present in the request
 		if err := json.NewDecoder(r.Body).Decode(item); err != nil {
 			http.Error(w, "Invalid JSON", http.StatusBadRequest)
 			return
-		}
-		// Set ID on the item
-		itemVal := reflect.ValueOf(item).Elem()
-		idField := itemVal.FieldByName("ID")
-		if idField.IsValid() && idField.CanSet() {
-			idField.SetUint(uint64(id))
 		}
 	}
 
@@ -674,27 +684,8 @@ func (a *App) handleUpdate(w http.ResponseWriter, r *http.Request, model CRUDMod
 		}
 	}
 
-	// Reload from DB to get accurate timestamps (CreatedAt, UpdatedAt)
-	reloaded := reflect.New(model.ModelType).Interface()
-	firstMethod := dbVal.MethodByName("First")
-	if firstMethod.IsValid() {
-		ret = firstMethod.Call([]reflect.Value{reflect.ValueOf(reloaded), reflect.ValueOf(id)})
-		if len(ret) > 0 {
-			errField := ret[0].MethodByName("Error")
-			if errField.IsValid() {
-				errVal := errField.Call(nil)
-				if len(errVal) > 0 && !errVal[0].IsNil() {
-					// Fallback to saved item if reload fails
-					reloaded = item
-				}
-			}
-		}
-	} else {
-		reloaded = item
-	}
-
 	// Convert response to DTO if configured
-	output := reflect.ValueOf(reloaded).Elem().Interface()
+	output := reflect.ValueOf(item).Elem().Interface()
 	if model.DetailDTO != nil {
 		output = a.convertSingleToDTO(output, model.DetailDTO)
 	}
