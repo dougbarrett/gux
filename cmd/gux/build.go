@@ -333,6 +333,30 @@ func (a *%sAPI) List(callback func([]%s, error)) {
 	callback(result, nil)
 }
 
+// ListFiltered returns %s records matching the given filters.
+func (a *%sAPI) ListFiltered(params map[string]string, callback func([]%s, error)) {
+	if db == nil {
+		callback(nil, nil)
+		return
+	}
+	query := db
+	for k, v := range params {
+		query = query.Where(k+" = ?", v)
+	}
+	var items []models.%s
+	if err := query.Find(&items).Error; err != nil {
+		callback(nil, err)
+		return
+	}
+	result := make([]%s, len(items))
+	for i, item := range items {
+		result[i] = %s{
+			ID: item.ID,
+%s		}
+	}
+	callback(result, nil)
+}
+
 // Get returns a single %s by ID.
 func (a *%sAPI) Get(id uint, callback func(*%s, error)) {
 	if db == nil {
@@ -407,6 +431,11 @@ func (a *%sAPI) Delete(id uint, callback func(error)) {
 		modelName,                  // List query
 		modelName, modelName,       // List convert type
 		listFieldAssignments.String(), // List field assignments
+		modelName,                  // ListFiltered comment
+		pluralName, modelName,      // ListFiltered signature
+		modelName,                  // ListFiltered query
+		modelName, modelName,       // ListFiltered convert type
+		listFieldAssignments.String(), // ListFiltered field assignments
 		modelName,                  // Get comment
 		pluralName, modelName,      // Get signature
 		modelName,                  // Get query
@@ -450,6 +479,28 @@ func (a *%sAPI) List(callback func([]%s, error)) {
 	}
 	var items []models.%s
 	if err := db.Find(&items).Error; err != nil {
+		callback(nil, err)
+		return
+	}
+	result := make([]%s, len(items))
+	for i, item := range items {
+		result[i] = %s{ID: item.ID}
+	}
+	callback(result, nil)
+}
+
+// ListFiltered returns %s records matching the given filters.
+func (a *%sAPI) ListFiltered(params map[string]string, callback func([]%s, error)) {
+	if db == nil {
+		callback(nil, nil)
+		return
+	}
+	query := db
+	for k, v := range params {
+		query = query.Where(k+" = ?", v)
+	}
+	var items []models.%s
+	if err := query.Find(&items).Error; err != nil {
 		callback(nil, err)
 		return
 	}
@@ -523,6 +574,10 @@ func (a *%sAPI) Delete(id uint, callback func(error)) {
 		pluralName, modelName, // List signature
 		modelName,             // List query
 		modelName, modelName,  // List convert
+		modelName,             // ListFiltered comment
+		pluralName, modelName, // ListFiltered signature
+		modelName,             // ListFiltered query
+		modelName, modelName,  // ListFiltered convert
 		modelName,             // Get comment
 		pluralName, modelName, // Get signature
 		modelName,             // Get query
@@ -2280,6 +2335,29 @@ func (a *%sAPI) List(callback func([]%s.%s, error)) {
 	callback(result, nil)
 }
 
+// ListFiltered returns %s records matching the given filters.
+func (a *%sAPI) ListFiltered(params map[string]string, callback func([]%s.%s, error)) {
+	if db == nil {
+		callback(nil, nil)
+		return
+	}
+	query := db
+	for k, v := range params {
+		query = query.Where(k+" = ?", v)
+	}
+	var items []%s.%s
+	if err := query%s.Find(&items).Error; err != nil {
+		callback(nil, err)
+		return
+	}
+	result := make([]%s.%s, len(items))
+	for i, item := range items {
+		result[i] = %s.%s{
+%s		}
+%s	}
+	callback(result, nil)
+}
+
 %s
 
 // Create creates a new %s (server-side stub - actual creation handled by CRUD endpoint).
@@ -2313,6 +2391,14 @@ func (a *%sAPI) Delete(id uint, callback func(error)) {
 		dtoPkg, listDTO,                         // List DTO type
 		listFieldMapping,                        // List field mapping
 		listNestedMapping,                       // List nested DTO mapping
+		m.Name,                                  // ListFiltered comment
+		m.PluralName, dtoPkg, listDTO,           // ListFiltered signature
+		modelPkg, modelName,                     // ListFiltered query model
+		listPreloads,                            // ListFiltered preloads
+		dtoPkg, listDTO,                         // ListFiltered result make
+		dtoPkg, listDTO,                         // ListFiltered DTO type
+		listFieldMapping,                        // ListFiltered field mapping
+		listNestedMapping,                       // ListFiltered nested DTO mapping
 		getMethodBody,                           // Get method (generated above)
 		m.Name,                                  // Create comment
 		m.PluralName, dtoPkg, detailDTO,         // Create signature
@@ -2546,6 +2632,31 @@ func (a *%sAPI) List(callback func([]%s.%s, error)) {
 	}()
 }
 
+// ListFiltered returns %s records matching the given filters using %s DTO.
+func (a *%sAPI) ListFiltered(params map[string]string, callback func([]%s.%s, error)) {
+	go func() {
+		endpoint := a.baseURL
+		if len(params) > 0 {
+			v := make([]string, 0, len(params))
+			for k, val := range params {
+				v = append(v, k+"="+val)
+			}
+			endpoint += "?" + strings.Join(v, "&")
+		}
+		resp, err := fetch("GET", endpoint, nil)
+		if err != nil {
+			callback(nil, err)
+			return
+		}
+		var items []%s.%s
+		if err := json.Unmarshal(resp, &items); err != nil {
+			callback(nil, err)
+			return
+		}
+		callback(items, nil)
+	}()
+}
+
 // Get returns a single %s by ID using %s DTO.
 func (a *%sAPI) Get(id uint, callback func(*%s.%s, error)) {
 	go func() {
@@ -2614,6 +2725,9 @@ func (a *%sAPI) Delete(id uint, callback func(error)) {
 				m.Name, listType,                   // List comment
 				m.PluralName, dtoPkg, listType,     // List signature
 				dtoPkg, listType,                   // List body
+				m.Name, listType,                   // ListFiltered comment
+				m.PluralName, dtoPkg, listType,     // ListFiltered signature
+				dtoPkg, listType,                   // ListFiltered body
 				m.Name, detailType,                 // Get comment
 				m.PluralName, dtoPkg, detailType,   // Get signature
 				dtoPkg, detailType,                 // Get body
@@ -2643,6 +2757,31 @@ var %s = &%sAPI{baseURL: "/__gux_api/crud/%s"}
 func (a *%sAPI) List(callback func([]%s, error)) {
 	go func() {
 		resp, err := fetch("GET", a.baseURL, nil)
+		if err != nil {
+			callback(nil, err)
+			return
+		}
+		var items []%s
+		if err := json.Unmarshal(resp, &items); err != nil {
+			callback(nil, err)
+			return
+		}
+		callback(items, nil)
+	}()
+}
+
+// ListFiltered returns %s records matching the given filters.
+func (a *%sAPI) ListFiltered(params map[string]string, callback func([]%s, error)) {
+	go func() {
+		endpoint := a.baseURL
+		if len(params) > 0 {
+			v := make([]string, 0, len(params))
+			for k, val := range params {
+				v = append(v, k+"="+val)
+			}
+			endpoint += "?" + strings.Join(v, "&")
+		}
+		resp, err := fetch("GET", endpoint, nil)
 		if err != nil {
 			callback(nil, err)
 			return
@@ -2724,6 +2863,9 @@ func (a *%sAPI) Delete(id uint, callback func(error)) {
 			m.Name,                             // List comment
 			m.PluralName, m.Name,               // List signature
 			m.Name,                             // List body
+			m.Name,                             // ListFiltered comment
+			m.PluralName, m.Name,               // ListFiltered signature
+			m.Name,                             // ListFiltered body
 			m.Name,                             // Get comment
 			m.PluralName, m.Name,               // Get signature
 			m.Name,                             // Get body
@@ -2745,6 +2887,7 @@ func (a *%sAPI) Delete(id uint, callback func(error)) {
 	imports := `"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"syscall/js"`
 
 	// Add dto import if any model uses DTOs

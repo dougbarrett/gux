@@ -9,3 +9,8 @@ func ScheduleRerender(r *Router) {
 		r.rerender()
 	}
 }
+
+// wasmQuery is a no-op on server — query params are read from r.request.
+func wasmQuery(name string) string {
+	return ""
+}

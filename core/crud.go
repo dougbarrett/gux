@@ -339,6 +339,9 @@ func (a *App) handleList(w http.ResponseWriter, r *http.Request, model CRUDModel
 		}
 	}
 
+	// Apply query parameter filters (e.g., ?order_id=5&active=true)
+	dbVal = applyQueryFilters(dbVal, r, model.ModelType)
+
 	// Use reflection to call db.Find(results)
 	findMethod := dbVal.MethodByName("Find")
 	if !findMethod.IsValid() {
@@ -729,4 +732,133 @@ func (a *App) handleDelete(w http.ResponseWriter, r *http.Request, model CRUDMod
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// applyQueryFilters applies WHERE conditions to the database query based on
+// URL query parameters. Parameters are matched against the model's struct fields
+// using JSON tag names (snake_case). Only fields that exist on the model are filtered.
+func applyQueryFilters(dbVal reflect.Value, r *http.Request, modelType reflect.Type) reflect.Value {
+	query := r.URL.Query()
+	if len(query) == 0 {
+		return dbVal
+	}
+
+	// Build a map of json tag → field info for the model
+	type fieldInfo struct {
+		Name   string       // Go field name
+		Type   reflect.Type // Field type
+		Column string       // DB column name (snake_case)
+	}
+	tagMap := make(map[string]fieldInfo)
+	for i := 0; i < modelType.NumField(); i++ {
+		f := modelType.Field(i)
+		// Handle embedded structs (like gorm.Model)
+		if f.Anonymous {
+			for j := 0; j < f.Type.NumField(); j++ {
+				ef := f.Type.Field(j)
+				jsonTag := ef.Tag.Get("json")
+				if jsonTag == "" || jsonTag == "-" {
+					jsonTag = toSnakeCase(ef.Name)
+				} else {
+					jsonTag = strings.Split(jsonTag, ",")[0]
+				}
+				tagMap[jsonTag] = fieldInfo{Name: ef.Name, Type: ef.Type, Column: toSnakeCase(ef.Name)}
+			}
+			continue
+		}
+		jsonTag := f.Tag.Get("json")
+		if jsonTag == "-" {
+			continue
+		}
+		if jsonTag == "" {
+			jsonTag = toSnakeCase(f.Name)
+		} else {
+			jsonTag = strings.Split(jsonTag, ",")[0]
+		}
+		tagMap[jsonTag] = fieldInfo{Name: f.Name, Type: f.Type, Column: toSnakeCase(f.Name)}
+	}
+
+	for param, values := range query {
+		if len(values) == 0 || values[0] == "" {
+			continue
+		}
+		fi, ok := tagMap[param]
+		if !ok {
+			continue // Skip unknown parameters
+		}
+
+		// Coerce the string value to the correct type
+		var val interface{}
+		rawVal := values[0]
+		switch fi.Type.Kind() {
+		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+			if v, err := strconv.ParseUint(rawVal, 10, 64); err == nil {
+				val = v
+			}
+		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+			if v, err := strconv.ParseInt(rawVal, 10, 64); err == nil {
+				val = v
+			}
+		case reflect.Float32, reflect.Float64:
+			if v, err := strconv.ParseFloat(rawVal, 64); err == nil {
+				val = v
+			}
+		case reflect.Bool:
+			if v, err := strconv.ParseBool(rawVal); err == nil {
+				val = v
+			}
+		case reflect.String:
+			val = rawVal
+		case reflect.Ptr:
+			// Handle pointer types (e.g., *uint) — coerce the element type
+			elemKind := fi.Type.Elem().Kind()
+			switch elemKind {
+			case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+				if v, err := strconv.ParseUint(rawVal, 10, 64); err == nil {
+					val = v
+				}
+			case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+				if v, err := strconv.ParseInt(rawVal, 10, 64); err == nil {
+					val = v
+				}
+			case reflect.String:
+				val = rawVal
+			case reflect.Bool:
+				if v, err := strconv.ParseBool(rawVal); err == nil {
+					val = v
+				}
+			}
+		}
+
+		if val == nil {
+			continue // Could not coerce value
+		}
+
+		// Chain .Where("column = ?", val)
+		whereMethod := dbVal.MethodByName("Where")
+		if whereMethod.IsValid() {
+			condition := fi.Column + " = ?"
+			ret := whereMethod.Call([]reflect.Value{
+				reflect.ValueOf(condition),
+				reflect.ValueOf(val),
+			})
+			if len(ret) > 0 {
+				dbVal = ret[0]
+			}
+		}
+	}
+
+	return dbVal
+}
+
+// toSnakeCase converts a Go field name to snake_case for DB column names.
+func toSnakeCase(s string) string {
+	var result strings.Builder
+	for i, r := range s {
+		if i > 0 && r >= 'A' && r <= 'Z' {
+			result.WriteByte('_')
+		}
+		result.WriteRune(r)
+	}
+	return strings.ToLower(result.String())
 }

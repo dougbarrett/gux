@@ -897,6 +897,16 @@ func (r *Router) Path() string {
 	return ""
 }
 
+// Query returns a URL query parameter value by name.
+// On server, reads from the HTTP request URL.
+// In WASM, reads from window.location.search.
+func (r *Router) Query(name string) string {
+	if r.request != nil {
+		return r.request.URL.Query().Get(name)
+	}
+	return wasmQuery(name)
+}
+
 // DB returns the database connection for server-side queries.
 // Returns nil in WASM - use api package for client-side data fetching.
 func (r *Router) DB() interface{} {

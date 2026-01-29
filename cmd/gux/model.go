@@ -51,14 +51,17 @@ type ModelField struct {
 
 // ModelDefinition represents a complete model configuration
 type ModelDefinition struct {
-	Name       string                  `json:"-"`                      // Model name (from map key)
-	Preset     string                  `json:"preset,omitempty"`       // Preset: "auth" for authentication models
-	Display    string                  `json:"display,omitempty"`      // Display field name (for Brief DTOs and relation labels)
-	Sections   map[string][]ModelField `json:"sections"`               // Fields grouped by section
-	Preloads   []string                `json:"preloads,omitempty"`     // Relations to preload
-	Public     bool                    `json:"public,omitempty"`       // CRUD is public (no auth)
-	Roles      []string                `json:"roles,omitempty"`        // Required roles for CRUD
-	FormLayout string                  `json:"formLayout,omitempty"`   // Form layout: "stacked" (default) or "grid"
+	Name        string                  `json:"-"`                      // Model name (from map key)
+	Preset      string                  `json:"preset,omitempty"`       // Preset: "auth" for authentication models
+	Display     string                  `json:"display,omitempty"`      // Display field name (for Brief DTOs and relation labels)
+	Sections    map[string][]ModelField `json:"sections"`               // Fields grouped by section
+	Preloads    []string                `json:"preloads,omitempty"`     // Relations to preload
+	Public      bool                    `json:"public,omitempty"`       // CRUD is public (no auth)
+	Roles       []string                `json:"roles,omitempty"`        // Required roles for CRUD
+	FormLayout  string                  `json:"formLayout,omitempty"`   // Form layout: "stacked" (default) or "grid"
+	Parent      string                  `json:"parent,omitempty"`       // Parent model name for inline management (e.g., "Order")
+	ParentField string                  `json:"parentField,omitempty"`  // FK field to parent (e.g., "OrderID")
+	Sidebar     *bool                   `json:"sidebar,omitempty"`      // Show in sidebar (defaults to true, set false to hide)
 }
 
 // OptionSet defines a reusable set of select options
@@ -1075,7 +1078,13 @@ func GenerateModelFiles(model *ModelDefinition, optionSets map[string]OptionSet)
 	// Build set of models defined in gux.config.json (for detecting external relations)
 	configModels := BuildConfigModelsSet(".")
 
-	return GenerateModelFilesImpl(model, optionSets, config.Module, config.Admin, displayFields, configModels)
+	// Load all models for parent-child resolution
+	var allModels map[string]ModelDefinition
+	if modelsConfig, err := LoadModelsConfig("."); err == nil {
+		allModels = modelsConfig.Models
+	}
+
+	return GenerateModelFilesImpl(model, optionSets, config.Module, config.Admin, displayFields, configModels, allModels)
 }
 
 // BuildConfigModelsSet returns a set of model names defined in gux.config.json

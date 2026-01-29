@@ -4,6 +4,8 @@ package core
 
 import (
 	"fmt"
+	"net/url"
+	"strings"
 	"syscall/js"
 )
 
@@ -44,6 +46,19 @@ func init() {
 		println(fmt.Sprintf("[Gux State] %s key=%q value=%v router=%p state_size=%d",
 			action, key, value, router, len(router.state)))
 	}
+}
+
+// wasmQuery reads a query parameter from the browser's window.location.search.
+func wasmQuery(name string) string {
+	search := js.Global().Get("location").Get("search").String()
+	if search == "" {
+		return ""
+	}
+	vals, err := url.ParseQuery(strings.TrimPrefix(search, "?"))
+	if err != nil {
+		return ""
+	}
+	return vals.Get(name)
 }
 
 // SetInChangeEvent sets the change event flag.

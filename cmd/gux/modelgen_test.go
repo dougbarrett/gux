@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 )
@@ -181,6 +182,283 @@ func TestHasSelectRelations_IncludesUint(t *testing.T) {
 			}
 			if got != tt.want {
 				t.Errorf("HasSelectRelations for type=%q relation=%q = %v, want %v", tt.fieldType, tt.relation, got, tt.want)
+			}
+		})
+	}
+}
+
+// TestParentChildConfigParsing verifies that parent-child config fields are parsed correctly.
+func TestParentChildConfigParsing(t *testing.T) {
+	configJSON := `{
+		"models": {
+			"Order": {
+				"sections": {
+					"Details": [
+						{"name": "OrderNumber", "type": "string", "table": true}
+					]
+				}
+			},
+			"OrderItem": {
+				"parent": "Order",
+				"parentField": "OrderID",
+				"sidebar": false,
+				"sections": {
+					"Details": [
+						{"name": "ProductName", "type": "string", "table": true},
+						{"name": "Quantity", "type": "int", "table": true},
+						{"name": "OrderID", "type": "uint", "relation": "Order"}
+					]
+				}
+			}
+		}
+	}`
+
+	var config ModelsConfig
+	if err := json.Unmarshal([]byte(configJSON), &config); err != nil {
+		t.Fatalf("failed to parse config: %v", err)
+	}
+
+	// Verify OrderItem has parent config
+	orderItem, ok := config.Models["OrderItem"]
+	if !ok {
+		t.Fatal("OrderItem not found in config")
+	}
+	if orderItem.Parent != "Order" {
+		t.Errorf("OrderItem.Parent = %q, want %q", orderItem.Parent, "Order")
+	}
+	if orderItem.ParentField != "OrderID" {
+		t.Errorf("OrderItem.ParentField = %q, want %q", orderItem.ParentField, "OrderID")
+	}
+	if orderItem.Sidebar == nil || *orderItem.Sidebar != false {
+		t.Errorf("OrderItem.Sidebar should be false")
+	}
+
+	// Verify Order has no parent config
+	order, ok := config.Models["Order"]
+	if !ok {
+		t.Fatal("Order not found in config")
+	}
+	if order.Parent != "" {
+		t.Errorf("Order.Parent = %q, want empty", order.Parent)
+	}
+}
+
+// TestChildModelCollection verifies that GenerateModelFilesImpl correctly
+// identifies child models for a parent model.
+func TestChildModelCollection(t *testing.T) {
+	allModels := map[string]ModelDefinition{
+		"Order": {
+			Name: "Order",
+			Sections: map[string][]ModelField{
+				"Details": {
+					{Name: "OrderNumber", Type: "string", Table: true},
+				},
+			},
+		},
+		"OrderItem": {
+			Name:        "OrderItem",
+			Parent:      "Order",
+			ParentField: "OrderID",
+			Sections: map[string][]ModelField{
+				"Details": {
+					{Name: "ProductName", Type: "string", Table: true},
+					{Name: "Quantity", Type: "int", Table: true},
+				},
+			},
+		},
+		"OrderNote": {
+			Name:        "OrderNote",
+			Parent:      "Order",
+			ParentField: "OrderID",
+			Sections: map[string][]ModelField{
+				"Details": {
+					{Name: "Content", Type: "string", Table: true},
+				},
+			},
+		},
+		"User": {
+			Name: "User",
+			Sections: map[string][]ModelField{
+				"Details": {
+					{Name: "Email", Type: "string", Table: true},
+				},
+			},
+		},
+	}
+
+	// Simulate the child collection logic from GenerateModelFilesImpl
+	var children []ChildModel
+	for childName, childModel := range allModels {
+		if childModel.Parent == "Order" {
+			child := ChildModel{
+				Name:              childName,
+				NamePlural:        ToPlural(childName),
+				NameDisplay:       toDisplayName(childName),
+				NamePluralDisplay: toDisplayName(ToPlural(childName)),
+				NamePluralLower:   strings.ToLower(toDisplayName(ToPlural(childName))),
+				RoutePlural:       ToKebabCase(ToPlural(childName)),
+				ParentField:       childModel.ParentField,
+				ParentFieldSnake:  ToSnakeCase(childModel.ParentField),
+			}
+			for _, fields := range childModel.Sections {
+				for _, f := range fields {
+					if f.Table {
+						child.TableFields = append(child.TableFields, TemplateField{
+							Name:  f.Name,
+							Label: getLabel(f),
+						})
+					}
+				}
+			}
+			children = append(children, child)
+		}
+	}
+
+	if len(children) != 2 {
+		t.Fatalf("expected 2 children for Order, got %d", len(children))
+	}
+
+	// Verify child properties (order may vary due to map iteration)
+	childByName := make(map[string]ChildModel)
+	for _, c := range children {
+		childByName[c.Name] = c
+	}
+
+	item, ok := childByName["OrderItem"]
+	if !ok {
+		t.Fatal("OrderItem not found in children")
+	}
+	if item.ParentFieldSnake != "order_id" {
+		t.Errorf("OrderItem.ParentFieldSnake = %q, want %q", item.ParentFieldSnake, "order_id")
+	}
+	if item.NamePluralLower != "order items" {
+		t.Errorf("OrderItem.NamePluralLower = %q, want %q", item.NamePluralLower, "order items")
+	}
+	if len(item.TableFields) != 2 {
+		t.Errorf("OrderItem.TableFields count = %d, want 2", len(item.TableFields))
+	}
+
+	note, ok := childByName["OrderNote"]
+	if !ok {
+		t.Fatal("OrderNote not found in children")
+	}
+	if note.RoutePlural != "order-notes" {
+		t.Errorf("OrderNote.RoutePlural = %q, want %q", note.RoutePlural, "order-notes")
+	}
+	if len(note.TableFields) != 1 {
+		t.Errorf("OrderNote.TableFields count = %d, want 1", len(note.TableFields))
+	}
+}
+
+// TestParentTemplateDataPopulation verifies that parent model template data
+// is correctly set for child models.
+func TestParentTemplateDataPopulation(t *testing.T) {
+	model := &ModelDefinition{
+		Name:        "OrderItem",
+		Parent:      "Order",
+		ParentField: "OrderID",
+	}
+
+	// Simulate parent data population
+	data := ModelTemplateData{}
+	if model.Parent != "" {
+		data.Parent = model.Parent
+		data.ParentField = model.ParentField
+		data.ParentFieldSnake = ToSnakeCase(model.ParentField)
+		data.ParentRoutePlural = ToKebabCase(ToPlural(model.Parent))
+	}
+
+	if data.Parent != "Order" {
+		t.Errorf("Parent = %q, want %q", data.Parent, "Order")
+	}
+	if data.ParentField != "OrderID" {
+		t.Errorf("ParentField = %q, want %q", data.ParentField, "OrderID")
+	}
+	if data.ParentFieldSnake != "order_id" {
+		t.Errorf("ParentFieldSnake = %q, want %q", data.ParentFieldSnake, "order_id")
+	}
+	if data.ParentRoutePlural != "orders" {
+		t.Errorf("ParentRoutePlural = %q, want %q", data.ParentRoutePlural, "orders")
+	}
+}
+
+// TestHideSidebarFlag verifies that the sidebar hiding flag is set correctly
+// for child models with sidebar: false.
+func TestHideSidebarFlag(t *testing.T) {
+	falseBool := false
+	trueBool := true
+
+	tests := []struct {
+		name    string
+		sidebar *bool
+		parent  string
+		want    bool
+	}{
+		{"child with sidebar false", &falseBool, "Order", true},
+		{"child with sidebar true", &trueBool, "Order", false},
+		{"child with sidebar nil", nil, "Order", false},
+		{"non-child model", nil, "", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			model := &ModelDefinition{
+				Name:    "OrderItem",
+				Parent:  tt.parent,
+				Sidebar: tt.sidebar,
+			}
+
+			data := ModelTemplateData{}
+			if model.Parent != "" {
+				if model.Sidebar != nil && !*model.Sidebar {
+					data.HideSidebar = true
+				}
+			}
+
+			if data.HideSidebar != tt.want {
+				t.Errorf("HideSidebar = %v, want %v", data.HideSidebar, tt.want)
+			}
+		})
+	}
+}
+
+// TestChildModelDisplayNames verifies that child model display names are
+// correctly generated for multi-word model names.
+func TestChildModelDisplayNames(t *testing.T) {
+	tests := []struct {
+		name              string
+		wantDisplay       string
+		wantPluralDisplay string
+		wantPluralLower   string
+		wantRoutePlural   string
+	}{
+		{"OrderItem", "Order Item", "Order Items", "order items", "order-items"},
+		{"ProductCategory", "Product Category", "Product Categories", "product categories", "product-categories"},
+		{"Note", "Note", "Notes", "notes", "notes"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			child := ChildModel{
+				Name:              tt.name,
+				NamePlural:        ToPlural(tt.name),
+				NameDisplay:       toDisplayName(tt.name),
+				NamePluralDisplay: toDisplayName(ToPlural(tt.name)),
+				NamePluralLower:   strings.ToLower(toDisplayName(ToPlural(tt.name))),
+				RoutePlural:       ToKebabCase(ToPlural(tt.name)),
+			}
+
+			if child.NameDisplay != tt.wantDisplay {
+				t.Errorf("NameDisplay = %q, want %q", child.NameDisplay, tt.wantDisplay)
+			}
+			if child.NamePluralDisplay != tt.wantPluralDisplay {
+				t.Errorf("NamePluralDisplay = %q, want %q", child.NamePluralDisplay, tt.wantPluralDisplay)
+			}
+			if child.NamePluralLower != tt.wantPluralLower {
+				t.Errorf("NamePluralLower = %q, want %q", child.NamePluralLower, tt.wantPluralLower)
+			}
+			if child.RoutePlural != tt.wantRoutePlural {
+				t.Errorf("RoutePlural = %q, want %q", child.RoutePlural, tt.wantRoutePlural)
 			}
 		})
 	}

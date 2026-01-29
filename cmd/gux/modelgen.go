@@ -422,8 +422,11 @@ import (
 {{- if .HasRelations}}
 	"encoding/json"
 {{- end}}
-{{- if .HasSelectRelations}}
+{{- if or .HasSelectRelations .ParentField}}
 	"strconv"
+{{- end}}
+{{- if .ParentField}}
+	"fmt"
 {{- end}}
 
 	"github.com/dougbarrett/gux/core"
@@ -463,6 +466,10 @@ func {{.Name}}New(r *core.Router) func() core.Node {
 {{range .AllFields}}		{{.StateVar}} := r.State{{.StateType}}("{{.StateName}}", {{.StateDefault}})
 {{end}}		errorState := r.StateString("error", "")
 		successState := r.StateString("success", "")
+{{- if .ParentField}}
+		// Pre-fill parent FK from query param (e.g., /admin/items/new?{{.ParentFieldSnake}}=5)
+		parentFKFromQuery := r.Query("{{.ParentFieldSnake}}")
+{{- end}}
 
 {{- range .Relations}}
 		// {{.Label}} state
@@ -508,6 +515,14 @@ func {{.Name}}New(r *core.Router) func() core.Node {
 			data := map[string]any{
 {{range .AllFields}}				"{{.JSONName}}": {{.DataValue}},
 {{end}}			}
+{{- if .ParentField}}
+			// Override parent FK if pre-filled from query param
+			if parentFKFromQuery != "" {
+				if parentID, err := strconv.ParseUint(parentFKFromQuery, 10, 64); err == nil {
+					data["{{.ParentFieldSnake}}"] = uint(parentID)
+				}
+			}
+{{- end}}
 
 			// Call BeforeSave hook if set
 			if {{.Name}}BeforeSave != nil {
@@ -526,7 +541,16 @@ func {{.Name}}New(r *core.Router) func() core.Node {
 						{{.Name}}AfterSave(HookContext{Router: r}, result.ID, false)
 					}
 					successState.Set("{{.NameDisplay}} created successfully!")
+{{- if .ParentField}}
+					// Navigate back to parent detail if FK was pre-filled
+					if parentFKFromQuery != "" {
+						r.Navigate(fmt.Sprintf("/admin/{{.ParentRoutePlural}}/%s", parentFKFromQuery))
+					} else {
+						r.Navigate("/admin/{{.RoutePlural}}")
+					}
+{{- else}}
 					r.Navigate("/admin/{{.RoutePlural}}")
+{{- end}}
 				}
 			})
 		}
@@ -689,6 +713,9 @@ var {{.Name}}DetailSections DetailSectionsHook[dto.{{.Name}}Detail]
 // {{.Name}}Detail shows a single {{.NameLower}}.
 func {{.Name}}Detail(r *core.Router) func() core.Node {
 	var item *dto.{{.Name}}Detail
+{{- range .Children}}
+	var child{{.NamePlural}} []dto.{{.Name}}List
+{{- end}}
 
 	r.OnLoad(func() {
 		idStr := r.Param("id")
@@ -701,6 +728,13 @@ func {{.Name}}Detail(r *core.Router) func() core.Node {
 				item = result
 			}
 		})
+{{- range .Children}}
+		api.{{.NamePlural}}.ListFiltered(map[string]string{"{{.ParentFieldSnake}}": idStr}, func(result []dto.{{.Name}}List, err error) {
+			if err == nil {
+				child{{.NamePlural}} = result
+			}
+		})
+{{- end}}
 	})
 
 	return func() core.Node {
@@ -714,6 +748,13 @@ func {{.Name}}Detail(r *core.Router) func() core.Node {
 
 		var displayItem dto.{{.Name}}Detail
 		json.Unmarshal([]byte(itemState.Get()), &displayItem)
+
+{{- range .Children}}
+		child{{.NamePlural}}JSON, _ := json.Marshal(child{{.NamePlural}})
+		child{{.NamePlural}}State := r.StateString("child_{{.RoutePlural}}", string(child{{.NamePlural}}JSON))
+		var display{{.NamePlural}} []dto.{{.Name}}List
+		json.Unmarshal([]byte(child{{.NamePlural}}State.Get()), &display{{.NamePlural}})
+{{- end}}
 
 {{- if .AdminEnabled}}
 		// Delete confirmation modal state
@@ -875,6 +916,70 @@ func {{.Name}}Detail(r *core.Router) func() core.Node {
 					}),
 				},
 			}),
+{{- range .Children}}
+			// Child section: {{.NamePluralDisplay}}
+			core.Div(core.Class("mt-8"),
+				core.Div(core.Class("flex items-center justify-between mb-4"),
+					core.H3(core.Class("text-lg font-semibold text-gray-900 dark:text-white"),
+						core.Text("{{.NamePluralDisplay}}"),
+					),
+					core.A(
+						core.Attrs{
+							Href:  fmt.Sprintf("/admin/{{.RoutePlural}}/new?{{.ParentFieldSnake}}=%d", displayItem.ID),
+							Class: "inline-flex items-center gap-1 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium",
+						},
+						core.Span(core.Class("text-lg"), core.Text("+")),
+						core.Text("Add {{.NameDisplay}}"),
+					),
+				),
+				ui.Card(ui.CardProps{
+					Children: []core.Node{
+						core.Table(core.Class("w-full"),
+							core.Thead(core.Class("bg-gray-100 dark:bg-gray-700"),
+								core.Tr(core.Attrs{},
+									core.Th(core.Class("px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider"), core.Text("ID")),
+{{- range .TableFields}}
+									core.Th(core.Class("px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider"), core.Text("{{.Label}}")),
+{{- end}}
+									core.Th(core.Class("px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider"), core.Text("Actions")),
+								),
+							),
+							core.Tbody(core.Attrs{},
+								func() []core.Node {
+									if len(display{{.NamePlural}}) == 0 {
+										return []core.Node{
+											core.Tr(core.Attrs{},
+												core.Td(core.Class("px-6 py-4 text-gray-500 dark:text-gray-400 text-center"),
+													core.Text("No {{.NamePluralLower}} yet"),
+												),
+											),
+										}
+									}
+									var rows []core.Node
+									for _, child := range display{{.NamePlural}} {
+										rows = append(rows, core.Tr(core.Class("border-t border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750"),
+											core.Td(core.Class("px-6 py-4 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300"), core.Text(fmt.Sprintf("%d", child.ID))),
+{{- range .TableFields}}
+											core.Td(core.Class("px-6 py-4 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300"), core.Text(fmt.Sprintf("%v", child.{{.Name}}))),
+{{- end}}
+											core.Td(core.Class("px-6 py-4 whitespace-nowrap text-sm"),
+												ui.Button(ui.ButtonProps{
+													Variant:  ui.ButtonGhost,
+													Size:     ui.ButtonSM,
+													Children: []core.Node{core.Text("View")},
+													OnClick:  func() { r.Navigate(fmt.Sprintf("/admin/{{.RoutePlural}}/%d", child.ID)) },
+												}),
+											),
+										))
+									}
+									return rows
+								}()...,
+							),
+						),
+					},
+				}),
+			),
+{{- end}}
 		)
 {{- else}}
 		if displayItem.ID == 0 {
@@ -1517,6 +1622,25 @@ type ModelTemplateData struct {
 	FormLayout        string // "stacked" (default) or "grid" for two-column layout
 	IsAuthModel       bool   // True if model uses auth preset (adds password helpers)
 	AuthFields        []AuthField // Auth-specific fields (PasswordHash, Verified)
+	Children          []ChildModel // Child models for inline management on detail page
+	Parent            string       // Parent model name (if this is a child model)
+	ParentField       string       // FK field to parent (e.g., "OrderID")
+	ParentFieldSnake  string       // FK field snake_case (e.g., "order_id") for query params
+	ParentRoutePlural string       // Parent route plural (e.g., "orders") for navigation
+	HideSidebar       bool         // If true, hide from sidebar navigation
+}
+
+// ChildModel describes a child model for inline management on parent detail pages
+type ChildModel struct {
+	Name              string // e.g., "OrderItem"
+	NamePlural        string // e.g., "OrderItems"
+	NameDisplay       string // e.g., "Order Item"
+	NamePluralDisplay string // e.g., "Order Items"
+	NamePluralLower   string // e.g., "order items" (for empty state text)
+	RoutePlural       string // e.g., "order-items"
+	ParentField       string // e.g., "OrderID"
+	ParentFieldSnake  string // e.g., "order_id" for query parameter filtering
+	TableFields       []TemplateField // Fields to show in the child table
 }
 
 // AuthField represents an auth-specific field that needs special handling
@@ -1530,10 +1654,51 @@ type AuthField struct {
 // GenerateModelFilesImpl generates all files for a model definition
 // displayFields maps model names to their display field names (for Brief DTOs)
 // configModels is a set of model names that are defined in gux.config.json (for detecting external relations)
-func GenerateModelFilesImpl(model *ModelDefinition, optionSets map[string]OptionSet, modulePath string, adminEnabled bool, displayFields map[string]string, configModels map[string]bool) error {
+func GenerateModelFilesImpl(model *ModelDefinition, optionSets map[string]OptionSet, modulePath string, adminEnabled bool, displayFields map[string]string, configModels map[string]bool, allModels map[string]ModelDefinition) error {
 	// Prepare template data
 	data := prepareModelTemplateData(model, modulePath, displayFields, configModels)
 	data.AdminEnabled = adminEnabled
+
+	// Populate parent-child info
+	if model.Parent != "" {
+		data.Parent = model.Parent
+		data.ParentField = model.ParentField
+		data.ParentFieldSnake = ToSnakeCase(model.ParentField)
+		data.ParentRoutePlural = ToKebabCase(ToPlural(model.Parent))
+		if model.Sidebar != nil && !*model.Sidebar {
+			data.HideSidebar = true
+		}
+	}
+
+	// Find child models that declare this model as parent
+	if allModels != nil {
+		for childName, childModel := range allModels {
+			if childModel.Parent == model.Name {
+				child := ChildModel{
+					Name:              childName,
+					NamePlural:        ToPlural(childName),
+					NameDisplay:       toDisplayName(childName),
+					NamePluralDisplay: toDisplayName(ToPlural(childName)),
+					NamePluralLower:   strings.ToLower(toDisplayName(ToPlural(childName))),
+					RoutePlural:       ToKebabCase(ToPlural(childName)),
+					ParentField:       childModel.ParentField,
+					ParentFieldSnake:  ToSnakeCase(childModel.ParentField),
+				}
+				// Collect table fields from child model
+				for _, fields := range childModel.Sections {
+					for _, f := range fields {
+						if f.Table {
+							child.TableFields = append(child.TableFields, TemplateField{
+								Name:  f.Name,
+								Label: getLabel(f),
+							})
+						}
+					}
+				}
+				data.Children = append(data.Children, child)
+			}
+		}
+	}
 
 	// Create directories if needed (generated files go in guxgen/, hooks bridge in admin/)
 	dirs := []string{"guxgen/models", "guxgen/dto", "guxgen/admin", "admin"}
@@ -1611,6 +1776,18 @@ func GenerateModelFilesImpl(model *ModelDefinition, optionSets map[string]Option
 		return fmt.Errorf("generate admin edit: %w", err)
 	}
 	fmt.Printf("  %s\n", adminEditPath)
+
+	// Print sidebar note for child models
+	if data.HideSidebar {
+		fmt.Printf("  Note: %s has sidebar:false — exclude it from your admin/layout.go navItems\n", model.Name)
+	}
+
+	// Print parent-child info
+	if len(data.Children) > 0 {
+		for _, child := range data.Children {
+			fmt.Printf("  Child: %s (filtered by %s) shown on detail page\n", child.NamePlural, child.ParentFieldSnake)
+		}
+	}
 
 	return nil
 }
