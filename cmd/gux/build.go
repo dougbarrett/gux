@@ -932,18 +932,32 @@ func parseCRUDModels(filename string) ([]CRUDModel, string, string, error) {
 				dtoName := ""
 				if len(optCall.Args) >= 1 {
 					// Get DTO type name: dto.UserList{}
+					// Use canonical package name from import path, not the user's alias
+					canonicalDTOPkg := ""
+					if dtoImport != "" {
+						parts := strings.Split(dtoImport, "/")
+						canonicalDTOPkg = parts[len(parts)-1]
+					}
 					switch dtoArg := optCall.Args[0].(type) {
 					case *ast.CompositeLit:
 						if dtoSel, ok := dtoArg.Type.(*ast.SelectorExpr); ok {
 							dtoName = dtoSel.Sel.Name
-							if pkgIdent, ok := dtoSel.X.(*ast.Ident); ok {
-								model.DTOPackage = pkgIdent.Name
+							if _, ok := dtoSel.X.(*ast.Ident); ok {
+								if canonicalDTOPkg != "" {
+									model.DTOPackage = canonicalDTOPkg
+								} else {
+									model.DTOPackage = "dto"
+								}
 							}
 						}
 					case *ast.SelectorExpr:
 						dtoName = dtoArg.Sel.Name
-						if pkgIdent, ok := dtoArg.X.(*ast.Ident); ok {
-							model.DTOPackage = pkgIdent.Name
+						if _, ok := dtoArg.X.(*ast.Ident); ok {
+							if canonicalDTOPkg != "" {
+								model.DTOPackage = canonicalDTOPkg
+							} else {
+								model.DTOPackage = "dto"
+							}
 						}
 					}
 				}
@@ -3950,6 +3964,28 @@ func runBuildNew(tinygo bool) {
 		for i := range crudModels {
 			if _, inConfig := config.Models[crudModels[i].Name]; !inConfig {
 				crudModels[i].IsExternal = true
+			}
+		}
+
+		// Auto-populate ListDTO/DetailDTO for config models that don't have
+		// explicit WithListDTO/WithDetailDTO in app.go. Scaffolded models always
+		// generate DTOs in guxgen/dto/ ({Model}List, {Model}Detail), so the
+		// CRUD client should use them even if app.go omits the DTO options.
+		for i := range crudModels {
+			if crudModels[i].IsExternal {
+				continue
+			}
+			if crudModels[i].ListDTO == "" {
+				crudModels[i].ListDTO = crudModels[i].Name + "List"
+				if crudModels[i].DTOPackage == "" {
+					crudModels[i].DTOPackage = "dto"
+				}
+			}
+			if crudModels[i].DetailDTO == "" {
+				crudModels[i].DetailDTO = crudModels[i].Name + "Detail"
+				if crudModels[i].DTOPackage == "" {
+					crudModels[i].DTOPackage = "dto"
+				}
 			}
 		}
 	}

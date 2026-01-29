@@ -141,6 +141,28 @@ func generateGuxFiles() error {
 				crudModels[i].IsExternal = true
 			}
 		}
+
+		// Auto-populate ListDTO/DetailDTO for config models that don't have
+		// explicit WithListDTO/WithDetailDTO in app.go. Scaffolded models always
+		// generate DTOs in guxgen/dto/ ({Model}List, {Model}Detail), so the
+		// CRUD client should use them even if app.go omits the DTO options.
+		for i := range crudModels {
+			if crudModels[i].IsExternal {
+				continue
+			}
+			if crudModels[i].ListDTO == "" {
+				crudModels[i].ListDTO = crudModels[i].Name + "List"
+				if crudModels[i].DTOPackage == "" {
+					crudModels[i].DTOPackage = "dto"
+				}
+			}
+			if crudModels[i].DetailDTO == "" {
+				crudModels[i].DetailDTO = crudModels[i].Name + "Detail"
+				if crudModels[i].DTOPackage == "" {
+					crudModels[i].DTOPackage = "dto"
+				}
+			}
+		}
 	}
 
 	// For projects with gux.config.json, always use guxgen/ paths

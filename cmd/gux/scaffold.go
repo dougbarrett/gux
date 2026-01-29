@@ -149,14 +149,16 @@ func runInit(appName, modulePath string, authMode AuthMode, withAdmin bool, with
 			os.Exit(1)
 		}
 
-		// Check if directory has conflicting files
-		conflicts := checkForConflicts(targetDir)
-		if len(conflicts) > 0 {
-			fmt.Println("Error: directory contains files that would be overwritten:")
-			for _, f := range conflicts {
-				fmt.Printf("  - %s\n", f)
+		// Check if directory has conflicting files (skip when re-init from config)
+		if !ConfigExists(targetDir) {
+			conflicts := checkForConflicts(targetDir)
+			if len(conflicts) > 0 {
+				fmt.Println("Error: directory contains files that would be overwritten:")
+				for _, f := range conflicts {
+					fmt.Printf("  - %s\n", f)
+				}
+				os.Exit(1)
 			}
-			os.Exit(1)
 		}
 	} else {
 		// Validate app name for new directory
@@ -379,7 +381,16 @@ func runInit(appName, modulePath string, authMode AuthMode, withAdmin bool, with
 
 	fmt.Printf("Creating Gux application '%s'...\n\n", appName)
 
+	// When re-initializing from config, skip files that already exist
+	reinit := initHere && ConfigExists(targetDir)
 	for _, f := range filesToCreate {
+		destFullPath := filepath.Join(targetDir, f.destPath)
+		if reinit {
+			if _, err := os.Stat(destFullPath); err == nil {
+				fmt.Printf("  skipped %s (already exists)\n", f.destPath)
+				continue
+			}
+		}
 		if err := renderTemplate(targetDir, f.tmplPath, f.destPath, data); err != nil {
 			fmt.Printf("Error creating %s: %v\n", f.destPath, err)
 			os.Exit(1)
