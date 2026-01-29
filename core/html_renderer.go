@@ -99,6 +99,10 @@ func (r *HTMLRenderer) RenderFragment(children []Node) RenderResult {
 	return &htmlResult{html: b.String()}
 }
 
+func (r *HTMLRenderer) RenderRawHTML(content string) RenderResult {
+	return &htmlResult{html: content}
+}
+
 // htmlResult holds the result of HTML rendering.
 type htmlResult struct {
 	html string

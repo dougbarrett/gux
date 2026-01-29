@@ -82,3 +82,20 @@ type Fragment struct {
 func (f Fragment) Render(r Renderer) RenderResult {
 	return r.RenderFragment(f.Children)
 }
+
+// RawHTMLNode renders pre-built HTML/SVG markup directly without escaping.
+// Use only with trusted content (e.g., chart library SVG output).
+type RawHTMLNode struct {
+	Content string
+}
+
+func (n RawHTMLNode) Render(r Renderer) RenderResult {
+	return r.RenderRawHTML(n.Content)
+}
+
+// RawHTML creates a node that renders raw HTML content without escaping.
+// WARNING: Content is not sanitized. Only use with trusted content
+// such as SVG output from charting libraries.
+func RawHTML(content string) Node {
+	return RawHTMLNode{Content: content}
+}

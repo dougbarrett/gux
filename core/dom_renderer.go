@@ -217,6 +217,14 @@ func (r *DOMRenderer) RenderFragment(children []Node) RenderResult {
 	return &domResult{value: fragment}
 }
 
+func (r *DOMRenderer) RenderRawHTML(content string) RenderResult {
+	// Use a <template> element to parse the HTML/SVG string into DOM nodes.
+	// The browser's HTML parser handles SVG namespace correctly via innerHTML.
+	tpl := document.Call("createElement", "template")
+	tpl.Set("innerHTML", content)
+	return &domResult{value: tpl.Get("content")}
+}
+
 // domResult holds the result of DOM rendering.
 type domResult struct {
 	value js.Value

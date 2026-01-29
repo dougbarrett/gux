@@ -8,4 +8,7 @@ type Renderer interface {
 	RenderText(content string) RenderResult
 	RenderElement(tag string, attrs Attrs, children []Node) RenderResult
 	RenderFragment(children []Node) RenderResult
+	// RenderRawHTML renders pre-built HTML/SVG content without escaping.
+	// Used for embedding trusted content such as chart library SVG output.
+	RenderRawHTML(content string) RenderResult
 }
