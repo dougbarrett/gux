@@ -155,11 +155,15 @@ func generateGuxFiles() error {
 	if len(crudModels) > 0 {
 		fmt.Println("Generating API client...")
 
-		// Parse DTO files to get field mappings
+		// Parse DTO files to get field mappings (check guxgen/dto first, then dto)
 		for i := range crudModels {
 			m := &crudModels[i]
 			if m.ListDTO != "" {
-				info, err := parseDTOFile("dto", m.ListDTO)
+				info, err := parseDTOFile("guxgen/dto", m.ListDTO)
+				if err != nil {
+					// Fallback to dto/ for backwards compatibility
+					info, err = parseDTOFile("dto", m.ListDTO)
+				}
 				if err != nil {
 					fmt.Printf("Warning: could not parse DTO %s: %v\n", m.ListDTO, err)
 				} else {
@@ -167,7 +171,11 @@ func generateGuxFiles() error {
 				}
 			}
 			if m.DetailDTO != "" {
-				info, err := parseDTOFile("dto", m.DetailDTO)
+				info, err := parseDTOFile("guxgen/dto", m.DetailDTO)
+				if err != nil {
+					// Fallback to dto/ for backwards compatibility
+					info, err = parseDTOFile("dto", m.DetailDTO)
+				}
 				if err != nil {
 					fmt.Printf("Warning: could not parse DTO %s: %v\n", m.DetailDTO, err)
 				} else {

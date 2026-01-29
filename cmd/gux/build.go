@@ -2363,7 +2363,11 @@ func generateNestedDTOMapping(info *DTOInfo, resultVar, itemVar string, forList 
 		}
 
 		// Parse nested DTO type to get field mappings (e.g., UserBrief -> ID, Name)
-		nestedInfo, err := parseDTOFile("dto", dtoTypeName)
+		nestedInfo, err := parseDTOFile("guxgen/dto", dtoTypeName)
+		if err != nil {
+			// Fallback to dto/ for backwards compatibility
+			nestedInfo, err = parseDTOFile("dto", dtoTypeName)
+		}
 		if err != nil {
 			// Can't parse nested DTO - generate simple direct mapping using relation field
 			// This handles cases where the nested DTO isn't in the dto/ directory
@@ -3725,11 +3729,15 @@ func runBuildNew(tinygo bool) {
 	if len(crudModels) > 0 {
 		fmt.Println("Generating API client...")
 
-		// Parse DTO files to get field mappings
+		// Parse DTO files to get field mappings (check guxgen/dto first, then dto)
 		for i := range crudModels {
 			m := &crudModels[i]
 			if m.ListDTO != "" {
-				info, err := parseDTOFile("dto", m.ListDTO)
+				info, err := parseDTOFile("guxgen/dto", m.ListDTO)
+				if err != nil {
+					// Fallback to dto/ for backwards compatibility
+					info, err = parseDTOFile("dto", m.ListDTO)
+				}
 				if err != nil {
 					fmt.Printf("Warning: could not parse DTO %s: %v\n", m.ListDTO, err)
 				} else {
@@ -3737,7 +3745,11 @@ func runBuildNew(tinygo bool) {
 				}
 			}
 			if m.DetailDTO != "" {
-				info, err := parseDTOFile("dto", m.DetailDTO)
+				info, err := parseDTOFile("guxgen/dto", m.DetailDTO)
+				if err != nil {
+					// Fallback to dto/ for backwards compatibility
+					info, err = parseDTOFile("dto", m.DetailDTO)
+				}
 				if err != nil {
 					fmt.Printf("Warning: could not parse DTO %s: %v\n", m.DetailDTO, err)
 				} else {
