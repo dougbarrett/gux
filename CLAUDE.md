@@ -394,28 +394,29 @@ For a model named `User` with auth preset:
 
 | File | Description |
 |------|-------------|
-| `models/user_gen.go` | GORM model with SetPassword/CheckPassword methods |
-| `dto/user_gen.go` | UserList and UserDetail DTOs (excludes PasswordHash) |
-| `admin/user_list_gen.go` | Admin list page |
-| `admin/user_new_gen.go` | Admin create form (includes Password field) |
-| `admin/user_detail_gen.go` | Admin detail view |
-| `admin/user_edit_gen.go` | Admin edit form (includes Password field) |
+| `guxgen/models/user_gen.go` | GORM model with SetPassword/CheckPassword methods |
+| `guxgen/dto/user_gen.go` | UserList and UserDetail DTOs (excludes PasswordHash) |
+| `guxgen/admin/user_list_gen.go` | Admin list page |
+| `guxgen/admin/user_new_gen.go` | Admin create form (includes Password field) |
+| `guxgen/admin/user_detail_gen.go` | Admin detail view |
+| `guxgen/admin/user_edit_gen.go` | Admin edit form (includes Password field) |
+| `admin/user_hooks_gen.go` | Hook setter functions for customization |
 
 ## Admin Page Hooks
 
-Scaffolded admin pages support **view hooks** that allow customization without modifying generated code. Hooks use package-level function variables set in `init()`.
+Scaffolded admin pages support **view hooks** that allow customization without modifying generated code. Generated admin pages live in `guxgen/admin/`, and hook setter functions are generated in `admin/` for each model.
 
 ### Available Hooks
 
-| Hook | Purpose | Signature |
-|------|---------|-----------|
-| `{Model}ListActions` | Add buttons to list page header | `func(ctx HookContext) []core.Node` |
-| `{Model}ListRowActions` | Add buttons per table row | `func(ctx HookContext, item T) []core.Node` |
-| `{Model}DetailActions` | Add buttons to detail page header | `func(ctx HookContext, item T) []core.Node` |
-| `{Model}DetailSections` | Add sections to detail page body | `func(ctx HookContext, item T) []core.Node` |
-| `{Model}FormSections` | Add sections to create/edit forms | `func(ctx HookContext, isEdit bool) []core.Node` |
-| `{Model}BeforeSave` | Validate/transform before API call | `func(ctx HookContext, data map[string]any, isEdit bool) error` |
-| `{Model}AfterSave` | Run after successful save | `func(ctx HookContext, id uint, isEdit bool)` |
+| Setter Function | Purpose | Signature |
+|-----------------|---------|-----------|
+| `Set{Model}ListActions` | Add buttons to list page header | `func(ctx HookContext) []core.Node` |
+| `Set{Model}ListRowActions` | Add buttons per table row | `func(ctx HookContext, item T) []core.Node` |
+| `Set{Model}DetailActions` | Add buttons to detail page header | `func(ctx HookContext, item T) []core.Node` |
+| `Set{Model}DetailSections` | Add sections to detail page body | `func(ctx HookContext, item T) []core.Node` |
+| `Set{Model}FormSections` | Add sections to create/edit forms | `func(ctx HookContext, bool) []core.Node` |
+| `Set{Model}BeforeSave` | Validate/transform before API call | `func(ctx HookContext, data map[string]any, isEdit bool) error` |
+| `Set{Model}AfterSave` | Run after successful save | `func(ctx HookContext, id uint, isEdit bool)` |
 
 ### Usage Example
 
@@ -425,14 +426,17 @@ Create a hooks file (e.g., `admin/client_hooks.go`) - this file is never overwri
 package admin
 
 import (
+    "fmt"
+    "strings"
+
     "github.com/dougbarrett/gux/core"
     "github.com/dougbarrett/gux/ui"
-    "myapp/dto"
+    "myapp/guxgen/dto"
 )
 
 func init() {
     // Add "Export CSV" button to list page header
-    ClientListActions = func(ctx HookContext) []core.Node {
+    SetClientListActions(func(ctx HookContext) []core.Node {
         return []core.Node{
             ui.Button(ui.ButtonProps{
                 Variant:  ui.ButtonSecondary,
@@ -440,10 +444,10 @@ func init() {
                 OnClick:  func() { /* export logic */ },
             }),
         }
-    }
+    })
 
     // Add "Send Email" button to detail page
-    ClientDetailActions = func(ctx HookContext, item dto.ClientDetail) []core.Node {
+    SetClientDetailActions(func(ctx HookContext, item dto.ClientDetail) []core.Node {
         return []core.Node{
             ui.Button(ui.ButtonProps{
                 Variant:  ui.ButtonSecondary,
@@ -451,10 +455,10 @@ func init() {
                 OnClick:  func() { /* email logic */ },
             }),
         }
-    }
+    })
 
     // Add custom section to detail page
-    ClientDetailSections = func(ctx HookContext, item dto.ClientDetail) []core.Node {
+    SetClientDetailSections(func(ctx HookContext, item dto.ClientDetail) []core.Node {
         return []core.Node{
             core.Div(core.Class("mt-6 pt-4 border-t border-gray-200 dark:border-gray-700"),
                 core.H3(core.Class("text-lg font-semibold text-gray-900 dark:text-white mb-4"),
@@ -463,22 +467,22 @@ func init() {
                 // ... activity log content
             ),
         }
-    }
+    })
 
     // Validate before save (return error to cancel)
-    ClientBeforeSave = func(ctx HookContext, data map[string]any, isEdit bool) error {
+    SetClientBeforeSave(func(ctx HookContext, data map[string]any, isEdit bool) error {
         email, _ := data["email"].(string)
         if email != "" && !strings.Contains(email, "@") {
             return fmt.Errorf("invalid email format")
         }
         return nil
-    }
+    })
 }
 ```
 
 ### Hook Context
 
-`HookContext` provides access to the router for navigation and state:
+`HookContext` provides access to the router for navigation and state (re-exported from `guxgen/admin`):
 
 ```go
 type HookContext struct {
@@ -491,10 +495,19 @@ OnClick: func() {
 }
 ```
 
+### Generated Files
+
+For each model, the following hooks-related files are generated:
+
+| File | Location | Purpose |
+|------|----------|---------|
+| `{model}_*_gen.go` | `guxgen/admin/` | Admin pages with hook slot variables |
+| `{model}_hooks_gen.go` | `admin/` | Hook setter functions (`Set*` functions) |
+
 ### Regeneration Safety
 
-- Generated files (`*_gen.go`) declare hook slot variables but don't set them
-- Hook files (e.g., `client_hooks.go`) are user-owned and never overwritten
+- Generated files (`*_gen.go`) are regenerated on each `gux model regen`
+- Hook files (e.g., `client_hooks.go`) in `admin/` are user-owned and never overwritten
 - Running `gux model regen` preserves all custom hooks
 
 ## Development Notes
