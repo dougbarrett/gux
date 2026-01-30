@@ -95,7 +95,10 @@ type CRUDModel struct {
 	ListDTO    string // e.g., "UserList" - DTO type for list responses
 	DetailDTO  string // e.g., "UserDetail" - DTO type for detail responses
 	DTOPackage string // e.g., "dto" - package name for DTOs
-	IsExternal bool   // True if model is NOT in gux.config.json (manually defined)
+	IsExternal    bool   // True if model package is NOT the guxgen/models path
+	DTOIsExternal bool   // True if DTO package is NOT the guxgen/dto path
+	ModelImportPath string // Resolved import path for the model package
+	DTOImportPath   string // Resolved import path for the DTO package
 	ListDTOInfo   *DTOInfo // Parsed DTO info for list responses
 	DetailDTOInfo *DTOInfo // Parsed DTO info for detail responses
 }
@@ -871,24 +874,29 @@ func parseCRUDModels(filename string) ([]CRUDModel, string, string, error) {
 	var modelsImport string
 	var dtoImport string
 
-	// Build identifier→import path map for dto-like packages
-	// This handles the case where both guxgen/dto and dto/ exist with different aliases
+	// Build identifier→import path maps for both models and dto packages.
+	// This handles the case where both guxgen/models and models/ (or guxgen/dto
+	// and dto/) exist with different aliases, e.g.:
+	//   "myapp/guxgen/models"          → ident "models"
+	//   usermodels "myapp/models"      → ident "usermodels"
 	dtoIdentToPath := make(map[string]string)
+	modelsIdentToPath := make(map[string]string)
 	for _, imp := range node.Imports {
 		path := strings.Trim(imp.Path.Value, `"`)
+		// Determine the identifier: explicit alias or last path segment
+		var ident string
+		if imp.Name != nil {
+			ident = imp.Name.Name
+		} else {
+			parts := strings.Split(path, "/")
+			ident = parts[len(parts)-1]
+		}
 		if strings.HasSuffix(path, "/models") || strings.Contains(path, "/models") {
 			modelsImport = path
+			modelsIdentToPath[ident] = path
 		}
 		if strings.HasSuffix(path, "/dto") || strings.Contains(path, "/dto") {
 			dtoImport = path
-			// Determine the identifier: explicit alias or last path segment
-			var ident string
-			if imp.Name != nil {
-				ident = imp.Name.Name
-			} else {
-				parts := strings.Split(path, "/")
-				ident = parts[len(parts)-1]
-			}
 			dtoIdentToPath[ident] = path
 		}
 	}
@@ -908,17 +916,31 @@ func parseCRUDModels(filename string) ([]CRUDModel, string, string, error) {
 
 		if len(call.Args) >= 1 {
 			var model CRUDModel
+			var modelPkgIdent string
 
-			// Get model name from first argument: models.Counter{}
+			// Get model name and package identifier from first argument: models.Counter{}
 			switch arg := call.Args[0].(type) {
 			case *ast.CompositeLit:
 				// models.Counter{}
 				if sel, ok := arg.Type.(*ast.SelectorExpr); ok {
 					model.Name = sel.Sel.Name
+					if pkgIdent, ok := sel.X.(*ast.Ident); ok {
+						modelPkgIdent = pkgIdent.Name
+					}
 				}
 			case *ast.SelectorExpr:
 				// models.Counter
 				model.Name = arg.Sel.Name
+				if pkgIdent, ok := arg.X.(*ast.Ident); ok {
+					modelPkgIdent = pkgIdent.Name
+				}
+			}
+
+			// Resolve model import path from the package identifier
+			if modelPkgIdent != "" {
+				if importPath, ok := modelsIdentToPath[modelPkgIdent]; ok {
+					model.ModelImportPath = importPath
+				}
 			}
 
 			if model.Name == "" {
@@ -944,27 +966,26 @@ func parseCRUDModels(filename string) ([]CRUDModel, string, string, error) {
 				if len(optCall.Args) >= 1 {
 					// Get DTO type name: dto.UserList{}
 					// Resolve the package identifier to the canonical package name
-					// using the identifier→import path map built from imports
-					resolveCanonicalPkg := func(identName string) string {
-						if importPath, ok := dtoIdentToPath[identName]; ok {
-							parts := strings.Split(importPath, "/")
-							return parts[len(parts)-1]
+					// and the full import path using the identifier→import path map.
+					resolveDTOPkg := func(identName string) (canonicalName string, importPath string) {
+						if ip, ok := dtoIdentToPath[identName]; ok {
+							parts := strings.Split(ip, "/")
+							return parts[len(parts)-1], ip
 						}
-						// Fallback: use the identifier as-is
-						return identName
+						return identName, ""
 					}
 					switch dtoArg := optCall.Args[0].(type) {
 					case *ast.CompositeLit:
 						if dtoSel, ok := dtoArg.Type.(*ast.SelectorExpr); ok {
 							dtoName = dtoSel.Sel.Name
 							if pkgIdent, ok := dtoSel.X.(*ast.Ident); ok {
-								model.DTOPackage = resolveCanonicalPkg(pkgIdent.Name)
+								model.DTOPackage, model.DTOImportPath = resolveDTOPkg(pkgIdent.Name)
 							}
 						}
 					case *ast.SelectorExpr:
 						dtoName = dtoArg.Sel.Name
 						if pkgIdent, ok := dtoArg.X.(*ast.Ident); ok {
-							model.DTOPackage = resolveCanonicalPkg(pkgIdent.Name)
+							model.DTOPackage, model.DTOImportPath = resolveDTOPkg(pkgIdent.Name)
 						}
 					}
 				}
@@ -2229,11 +2250,15 @@ func buildWasmBundle(bundleName string, tinygo bool) error {
 func generateServerDTOCode(m CRUDModel) string {
 	var sb strings.Builder
 
-	// Use correct package prefix for external models
+	// Use correct package prefix for external models and DTOs independently.
+	// A model can be external (from local models/) while its DTOs are internal
+	// (from guxgen/dto), or vice versa.
 	modelPkg := "models"
 	dtoPkg := "dto"
 	if m.IsExternal {
 		modelPkg = "extmodels"
+	}
+	if m.DTOIsExternal {
 		dtoPkg = "extdto"
 	}
 
@@ -2623,7 +2648,7 @@ type %s struct {
 			if dtoPkg == "" {
 				dtoPkg = "dto"
 			}
-			if m.IsExternal {
+			if m.DTOIsExternal {
 				dtoPkg = "extdto"
 			}
 
@@ -2917,7 +2942,7 @@ func (a *%sAPI) Delete(id uint, callback func(error)) {
 		needsExtDTO := false
 		for _, m := range models {
 			if m.ListDTO != "" || m.DetailDTO != "" {
-				if m.IsExternal {
+				if m.DTOIsExternal {
 					needsExtDTO = true
 				} else {
 					needsDTO = true
@@ -3082,14 +3107,19 @@ type %s struct {
 		stubCode.WriteString(generateServerAPICode(m.Name, m.PluralName))
 	}
 
-	// Check if any CRUD models are external (not in gux.config.json)
-	hasExternalCRUD := false
+	// Check if any CRUD models have external models or external DTOs
+	hasExternalModels := false
 	hasExternalDTOs := false
+	hasInternalDTOs := false
 	for _, m := range models {
 		if m.IsExternal {
-			hasExternalCRUD = true
-			if m.ListDTOInfo != nil || m.DetailDTOInfo != nil {
+			hasExternalModels = true
+		}
+		if m.ListDTOInfo != nil || m.DetailDTOInfo != nil {
+			if m.DTOIsExternal {
 				hasExternalDTOs = true
+			} else {
+				hasInternalDTOs = true
 			}
 		}
 	}
@@ -3100,23 +3130,20 @@ type %s struct {
 	"%s"`, modelsImport)
 
 	// Add external models import if needed
-	if hasExternalCRUD {
+	if hasExternalModels {
 		extModelsPath := strings.TrimSuffix(modelsImport, "/guxgen/models") + "/models"
 		serverImports += fmt.Sprintf(`
 	extmodels "%s"`, extModelsPath)
 	}
 
-	// Add dto import if any models use DTOs with parsed info
-	for _, m := range models {
-		if m.ListDTOInfo != nil || m.DetailDTOInfo != nil {
-			serverImports += fmt.Sprintf(`
+	// Add dto import if any models use internal (guxgen) DTOs with parsed info
+	if hasInternalDTOs {
+		serverImports += fmt.Sprintf(`
 
 	"%s"`, dtoImport)
-			break
-		}
 	}
 
-	// Add external dto import only if external models actually use DTOs
+	// Add external dto import only if some models have external DTOs
 	if hasExternalDTOs {
 		extDTOPath := strings.TrimSuffix(dtoImport, "/guxgen/dto") + "/dto"
 		serverImports += fmt.Sprintf(`
@@ -3968,10 +3995,27 @@ func runBuildNew(tinygo bool) {
 	if config, err := LoadModelsConfig("."); err == nil && len(config.Models) > 0 {
 		hasGuxConfig = true
 
-		// Mark CRUD models that are NOT in gux.config.json as external
+		guxgenModelsPath := modulePath + "/guxgen/models"
+		guxgenDTOPath := modulePath + "/guxgen/dto"
+
+		// Determine model and DTO externality from actual import paths.
+		// A model is "external" if it comes from a non-guxgen package (e.g., local models/).
+		// A DTO is "external" if it comes from a non-guxgen package (e.g., local dto/).
+		// These are tracked independently — an external model can have internal DTOs.
 		for i := range crudModels {
-			if _, inConfig := config.Models[crudModels[i].Name]; !inConfig {
+			// Model externality: compare resolved import path with guxgen/models
+			if crudModels[i].ModelImportPath != "" && crudModels[i].ModelImportPath != guxgenModelsPath {
 				crudModels[i].IsExternal = true
+			} else if crudModels[i].ModelImportPath == "" {
+				// Fallback: if no import path resolved, check config membership
+				if _, inConfig := config.Models[crudModels[i].Name]; !inConfig {
+					crudModels[i].IsExternal = true
+				}
+			}
+
+			// DTO externality: compare resolved import path with guxgen/dto
+			if crudModels[i].DTOImportPath != "" && crudModels[i].DTOImportPath != guxgenDTOPath {
+				crudModels[i].DTOIsExternal = true
 			}
 		}
 

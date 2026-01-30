@@ -135,10 +135,21 @@ func generateGuxFiles() error {
 	if config, err := LoadModelsConfig("."); err == nil && len(config.Models) > 0 {
 		hasGuxConfig = true
 
-		// Mark CRUD models that are NOT in gux.config.json as external
+		guxgenModelsPath := modulePath + "/guxgen/models"
+		guxgenDTOPath := modulePath + "/guxgen/dto"
+
+		// Determine model and DTO externality from actual import paths.
 		for i := range crudModels {
-			if _, inConfig := config.Models[crudModels[i].Name]; !inConfig {
+			if crudModels[i].ModelImportPath != "" && crudModels[i].ModelImportPath != guxgenModelsPath {
 				crudModels[i].IsExternal = true
+			} else if crudModels[i].ModelImportPath == "" {
+				if _, inConfig := config.Models[crudModels[i].Name]; !inConfig {
+					crudModels[i].IsExternal = true
+				}
+			}
+
+			if crudModels[i].DTOImportPath != "" && crudModels[i].DTOImportPath != guxgenDTOPath {
+				crudModels[i].DTOIsExternal = true
 			}
 		}
 
