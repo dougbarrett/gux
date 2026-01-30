@@ -3927,6 +3927,7 @@ func buildBinary() error {
 	fmt.Println("Building binary...")
 
 	cmd := exec.Command("go", "build", "-o", "bin/app", ".")
+	cmd.Env = append(os.Environ(), "CGO_ENABLED=0")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
