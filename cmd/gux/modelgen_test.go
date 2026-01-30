@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"os"
 	"strings"
 	"testing"
 )
@@ -575,5 +576,308 @@ func TestChildTableFieldRelationResolution(t *testing.T) {
 	}
 	if quantityField.IsRelation {
 		t.Error("Quantity should NOT be marked as IsRelation")
+	}
+}
+
+// setupModelGenTestDir creates a temporary directory with the required structure
+// for testing GenerateModelFilesImpl, and changes the working directory to it.
+// Returns a cleanup function to restore the original working directory.
+func setupModelGenTestDir(t *testing.T) (string, func()) {
+	t.Helper()
+	dir := t.TempDir()
+	origDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("get cwd: %v", err)
+	}
+	if err := os.Chdir(dir); err != nil {
+		t.Fatalf("chdir to temp: %v", err)
+	}
+	// Create required directories
+	for _, d := range []string{"guxgen/models", "guxgen/dto", "guxgen/admin"} {
+		if err := os.MkdirAll(d, 0755); err != nil {
+			t.Fatalf("mkdir %s: %v", d, err)
+		}
+	}
+	return dir, func() {
+		os.Chdir(origDir)
+	}
+}
+
+// TestTypeAlias_ModelFileGenerated verifies that when NO manual model file
+// exists, a full model file is generated in guxgen/models/.
+func TestTypeAlias_ModelFileGenerated(t *testing.T) {
+	_, cleanup := setupModelGenTestDir(t)
+	defer cleanup()
+
+	model := &ModelDefinition{
+		Name: "Product",
+		Sections: map[string][]ModelField{
+			"Details": {
+				{Name: "Name", Type: "string", Table: true},
+			},
+		},
+	}
+
+	err := GenerateModelFilesImpl(model, nil, "myapp", false, nil, nil, nil)
+	if err != nil {
+		t.Fatalf("GenerateModelFilesImpl: %v", err)
+	}
+
+	// Check that a full model file was generated (not a type alias)
+	content, err := os.ReadFile("guxgen/models/product_gen.go")
+	if err != nil {
+		t.Fatalf("read generated model: %v", err)
+	}
+
+	s := string(content)
+	if !strings.Contains(s, "type Product struct") {
+		t.Error("expected full model struct definition, got type alias or missing struct")
+	}
+	if strings.Contains(s, "type Product =") {
+		t.Error("should NOT be a type alias when no manual file exists")
+	}
+}
+
+// TestTypeAlias_ManualModelGeneratesAlias verifies that when a manual model
+// file exists in models/, a type alias is generated in guxgen/models/.
+// (Regression test for #48)
+func TestTypeAlias_ManualModelGeneratesAlias(t *testing.T) {
+	_, cleanup := setupModelGenTestDir(t)
+	defer cleanup()
+
+	// Create a manual model file
+	os.MkdirAll("models", 0755)
+	os.WriteFile("models/user.go", []byte("package models\n\ntype User struct {}\n"), 0644)
+
+	model := &ModelDefinition{
+		Name:   "User",
+		Preset: "auth",
+		Sections: map[string][]ModelField{
+			"Account": {
+				{Name: "Email", Type: "string", Table: true},
+				{Name: "Name", Type: "string", Table: true},
+			},
+		},
+	}
+
+	err := GenerateModelFilesImpl(model, nil, "myapp", false, nil, nil, nil)
+	if err != nil {
+		t.Fatalf("GenerateModelFilesImpl: %v", err)
+	}
+
+	// Check that a type alias was generated
+	content, err := os.ReadFile("guxgen/models/user_gen.go")
+	if err != nil {
+		t.Fatalf("read type alias file: %v", err)
+	}
+
+	s := string(content)
+	if !strings.Contains(s, "type User = manualmodels.User") {
+		t.Errorf("expected type alias 'type User = manualmodels.User', got:\n%s", s)
+	}
+	if !strings.Contains(s, `import manualmodels "myapp/models"`) {
+		t.Errorf("expected import of manual models package, got:\n%s", s)
+	}
+	// Should NOT contain a struct definition
+	if strings.Contains(s, "type User struct") {
+		t.Error("type alias file should NOT contain struct definition")
+	}
+}
+
+// TestTypeAlias_ManualDTOGeneratesAlias verifies that when a manual DTO file
+// exists in dto/, type aliases are generated in guxgen/dto/.
+// (Regression test for #48)
+func TestTypeAlias_ManualDTOGeneratesAlias(t *testing.T) {
+	_, cleanup := setupModelGenTestDir(t)
+	defer cleanup()
+
+	// Create a manual DTO file
+	os.MkdirAll("dto", 0755)
+	os.WriteFile("dto/user.go", []byte("package dto\n\ntype UserList struct {}\ntype UserDetail struct {}\n"), 0644)
+
+	model := &ModelDefinition{
+		Name:   "User",
+		Preset: "auth",
+		Sections: map[string][]ModelField{
+			"Account": {
+				{Name: "Email", Type: "string", Table: true},
+			},
+		},
+	}
+
+	err := GenerateModelFilesImpl(model, nil, "myapp", false, nil, nil, nil)
+	if err != nil {
+		t.Fatalf("GenerateModelFilesImpl: %v", err)
+	}
+
+	// Check that type aliases were generated for DTOs
+	content, err := os.ReadFile("guxgen/dto/user_gen.go")
+	if err != nil {
+		t.Fatalf("read DTO type alias file: %v", err)
+	}
+
+	s := string(content)
+	if !strings.Contains(s, "type UserList = manualdto.UserList") {
+		t.Errorf("expected UserList type alias, got:\n%s", s)
+	}
+	if !strings.Contains(s, "type UserDetail = manualdto.UserDetail") {
+		t.Errorf("expected UserDetail type alias, got:\n%s", s)
+	}
+	if !strings.Contains(s, `import manualdto "myapp/dto"`) {
+		t.Errorf("expected import of manual dto package, got:\n%s", s)
+	}
+}
+
+// TestTypeAlias_NoDTOAliasWhenNoManualFile verifies that when NO manual DTO
+// file exists, full DTO structs are generated (not type aliases).
+func TestTypeAlias_NoDTOAliasWhenNoManualFile(t *testing.T) {
+	_, cleanup := setupModelGenTestDir(t)
+	defer cleanup()
+
+	model := &ModelDefinition{
+		Name: "Product",
+		Sections: map[string][]ModelField{
+			"Details": {
+				{Name: "Name", Type: "string", Table: true},
+			},
+		},
+	}
+
+	err := GenerateModelFilesImpl(model, nil, "myapp", false, nil, nil, nil)
+	if err != nil {
+		t.Fatalf("GenerateModelFilesImpl: %v", err)
+	}
+
+	content, err := os.ReadFile("guxgen/dto/product_gen.go")
+	if err != nil {
+		t.Fatalf("read generated DTO: %v", err)
+	}
+
+	s := string(content)
+	if !strings.Contains(s, "type ProductList struct") {
+		t.Error("expected full ProductList struct definition")
+	}
+	if strings.Contains(s, "type ProductList =") {
+		t.Error("should NOT be a type alias when no manual file exists")
+	}
+}
+
+// TestTypeAlias_BothManualFilesGenerateBothAliases verifies that when both
+// manual model and manual DTO files exist, both type alias files are generated.
+// (Full scenario for #48)
+func TestTypeAlias_BothManualFilesGenerateBothAliases(t *testing.T) {
+	_, cleanup := setupModelGenTestDir(t)
+	defer cleanup()
+
+	// Create both manual files
+	os.MkdirAll("models", 0755)
+	os.MkdirAll("dto", 0755)
+	os.WriteFile("models/user.go", []byte("package models\n\ntype User struct {}\n"), 0644)
+	os.WriteFile("dto/user.go", []byte("package dto\n\ntype UserList struct {}\ntype UserDetail struct {}\n"), 0644)
+
+	model := &ModelDefinition{
+		Name:   "User",
+		Preset: "auth",
+		Sections: map[string][]ModelField{
+			"Account": {
+				{Name: "Email", Type: "string", Table: true},
+				{Name: "Name", Type: "string", Table: true},
+				{Name: "Role", Type: "string", Table: true},
+			},
+		},
+	}
+
+	err := GenerateModelFilesImpl(model, nil, "myapp", false, nil, nil, nil)
+	if err != nil {
+		t.Fatalf("GenerateModelFilesImpl: %v", err)
+	}
+
+	// Model alias
+	modelContent, err := os.ReadFile("guxgen/models/user_gen.go")
+	if err != nil {
+		t.Fatalf("read model alias: %v", err)
+	}
+	if !strings.Contains(string(modelContent), "type User = manualmodels.User") {
+		t.Error("missing model type alias")
+	}
+
+	// DTO alias
+	dtoContent, err := os.ReadFile("guxgen/dto/user_gen.go")
+	if err != nil {
+		t.Fatalf("read DTO alias: %v", err)
+	}
+	if !strings.Contains(string(dtoContent), "type UserList = manualdto.UserList") {
+		t.Error("missing UserList type alias")
+	}
+	if !strings.Contains(string(dtoContent), "type UserDetail = manualdto.UserDetail") {
+		t.Error("missing UserDetail type alias")
+	}
+}
+
+// TestTypeAlias_ModulePathInImport verifies that the module path is correctly
+// embedded in the type alias import statements.
+func TestTypeAlias_ModulePathInImport(t *testing.T) {
+	_, cleanup := setupModelGenTestDir(t)
+	defer cleanup()
+
+	os.MkdirAll("models", 0755)
+	os.WriteFile("models/client.go", []byte("package models\n\ntype Client struct {}\n"), 0644)
+
+	model := &ModelDefinition{
+		Name: "Client",
+		Sections: map[string][]ModelField{
+			"Details": {
+				{Name: "Name", Type: "string", Table: true},
+			},
+		},
+	}
+
+	err := GenerateModelFilesImpl(model, nil, "github.com/example/myproject", false, nil, nil, nil)
+	if err != nil {
+		t.Fatalf("GenerateModelFilesImpl: %v", err)
+	}
+
+	content, err := os.ReadFile("guxgen/models/client_gen.go")
+	if err != nil {
+		t.Fatalf("read model alias: %v", err)
+	}
+
+	s := string(content)
+	if !strings.Contains(s, `import manualmodels "github.com/example/myproject/models"`) {
+		t.Errorf("expected full module path in import, got:\n%s", s)
+	}
+}
+
+// TestTypeAlias_MultiWordModelName verifies that type aliases use the correct
+// snake_case file names for multi-word model names.
+func TestTypeAlias_MultiWordModelName(t *testing.T) {
+	_, cleanup := setupModelGenTestDir(t)
+	defer cleanup()
+
+	os.MkdirAll("models", 0755)
+	os.WriteFile("models/lead_source.go", []byte("package models\n\ntype LeadSource struct {}\n"), 0644)
+
+	model := &ModelDefinition{
+		Name: "LeadSource",
+		Sections: map[string][]ModelField{
+			"Details": {
+				{Name: "Name", Type: "string", Table: true},
+			},
+		},
+	}
+
+	err := GenerateModelFilesImpl(model, nil, "myapp", false, nil, nil, nil)
+	if err != nil {
+		t.Fatalf("GenerateModelFilesImpl: %v", err)
+	}
+
+	content, err := os.ReadFile("guxgen/models/lead_source_gen.go")
+	if err != nil {
+		t.Fatalf("read model alias for LeadSource: %v", err)
+	}
+
+	s := string(content)
+	if !strings.Contains(s, "type LeadSource = manualmodels.LeadSource") {
+		t.Errorf("expected LeadSource type alias, got:\n%s", s)
 	}
 }
