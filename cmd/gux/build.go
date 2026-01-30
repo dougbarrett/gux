@@ -48,9 +48,30 @@ func getModulePath() (string, error) {
 	cmd := exec.Command("go", "list", "-m")
 	out, err := cmd.Output()
 	if err != nil {
+		// Fallback: parse module path directly from go.mod
+		// This handles cases where go list fails (e.g., after gux clean
+		// when generated packages don't exist yet)
+		if mod, parseErr := parseGoModModule(); parseErr == nil {
+			return mod, nil
+		}
 		return "", fmt.Errorf("failed to get module path: %w", err)
 	}
 	return strings.TrimSpace(string(out)), nil
+}
+
+// parseGoModModule reads the module path directly from go.mod without invoking go tools.
+func parseGoModModule() (string, error) {
+	data, err := os.ReadFile("go.mod")
+	if err != nil {
+		return "", err
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "module ") {
+			return strings.TrimSpace(strings.TrimPrefix(line, "module")), nil
+		}
+	}
+	return "", fmt.Errorf("module directive not found in go.mod")
 }
 
 // findMainAppFile finds the main app file (app.go or main.go with core.New())

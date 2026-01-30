@@ -106,6 +106,11 @@ func generateGuxFiles() error {
 		fmt.Println()
 	}
 
+	// Regenerate scaffold files in guxgen/ from templates
+	if err := regenerateScaffoldFiles(modulePath); err != nil {
+		fmt.Printf("Warning: scaffold regeneration failed: %v\n", err)
+	}
+
 	// Find main app file
 	appFile, err := findMainAppFile()
 	if err != nil {
@@ -406,6 +411,92 @@ func regenerateDockerfile() error {
 	}
 
 	return renderTemplate(".", "templates/Dockerfile.tmpl", "Dockerfile", data)
+}
+
+// regenerateScaffoldFiles regenerates scaffold template files in guxgen/
+// that were originally created by gux init (layout, dashboard, settings, auth DTOs).
+// This ensures gux clean && gux gen produces a complete guxgen/ directory.
+func regenerateScaffoldFiles(modulePath string) error {
+	guxConfig, err := LoadConfig(".")
+	if err != nil {
+		// No config file — nothing to regenerate
+		return nil
+	}
+
+	// Derive app name from directory (same as gux init)
+	cwd, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("getting working directory: %w", err)
+	}
+	appName := filepath.Base(cwd)
+
+	guxVersion := getVersion()
+	if guxVersion == "dev" {
+		guxVersion = "latest"
+	}
+
+	withAuth := guxConfig.Auth != "" && guxConfig.Auth != "none"
+	publicSignup := guxConfig.Auth == "public"
+
+	data := TemplateData{
+		AppName:      appName,
+		ModulePath:   modulePath,
+		GuxModule:    "github.com/dougbarrett/gux",
+		GuxVersion:   guxVersion,
+		WithAuth:     withAuth,
+		PublicSignup: publicSignup,
+		WithAdmin:    guxConfig.Admin,
+		Port:         guxConfig.Port,
+	}
+
+	// Regenerate admin scaffold files
+	if guxConfig.Admin {
+		scaffoldFiles := []struct {
+			tmplPath string
+			destPath string
+		}{
+			{"templates/admin/admin/layout.go.tmpl", "guxgen/admin/layout.go"},
+			{"templates/admin/admin/dashboard.go.tmpl", "guxgen/admin/dashboard.go"},
+			{"templates/admin/admin/settings.go.tmpl", "guxgen/admin/settings.go"},
+		}
+
+		// Admin without auth also gets static user pages and breadcrumb DTO
+		if !withAuth {
+			scaffoldFiles = append(scaffoldFiles,
+				struct {
+					tmplPath string
+					destPath string
+				}{"templates/admin/admin/users.go.tmpl", "guxgen/admin/users.go"},
+				struct {
+					tmplPath string
+					destPath string
+				}{"templates/admin/admin/user_new.go.tmpl", "guxgen/admin/user_new.go"},
+				struct {
+					tmplPath string
+					destPath string
+				}{"templates/admin/admin/user_detail.go.tmpl", "guxgen/admin/user_detail.go"},
+				struct {
+					tmplPath string
+					destPath string
+				}{"templates/admin/dto/breadcrumb.go.tmpl", "guxgen/dto/breadcrumb.go"},
+			)
+		}
+
+		for _, f := range scaffoldFiles {
+			if err := renderTemplate(".", f.tmplPath, f.destPath, data); err != nil {
+				return fmt.Errorf("regenerate %s: %w", f.destPath, err)
+			}
+		}
+	}
+
+	// Regenerate auth DTO files (LoginRequest, LoginResponse, LogoutResponse, Breadcrumb)
+	if withAuth {
+		if err := renderTemplate(".", "templates/admin/dto/auth.go.tmpl", "guxgen/dto/auth.go", data); err != nil {
+			return fmt.Errorf("regenerate guxgen/dto/auth.go: %w", err)
+		}
+	}
+
+	return nil
 }
 
 // Legacy generate functions below - kept for backward compatibility
