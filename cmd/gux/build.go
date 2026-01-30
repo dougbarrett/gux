@@ -871,7 +871,9 @@ func parseCRUDModels(filename string) ([]CRUDModel, string, string, error) {
 	var modelsImport string
 	var dtoImport string
 
-	// Find models and dto imports
+	// Build identifier→import path map for dto-like packages
+	// This handles the case where both guxgen/dto and dto/ exist with different aliases
+	dtoIdentToPath := make(map[string]string)
 	for _, imp := range node.Imports {
 		path := strings.Trim(imp.Path.Value, `"`)
 		if strings.HasSuffix(path, "/models") || strings.Contains(path, "/models") {
@@ -879,6 +881,15 @@ func parseCRUDModels(filename string) ([]CRUDModel, string, string, error) {
 		}
 		if strings.HasSuffix(path, "/dto") || strings.Contains(path, "/dto") {
 			dtoImport = path
+			// Determine the identifier: explicit alias or last path segment
+			var ident string
+			if imp.Name != nil {
+				ident = imp.Name.Name
+			} else {
+				parts := strings.Split(path, "/")
+				ident = parts[len(parts)-1]
+			}
+			dtoIdentToPath[ident] = path
 		}
 	}
 
@@ -932,32 +943,28 @@ func parseCRUDModels(filename string) ([]CRUDModel, string, string, error) {
 				dtoName := ""
 				if len(optCall.Args) >= 1 {
 					// Get DTO type name: dto.UserList{}
-					// Use canonical package name from import path, not the user's alias
-					canonicalDTOPkg := ""
-					if dtoImport != "" {
-						parts := strings.Split(dtoImport, "/")
-						canonicalDTOPkg = parts[len(parts)-1]
+					// Resolve the package identifier to the canonical package name
+					// using the identifier→import path map built from imports
+					resolveCanonicalPkg := func(identName string) string {
+						if importPath, ok := dtoIdentToPath[identName]; ok {
+							parts := strings.Split(importPath, "/")
+							return parts[len(parts)-1]
+						}
+						// Fallback: use the identifier as-is
+						return identName
 					}
 					switch dtoArg := optCall.Args[0].(type) {
 					case *ast.CompositeLit:
 						if dtoSel, ok := dtoArg.Type.(*ast.SelectorExpr); ok {
 							dtoName = dtoSel.Sel.Name
-							if _, ok := dtoSel.X.(*ast.Ident); ok {
-								if canonicalDTOPkg != "" {
-									model.DTOPackage = canonicalDTOPkg
-								} else {
-									model.DTOPackage = "dto"
-								}
+							if pkgIdent, ok := dtoSel.X.(*ast.Ident); ok {
+								model.DTOPackage = resolveCanonicalPkg(pkgIdent.Name)
 							}
 						}
 					case *ast.SelectorExpr:
 						dtoName = dtoArg.Sel.Name
-						if _, ok := dtoArg.X.(*ast.Ident); ok {
-							if canonicalDTOPkg != "" {
-								model.DTOPackage = canonicalDTOPkg
-							} else {
-								model.DTOPackage = "dto"
-							}
+						if pkgIdent, ok := dtoArg.X.(*ast.Ident); ok {
+							model.DTOPackage = resolveCanonicalPkg(pkgIdent.Name)
 						}
 					}
 				}
@@ -3077,10 +3084,13 @@ type %s struct {
 
 	// Check if any CRUD models are external (not in gux.config.json)
 	hasExternalCRUD := false
+	hasExternalDTOs := false
 	for _, m := range models {
 		if m.IsExternal {
 			hasExternalCRUD = true
-			break
+			if m.ListDTOInfo != nil || m.DetailDTOInfo != nil {
+				hasExternalDTOs = true
+			}
 		}
 	}
 
@@ -3097,10 +3107,8 @@ type %s struct {
 	}
 
 	// Add dto import if any models use DTOs with parsed info
-	hasDTOs := false
 	for _, m := range models {
 		if m.ListDTOInfo != nil || m.DetailDTOInfo != nil {
-			hasDTOs = true
 			serverImports += fmt.Sprintf(`
 
 	"%s"`, dtoImport)
@@ -3108,8 +3116,8 @@ type %s struct {
 		}
 	}
 
-	// Add external dto import if needed
-	if hasExternalCRUD && hasDTOs {
+	// Add external dto import only if external models actually use DTOs
+	if hasExternalDTOs {
 		extDTOPath := strings.TrimSuffix(dtoImport, "/guxgen/dto") + "/dto"
 		serverImports += fmt.Sprintf(`
 	extdto "%s"`, extDTOPath)
