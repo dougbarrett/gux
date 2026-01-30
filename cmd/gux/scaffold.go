@@ -309,7 +309,7 @@ func runInit(appName, modulePath string, authMode AuthMode, withAdmin bool, with
 				struct {
 					tmplPath string
 					destPath string
-				}{"templates/admin/dto/breadcrumb.go.tmpl", "dto/breadcrumb.go"},
+				}{"templates/admin/dto/breadcrumb.go.tmpl", "guxgen/dto/breadcrumb.go"},
 			)
 		}
 	}
@@ -339,7 +339,7 @@ func runInit(appName, modulePath string, authMode AuthMode, withAdmin bool, with
 				struct {
 					tmplPath string
 					destPath string
-				}{"templates/admin/dto/auth.go.tmpl", "dto/auth.go"},
+				}{"templates/admin/dto/auth.go.tmpl", "guxgen/dto/auth.go"},
 			)
 		} else {
 			// Auth only: use standard auth pages
