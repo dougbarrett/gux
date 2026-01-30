@@ -54,12 +54,21 @@ Open http://localhost:8080
 # Stage 1: Build with TinyGo using gux
 FROM tinygo/tinygo:latest AS builder
 WORKDIR /app
+
+# Install Tailwind CSS v4 standalone binary (no Node.js required)
+RUN apt-get update && apt-get install -y --no-install-recommends curl && \
+    curl -sLO https://github.com/tailwindlabs/tailwindcss/releases/latest/download/tailwindcss-linux-x64 && \
+    chmod +x tailwindcss-linux-x64 && \
+    mv tailwindcss-linux-x64 /usr/local/bin/tailwindcss && \
+    apt-get remove -y curl && apt-get autoremove -y && rm -rf /var/lib/apt/lists/*
+
 COPY go.mod go.sum* ./
 RUN go mod download || true
 ENV GOBIN=/app/bin
 ENV PATH="/app/bin:${PATH}"
 RUN mkdir -p /app/bin && go install github.com/dougbarrett/gux/cmd/gux@latest
 COPY --chown=tinygo:tinygo . .
+RUN gux gen
 RUN gux build  # TinyGo is the default, wasm_exec.js injected automatically
 
 # Stage 2: Minimal production image
