@@ -280,15 +280,15 @@ func runInit(appName, modulePath string, authMode AuthMode, withAdmin bool, with
 			struct {
 				tmplPath string
 				destPath string
-			}{"templates/admin/admin/layout.go.tmpl", "admin/layout.go"},
+			}{"templates/admin/admin/layout.go.tmpl", "guxgen/admin/layout.go"},
 			struct {
 				tmplPath string
 				destPath string
-			}{"templates/admin/admin/dashboard.go.tmpl", "admin/dashboard.go"},
+			}{"templates/admin/admin/dashboard.go.tmpl", "guxgen/admin/dashboard.go"},
 			struct {
 				tmplPath string
 				destPath string
-			}{"templates/admin/admin/settings.go.tmpl", "admin/settings.go"},
+			}{"templates/admin/admin/settings.go.tmpl", "guxgen/admin/settings.go"},
 		)
 
 		// Add user admin pages only if auth is NOT enabled (no User model to scaffold)
@@ -297,15 +297,15 @@ func runInit(appName, modulePath string, authMode AuthMode, withAdmin bool, with
 				struct {
 					tmplPath string
 					destPath string
-				}{"templates/admin/admin/users.go.tmpl", "admin/users.go"},
+				}{"templates/admin/admin/users.go.tmpl", "guxgen/admin/users.go"},
 				struct {
 					tmplPath string
 					destPath string
-				}{"templates/admin/admin/user_new.go.tmpl", "admin/user_new.go"},
+				}{"templates/admin/admin/user_new.go.tmpl", "guxgen/admin/user_new.go"},
 				struct {
 					tmplPath string
 					destPath string
-				}{"templates/admin/admin/user_detail.go.tmpl", "admin/user_detail.go"},
+				}{"templates/admin/admin/user_detail.go.tmpl", "guxgen/admin/user_detail.go"},
 				struct {
 					tmplPath string
 					destPath string

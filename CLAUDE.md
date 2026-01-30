@@ -161,6 +161,25 @@ gux gen           # Generate API client/server code
 
 **Note**: `gux build` always runs `gux gen` first, regenerating all files in `guxgen/`. Never manually edit files in `guxgen/` — they will be overwritten.
 
+### Customizing Generated Admin Pages
+
+All admin pages (layout, dashboard, settings, model CRUD pages) live in `guxgen/admin/` and are regenerated on every `gux gen` or `gux build`. **Do not edit these files directly.**
+
+To customize a generated admin page:
+
+1. **Copy** the file from `guxgen/admin/` to your project's `admin/` directory
+2. **Change the package** declaration if needed (both directories use `package admin`)
+3. **Update `app.go`** to import your project's `admin` package instead of `guxgen/admin`
+4. **Remove the route** that referenced the generated version and point it to your custom version
+
+For example, to customize the dashboard:
+```bash
+cp guxgen/admin/dashboard.go admin/dashboard.go
+```
+Then update `app.go` imports to use your local `admin` package for that page.
+
+**For minor customizations**, prefer using [Admin Page Hooks](#admin-page-hooks) instead of copying files — hooks survive regeneration.
+
 ## Examples/Minimal
 
 The minimal example demonstrates:

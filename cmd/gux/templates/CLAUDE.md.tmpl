@@ -256,8 +256,20 @@ List endpoints accept query params: `GET /__gux_api/crud/orderitems?order_id=2`.
 
 ## Generated Files (Do Not Edit)
 
-- `guxgen/` - API client, WASM entry points, models, DTOs, admin pages
+- `guxgen/` - API client, WASM entry points, models, DTOs, admin pages (layout, dashboard, settings, model CRUD)
 - `admin/hooks_gen.go` - Hook setter functions (regenerated, but user hook files are preserved)
 - `assets_gen.go` - Embedded assets
 
 Run `gux gen` to regenerate after changing models or routes.
+
+## Customizing Generated Admin Pages
+
+All admin pages live in `guxgen/admin/` and are **regenerated on every `gux gen` or `gux build`**. Do not edit these files directly — changes will be lost.
+
+To customize a generated admin page:
+
+1. **Copy** the file from `guxgen/admin/` to your project's `admin/` directory (e.g., `cp guxgen/admin/dashboard.go admin/dashboard.go`)
+2. **Update `app.go`** to import your local `admin` package instead of (or in addition to) `guxgen/admin`, and update route references to point to the local copy
+3. Your local copy will not be overwritten by regeneration
+
+**For minor customizations**, prefer using Admin Page Hooks (see above) — hooks survive regeneration without needing to copy files.

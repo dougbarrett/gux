@@ -813,7 +813,7 @@ guxgen/admin/client_edit_gen.go   # Edit form
 admin/hooks_gen.go                # Hook setter functions (all models, in user-owned admin/)
 ```
 
-**Important**: All `guxgen/` files are regenerated on every `gux build` and `gux gen`. Do not manually edit them — changes will be overwritten. The `admin/hooks_gen.go` file is also regenerated, but user-created hook files (e.g., `admin/client_hooks.go`) are never overwritten.
+**Important**: All `guxgen/` files (including `guxgen/admin/` layout, dashboard, settings, and model pages) are regenerated on every `gux build` and `gux gen`. Do not manually edit them — changes will be overwritten. The `admin/hooks_gen.go` file is also regenerated, but user-created hook files (e.g., `admin/client_hooks.go`) are never overwritten. To customize a generated admin page, copy it from `guxgen/admin/` to `admin/` and update `app.go` imports accordingly.
 
 ```bash
 # Re-init project from config (regenerate files)
@@ -1070,6 +1070,21 @@ func OrderItemNew(r *core.Router) func() core.Node {
 - **Custom code** belongs in `admin/` (hooks), `models/` (custom methods), `dto/` (custom DTOs)
 - After changing `gux.config.json`, run `gux model regen <Name>` to update generated files
 - If generated code appears stale, run `gux clean && gux gen` for a fresh build
+
+### Customizing Generated Admin Pages
+
+All admin pages (layout, dashboard, settings, and model CRUD pages) live in `guxgen/admin/` and are regenerated on every `gux gen` or `gux build`. **Do not edit these files directly** — changes will be lost.
+
+To customize a generated admin page:
+
+1. **Copy** the file from `guxgen/admin/` to your project's `admin/` directory:
+   ```bash
+   cp guxgen/admin/dashboard.go admin/dashboard.go
+   ```
+2. **Update `app.go`** to import your local `admin` package instead of (or in addition to) `guxgen/admin`, and update route references to point to your local copy
+3. Your local copy in `admin/` will **not** be overwritten by regeneration
+
+**For minor customizations**, prefer using [Admin Page Hooks](#admin-page-hooks) instead of copying files — hooks survive regeneration automatically.
 
 ## API Code Generation
 
