@@ -125,9 +125,10 @@ func main() {
 	case "gen", "generate":
 		genCmd := flag.NewFlagSet("gen", flag.ExitOnError)
 		watch := genCmd.Bool("watch", false, "Watch for file changes and regenerate")
+		updateDockerfile := genCmd.Bool("update-dockerfile", false, "Regenerate Dockerfile from template")
 		genCmd.Parse(os.Args[2:])
 
-		runGenNew(*watch)
+		runGenNew(*watch, *updateDockerfile)
 
 	case "pages":
 		pagesCmd := flag.NewFlagSet("pages", flag.ExitOnError)
@@ -197,7 +198,7 @@ Usage:
     gux init <appname>                            Create a new Gux application (interactive)
     gux init [options] <appname>                  Create with explicit options (non-interactive)
     gux init --module <module-path> .             Initialize in current directory
-    gux gen [--watch]                             Generate guxgen files (API, WASM entry points)
+    gux gen [--watch] [--update-dockerfile]        Generate guxgen files (API, WASM entry points)
     gux model add                                 Interactive model builder
     gux model add --from-config                   Generate models from gux.config.json
     gux model list                                List models in config
@@ -238,6 +239,7 @@ Examples:
     gux init .                                    # Auto-detects gux.config.json
     gux gen                  # Generate guxgen files only
     gux gen --watch          # Generate and watch for changes
+    gux gen --update-dockerfile  # Regenerate Dockerfile from latest template
     gux build                # Build with TinyGo
     gux build --go           # Build with standard Go
     gux dev                  # Build and run server

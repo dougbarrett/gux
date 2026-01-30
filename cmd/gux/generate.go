@@ -12,11 +12,20 @@ import (
 )
 
 // runGenNew generates all guxgen files without building WASM or binary
-func runGenNew(watch bool) {
+func runGenNew(watch bool, updateDockerfile bool) {
 	// Initial generation
 	if err := generateGuxFiles(); err != nil {
 		fmt.Printf("Error: %v\n", err)
 		os.Exit(1)
+	}
+
+	// Regenerate Dockerfile from template if requested
+	if updateDockerfile {
+		if err := regenerateDockerfile(); err != nil {
+			fmt.Printf("Error updating Dockerfile: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Println("Dockerfile updated from template.")
 	}
 
 	if !watch {
@@ -366,6 +375,37 @@ func watchAndRegenerate(fullBuild bool, notifyReload func()) {
 			fmt.Printf("Watcher error: %v\n", err)
 		}
 	}
+}
+
+// regenerateDockerfile regenerates the Dockerfile from the embedded template
+func regenerateDockerfile() error {
+	// Get module path from go.mod
+	modulePath, err := getModulePath()
+	if err != nil {
+		return fmt.Errorf("getting module path: %w", err)
+	}
+
+	// Get gux version
+	guxVersion := getVersion()
+	if guxVersion == "dev" {
+		guxVersion = "latest"
+	}
+
+	// Get app name from current directory
+	cwd, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("getting working directory: %w", err)
+	}
+	appName := filepath.Base(cwd)
+
+	data := TemplateData{
+		AppName:    appName,
+		ModulePath: modulePath,
+		GuxModule:  "github.com/dougbarrett/gux",
+		GuxVersion: guxVersion,
+	}
+
+	return renderTemplate(".", "templates/Dockerfile.tmpl", "Dockerfile", data)
 }
 
 // Legacy generate functions below - kept for backward compatibility

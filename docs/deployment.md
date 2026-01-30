@@ -55,19 +55,20 @@ Open http://localhost:8080
 FROM tinygo/tinygo:latest AS builder
 WORKDIR /app
 
-# Install Tailwind CSS v4 standalone binary (no Node.js required)
-RUN apt-get update && apt-get install -y --no-install-recommends curl && \
-    curl -sLO https://github.com/tailwindlabs/tailwindcss/releases/latest/download/tailwindcss-linux-x64 && \
-    chmod +x tailwindcss-linux-x64 && \
-    mv tailwindcss-linux-x64 /usr/local/bin/tailwindcss && \
-    apt-get remove -y curl && apt-get autoremove -y && rm -rf /var/lib/apt/lists/*
-
 COPY go.mod go.sum* ./
 RUN go mod download || true
+
 ENV GOBIN=/app/bin
 ENV PATH="/app/bin:${PATH}"
 RUN mkdir -p /app/bin && go install github.com/dougbarrett/gux/cmd/gux@latest
+
+# Install Node.js for Tailwind CSS (npx)
+USER root
+RUN apt-get update && apt-get install -y nodejs npm && rm -rf /var/lib/apt/lists/*
+USER tinygo
+
 COPY --chown=tinygo:tinygo . .
+RUN npm install -D tailwindcss
 RUN gux gen
 RUN gux build  # TinyGo is the default, wasm_exec.js injected automatically
 
@@ -75,11 +76,11 @@ RUN gux build  # TinyGo is the default, wasm_exec.js injected automatically
 FROM alpine:3.21
 WORKDIR /app
 RUN apk add --no-cache ca-certificates
-COPY --from=builder /app/server .
+COPY --from=builder /app/bin/app .
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD wget --no-verbose --tries=1 --spider http://localhost:8080/ || exit 1
-CMD ["./server", "-port", "8080"]
+CMD ["./app"]
 ```
 
 ### Key Optimizations
