@@ -3896,12 +3896,18 @@ func buildTailwind() error {
 	cmd.Stderr = os.Stderr
 
 	if err := cmd.Run(); err != nil {
-		// Try npx as fallback (for local npm installs)
-		cmd = exec.Command("npx", append([]string{"tailwindcss"}, args...)...)
+		// Try npx @tailwindcss/cli (Tailwind v4 moved CLI to separate package)
+		cmd = exec.Command("npx", append([]string{"@tailwindcss/cli"}, args...)...)
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		if err := cmd.Run(); err != nil {
-			return fmt.Errorf("Tailwind CSS build failed (install with: npm install -D tailwindcss or gem install tailwindcss-ruby): %w", err)
+			// Try npx tailwindcss as last resort (Tailwind v3 compat)
+			cmd = exec.Command("npx", append([]string{"tailwindcss"}, args...)...)
+			cmd.Stdout = os.Stdout
+			cmd.Stderr = os.Stderr
+			if err := cmd.Run(); err != nil {
+				return fmt.Errorf("Tailwind CSS build failed (install with: npm install -D @tailwindcss/cli or gem install tailwindcss-ruby): %w", err)
+			}
 		}
 	}
 

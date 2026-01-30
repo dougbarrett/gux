@@ -23,8 +23,8 @@ USER tinygo
 # Copy source code with correct ownership for non-root user
 COPY --chown=tinygo:tinygo . .
 
-# Install Tailwind CSS
-RUN npm install -D tailwindcss
+# Install Tailwind CSS v4 (core + CLI)
+RUN npm install -D tailwindcss @tailwindcss/cli
 
 # Generate code from config and build
 RUN gux gen

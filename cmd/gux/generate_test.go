@@ -134,7 +134,7 @@ func TestRegenerateDockerfile_NodejsInstall(t *testing.T) {
 	if !strings.Contains(s, "nodejs npm") {
 		t.Error("Dockerfile missing Node.js/npm installation")
 	}
-	if !strings.Contains(s, "npm install -D tailwindcss") {
+	if !strings.Contains(s, "npm install -D tailwindcss @tailwindcss/cli") {
 		t.Error("Dockerfile missing tailwindcss npm install")
 	}
 }

@@ -68,7 +68,7 @@ RUN apt-get update && apt-get install -y nodejs npm && rm -rf /var/lib/apt/lists
 USER tinygo
 
 COPY --chown=tinygo:tinygo . .
-RUN npm install -D tailwindcss
+RUN npm install -D tailwindcss @tailwindcss/cli
 RUN gux gen
 RUN gux build  # TinyGo is the default, wasm_exec.js injected automatically
 
