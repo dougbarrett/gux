@@ -881,3 +881,69 @@ func TestTypeAlias_MultiWordModelName(t *testing.T) {
 		t.Errorf("expected LeadSource type alias, got:\n%s", s)
 	}
 }
+
+// --- GORM tag generation tests (issue #49) ---
+
+func TestGenerateGormTag_StringFieldSize(t *testing.T) {
+	field := &ModelField{Name: "FirstName", Type: "string"}
+	tag := generateGormTag(field)
+	if !strings.Contains(tag, `size:255`) {
+		t.Errorf("expected size:255 for plain string, got: %s", tag)
+	}
+}
+
+func TestGenerateGormTag_TextareaField(t *testing.T) {
+	field := &ModelField{Name: "Message", Type: "string", Input: "textarea"}
+	tag := generateGormTag(field)
+	if !strings.Contains(tag, `type:text`) {
+		t.Errorf("expected type:text for textarea, got: %s", tag)
+	}
+	if strings.Contains(tag, `size:255`) {
+		t.Errorf("textarea should not have size:255, got: %s", tag)
+	}
+}
+
+func TestGenerateGormTag_RequiredStringField(t *testing.T) {
+	field := &ModelField{Name: "Email", Type: "string", Required: true}
+	tag := generateGormTag(field)
+	if !strings.Contains(tag, `not null`) {
+		t.Errorf("expected not null for required field, got: %s", tag)
+	}
+	if !strings.Contains(tag, `size:255`) {
+		t.Errorf("expected size:255 for required string, got: %s", tag)
+	}
+}
+
+func TestGenerateGormTag_NonStringField(t *testing.T) {
+	fields := []ModelField{
+		{Name: "Age", Type: "int"},
+		{Name: "Active", Type: "bool"},
+		{Name: "Price", Type: "float64"},
+	}
+	for _, f := range fields {
+		tag := generateGormTag(&f)
+		if strings.Contains(tag, `size:255`) || strings.Contains(tag, `type:text`) {
+			t.Errorf("non-string field %s should not have size/type tag, got: %s", f.Name, tag)
+		}
+	}
+}
+
+func TestGenerateGormTag_RelationField(t *testing.T) {
+	// Relation fields (e.g., Role string with Relation set) should not get size tag
+	field := &ModelField{Name: "Role", Type: "string", Relation: "Role"}
+	tag := generateGormTag(field)
+	if strings.Contains(tag, `size:255`) || strings.Contains(tag, `type:text`) {
+		t.Errorf("relation string field should not get size/type tag, got: %s", tag)
+	}
+}
+
+func TestGenerateGormTag_SliceStringField(t *testing.T) {
+	field := &ModelField{Name: "Tags", Type: "[]string"}
+	tag := generateGormTag(field)
+	if !strings.Contains(tag, `type:json`) {
+		t.Errorf("expected type:json for []string, got: %s", tag)
+	}
+	if strings.Contains(tag, `size:255`) {
+		t.Errorf("[]string should not have size:255, got: %s", tag)
+	}
+}

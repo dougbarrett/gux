@@ -2191,6 +2191,15 @@ func generateGormTag(field *ModelField) string {
 		tags = append(tags, "type:json")
 	}
 
+	// String fields: add size for MySQL compatibility (VARCHAR vs TEXT)
+	if field.Type == "string" && field.Relation == "" {
+		if field.Input == "textarea" {
+			tags = append(tags, "type:text")
+		} else {
+			tags = append(tags, "size:255")
+		}
+	}
+
 	if field.Many2Many != "" {
 		tags = append(tags, fmt.Sprintf("many2many:%s", field.Many2Many))
 	}
