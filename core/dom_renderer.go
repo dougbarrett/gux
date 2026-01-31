@@ -106,6 +106,11 @@ func (r *DOMRenderer) RenderElement(tag string, attrs Attrs, children []Node) Re
 		setAttr("data-gux-external", "true")
 	}
 
+	// Preserve scroll position on navigation
+	if attrs.PreserveScroll {
+		setAttr("data-gux-preserve-scroll", "true")
+	}
+
 	// Data attributes
 	for k, v := range attrs.Data {
 		setAttr("data-"+k, v)

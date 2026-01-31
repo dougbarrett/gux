@@ -41,6 +41,10 @@ type Attrs struct {
 	// Use this for links that cross bundle boundaries (e.g., admin -> public).
 	External bool
 
+	// PreserveScroll prevents automatic scroll-to-top when navigating via this link.
+	// By default, client-side navigation scrolls to the top of the page.
+	PreserveScroll bool
+
 	// Data attributes (rendered as data-*)
 	Data map[string]string
 

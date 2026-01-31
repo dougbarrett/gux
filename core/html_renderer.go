@@ -46,6 +46,11 @@ func (r *HTMLRenderer) RenderElement(tag string, attrs Attrs, children []Node) R
 		writeAttr("data-gux-external", "true")
 	}
 
+	// Preserve scroll position on navigation
+	if attrs.PreserveScroll {
+		writeAttr("data-gux-preserve-scroll", "true")
+	}
+
 	// Data attributes
 	for k, v := range attrs.Data {
 		writeAttr("data-"+k, v)
