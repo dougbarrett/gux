@@ -181,8 +181,26 @@ func newAPIContext(app *App, w http.ResponseWriter, r *http.Request, pattern str
 		params:   make(map[string]string),
 	}
 
-	// Extract path parameters from the URL based on the pattern
-	ctx.params = extractPathParams(pattern, r.URL.Path)
+	// Extract path parameters using Go 1.22+ r.PathValue() first,
+	// falling back to manual extraction from the URL path.
+	paramNames := extractParamNames(pattern)
+	if len(paramNames) > 0 {
+		// Try Go 1.22+ PathValue first (works when mux registers {param} patterns)
+		allFound := true
+		for _, name := range paramNames {
+			val := r.PathValue(name)
+			if val != "" {
+				ctx.params[name] = val
+			} else {
+				allFound = false
+				break
+			}
+		}
+		if !allFound {
+			// Fallback to manual extraction (for older Go or non-mux routing)
+			ctx.params = extractPathParams(pattern, r.URL.Path)
+		}
+	}
 
 	// Load user from session if auth is enabled
 	if app.authConfig != nil && app.authConfig.SessionStore != nil {
@@ -199,7 +217,32 @@ func newAPIContext(app *App, w http.ResponseWriter, r *http.Request, pattern str
 	return ctx
 }
 
+// convertColonParams converts :param syntax to {param} for Go 1.22+ http.ServeMux.
+// "GET /api/users/:id/posts/:postId" -> "GET /api/users/{id}/posts/{postId}"
+func convertColonParams(pattern string) string {
+	parts := strings.Split(pattern, "/")
+	for i, part := range parts {
+		if strings.HasPrefix(part, ":") {
+			parts[i] = "{" + strings.TrimPrefix(part, ":") + "}"
+		}
+	}
+	return strings.Join(parts, "/")
+}
+
+// extractParamNames returns the parameter names from a :param-style pattern.
+func extractParamNames(pattern string) []string {
+	var names []string
+	for _, part := range strings.Split(pattern, "/") {
+		if strings.HasPrefix(part, ":") {
+			names = append(names, strings.TrimPrefix(part, ":"))
+		}
+	}
+	return names
+}
+
 // extractPathParams extracts path parameters from a URL path based on a pattern.
+// It first tries Go 1.22+ r.PathValue() via the request (if available),
+// then falls back to manual extraction from the URL path.
 // Pattern: /api/users/:id/posts/:postId
 // Path: /api/users/123/posts/456
 // Returns: map[string]string{"id": "123", "postId": "456"}

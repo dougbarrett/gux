@@ -427,9 +427,9 @@ func (a *App) Run(addr string) error {
 	// Register CRUD handlers
 	a.registerCRUDHandlers(mux)
 
-	// Register custom handlers
+	// Register custom handlers — convert :param to {param} for Go 1.22+ ServeMux
 	for pattern, handler := range a.customHandlers {
-		mux.HandleFunc(pattern, handler)
+		mux.HandleFunc(convertColonParams(pattern), handler)
 	}
 
 	// Hot reload ping endpoint (only active when GUX_HOT_RELOAD=1)

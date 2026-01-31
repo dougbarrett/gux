@@ -720,6 +720,61 @@ func getModelFieldTypes(modelName string) (map[string]string, error) {
 	return nil, fmt.Errorf("model %s not found", modelName)
 }
 
+// getDTOFieldTypes parses a DTO struct from dto/ or guxgen/dto/ and returns a map of field name → type.
+// Used to detect actual DTO types when generating admin pages for models with manual DTOs.
+func getDTOFieldTypes(dtoName string) (map[string]string, error) {
+	// Check both dto/ (manual) and guxgen/dto/ (generated) directories
+	for _, dir := range []string{"dto", filepath.Join("guxgen", "dto")} {
+		entries, err := os.ReadDir(dir)
+		if err != nil {
+			continue
+		}
+
+		for _, entry := range entries {
+			if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".go") {
+				continue
+			}
+
+			fset := token.NewFileSet()
+			filename := filepath.Join(dir, entry.Name())
+			node, err := parser.ParseFile(fset, filename, nil, parser.ParseComments)
+			if err != nil {
+				continue
+			}
+
+			for _, decl := range node.Decls {
+				genDecl, ok := decl.(*ast.GenDecl)
+				if !ok || genDecl.Tok != token.TYPE {
+					continue
+				}
+
+				for _, spec := range genDecl.Specs {
+					typeSpec, ok := spec.(*ast.TypeSpec)
+					if !ok || typeSpec.Name.Name != dtoName {
+						continue
+					}
+
+					structType, ok := typeSpec.Type.(*ast.StructType)
+					if !ok {
+						continue
+					}
+
+					fieldTypes := make(map[string]string)
+					for _, field := range structType.Fields.List {
+						if len(field.Names) == 0 {
+							continue
+						}
+						fieldTypes[field.Names[0].Name] = formatType(field.Type)
+					}
+					return fieldTypes, nil
+				}
+			}
+		}
+	}
+
+	return nil, fmt.Errorf("DTO %s not found", dtoName)
+}
+
 // splitParamRoute splits a parameterized route into prefix and suffix around the parameter.
 // "/admin/users/:id" -> ("/admin/users/", "")
 // "/admin/users/:id/posts/new" -> ("/admin/users/", "/posts/new")
@@ -2567,6 +2622,9 @@ func generateFieldMapping(info *DTOInfo, varName string) string {
 		return ""
 	}
 
+	// Get model field types to detect pointer mismatches
+	modelFieldTypes, _ := getModelFieldTypes(info.ModelName)
+
 	var sb strings.Builder
 	for _, f := range info.Fields {
 		if f.IsSlice {
@@ -2580,7 +2638,43 @@ func generateFieldMapping(info *DTOInfo, varName string) string {
 			// Skip nested DTOs here - they are handled by generateNestedDTOMapping
 			continue
 		}
-		sb.WriteString(fmt.Sprintf("\t\t\t%s: %s.%s,\n", f.DTOField, varName, f.ModelField))
+
+		// Check if model field is a pointer type but DTO field is not (or vice versa)
+		modelType := ""
+		if modelFieldTypes != nil {
+			modelType = modelFieldTypes[f.ModelField]
+		}
+		dtoType := f.DTOType
+
+		if modelType != "" && strings.HasPrefix(modelType, "*") && !strings.HasPrefix(dtoType, "*") {
+			// Model field is pointer, DTO field is not — need to dereference
+			switch modelType {
+			case "*string":
+				sb.WriteString(fmt.Sprintf("\t\t\t%s: func() string { if %s.%s != nil { return *%s.%s }; return \"\" }(),\n",
+					f.DTOField, varName, f.ModelField, varName, f.ModelField))
+			case "*float64", "*float32":
+				sb.WriteString(fmt.Sprintf("\t\t\t%s: func() float64 { if %s.%s != nil { return float64(*%s.%s) }; return 0 }(),\n",
+					f.DTOField, varName, f.ModelField, varName, f.ModelField))
+			case "*int", "*int64", "*int32":
+				sb.WriteString(fmt.Sprintf("\t\t\t%s: func() int { if %s.%s != nil { return int(*%s.%s) }; return 0 }(),\n",
+					f.DTOField, varName, f.ModelField, varName, f.ModelField))
+			case "*uint", "*uint64", "*uint32":
+				sb.WriteString(fmt.Sprintf("\t\t\t%s: func() uint { if %s.%s != nil { return uint(*%s.%s) }; return 0 }(),\n",
+					f.DTOField, varName, f.ModelField, varName, f.ModelField))
+			case "*bool":
+				sb.WriteString(fmt.Sprintf("\t\t\t%s: func() bool { if %s.%s != nil { return *%s.%s }; return false }(),\n",
+					f.DTOField, varName, f.ModelField, varName, f.ModelField))
+			default:
+				// Fallback: direct assignment (may fail at compile time if types mismatch)
+				sb.WriteString(fmt.Sprintf("\t\t\t%s: %s.%s,\n", f.DTOField, varName, f.ModelField))
+			}
+		} else if modelType != "" && !strings.HasPrefix(modelType, "*") && strings.HasPrefix(dtoType, "*") {
+			// Model field is not pointer, DTO field is pointer — need to take address
+			sb.WriteString(fmt.Sprintf("\t\t\t%s: &%s.%s,\n", f.DTOField, varName, f.ModelField))
+		} else {
+			// Types match (both pointer or both non-pointer)
+			sb.WriteString(fmt.Sprintf("\t\t\t%s: %s.%s,\n", f.DTOField, varName, f.ModelField))
+		}
 	}
 	return sb.String()
 }

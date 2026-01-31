@@ -779,7 +779,7 @@ func {{.Name}}Detail(r *core.Router) func() core.Node {
 		}
 
 		// Build display name from display field
-		displayName := {{if .DisplayField}}displayItem.{{.DisplayField}}{{else}}""{{end}}
+		displayName := {{if .DisplayField}}{{if .DisplayFieldIsPointer}}func() string { if displayItem.{{.DisplayField}} != nil { return *displayItem.{{.DisplayField}} }; return "" }(){{else}}displayItem.{{.DisplayField}}{{end}}{{else}}""{{end}}
 		if displayName == "" {
 			displayName = fmt.Sprintf("{{.NameDisplay}} #%d", displayItem.ID)
 		}
@@ -1171,7 +1171,7 @@ func {{.Name}}Edit(r *core.Router) func() core.Node {
 		}
 
 		// Build display name from display field
-		displayName := {{if .DisplayField}}displayItem.{{.DisplayField}}{{else}}""{{end}}
+		displayName := {{if .DisplayField}}{{if .DisplayFieldIsPointer}}func() string { if displayItem.{{.DisplayField}} != nil { return *displayItem.{{.DisplayField}} }; return "" }(){{else}}displayItem.{{.DisplayField}}{{end}}{{else}}""{{end}}
 		if displayName == "" {
 			displayName = fmt.Sprintf("{{.Name}} #%d", displayItem.ID)
 		}
@@ -1629,7 +1629,8 @@ type ModelTemplateData struct {
 	HasRelations         bool
 	HasSelectRelations   bool   // True if any relation uses a select dropdown (*uint or input:"select")
 	HasExternalRelations bool   // True if any relations are to models not in gux.config.json
-	DisplayField      string
+	DisplayField          string
+	DisplayFieldIsPointer bool   // True if the display field type is a pointer (e.g., *string)
 	AdminEnabled      bool   // From config.Admin - use ui components instead of inline styles
 	FieldCount        int    // Number of fields for layout decisions
 	FormLayout        string // "stacked" (default) or "grid" for two-column layout
@@ -1668,8 +1669,21 @@ type AuthField struct {
 // displayFields maps model names to their display field names (for Brief DTOs)
 // configModels is a set of model names that are defined in gux.config.json (for detecting external relations)
 func GenerateModelFilesImpl(model *ModelDefinition, optionSets map[string]OptionSet, modulePath string, adminEnabled bool, displayFields map[string]string, configModels map[string]bool, allModels map[string]ModelDefinition) error {
+	// Check if manual DTO exists and get actual field types for type-safe code generation.
+	// When a manual DTO has pointer types (e.g., *string) that differ from config types,
+	// the admin pages must use the actual DTO types for correct pointer handling.
+	var dtoFieldTypes map[string]string
+	manualDTOPath := filepath.Join("dto", ToSnakeCase(model.Name)+".go")
+	if _, err := os.Stat(manualDTOPath); err == nil {
+		// Manual DTO exists - parse the Detail DTO for field types
+		detailDTOName := model.Name + "Detail"
+		if types, err := getDTOFieldTypes(detailDTOName); err == nil {
+			dtoFieldTypes = types
+		}
+	}
+
 	// Prepare template data
-	data := prepareModelTemplateData(model, modulePath, displayFields, configModels)
+	data := prepareModelTemplateData(model, modulePath, displayFields, configModels, dtoFieldTypes)
 	data.AdminEnabled = adminEnabled
 
 	// Populate parent-child info
@@ -1779,7 +1793,7 @@ type %s = manualmodels.%s
 	}
 
 	// Check if non-generated DTO file exists (in dto/ for backwards compat)
-	manualDTOPath := filepath.Join("dto", ToSnakeCase(model.Name)+".go")
+	manualDTOPath = filepath.Join("dto", ToSnakeCase(model.Name)+".go")
 	if _, err := os.Stat(manualDTOPath); err == nil {
 		// Manual DTO exists — generate type aliases in guxgen/dto/ so that
 		// generated admin pages and API client can reference dto.{Name}List etc.
@@ -1925,7 +1939,7 @@ func detectDisplayField(model *ModelDefinition) string {
 	return "" // Will use ID as fallback in template
 }
 
-func prepareModelTemplateData(model *ModelDefinition, modulePath string, displayFields map[string]string, configModels map[string]bool) *ModelTemplateData {
+func prepareModelTemplateData(model *ModelDefinition, modulePath string, displayFields map[string]string, configModels map[string]bool, dtoFieldTypes map[string]string) *ModelTemplateData {
 	// Default form layout is "stacked" for simplicity
 	formLayout := model.FormLayout
 	if formLayout == "" {
@@ -1960,6 +1974,13 @@ func prepareModelTemplateData(model *ModelDefinition, modulePath string, display
 		var sectionFields []TemplateField
 
 		for _, field := range fields {
+			// If we have actual DTO field types (from manual DTO), override the config type
+			// so that pointer types in the DTO are handled correctly in admin page generation.
+			if dtoFieldTypes != nil {
+				if dtoType, ok := dtoFieldTypes[field.Name]; ok && dtoType != field.Type {
+					field.Type = dtoType
+				}
+			}
 			tf := convertToTemplateField(&field, model.Name, displayFields)
 			// Mark display field for clickable links in list tables
 			if tf.Name == data.DisplayField {
@@ -2031,6 +2052,17 @@ func prepareModelTemplateData(model *ModelDefinition, modulePath string, display
 	}
 
 	data.FieldCount = len(data.AllFields)
+
+	// Check if the display field is a pointer type
+	if data.DisplayField != "" {
+		for _, tf := range data.AllFields {
+			if tf.Name == data.DisplayField && tf.IsPointer {
+				data.DisplayFieldIsPointer = true
+				break
+			}
+		}
+	}
+
 	return data
 }
 
@@ -2369,9 +2401,13 @@ func generateDetailFieldCode(field *ModelField, tf TemplateField, modelNameLower
 %s}()),
 `, indent, modelNameLower, tf.Label, indent, tf.DTOFieldName, indent, indent, indent, indent)
 
-	case field.Type == "time.Time" || field.Type == "*time.Time":
+	case field.Type == "time.Time":
 		return fmt.Sprintf(`%s%sDetailRow("%s", displayItem.%s.Format("Jan 2, 2006")),
 `, indent, modelNameLower, tf.Label, tf.DTOFieldName)
+
+	case field.Type == "*time.Time":
+		return fmt.Sprintf(`%s%sDetailRow("%s", func() string { if displayItem.%s != nil { return displayItem.%s.Format("Jan 2, 2006") }; return "-" }()),
+`, indent, modelNameLower, tf.Label, tf.DTOFieldName, tf.DTOFieldName)
 
 	case field.Type == "*string":
 		return fmt.Sprintf(`%s%sDetailRow("%s", func() string { if displayItem.%s != nil { return *displayItem.%s }; return "-" }()),

@@ -605,6 +605,33 @@ Access URL query parameters in page functions (works on both server and WASM):
 orderID := r.Query("order_id") // reads ?order_id=X from URL
 ```
 
+## Testing
+
+All bug fixes and new features **must** include unit tests. Run the full test suite before committing:
+
+```bash
+go test ./... -count=1 -timeout 120s
+```
+
+### Test Files
+
+| File | Coverage |
+|------|----------|
+| `cmd/gux/build_test.go` | CRUD parsing, endpoint generation, pointer type mapping, `isNumericParam`, `generateFieldMapping`, `generateServerAPICode` |
+| `cmd/gux/modelgen_test.go` | Template field conversion, form field generation, detail field generation, pointer types, display field detection, DTO type overrides, GORM tags |
+| `cmd/gux/generate_test.go` | Dockerfile regeneration |
+| `core/endpoint_test.go` | Path parameter extraction, `:param` to `{param}` conversion, param name extraction |
+| `core/crud_test.go` | CRUD API operations |
+| `core/audit_test.go` | Audit logging |
+
+### Testing Requirements
+
+- **Pointer type handling**: Every code generation path that maps between model fields and DTO fields must be tested with pointer types (`*string`, `*float64`, `*uint`, `*time.Time`). This includes `generateFieldMapping`, `generateServerAPICode`, `convertToTemplateField`, and `generateDetailFieldCode`.
+- **Path parameters**: Test both `:param` and `{param}` syntax. Test numeric params (`id`, `user_id`) and string params (`slug`, `code`).
+- **Table-driven tests**: Use Go table-driven test patterns with `t.Run()` subtests.
+- **Temp directories**: Tests that need file system access should use `t.TempDir()` and `os.Chdir()` with defer to restore.
+- **Cache clearing**: Tests that use `getModelFieldTypes()` must reset `modelFieldTypesCache` before running.
+
 ## Development Notes
 
 - **core/** is the low-level universal rendering system (focus of current development)

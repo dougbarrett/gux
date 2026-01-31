@@ -947,3 +947,182 @@ func TestGenerateGormTag_SliceStringField(t *testing.T) {
 		t.Errorf("[]string should not have size:255, got: %s", tag)
 	}
 }
+
+// TestConvertToTemplateField_PointerString tests that *string fields generate
+// correct EditStateInit with nil-check dereference (#53).
+func TestConvertToTemplateField_PointerString(t *testing.T) {
+	field := &ModelField{Name: "AdTagURL", Type: "*string"}
+	tf := convertToTemplateField(field, "Promotion", nil)
+
+	if tf.StateType != "String" {
+		t.Errorf("StateType = %q, want %q", tf.StateType, "String")
+	}
+	if !tf.IsPointer {
+		t.Error("IsPointer should be true for *string")
+	}
+	if !strings.Contains(tf.EditStateInit, "displayItem.AdTagURL != nil") {
+		t.Errorf("EditStateInit should check for nil, got: %s", tf.EditStateInit)
+	}
+	if !strings.Contains(tf.EditStateInit, "*displayItem.AdTagURL") {
+		t.Errorf("EditStateInit should dereference pointer, got: %s", tf.EditStateInit)
+	}
+	if !strings.Contains(tf.DataValue, "parseStringPtr") {
+		t.Errorf("DataValue should use parseStringPtr, got: %s", tf.DataValue)
+	}
+}
+
+// TestConvertToTemplateField_PointerFloat64 tests that *float64 fields generate
+// correct EditStateInit with nil-check dereference (#53).
+func TestConvertToTemplateField_PointerFloat64(t *testing.T) {
+	field := &ModelField{Name: "MinWatchTimeSec", Type: "*float64"}
+	tf := convertToTemplateField(field, "PromotionVideo", nil)
+
+	if tf.StateType != "String" {
+		t.Errorf("StateType = %q, want %q", tf.StateType, "String")
+	}
+	if !tf.IsPointer {
+		t.Error("IsPointer should be true for *float64")
+	}
+	if !strings.Contains(tf.EditStateInit, "displayItem.MinWatchTimeSec != nil") {
+		t.Errorf("EditStateInit should check for nil, got: %s", tf.EditStateInit)
+	}
+	if !strings.Contains(tf.EditStateInit, "*displayItem.MinWatchTimeSec") {
+		t.Errorf("EditStateInit should dereference pointer, got: %s", tf.EditStateInit)
+	}
+	if !strings.Contains(tf.DataValue, "parseFloatPtr") {
+		t.Errorf("DataValue should use parseFloatPtr, got: %s", tf.DataValue)
+	}
+}
+
+// TestConvertToTemplateField_NonPointerString tests that regular string fields
+// use direct assignment (no pointer handling).
+func TestConvertToTemplateField_NonPointerString(t *testing.T) {
+	field := &ModelField{Name: "Name", Type: "string"}
+	tf := convertToTemplateField(field, "User", nil)
+
+	if tf.IsPointer {
+		t.Error("IsPointer should be false for string")
+	}
+	if tf.EditStateInit != "displayItem.Name" {
+		t.Errorf("EditStateInit = %q, want %q", tf.EditStateInit, "displayItem.Name")
+	}
+}
+
+// TestGenerateDetailFieldCode_PointerString tests that *string fields in detail views
+// generate nil-check code instead of direct access (#53).
+func TestGenerateDetailFieldCode_PointerString(t *testing.T) {
+	field := &ModelField{Name: "WebhookURL", Type: "*string"}
+	tf := convertToTemplateField(field, "Promotion", nil)
+
+	code := generateDetailFieldCode(field, tf, "promotion")
+
+	if !strings.Contains(code, "displayItem.WebhookURL != nil") {
+		t.Errorf("detail code should check for nil, got:\n%s", code)
+	}
+	if !strings.Contains(code, "*displayItem.WebhookURL") {
+		t.Errorf("detail code should dereference pointer, got:\n%s", code)
+	}
+}
+
+// TestGenerateDetailFieldCode_PointerFloat64 tests *float64 detail field generation (#53).
+func TestGenerateDetailFieldCode_PointerFloat64(t *testing.T) {
+	field := &ModelField{Name: "Price", Type: "*float64"}
+	tf := convertToTemplateField(field, "Product", nil)
+
+	code := generateDetailFieldCode(field, tf, "product")
+
+	if !strings.Contains(code, "displayItem.Price != nil") {
+		t.Errorf("detail code should check for nil, got:\n%s", code)
+	}
+	if !strings.Contains(code, "*displayItem.Price") {
+		t.Errorf("detail code should dereference pointer, got:\n%s", code)
+	}
+}
+
+// TestGenerateDetailFieldCode_PointerTime tests *time.Time detail field generation.
+func TestGenerateDetailFieldCode_PointerTime(t *testing.T) {
+	field := &ModelField{Name: "ExpiresAt", Type: "*time.Time"}
+	tf := convertToTemplateField(field, "Session", nil)
+
+	code := generateDetailFieldCode(field, tf, "session")
+
+	if !strings.Contains(code, "displayItem.ExpiresAt != nil") {
+		t.Errorf("detail code should check for nil, got:\n%s", code)
+	}
+	if !strings.Contains(code, `displayItem.ExpiresAt.Format("Jan 2, 2006")`) {
+		t.Errorf("detail code should format time, got:\n%s", code)
+	}
+}
+
+// TestGenerateDetailFieldCode_NonPointerString tests that regular string fields
+// use direct access in detail views.
+func TestGenerateDetailFieldCode_NonPointerString(t *testing.T) {
+	field := &ModelField{Name: "Email", Type: "string"}
+	tf := convertToTemplateField(field, "User", nil)
+
+	code := generateDetailFieldCode(field, tf, "user")
+
+	if strings.Contains(code, "!= nil") {
+		t.Errorf("non-pointer field should not have nil check, got:\n%s", code)
+	}
+	if !strings.Contains(code, "displayItem.Email") {
+		t.Errorf("should reference displayItem.Email, got:\n%s", code)
+	}
+}
+
+// TestPrepareModelTemplateData_DisplayFieldIsPointer tests that the DisplayFieldIsPointer
+// flag is correctly set when the display field type is a pointer (#53).
+func TestPrepareModelTemplateData_DisplayFieldIsPointer(t *testing.T) {
+	model := &ModelDefinition{
+		Name:    "Promotion",
+		Display: "SecondaryColor",
+		Sections: map[string][]ModelField{
+			"Main": {
+				{Name: "SecondaryColor", Type: "*string", Table: true},
+				{Name: "Active", Type: "bool"},
+			},
+		},
+	}
+
+	data := prepareModelTemplateData(model, "myapp", nil, nil, nil)
+	// Display field is SecondaryColor which is *string — but detectDisplayField
+	// only picks string fields, so DisplayField should be empty since we override with model.Display
+	if data.DisplayField != "SecondaryColor" {
+		t.Errorf("DisplayField = %q, want %q", data.DisplayField, "SecondaryColor")
+	}
+	if !data.DisplayFieldIsPointer {
+		t.Error("DisplayFieldIsPointer should be true when display field is *string")
+	}
+}
+
+// TestPrepareModelTemplateData_DTOFieldTypeOverride tests that manual DTO field types
+// override config field types for admin page generation (#53).
+func TestPrepareModelTemplateData_DTOFieldTypeOverride(t *testing.T) {
+	model := &ModelDefinition{
+		Name: "Widget",
+		Sections: map[string][]ModelField{
+			"Main": {
+				{Name: "Description", Type: "string", Table: true},
+			},
+		},
+	}
+
+	// Simulate a manual DTO with *string where config says string
+	dtoTypes := map[string]string{
+		"Description": "*string",
+	}
+
+	data := prepareModelTemplateData(model, "myapp", nil, nil, dtoTypes)
+
+	// The field type should be overridden to *string
+	if len(data.AllFields) != 1 {
+		t.Fatalf("expected 1 field, got %d", len(data.AllFields))
+	}
+	tf := data.AllFields[0]
+	if !tf.IsPointer {
+		t.Error("field should be marked as pointer after DTO type override")
+	}
+	if !strings.Contains(tf.EditStateInit, "!= nil") {
+		t.Errorf("EditStateInit should have nil check after DTO type override, got: %s", tf.EditStateInit)
+	}
+}

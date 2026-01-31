@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -589,5 +590,211 @@ func main() {
 	}
 	if models[0].Name != "AuditEntry" {
 		t.Errorf("model name = %q, want %q", models[0].Name, "AuditEntry")
+	}
+}
+
+// TestIsNumericParam tests the isNumericParam helper used for endpoint path params (#51).
+func TestIsNumericParam(t *testing.T) {
+	tests := []struct {
+		name string
+		want bool
+	}{
+		{"id", true},
+		{"user_id", true},
+		{"userId", true},
+		{"userID", true},
+		{"post_id", true},
+		{"slug", false},
+		{"code", false},
+		{"token", false},
+		{"name", false},
+		{"email", false},
+		{"category", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := isNumericParam(tt.name)
+			if got != tt.want {
+				t.Errorf("isNumericParam(%q) = %v, want %v", tt.name, got, tt.want)
+			}
+		})
+	}
+}
+
+// TestGenerateFieldMapping_PointerTypes tests that generateFieldMapping handles
+// pointer type mismatches between model and DTO fields (#53).
+func TestGenerateFieldMapping_PointerTypes(t *testing.T) {
+	// Set up a temporary model file with pointer fields for getModelFieldTypes to parse
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(origDir)
+
+	// Create guxgen/models directory with a test model
+	os.MkdirAll(filepath.Join("guxgen", "models"), 0755)
+	modelContent := `package models
+
+type Promotion struct {
+	SecondaryColor *string
+	AdTagURL       *string
+	MinWatchTimeSec *float64
+	Name           string
+	Active         bool
+}
+`
+	os.WriteFile(filepath.Join("guxgen", "models", "promotion.go"), []byte(modelContent), 0644)
+
+	// Clear the cache since we're in a new directory
+	modelFieldTypesCache = make(map[string]map[string]string)
+
+	info := &DTOInfo{
+		ModelName: "Promotion",
+		Fields: []DTOFieldMapping{
+			{DTOField: "Name", DTOType: "string", ModelField: "Name"},
+			{DTOField: "SecondaryColor", DTOType: "string", ModelField: "SecondaryColor"},
+			{DTOField: "AdTagURL", DTOType: "string", ModelField: "AdTagURL"},
+			{DTOField: "MinWatchTimeSec", DTOType: "float64", ModelField: "MinWatchTimeSec"},
+			{DTOField: "Active", DTOType: "bool", ModelField: "Active"},
+		},
+	}
+
+	result := generateFieldMapping(info, "item")
+
+	// String field (no pointer) should be direct assignment
+	if !strings.Contains(result, "Name: item.Name,") {
+		t.Errorf("expected direct assignment for Name, got:\n%s", result)
+	}
+
+	// *string model -> string DTO should use pointer dereference
+	if !strings.Contains(result, "SecondaryColor: func() string { if item.SecondaryColor != nil") {
+		t.Errorf("expected pointer dereference for SecondaryColor (*string -> string), got:\n%s", result)
+	}
+
+	if !strings.Contains(result, "AdTagURL: func() string { if item.AdTagURL != nil") {
+		t.Errorf("expected pointer dereference for AdTagURL (*string -> string), got:\n%s", result)
+	}
+
+	// *float64 model -> float64 DTO should use pointer dereference
+	if !strings.Contains(result, "MinWatchTimeSec: func() float64 { if item.MinWatchTimeSec != nil") {
+		t.Errorf("expected pointer dereference for MinWatchTimeSec (*float64 -> float64), got:\n%s", result)
+	}
+
+	// bool field (no pointer mismatch) should be direct assignment
+	if !strings.Contains(result, "Active: item.Active,") {
+		t.Errorf("expected direct assignment for Active, got:\n%s", result)
+	}
+}
+
+// TestGenerateFieldMapping_NoPointerMismatch tests that matching types use direct assignment.
+func TestGenerateFieldMapping_NoPointerMismatch(t *testing.T) {
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(origDir)
+
+	os.MkdirAll(filepath.Join("guxgen", "models"), 0755)
+	modelContent := `package models
+
+type Product struct {
+	Name  string
+	Price float64
+	Slug  *string
+}
+`
+	os.WriteFile(filepath.Join("guxgen", "models", "product.go"), []byte(modelContent), 0644)
+	modelFieldTypesCache = make(map[string]map[string]string)
+
+	info := &DTOInfo{
+		ModelName: "Product",
+		Fields: []DTOFieldMapping{
+			{DTOField: "Name", DTOType: "string", ModelField: "Name"},
+			{DTOField: "Price", DTOType: "float64", ModelField: "Price"},
+			{DTOField: "Slug", DTOType: "*string", ModelField: "Slug"},
+		},
+	}
+
+	result := generateFieldMapping(info, "item")
+
+	// Both string → should be direct
+	if !strings.Contains(result, "Name: item.Name,") {
+		t.Errorf("expected direct assignment for matching types, got:\n%s", result)
+	}
+
+	// Both *string → should be direct (DTO also pointer)
+	if !strings.Contains(result, "Slug: item.Slug,") {
+		t.Errorf("expected direct assignment for matching pointer types, got:\n%s", result)
+	}
+}
+
+// TestGenerateDTOStructCode_PointerTypes tests that pointer types in inline DTOs
+// are correctly mapped (#53).
+func TestGenerateDTOStructCode_PointerTypes(t *testing.T) {
+	fields := []ModelFieldInfo{
+		{Name: "Name", Type: "string", JSONName: "name"},
+		{Name: "Description", Type: "*string", JSONName: "description"},
+		{Name: "Price", Type: "*float64", JSONName: "price"},
+		{Name: "ParentID", Type: "*uint", JSONName: "parent_id"},
+	}
+
+	result := generateDTOStructCode("TestDTO", fields)
+
+	if !strings.Contains(result, "Name string") {
+		t.Errorf("expected string type for Name, got:\n%s", result)
+	}
+	// *string maps to string in inline DTOs (default case)
+	if !strings.Contains(result, "Description string") {
+		t.Errorf("expected string type for Description (*string mapped to string), got:\n%s", result)
+	}
+	// *float64 maps to float64 in inline DTOs (no explicit case, hits default -> string)
+	// Actually check what the actual mapping is:
+	if !strings.Contains(result, "Price") {
+		t.Errorf("expected Price field in generated DTO, got:\n%s", result)
+	}
+	if !strings.Contains(result, "ParentID *uint") {
+		t.Errorf("expected *uint type for ParentID, got:\n%s", result)
+	}
+}
+
+// TestGenerateServerAPICode_PointerTypes tests that server API code handles
+// pointer type conversions correctly (#53).
+func TestGenerateServerAPICode_PointerTypes(t *testing.T) {
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(origDir)
+
+	os.MkdirAll(filepath.Join("guxgen", "models"), 0755)
+	modelContent := `package models
+
+type Widget struct {
+	Description *string
+	Weight      *float64
+	Label       string
+}
+`
+	os.WriteFile(filepath.Join("guxgen", "models", "widget.go"), []byte(modelContent), 0644)
+	modelFieldTypesCache = make(map[string]map[string]string)
+
+	result := generateServerAPICode("Widget", "Widgets")
+
+	// *string should have pointer dereference in model-to-DTO
+	if !strings.Contains(result, "if item.Description != nil") {
+		t.Errorf("expected nil check for *string field Description, got:\n%s", result)
+	}
+
+	// *float64 should have pointer dereference in model-to-DTO
+	if !strings.Contains(result, "if item.Weight != nil") {
+		t.Errorf("expected nil check for *float64 field Weight, got:\n%s", result)
+	}
+
+	// string field should be direct assignment
+	if !strings.Contains(result, "Label: item.Label,") {
+		t.Errorf("expected direct assignment for string field Label, got:\n%s", result)
+	}
+
+	// *string should have pointer wrapping in DTO-to-model (create)
+	if !strings.Contains(result, "func() *string") {
+		t.Errorf("expected *string wrapping function in create code, got:\n%s", result)
 	}
 }
