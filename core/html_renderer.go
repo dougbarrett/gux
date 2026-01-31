@@ -40,6 +40,24 @@ func (r *HTMLRenderer) RenderElement(tag string, attrs Attrs, children []Node) R
 	writeAttr("type", attrs.Type)
 	writeAttr("name", attrs.Name)
 	writeAttr("value", attrs.Value)
+	writeAttr("poster", attrs.Poster)
+	writeAttr("preload", attrs.Preload)
+	writeAttr("width", attrs.Width)
+	writeAttr("height", attrs.Height)
+
+	// Boolean attributes
+	if attrs.Autoplay {
+		b.WriteString(" autoplay")
+	}
+	if attrs.Loop {
+		b.WriteString(" loop")
+	}
+	if attrs.Muted {
+		b.WriteString(" muted")
+	}
+	if attrs.Controls {
+		b.WriteString(" controls")
+	}
 
 	// External link marker (bypass client-side navigation)
 	if attrs.External {

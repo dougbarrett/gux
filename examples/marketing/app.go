@@ -15,7 +15,8 @@ func main() {
 		Hybrid("/features", pages.Features).
 		Hybrid("/pricing", pages.Pricing).
 		Hybrid("/about", pages.About).
-		Hybrid("/contact", pages.Contact)
+		Hybrid("/contact", pages.Contact).
+		Hybrid("/video", pages.VideoDemo)
 
 	app.Run(":8083")
 }

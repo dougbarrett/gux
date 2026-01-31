@@ -1867,6 +1867,9 @@ func main() {
 		currentComponent = component
 	}
 
+	// Scroll-to-top flag: true by default, set to false by links with data-gux-preserve-scroll
+	scrollAfterNavigate := true
+
 	render = func() {
 		// Save focus state before re-render
 		activeElement := document.Get("activeElement")
@@ -1921,9 +1924,6 @@ func main() {
 			}
 		}
 	}
-
-	// Scroll-to-top flag: true by default, set to false by links with data-gux-preserve-scroll
-	scrollAfterNavigate := true
 
 	// Navigate fetches page data then renders
 	navigate := func(path string) {
@@ -2228,6 +2228,9 @@ func main() {
 		currentComponent = component
 	}
 
+	// Scroll-to-top flag: true by default, set to false by links with data-gux-preserve-scroll
+	scrollAfterNavigate := true
+
 	render = func() {
 		// Save focus state before re-render
 		activeElement := document.Get("activeElement")
@@ -2282,9 +2285,6 @@ func main() {
 			}
 		}
 	}
-
-	// Scroll-to-top flag: true by default, set to false by links with data-gux-preserve-scroll
-	scrollAfterNavigate := true
 
 	// Navigate fetches page data then renders
 	// For cross-bundle navigation, do a full page redirect

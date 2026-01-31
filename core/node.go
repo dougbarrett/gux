@@ -45,6 +45,16 @@ type Attrs struct {
 	// By default, client-side navigation scrolls to the top of the page.
 	PreserveScroll bool
 
+	// Media element attributes
+	Poster   string // Video poster image
+	Autoplay bool   // Auto-play media
+	Loop     bool   // Loop playback
+	Muted    bool   // Start muted
+	Controls bool   // Show playback controls
+	Preload  string // "none", "metadata", "auto"
+	Width    string // Element width
+	Height   string // Element height
+
 	// Data attributes (rendered as data-*)
 	Data map[string]string
 
@@ -53,6 +63,13 @@ type Attrs struct {
 	OnSubmit func()
 	OnChange func(value string)
 	OnEnter  func() // Called when Enter key is pressed
+
+	// OnMount is called after the element's DOM node is created and children
+	// are appended (WASM only, ignored in SSR). The callback receives the DOM
+	// element as interface{} which can be cast to syscall/js.Value in WASM.
+	// Called on every render since gux replaces DOM trees on re-render.
+	// JS library initialization should be idempotent.
+	OnMount func(el any)
 
 	// Additional attributes not covered above
 	Extra map[string]string

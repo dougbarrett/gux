@@ -141,6 +141,30 @@ func Textarea(attrs Attrs, children ...Node) Node {
 	return El("textarea", attrs, children...)
 }
 
+func Video(attrs Attrs, children ...Node) Node {
+	return El("video", attrs, children...)
+}
+
+func Audio(attrs Attrs, children ...Node) Node {
+	return El("audio", attrs, children...)
+}
+
+func Source(attrs Attrs) Node {
+	return El("source", attrs)
+}
+
+func Track(attrs Attrs) Node {
+	return El("track", attrs)
+}
+
+func Iframe(attrs Attrs, children ...Node) Node {
+	return El("iframe", attrs, children...)
+}
+
+func Canvas(attrs Attrs, children ...Node) Node {
+	return El("canvas", attrs, children...)
+}
+
 // If conditionally renders a node based on a condition.
 func If(condition bool, node Node) Node {
 	if condition {

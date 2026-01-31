@@ -72,6 +72,11 @@ core.Main, core.Section, core.Article, core.Img
 core.Table, core.Thead, core.Tbody, core.Tr, core.Th, core.Td
 core.Select, core.Option, core.Textarea
 
+// Media elements:
+core.Video, core.Audio     // Container elements with children
+core.Source, core.Track    // Self-closing media children
+core.Iframe, core.Canvas   // Embedding elements
+
 // Generic element
 core.El("custom-tag", core.Attrs{}, children...)
 
@@ -104,11 +109,27 @@ core.Attrs{
     // Data attributes (rendered as data-*)
     Data: map[string]string{"id": "123"},
 
+    // Media attributes (for Video, Audio, Iframe, etc.)
+    Poster:   "/poster.jpg",   // Video poster image
+    Autoplay: true,            // Auto-play media
+    Loop:     true,            // Loop playback
+    Muted:    true,            // Start muted
+    Controls: true,            // Show playback controls
+    Preload:  "metadata",      // "none", "metadata", "auto"
+    Width:    "640",           // Element width
+    Height:   "360",           // Element height
+
     // Event handlers (WASM only, ignored in SSR)
     OnClick:  func() { /* handle click */ },
     OnSubmit: func() { /* handle form submit */ },
     OnChange: func(value string) { /* handle input change */ },
     OnEnter:  func() { /* handle Enter key */ },
+
+    // Lifecycle hooks (WASM only, ignored in SSR)
+    OnMount: func(el any) {
+        // Called after element + children are created in DOM.
+        // el is js.Value in WASM. Must be idempotent (called on every render).
+    },
 
     // Additional attributes
     Extra: map[string]string{"aria-label": "Label"},
@@ -1300,3 +1321,83 @@ func CreateForm(r *core.Router) func() core.Node {
     }
 }
 ```
+
+### OnMount Lifecycle Hook
+
+`OnMount` fires after the element and its children are created in the DOM (WASM only, ignored in SSR). The callback receives the DOM element as `any` (cast to `js.Value` in WASM). Since gux replaces DOM trees on re-render, `OnMount` fires on every render — initialization must be idempotent.
+
+```go
+core.Div(core.Attrs{
+    ID: "my-widget",
+    OnMount: func(el any) {
+        jsEl := el.(js.Value)
+        // Initialize JS library on the DOM element
+        // Check for existing initialization to be idempotent
+    },
+}, children...)
+```
+
+### Script & CSS Loading (WASM)
+
+Dynamic loading of external scripts and stylesheets with deduplication. Scripts are loaded once and callbacks are queued if a load is already in progress.
+
+```go
+import "github.com/dougbarrett/gux/core"
+
+core.LoadScript("https://cdn.example.com/lib.js", func(err error) {
+    if err != nil { return }
+    // Library is now available via js.Global()
+})
+
+core.LoadCSS("https://cdn.example.com/style.css", func(err error) {
+    // CSS loaded
+})
+```
+
+### VideoPlayer Component (`ui` package)
+
+A video player with optional VideoJS enhanced UI and Google IMA ads support.
+
+```go
+import "github.com/dougbarrett/gux/ui"
+
+// Basic HTML5 video
+ui.VideoPlayer(ui.VideoPlayerProps{
+    Sources:  []ui.VideoSource{{Src: "/video.mp4", Type: "video/mp4"}},
+    Controls: true,
+})
+
+// With VideoJS (loads from CDN automatically)
+ui.VideoPlayer(ui.VideoPlayerProps{
+    Sources:       []ui.VideoSource{{Src: "/video.mp4", Type: "video/mp4"}},
+    EnableVideoJS: true,
+    Controls:      true,
+    OnPlay:        func() { println("playing") },
+    OnPause:       func() { println("paused") },
+})
+
+// With Google IMA ads
+ui.VideoPlayer(ui.VideoPlayerProps{
+    Sources:       []ui.VideoSource{{Src: "/video.mp4", Type: "video/mp4"}},
+    EnableVideoJS: true,
+    EnableAds:     true,
+    AdTagURL:      "https://pubads.g.doubleclick.net/gampad/ads?...",
+    Controls:      true,
+    Muted:         true,
+    OnAdStarted: func(info ui.AdInfo) {
+        fmt.Printf("Ad: %s (%.0fs)\n", info.AdTitle, info.Duration)
+    },
+    OnAdComplete: func(info ui.AdInfo) {
+        fmt.Printf("Ad finished: %s\n", info.AdTitle)
+    },
+    OnContentResume: func() { println("Content resumed") },
+})
+```
+
+**VideoPlayerProps fields**: Sources, Poster, Width, Height, AutoPlay, Loop, Muted, Controls, Preload, Class, EnableVideoJS, VideoJSCSS, VideoJSScript, EnableAds, AdTagURL.
+
+**Video event callbacks** (WASM only): OnPlay, OnPause, OnEnded, OnError(msg), OnReady.
+
+**IMA ad event callbacks** (WASM only, require EnableAds+EnableVideoJS): OnAdLoaded(AdInfo), OnAdStarted(AdInfo), OnAdComplete(AdInfo), OnAdSkipped(AdInfo), OnAdError(errMsg), OnAdProgress(AdInfo), OnAdClicked(AdInfo), OnContentPause(), OnContentResume().
+
+**AdInfo struct**: AdID, AdTitle, AdSystem, Duration, CurrentTime, IsSkippable, ContentType, AdPosition, TotalAds, ClickURL.

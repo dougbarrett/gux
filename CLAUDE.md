@@ -9,11 +9,12 @@ Gux is a full-stack Go framework for building modern web applications with WebAs
 The core package provides a universal rendering system that works identically on server (SSR) and client (WASM):
 
 - **Node System** (`node.go`) - Abstract UI tree representation
-- **Elements** (`elements.go`) - HTML element helpers (Div, Button, Input, etc.)
+- **Elements** (`elements.go`) - HTML element helpers (Div, Button, Input, Video, Audio, etc.)
 - **Renderers** - HTML (`html_renderer.go`) for server, DOM (`dom_renderer.go`) for WASM
 - **App & Routing** (`app.go`, `router_server.go`, `router_wasm.go`) - Hybrid SSR+WASM routing
 - **CRUD** (`crud.go`) - Automatic REST API generation with DTOs and hooks
 - **CSRF** (`csrf.go`) - Automatic CSRF protection for mutating operations
+- **Script Loader** (`script_loader_wasm.go`) - Dynamic JS/CSS loading with deduplication
 
 ### Key Patterns
 
@@ -631,6 +632,156 @@ go test ./... -count=1 -timeout 120s
 - **Table-driven tests**: Use Go table-driven test patterns with `t.Run()` subtests.
 - **Temp directories**: Tests that need file system access should use `t.TempDir()` and `os.Chdir()` with defer to restore.
 - **Cache clearing**: Tests that use `getModelFieldTypes()` must reset `modelFieldTypesCache` before running.
+
+## OnMount Lifecycle Hook
+
+`OnMount` is a callback on `Attrs` that fires after an element's DOM node is created and all children are appended. It only runs in WASM — it's ignored during SSR.
+
+```go
+core.Div(core.Attrs{
+    ID: "my-element",
+    OnMount: func(el any) {
+        // el is a syscall/js.Value in WASM
+        // Cast: jsEl := el.(js.Value)
+        // Initialize JS libraries, add DOM listeners, etc.
+    },
+}, children...)
+```
+
+**Key behavior:**
+- Called on **every render** (not just first mount), since gux replaces DOM trees on re-render
+- JS library initialization should be **idempotent** (e.g., VideoJS returns existing player if already initialized)
+- The `el` parameter is `any` — cast to `syscall/js.Value` in WASM code
+
+## Script & CSS Loading
+
+Dynamic script/CSS loading with deduplication for WASM builds:
+
+```go
+// Load external JS (only loads once per URL, even with multiple calls)
+core.LoadScript("https://cdn.example.com/lib.js", func(err error) {
+    if err != nil {
+        println("Failed:", err.Error())
+        return
+    }
+    // Library is now available via js.Global()
+})
+
+// Load external CSS
+core.LoadCSS("https://cdn.example.com/styles.css", func(err error) {
+    // Stylesheet loaded
+})
+```
+
+On non-WASM builds, both functions are no-ops that immediately call the callback with nil.
+
+## Media Elements
+
+HTML element helpers for media content:
+
+```go
+core.Video(attrs, children...)   // <video>
+core.Audio(attrs, children...)   // <audio>
+core.Source(attrs)               // <source> (self-closing)
+core.Track(attrs)                // <track> (self-closing)
+core.Iframe(attrs, children...)  // <iframe>
+core.Canvas(attrs, children...)  // <canvas>
+```
+
+**Media attributes on `Attrs`:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `Poster` | `string` | Video poster image URL |
+| `Autoplay` | `bool` | Auto-play media |
+| `Loop` | `bool` | Loop playback |
+| `Muted` | `bool` | Start muted |
+| `Controls` | `bool` | Show playback controls |
+| `Preload` | `string` | `"none"`, `"metadata"`, `"auto"` |
+| `Width` | `string` | Element width |
+| `Height` | `string` | Element height |
+
+## VideoPlayer Component
+
+`ui.VideoPlayer` provides an integrated video player with optional VideoJS and Google IMA ads support.
+
+### Basic Usage
+
+```go
+// Native HTML5 video
+ui.VideoPlayer(ui.VideoPlayerProps{
+    Sources:  []ui.VideoSource{{Src: "/video.mp4", Type: "video/mp4"}},
+    Controls: true,
+})
+
+// With VideoJS (enhanced player UI, loaded from CDN)
+ui.VideoPlayer(ui.VideoPlayerProps{
+    Sources:       []ui.VideoSource{{Src: "/video.mp4", Type: "video/mp4"}},
+    EnableVideoJS: true,
+    Controls:      true,
+    OnPlay:        func() { println("playing") },
+})
+
+// With Google IMA pre-roll ads
+ui.VideoPlayer(ui.VideoPlayerProps{
+    Sources:       []ui.VideoSource{{Src: "/video.mp4", Type: "video/mp4"}},
+    EnableVideoJS: true,
+    EnableAds:     true,
+    AdTagURL:      "https://pubads.g.doubleclick.net/gampad/ads?...",
+    Controls:      true,
+})
+```
+
+### Props
+
+| Prop | Type | Description |
+|------|------|-------------|
+| `Sources` | `[]VideoSource` | Video sources (`Src` + `Type` MIME) |
+| `Poster` | `string` | Poster image URL |
+| `Width`, `Height` | `string` | Dimensions (default: `"100%"`, `"auto"`) |
+| `AutoPlay`, `Loop`, `Muted`, `Controls` | `bool` | Standard video attributes |
+| `Preload` | `string` | Default: `"metadata"` |
+| `EnableVideoJS` | `bool` | Use VideoJS enhanced player |
+| `VideoJSCSS`, `VideoJSScript` | `string` | Custom VideoJS CDN URLs |
+| `EnableAds` | `bool` | Enable Google IMA ads (requires VideoJS) |
+| `AdTagURL` | `string` | VAST/VMAP ad tag URL |
+
+### Video Event Handlers (WASM only)
+
+| Handler | Signature | Description |
+|---------|-----------|-------------|
+| `OnPlay` | `func()` | Video started playing |
+| `OnPause` | `func()` | Video paused |
+| `OnEnded` | `func()` | Video finished |
+| `OnError` | `func(msg string)` | Playback error |
+| `OnReady` | `func()` | Player fully initialized |
+
+### Google IMA Ad Event Handlers (WASM only)
+
+All ad event handlers receive `ui.AdInfo` with ad metadata:
+
+```go
+type AdInfo struct {
+    AdID, AdTitle, AdSystem string
+    Duration, CurrentTime   float64
+    IsSkippable             bool
+    ContentType             string
+    AdPosition, TotalAds    int
+    ClickURL                string
+}
+```
+
+| Handler | Signature | Description |
+|---------|-----------|-------------|
+| `OnAdLoaded` | `func(AdInfo)` | Ad creative loaded |
+| `OnAdStarted` | `func(AdInfo)` | Ad playback began |
+| `OnAdComplete` | `func(AdInfo)` | Ad finished playing |
+| `OnAdSkipped` | `func(AdInfo)` | User skipped the ad |
+| `OnAdProgress` | `func(AdInfo)` | Periodic progress tick |
+| `OnAdClicked` | `func(AdInfo)` | User clicked the ad |
+| `OnAdError` | `func(string)` | Ad error (falls back to content) |
+| `OnContentPause` | `func()` | Content pausing for ad break |
+| `OnContentResume` | `func()` | Content resuming after ads |
 
 ## Development Notes
 

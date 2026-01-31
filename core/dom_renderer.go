@@ -100,6 +100,24 @@ func (r *DOMRenderer) RenderElement(tag string, attrs Attrs, children []Node) Re
 	setAttr("type", attrs.Type)
 	setAttr("name", attrs.Name)
 	setAttr("value", attrs.Value)
+	setAttr("poster", attrs.Poster)
+	setAttr("preload", attrs.Preload)
+	setAttr("width", attrs.Width)
+	setAttr("height", attrs.Height)
+
+	// Boolean attributes
+	if attrs.Autoplay {
+		el.Call("setAttribute", "autoplay", "")
+	}
+	if attrs.Loop {
+		el.Call("setAttribute", "loop", "")
+	}
+	if attrs.Muted {
+		el.Call("setAttribute", "muted", "")
+	}
+	if attrs.Controls {
+		el.Call("setAttribute", "controls", "")
+	}
 
 	// External link marker (bypass client-side navigation)
 	if attrs.External {
@@ -203,6 +221,11 @@ func (r *DOMRenderer) RenderElement(tag string, attrs Attrs, children []Node) Re
 		if domVal := result.DOMValue(); domVal != nil {
 			el.Call("appendChild", domVal.(js.Value))
 		}
+	}
+
+	// Lifecycle hook: called after element and children are created
+	if attrs.OnMount != nil {
+		attrs.OnMount(el)
 	}
 
 	return &domResult{value: el}
