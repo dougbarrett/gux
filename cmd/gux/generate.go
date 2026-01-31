@@ -253,7 +253,7 @@ func generateGuxFiles() error {
 	}
 
 	// Parse typed API endpoints from app file
-	apiEndpoints, endpointDTOImport, err := parseAPIEndpoints(appFile)
+	apiEndpoints, endpointDTOImports, err := parseAPIEndpoints(appFile)
 	if err != nil {
 		return fmt.Errorf("parsing API endpoints: %w", err)
 	}
@@ -262,12 +262,20 @@ func generateGuxFiles() error {
 	if len(apiEndpoints) > 0 {
 		fmt.Printf("Generating API endpoint clients (%d endpoints)...\n", len(apiEndpoints))
 
-		// Use dto import from endpoints or from CRUD
-		if endpointDTOImport == "" {
-			endpointDTOImport = dtoImport
+		// Merge CRUD dto import into endpoint imports if not already present
+		if dtoImport != "" && len(endpointDTOImports) == 0 {
+			// Derive alias from import path
+			parts := strings.Split(dtoImport, "/")
+			endpointDTOImports = map[string]string{parts[len(parts)-1]: dtoImport}
 		}
 
-		if err := generateEndpointClient(apiEndpoints, endpointDTOImport); err != nil {
+		// Collect CRUD plural names to detect name collisions with endpoint functions
+		crudNames := make(map[string]bool)
+		for _, m := range crudModels {
+			crudNames[m.PluralName] = true
+		}
+
+		if err := generateEndpointClient(apiEndpoints, endpointDTOImports, crudNames); err != nil {
 			return fmt.Errorf("generating API endpoint client: %w", err)
 		}
 	}

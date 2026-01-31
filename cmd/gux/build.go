@@ -316,17 +316,45 @@ func generateServerAPICode(modelName, pluralName string) string {
 	var updateResultAssignments strings.Builder
 
 	for _, f := range fields {
-		// For List/Get: DTO field = model field
-		listFieldAssignments.WriteString(fmt.Sprintf("\t\t\t%s: item.%s,\n", f.Name, f.Name))
-		getFieldAssignments.WriteString(fmt.Sprintf("\t\t%s: item.%s,\n", f.Name, f.Name))
-		createResultAssignments.WriteString(fmt.Sprintf("\t\t%s: model.%s,\n", f.Name, f.Name))
-		updateResultAssignments.WriteString(fmt.Sprintf("\t\t%s: model.%s,\n", f.Name, f.Name))
+		// Determine if the model field is a pointer type that maps to a non-pointer DTO type
+		// (e.g., *string -> string, *float64 -> float64 in the inline DTO)
+		modelToDTO := fmt.Sprintf("item.%s", f.Name)
+		dtoToModel := fmt.Sprintf("item.%s", f.Name)
+		modelResultToDTO := fmt.Sprintf("model.%s", f.Name)
 
-		// For Create: model field = DTO field
-		createModelAssignments.WriteString(fmt.Sprintf("\t\t%s: item.%s,\n", f.Name, f.Name))
+		switch f.Type {
+		case "*string":
+			modelToDTO = fmt.Sprintf("func() string { if item.%s != nil { return *item.%s }; return \"\" }()", f.Name, f.Name)
+			modelResultToDTO = fmt.Sprintf("func() string { if model.%s != nil { return *model.%s }; return \"\" }()", f.Name, f.Name)
+			dtoToModel = fmt.Sprintf("func() *string { s := item.%s; if s == \"\" { return nil }; return &s }()", f.Name)
+		case "*float64":
+			modelToDTO = fmt.Sprintf("func() float64 { if item.%s != nil { return *item.%s }; return 0 }()", f.Name, f.Name)
+			modelResultToDTO = fmt.Sprintf("func() float64 { if model.%s != nil { return *model.%s }; return 0 }()", f.Name, f.Name)
+			dtoToModel = fmt.Sprintf("func() *float64 { v := item.%s; if v == 0 { return nil }; return &v }()", f.Name)
+		case "*uint", "*int":
+			modelToDTO = fmt.Sprintf("func() *uint { if item.%s != nil { v := uint(*item.%s); return &v }; return nil }()", f.Name, f.Name)
+			modelResultToDTO = fmt.Sprintf("func() *uint { if model.%s != nil { v := uint(*model.%s); return &v }; return nil }()", f.Name, f.Name)
+			// dtoToModel stays the same for *uint
+		}
 
-		// For Update: model.field = DTO.field
-		updateModelAssignments.WriteString(fmt.Sprintf("\tmodel.%s = item.%s\n", f.Name, f.Name))
+		// For List/Get: DTO field = model field (may need pointer dereference)
+		listFieldAssignments.WriteString(fmt.Sprintf("\t\t\t%s: %s,\n", f.Name, modelToDTO))
+		getFieldAssignments.WriteString(fmt.Sprintf("\t\t%s: %s,\n", f.Name, modelToDTO))
+		createResultAssignments.WriteString(fmt.Sprintf("\t\t%s: %s,\n", f.Name, modelResultToDTO))
+		updateResultAssignments.WriteString(fmt.Sprintf("\t\t%s: %s,\n", f.Name, modelResultToDTO))
+
+		// For Create: model field = DTO field (may need pointer wrapping)
+		createModelAssignments.WriteString(fmt.Sprintf("\t\t%s: %s,\n", f.Name, dtoToModel))
+
+		// For Update: model.field = DTO.field (may need pointer wrapping)
+		switch f.Type {
+		case "*string":
+			updateModelAssignments.WriteString(fmt.Sprintf("\tmodel.%s = func() *string { s := item.%s; if s == \"\" { return nil }; return &s }()\n", f.Name, f.Name))
+		case "*float64":
+			updateModelAssignments.WriteString(fmt.Sprintf("\tmodel.%s = func() *float64 { v := item.%s; if v == 0 { return nil }; return &v }()\n", f.Name, f.Name))
+		default:
+			updateModelAssignments.WriteString(fmt.Sprintf("\tmodel.%s = item.%s\n", f.Name, f.Name))
+		}
 	}
 
 	sb.WriteString(fmt.Sprintf(`
@@ -1031,22 +1059,30 @@ func parseCRUDModels(filename string) ([]CRUDModel, string, string, error) {
 }
 
 // parseAPIEndpoints parses the main app file to find core.API, core.APIGet, and core.APIDelete calls
-func parseAPIEndpoints(filename string) ([]APIEndpointInfo, string, error) {
+func parseAPIEndpoints(filename string) ([]APIEndpointInfo, map[string]string, error) {
 	fset := token.NewFileSet()
 	node, err := parser.ParseFile(fset, filename, nil, parser.ParseComments)
 	if err != nil {
-		return nil, "", fmt.Errorf("parse %s: %w", filename, err)
+		return nil, nil, fmt.Errorf("parse %s: %w", filename, err)
 	}
 
 	var endpoints []APIEndpointInfo
-	var dtoImport string
 
-	// Find dto import
+	// Build a map of all import aliases to their paths for DTO-related packages.
+	// This supports multiple DTO packages (e.g., guxgen/dto and project/dto as customdto).
+	dtoImports := make(map[string]string) // alias -> import path
 	for _, imp := range node.Imports {
 		path := strings.Trim(imp.Path.Value, `"`)
 		if strings.HasSuffix(path, "/dto") || strings.Contains(path, "/dto") {
-			dtoImport = path
-			break
+			alias := ""
+			if imp.Name != nil {
+				alias = imp.Name.Name
+			} else {
+				// Default alias is last path segment
+				parts := strings.Split(path, "/")
+				alias = parts[len(parts)-1]
+			}
+			dtoImports[alias] = path
 		}
 	}
 
@@ -1098,7 +1134,7 @@ func parseAPIEndpoints(filename string) ([]APIEndpointInfo, string, error) {
 		return true
 	})
 
-	return endpoints, dtoImport, nil
+	return endpoints, dtoImports, nil
 }
 
 // parseAPICall parses core.API(app, "POST", "/api/login", handler) call
@@ -1221,6 +1257,19 @@ func extractPathParams(path string) []string {
 		}
 	}
 	return params
+}
+
+// isNumericParam returns true if a path parameter name suggests a numeric ID.
+// Parameters named "id" or ending in "_id" / "Id" are treated as uint;
+// all others (slug, code, token, etc.) are treated as string.
+func isNumericParam(name string) bool {
+	if name == "id" {
+		return true
+	}
+	if strings.HasSuffix(name, "_id") || strings.HasSuffix(name, "Id") || strings.HasSuffix(name, "ID") {
+		return true
+	}
+	return false
 }
 
 // generateFuncName generates a function name from method and path
@@ -1501,6 +1550,12 @@ func parseRoutesAndBundles(filename string) (map[string]*BundleInfo, map[string]
 									innerPkgAlias = innerIdent.Name
 								}
 							}
+						} else if _, ok := h.Args[0].(*ast.CallExpr); ok {
+							// Inner arg is a factory call like customadmin.Promotions(db)
+							// which can't be reproduced in WASM (db not available).
+							// Skip this route — SSR will handle it.
+							fmt.Printf("  Skipping WASM route (custom factory function): %s\n", path)
+							handler = "" // Mark as unresolvable
 						}
 					}
 				}
@@ -1793,6 +1848,10 @@ func main() {
 				link.Call("addEventListener", "click", js.FuncOf(func(this js.Value, args []js.Value) any {
 					args[0].Call("preventDefault")
 					path := this.Get("pathname").String()
+					// Check if link opts out of scroll-to-top
+					if this.Call("getAttribute", "data-gux-preserve-scroll").String() == "true" {
+						scrollAfterNavigate = false
+					}
 					router.Navigate(path)
 					return nil
 				}))
@@ -1808,8 +1867,14 @@ func main() {
 		}
 	}
 
+	// Scroll-to-top flag: true by default, set to false by links with data-gux-preserve-scroll
+	scrollAfterNavigate := true
+
 	// Navigate fetches page data then renders
 	navigate := func(path string) {
+		// Capture and reset scroll flag
+		shouldScroll := scrollAfterNavigate
+		scrollAfterNavigate = true
 		// Clear current component to force reload for new path
 		currentComponent = nil
 		// Clear page-specific state before navigating to avoid stale data
@@ -1821,6 +1886,9 @@ func main() {
 			}
 			loadPage()
 			render()
+			if shouldScroll {
+				window.Call("scrollTo", 0, 0)
+			}
 		})
 	}
 
@@ -1853,6 +1921,7 @@ func main() {
 			}
 			loadPage()
 			render()
+			window.Call("scrollTo", 0, 0)
 		})
 		return nil
 	}))
@@ -2140,6 +2209,10 @@ func main() {
 				link.Call("addEventListener", "click", js.FuncOf(func(this js.Value, args []js.Value) any {
 					args[0].Call("preventDefault")
 					path := this.Get("pathname").String()
+					// Check if link opts out of scroll-to-top
+					if this.Call("getAttribute", "data-gux-preserve-scroll").String() == "true" {
+						scrollAfterNavigate = false
+					}
 					router.Navigate(path)
 					return nil
 				}))
@@ -2155,9 +2228,15 @@ func main() {
 		}
 	}
 
+	// Scroll-to-top flag: true by default, set to false by links with data-gux-preserve-scroll
+	scrollAfterNavigate := true
+
 	// Navigate fetches page data then renders
 	// For cross-bundle navigation, do a full page redirect
 	navigate := func(path string) {
+		// Capture and reset scroll flag
+		shouldScroll := scrollAfterNavigate
+		scrollAfterNavigate = true
 		// Check if this path belongs to this bundle
 		if !isRouteInBundle(path) {
 			// Cross-bundle navigation - do full page redirect
@@ -2175,6 +2254,9 @@ func main() {
 			}
 			loadPage()
 			render()
+			if shouldScroll {
+				window.Call("scrollTo", 0, 0)
+			}
 		})
 	}
 
@@ -2207,6 +2289,7 @@ func main() {
 			}
 			loadPage()
 			render()
+			window.Call("scrollTo", 0, 0)
 		})
 		return nil
 	}))
@@ -3204,7 +3287,7 @@ func Post[T any](url string, data any, callback func(T, error)) {
 }
 
 // generateEndpointClient generates guxgen/api/endpoints_gen.go for typed API endpoints
-func generateEndpointClient(endpoints []APIEndpointInfo, dtoImport string) error {
+func generateEndpointClient(endpoints []APIEndpointInfo, dtoImports map[string]string, crudNames map[string]bool) error {
 	if len(endpoints) == 0 {
 		return nil
 	}
@@ -3236,19 +3319,38 @@ func generateEndpointClient(endpoints []APIEndpointInfo, dtoImport string) error
 	guxfetch "github.com/dougbarrett/gux/fetch"`
 	}
 
-	// Check if we need dto import and find the package alias
-	hasDTOTypes := false
-	dtoPkgAlias := ""
+	// Collect all unique DTO packages used by endpoints and add their imports
+	usedDTOPkgs := make(map[string]bool)
 	for _, ep := range endpoints {
 		if ep.Package != "" && ep.Package != "main" {
-			hasDTOTypes = true
-			dtoPkgAlias = ep.Package
-			break
+			usedDTOPkgs[ep.Package] = true
+		}
+	}
+	for alias := range usedDTOPkgs {
+		if importPath, ok := dtoImports[alias]; ok {
+			imports += "\n\n\t" + formatDTOImport(alias, importPath)
 		}
 	}
 
-	if hasDTOTypes && dtoImport != "" {
-		imports += "\n\n\t" + formatDTOImport(dtoPkgAlias, dtoImport)
+	// Rename endpoint functions that collide with CRUD API variable names
+	for i := range endpoints {
+		if crudNames[endpoints[i].FuncName] {
+			// Add method prefix to disambiguate (e.g., "Leads" -> "PostLeads" for POST)
+			switch endpoints[i].Method {
+			case "POST":
+				endpoints[i].FuncName = "Post" + endpoints[i].FuncName
+			case "GET":
+				endpoints[i].FuncName = "Get" + endpoints[i].FuncName
+			case "PUT":
+				endpoints[i].FuncName = "Update" + endpoints[i].FuncName
+			case "PATCH":
+				endpoints[i].FuncName = "Patch" + endpoints[i].FuncName
+			case "DELETE":
+				endpoints[i].FuncName = "Delete" + endpoints[i].FuncName
+			default:
+				endpoints[i].FuncName = endpoints[i].Method + endpoints[i].FuncName
+			}
+		}
 	}
 
 	// Generate endpoint functions
@@ -3317,16 +3419,12 @@ func apiEndpointFetch(method, url string, body []byte) ([]byte, error) {
 	"net/http"
 	"os"`
 
-	if needsDTOImport && dtoImport != "" {
-		// Find the package alias used by endpoints
-		serverDTOAlias := ""
-		for _, ep := range endpoints {
-			if ep.Package != "" && ep.Package != "main" {
-				serverDTOAlias = ep.Package
-				break
+	if needsDTOImport {
+		for alias := range usedDTOPkgs {
+			if importPath, ok := dtoImports[alias]; ok {
+				serverImports += "\n\n\t" + formatDTOImport(alias, importPath)
 			}
 		}
-		serverImports += "\n\n\t" + formatDTOImport(serverDTOAlias, dtoImport)
 	}
 
 	serverCode := fmt.Sprintf(`//go:build !js || !wasm
@@ -3436,10 +3534,14 @@ func endpointFetch(method, path string, body []byte) ([]byte, error) {
 func generateEndpointFunc(ep APIEndpointInfo) string {
 	var sb strings.Builder
 
-	// Build function parameters
+	// Build function parameters with type-aware path params
 	var params []string
 	for _, p := range ep.PathParams {
-		params = append(params, p+" uint")
+		if isNumericParam(p) {
+			params = append(params, p+" uint")
+		} else {
+			params = append(params, p+" string")
+		}
 	}
 
 	// Add request body parameter if needed
@@ -3454,10 +3556,14 @@ func generateEndpointFunc(ep APIEndpointInfo) string {
 	// Build URL with path parameters
 	urlExpr := `"` + ep.Path + `"`
 	if len(ep.PathParams) > 0 {
-		// Replace :param with %d for formatting
+		// Replace :param with %d (numeric) or %s (string) for formatting
 		urlPattern := ep.Path
 		for _, p := range ep.PathParams {
-			urlPattern = strings.Replace(urlPattern, ":"+p, "%d", 1)
+			if isNumericParam(p) {
+				urlPattern = strings.Replace(urlPattern, ":"+p, "%d", 1)
+			} else {
+				urlPattern = strings.Replace(urlPattern, ":"+p, "%s", 1)
+			}
 		}
 		urlExpr = `fmt.Sprintf("` + urlPattern + `", ` + strings.Join(ep.PathParams, ", ") + `)`
 	}
@@ -3552,10 +3658,14 @@ func %s(%s) {
 func generateEndpointServerFunc(ep APIEndpointInfo) string {
 	var sb strings.Builder
 
-	// Build function parameters
+	// Build function parameters with type-aware path params
 	var params []string
 	for _, p := range ep.PathParams {
-		params = append(params, p+" uint")
+		if isNumericParam(p) {
+			params = append(params, p+" uint")
+		} else {
+			params = append(params, p+" string")
+		}
 	}
 
 	// Add request body parameter if needed
@@ -3570,10 +3680,14 @@ func generateEndpointServerFunc(ep APIEndpointInfo) string {
 	// Build URL with path parameters
 	urlExpr := `"` + ep.Path + `"`
 	if len(ep.PathParams) > 0 {
-		// Replace :param with %d for formatting
+		// Replace :param with %d (numeric) or %s (string) for formatting
 		urlPattern := ep.Path
 		for _, p := range ep.PathParams {
-			urlPattern = strings.Replace(urlPattern, ":"+p, "%d", 1)
+			if isNumericParam(p) {
+				urlPattern = strings.Replace(urlPattern, ":"+p, "%d", 1)
+			} else {
+				urlPattern = strings.Replace(urlPattern, ":"+p, "%s", 1)
+			}
 		}
 		urlExpr = `fmt.Sprintf("` + urlPattern + `", ` + strings.Join(ep.PathParams, ", ") + `)`
 	}
