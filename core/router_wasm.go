@@ -61,6 +61,40 @@ func wasmQuery(name string) string {
 	return vals.Get(name)
 }
 
+// SetInterval calls the callback repeatedly at the given interval (milliseconds).
+// The timer is automatically cleared when the user navigates to a different page.
+// Returns a TimerHandle that can be used to cancel the interval manually.
+func (r *Router) SetInterval(callback func(), ms int) *TimerHandle {
+	id := js.Global().Call("setInterval", js.FuncOf(func(this js.Value, args []js.Value) any {
+		callback()
+		return nil
+	}), ms).Int()
+	h := &TimerHandle{id: id, interval: true, router: r}
+	r.activeTimers = append(r.activeTimers, h)
+	return h
+}
+
+// SetTimeout calls the callback once after the given delay (milliseconds).
+// The timer is automatically cleared when the user navigates to a different page.
+// Returns a TimerHandle that can be used to cancel the timeout manually.
+func (r *Router) SetTimeout(callback func(), ms int) *TimerHandle {
+	id := js.Global().Call("setTimeout", js.FuncOf(func(this js.Value, args []js.Value) any {
+		callback()
+		return nil
+	}), ms).Int()
+	h := &TimerHandle{id: id, interval: false, router: r}
+	r.activeTimers = append(r.activeTimers, h)
+	return h
+}
+
+func clearTimer(h *TimerHandle) {
+	if h.interval {
+		js.Global().Call("clearInterval", h.id)
+	} else {
+		js.Global().Call("clearTimeout", h.id)
+	}
+}
+
 // SetInChangeEvent sets the change event flag.
 // When true, ScheduleRerender calls are ignored to prevent
 // re-renders from interrupting click events.

@@ -783,6 +783,34 @@ type AdInfo struct {
 | `OnContentPause` | `func()` | Content pausing for ad break |
 | `OnContentResume` | `func()` | Content resuming after ads |
 
+## Timer Helpers
+
+`r.SetInterval()` and `r.SetTimeout()` provide managed JavaScript timers with automatic cleanup on navigation. WASM only — no-ops during SSR.
+
+```go
+func MyPage(r *core.Router) func() core.Node {
+    count := r.StateInt("count", 0)
+
+    r.OnLoad(func() {
+        // Increment every second — automatically cleared on navigation
+        r.SetInterval(func() {
+            count.Set(count.Get() + 1)
+        }, 1000)
+
+        // One-shot after 5 seconds
+        r.SetTimeout(func() {
+            println("timeout fired")
+        }, 5000)
+    })
+
+    return func() core.Node {
+        return core.Text(fmt.Sprintf("Count: %d", count.Get()))
+    }
+}
+```
+
+Both return a `*TimerHandle` with a `Clear()` method for manual cancellation. All active timers are automatically cleared when the user navigates away (via `Router.ClearState()`).
+
 ## Development Notes
 
 - **core/** is the low-level universal rendering system (focus of current development)

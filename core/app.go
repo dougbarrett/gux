@@ -805,6 +805,26 @@ type Router struct {
 	response       http.ResponseWriter  // Current HTTP response (server-side only)
 	authConfig     *AuthConfig          // Auth configuration (server-side only)
 	sessionID      string               // Session ID for SSR API calls
+	activeTimers   []*TimerHandle       // Tracked timers/intervals for cleanup on navigation
+}
+
+// TimerHandle represents a JavaScript timer (setTimeout or setInterval).
+// Call Clear() to cancel the timer manually, or it will be automatically
+// cleared when the user navigates to a different page.
+type TimerHandle struct {
+	id       int
+	interval bool // true = setInterval, false = setTimeout
+	cleared  bool
+	router   *Router
+}
+
+// Clear cancels the timer. Safe to call multiple times.
+func (h *TimerHandle) Clear() {
+	if h.cleared {
+		return
+	}
+	h.cleared = true
+	clearTimer(h)
 }
 
 // SSRSessionSetter is a function that sets the session context for SSR API calls.
@@ -987,6 +1007,12 @@ func (r *Router) ClearState() {
 			preserved[k] = v
 		}
 	}
+
+	// Clear all active timers/intervals
+	for _, h := range r.activeTimers {
+		h.Clear()
+	}
+	r.activeTimers = nil
 
 	// Clear all state
 	r.state = make(map[string]any)

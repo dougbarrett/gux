@@ -1322,6 +1322,22 @@ func CreateForm(r *core.Router) func() core.Node {
 }
 ```
 
+### Timer Helpers
+
+`r.SetInterval()` and `r.SetTimeout()` provide managed JS timers with automatic cleanup on navigation. WASM only — no-ops in SSR.
+
+```go
+// Returns *TimerHandle with Clear() method for manual cancellation
+r.SetInterval(func() {
+    count.Set(count.Get() + 1)
+}, 1000)
+
+handle := r.SetTimeout(func() { doSomething() }, 5000)
+handle.Clear() // manual cancel
+```
+
+All active timers are automatically cleared when the user navigates away (`Router.ClearState()`).
+
 ### OnMount Lifecycle Hook
 
 `OnMount` fires after the element and its children are created in the DOM (WASM only, ignored in SSR). The callback receives the DOM element as `any` (cast to `js.Value` in WASM). Since gux replaces DOM trees on re-render, `OnMount` fires on every render — initialization must be idempotent.
