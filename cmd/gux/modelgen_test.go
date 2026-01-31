@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -1124,5 +1125,117 @@ func TestPrepareModelTemplateData_DTOFieldTypeOverride(t *testing.T) {
 	}
 	if !strings.Contains(tf.EditStateInit, "!= nil") {
 		t.Errorf("EditStateInit should have nil check after DTO type override, got: %s", tf.EditStateInit)
+	}
+}
+
+// TestPrepareModelTemplateData_ModelTypeOverride tests that model struct types
+// override config types when they differ (manual model with *string, config says string).
+func TestPrepareModelTemplateData_ModelTypeOverride(t *testing.T) {
+	// Set up temp dir with a manual model file
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(origDir)
+
+	// Create a manual model with *string fields
+	os.MkdirAll(filepath.Join("guxgen", "models"), 0755)
+	modelContent := `package models
+
+type Promotion struct {
+	SecondaryColor *string
+	AdTagURL       *string
+	WebhookURL     *string
+	Active         bool
+}
+`
+	os.WriteFile(filepath.Join("guxgen", "models", "promotion.go"), []byte(modelContent), 0644)
+
+	// Clear cache
+	modelFieldTypesCache = make(map[string]map[string]string)
+
+	// Config says "string" for these fields (mismatched with model)
+	model := &ModelDefinition{
+		Name: "Promotion",
+		Sections: map[string][]ModelField{
+			"Main": {
+				{Name: "SecondaryColor", Type: "string", Table: true},
+				{Name: "AdTagURL", Type: "string"},
+				{Name: "WebhookURL", Type: "string"},
+				{Name: "Active", Type: "bool"},
+			},
+		},
+	}
+
+	// Get model types (simulating what GenerateModelFilesImpl does)
+	modelTypes, err := getModelFieldTypes("Promotion")
+	if err != nil {
+		t.Fatalf("getModelFieldTypes: %v", err)
+	}
+
+	data := prepareModelTemplateData(model, "myapp", nil, nil, modelTypes)
+
+	// Verify that *string fields were detected and handled
+	for _, tf := range data.AllFields {
+		switch tf.Name {
+		case "SecondaryColor", "AdTagURL", "WebhookURL":
+			if !tf.IsPointer {
+				t.Errorf("field %s should be IsPointer=true after model type override", tf.Name)
+			}
+			if !strings.Contains(tf.EditStateInit, "!= nil") {
+				t.Errorf("field %s EditStateInit should have nil check, got: %s", tf.Name, tf.EditStateInit)
+			}
+			if !strings.Contains(tf.DetailField, "!= nil") {
+				t.Errorf("field %s DetailField should have nil check, got: %s", tf.Name, tf.DetailField)
+			}
+		case "Active":
+			if tf.IsPointer {
+				t.Errorf("field Active should NOT be IsPointer")
+			}
+		}
+	}
+}
+
+// TestPrepareModelTemplateData_ConfigPointerTypeWorks tests that config with *string
+// type correctly generates pointer handling even without model type override.
+func TestPrepareModelTemplateData_ConfigPointerTypeWorks(t *testing.T) {
+	// No temp directory needed - just test config-driven types
+	model := &ModelDefinition{
+		Name: "Widget",
+		Sections: map[string][]ModelField{
+			"Main": {
+				{Name: "Description", Type: "*string", Table: true},
+				{Name: "Price", Type: "*float64"},
+				{Name: "Name", Type: "string"},
+			},
+		},
+	}
+
+	// No DTO type override (nil) - rely purely on config types
+	data := prepareModelTemplateData(model, "myapp", nil, nil, nil)
+
+	for _, tf := range data.AllFields {
+		switch tf.Name {
+		case "Description":
+			if !tf.IsPointer {
+				t.Errorf("Description should be IsPointer=true from config *string")
+			}
+			if !strings.Contains(tf.EditStateInit, "!= nil") {
+				t.Errorf("Description EditStateInit should have nil check, got: %s", tf.EditStateInit)
+			}
+			if !strings.Contains(tf.DetailField, "!= nil") {
+				t.Errorf("Description DetailField should have nil check, got: %s", tf.DetailField)
+			}
+		case "Price":
+			if !tf.IsPointer {
+				t.Errorf("Price should be IsPointer=true from config *float64")
+			}
+			if !strings.Contains(tf.EditStateInit, "!= nil") {
+				t.Errorf("Price EditStateInit should have nil check, got: %s", tf.EditStateInit)
+			}
+		case "Name":
+			if tf.IsPointer {
+				t.Errorf("Name should NOT be IsPointer")
+			}
+		}
 	}
 }

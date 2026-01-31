@@ -1669,15 +1669,23 @@ type AuthField struct {
 // displayFields maps model names to their display field names (for Brief DTOs)
 // configModels is a set of model names that are defined in gux.config.json (for detecting external relations)
 func GenerateModelFilesImpl(model *ModelDefinition, optionSets map[string]OptionSet, modulePath string, adminEnabled bool, displayFields map[string]string, configModels map[string]bool, allModels map[string]ModelDefinition) error {
-	// Check if manual DTO exists and get actual field types for type-safe code generation.
-	// When a manual DTO has pointer types (e.g., *string) that differ from config types,
-	// the admin pages must use the actual DTO types for correct pointer handling.
+	// Check actual DTO and model field types for type-safe code generation.
+	// When a DTO or model has pointer types that differ from config types,
+	// the admin pages must use the actual types for correct pointer handling.
+	// This covers: manual DTOs in dto/, generated DTOs in guxgen/dto/,
+	// manual models in models/, and generated models in guxgen/models/.
 	var dtoFieldTypes map[string]string
-	manualDTOPath := filepath.Join("dto", ToSnakeCase(model.Name)+".go")
-	if _, err := os.Stat(manualDTOPath); err == nil {
-		// Manual DTO exists - parse the Detail DTO for field types
-		detailDTOName := model.Name + "Detail"
-		if types, err := getDTOFieldTypes(detailDTOName); err == nil {
+
+	// First try: get types from the Detail DTO (manual or generated)
+	detailDTOName := model.Name + "Detail"
+	if types, err := getDTOFieldTypes(detailDTOName); err == nil {
+		dtoFieldTypes = types
+	}
+
+	// Second try: if no DTO types found, check the actual model struct
+	// (handles case where model is manual with *string but config says string)
+	if dtoFieldTypes == nil {
+		if types, err := getModelFieldTypes(model.Name); err == nil {
 			dtoFieldTypes = types
 		}
 	}
@@ -1793,7 +1801,7 @@ type %s = manualmodels.%s
 	}
 
 	// Check if non-generated DTO file exists (in dto/ for backwards compat)
-	manualDTOPath = filepath.Join("dto", ToSnakeCase(model.Name)+".go")
+	manualDTOPath := filepath.Join("dto", ToSnakeCase(model.Name)+".go")
 	if _, err := os.Stat(manualDTOPath); err == nil {
 		// Manual DTO exists — generate type aliases in guxgen/dto/ so that
 		// generated admin pages and API client can reference dto.{Name}List etc.
