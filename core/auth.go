@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"sync"
 	"time"
@@ -282,4 +283,82 @@ func sessionUserFromJSON(data string) *SessionUser {
 		return nil
 	}
 	return &user
+}
+
+// GetSessionUser retrieves the authenticated user from a raw http.Request.
+// Returns nil if not authenticated or auth is not configured.
+//
+// Use this in raw http.Handler functions registered via app.HandleFunc():
+//
+//	app.HandleFunc("GET /api/me", func(w http.ResponseWriter, r *http.Request) {
+//	    user := core.GetSessionUser(app, r)
+//	    if user == nil {
+//	        http.Error(w, "unauthorized", 401)
+//	        return
+//	    }
+//	    // user.ID, user.Email, user.Roles, etc.
+//	})
+func GetSessionUser(app *App, r *http.Request) *SessionUser {
+	return app.getUserFromRequest(r)
+}
+
+// LoginFromHTTP creates a session for the user and sets the session cookie.
+// Use this in raw http.Handler functions registered via app.HandleFunc():
+//
+//	app.HandleFunc("POST /api/register", func(w http.ResponseWriter, r *http.Request) {
+//	    user := createUser(r)
+//	    if err := core.LoginFromHTTP(app, w, &core.SessionUser{
+//	        ID:    fmt.Sprint(user.ID),
+//	        Email: user.Email,
+//	        Roles: []string{user.Role},
+//	    }); err != nil {
+//	        http.Error(w, err.Error(), 500)
+//	        return
+//	    }
+//	})
+func LoginFromHTTP(app *App, w http.ResponseWriter, user *SessionUser) error {
+	if app.authConfig == nil || app.authConfig.SessionStore == nil {
+		return fmt.Errorf("auth not configured")
+	}
+
+	sessionID, err := generateSessionID()
+	if err != nil {
+		return fmt.Errorf("failed to generate session: %w", err)
+	}
+
+	maxAge := app.authConfig.CookieMaxAge
+	if maxAge == 0 {
+		maxAge = DefaultSessionMaxAge
+	}
+
+	if err := app.authConfig.SessionStore.Set(sessionID, user, time.Duration(maxAge)*time.Second); err != nil {
+		return fmt.Errorf("failed to store session: %w", err)
+	}
+
+	setSessionCookie(w, sessionID, *app.authConfig)
+	return nil
+}
+
+// LogoutFromHTTP destroys the session and clears the session cookie.
+// Use this in raw http.Handler functions registered via app.HandleFunc():
+//
+//	app.HandleFunc("POST /api/logout", func(w http.ResponseWriter, r *http.Request) {
+//	    core.LogoutFromHTTP(app, w, r)
+//	})
+func LogoutFromHTTP(app *App, w http.ResponseWriter, r *http.Request) {
+	if app.authConfig == nil || app.authConfig.SessionStore == nil {
+		return
+	}
+
+	cookieName := app.authConfig.CookieName
+	if cookieName == "" {
+		cookieName = DefaultSessionCookieName
+	}
+
+	sessionID := getSessionIDFromCookie(r, cookieName)
+	if sessionID != "" {
+		app.authConfig.SessionStore.Delete(sessionID)
+	}
+
+	clearSessionCookie(w, *app.authConfig)
 }
