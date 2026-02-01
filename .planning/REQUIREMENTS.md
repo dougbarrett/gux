@@ -9,21 +9,21 @@ Requirements for v2.4 milestone. Each maps to roadmap phases.
 
 ### Storage
 
-- [ ] **STOR-01**: Developer can configure a storage backend via `app.SetStorage()` in code
+- [x] **STOR-01**: Developer can configure a storage backend via `app.SetStorage()` in code
 - [ ] **STOR-02**: Developer can configure storage in gux.config.json with code overrides
-- [ ] **STOR-03**: Local filesystem storage backend stores files to a configurable directory
-- [ ] **STOR-04**: Storage interface provides Put, Delete, and URL methods
-- [ ] **STOR-05**: Uploaded files are accessible via HTTP URL (served by Go HTTP server for local storage)
-- [ ] **STOR-06**: File paths stored in database are provider-agnostic keys (not absolute paths or full URLs)
+- [x] **STOR-03**: Local filesystem storage backend stores files to a configurable directory
+- [x] **STOR-04**: Storage interface provides Put, Delete, and URL methods
+- [x] **STOR-05**: Uploaded files are accessible via HTTP URL (served by Go HTTP server for local storage)
+- [x] **STOR-06**: File paths stored in database are provider-agnostic keys (not absolute paths or full URLs)
 
 ### Upload Endpoint
 
-- [ ] **UPLD-01**: Server accepts multipart file uploads at a dedicated upload endpoint (separate from CRUD)
-- [ ] **UPLD-02**: Server validates file size against configurable maximum before fully reading the file
-- [ ] **UPLD-03**: Server validates file type via magic bytes (content sniffing), not just Content-Type header
-- [ ] **UPLD-04**: Server generates unique filenames (UUID/xid-based) to prevent collisions and path traversal
-- [ ] **UPLD-05**: Upload endpoint respects existing CSRF protection automatically
-- [ ] **UPLD-06**: Upload endpoint respects authentication when auth is configured on the app
+- [x] **UPLD-01**: Server accepts multipart file uploads at a dedicated upload endpoint (separate from CRUD)
+- [x] **UPLD-02**: Server validates file size against configurable maximum before fully reading the file
+- [x] **UPLD-03**: Server validates file type via magic bytes (content sniffing), not just Content-Type header
+- [x] **UPLD-04**: Server generates unique filenames (UUID/xid-based) to prevent collisions and path traversal
+- [x] **UPLD-05**: Upload endpoint respects existing CSRF protection automatically
+- [x] **UPLD-06**: Upload endpoint respects authentication when auth is configured on the app
 
 ### Upload UI Component
 
@@ -114,18 +114,18 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| STOR-01 | Phase 29 | Pending |
-| STOR-02 | Phase 29 | Pending |
-| STOR-03 | Phase 29 | Pending |
-| STOR-04 | Phase 29 | Pending |
-| STOR-05 | Phase 29 | Pending |
-| STOR-06 | Phase 29 | Pending |
-| UPLD-01 | Phase 29 | Pending |
-| UPLD-02 | Phase 29 | Pending |
-| UPLD-03 | Phase 29 | Pending |
-| UPLD-04 | Phase 29 | Pending |
-| UPLD-05 | Phase 29 | Pending |
-| UPLD-06 | Phase 29 | Pending |
+| STOR-01 | Phase 29 | Complete |
+| STOR-02 | Phase 29 | Deferred (config-driven setup is Phase 31) |
+| STOR-03 | Phase 29 | Complete |
+| STOR-04 | Phase 29 | Complete |
+| STOR-05 | Phase 29 | Complete |
+| STOR-06 | Phase 29 | Complete |
+| UPLD-01 | Phase 29 | Complete |
+| UPLD-02 | Phase 29 | Complete |
+| UPLD-03 | Phase 29 | Complete |
+| UPLD-04 | Phase 29 | Complete |
+| UPLD-05 | Phase 29 | Complete |
+| UPLD-06 | Phase 29 | Complete |
 | UICM-01 | Phase 30 | Pending |
 | UICM-02 | Phase 30 | Pending |
 | UICM-03 | Phase 30 | Pending |
@@ -167,4 +167,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-02-01*
-*Last updated: 2026-02-01 after roadmap creation*
+*Last updated: 2026-02-01 after phase 29 completion*

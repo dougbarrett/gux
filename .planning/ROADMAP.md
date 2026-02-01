@@ -128,7 +128,7 @@ Full details: [milestones/v2.3-ROADMAP.md](milestones/v2.3-ROADMAP.md)
 
 **Milestone Goal:** Developers can add `"input": "file"` to a model field in gux.config.json and get complete file upload -- UI, storage, API, admin integration -- with zero manual wiring.
 
-- [ ] **Phase 29: Storage Foundation** - Storage interface, local backend, upload endpoint, file serving
+- [x] **Phase 29: Storage Foundation** - Storage interface, local backend, upload endpoint, file serving
 - [ ] **Phase 30: Upload Client & UI Component** - WASM upload with progress, drag-drop UI, image preview
 - [ ] **Phase 31: Code Generation & CRUD Integration** - Config-driven file fields, admin scaffolding, lifecycle hooks, auto-cleanup
 - [ ] **Phase 32: Multi-File & Configuration** - Multi-file fields, per-field config for types/size/directory
@@ -146,8 +146,8 @@ Full details: [milestones/v2.3-ROADMAP.md](milestones/v2.3-ROADMAP.md)
 **Plans**: 2 plans
 
 Plans:
-- [ ] 29-01-PLAN.md -- Storage interface, types, functional options, LocalStorage with content-hash filenames, magic bytes validation, image dimensions
-- [ ] 29-02-PLAN.md -- Upload endpoint (multipart POST), file serving handler (GET with caching), app.SetStorage(), auth/CSRF integration
+- [x] 29-01-PLAN.md -- Storage interface, types, functional options, LocalStorage with content-hash filenames, magic bytes validation, image dimensions
+- [x] 29-02-PLAN.md -- Upload endpoint (multipart POST), file serving handler (GET with caching), app.SetStorage(), auth/CSRF integration
 
 #### Phase 30: Upload Client & UI Component
 **Goal**: User can select, preview, and upload files through an interactive UI component that works across SSR and WASM with upload progress feedback
@@ -231,7 +231,7 @@ Phases execute in numeric order: 1 -> 2 -> ... -> 28 -> 29 -> 30 -> 31 -> 32
 | 26. Dependency Cleanup | v2.1 | 1/1 | Complete | 2026-01-26 |
 | 27. gux init Templates | v2.2 | 3/3 | Complete | 2026-01-26 |
 | 28. Help Pattern Commands | v2.3 | 2/2 | Complete | 2026-01-26 |
-| 29. Storage Foundation | v2.4 | 0/2 | Not started | - |
+| 29. Storage Foundation | v2.4 | 2/2 | Complete | 2026-02-01 |
 | 30. Upload Client & UI Component | v2.4 | 0/2 | Not started | - |
 | 31. Code Generation & CRUD Integration | v2.4 | 0/3 | Not started | - |
 | 32. Multi-File & Configuration | v2.4 | 0/2 | Not started | - |
