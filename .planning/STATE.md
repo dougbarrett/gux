@@ -2,12 +2,12 @@
 
 ## Current Position
 
-Phase: 29 of 32 (Storage Foundation)
-Plan: 2 of 2 in current phase
-Status: Phase complete, verified
-Last activity: 2026-02-01 -- Phase 29 verified and completed
+Phase: 30 of 32 (Upload Client & UI Component)
+Plan: 1 of 2 in current phase
+Status: In progress
+Last activity: 2026-02-01 -- Completed 30-01-PLAN.md
 
-Progress: [██░░░░░░░░] 22% (2/9 plans across 4 phases)
+Progress: [███░░░░░░░] 33% (3/9 plans across 4 phases)
 
 ## Project Reference
 
@@ -31,15 +31,16 @@ See: .planning/PROJECT.md (updated 2026-02-01)
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 2 (v2.4)
-- Average duration: 3m 24s
-- Total execution time: 6m 48s
+- Total plans completed: 3 (v2.4)
+- Average duration: 4m 52s
+- Total execution time: 14m 36s
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 29 Storage Foundation | 2 | 6m 48s | 3m 24s |
+| 30 Upload Client & UI Component | 1 | 8m | 8m |
 
 *Updated after each plan completion*
 
@@ -58,6 +59,9 @@ Recent decisions affecting current work:
 - [29-02]: Upload endpoint protected by default when auth configured; file serving public by default (opt-in auth via WithServeAuth).
 - [29-02]: CSRF handled by existing CSRFMiddleware wrapping the mux - upload handler needs no custom CSRF logic.
 - [29-02]: Path traversal protection rejects keys containing ".." or starting with "/" before calling Storage.Serve.
+- [30-01]: XMLHttpRequest chosen over Fetch API because Fetch lacks upload.onprogress events - web platform limitation.
+- [30-01]: No stub file for fetch/upload.go - fetch package is WASM-only (same pattern as fetch.go).
+- [30-01]: File bytes never copied to Go WASM memory - js.Value File passed directly to FormData for memory efficiency.
 
 ### Pending Todos
 
@@ -65,7 +69,7 @@ None yet.
 
 ### Blockers/Concerns
 
-- [Research]: XHR upload progress from Go/WASM is less documented -- needs prototype validation in Phase 30 planning.
+None - XHR upload progress prototype validated in 30-01.
 
 ## Deferred Issues
 
@@ -75,9 +79,9 @@ v2.0 Tech Debt:
 ## Session Continuity
 
 Last session: 2026-02-01
-Stopped at: Phase 29 complete and verified. Next: Phase 30 (Upload Client & UI Component)
+Stopped at: Completed 30-01-PLAN.md. Next: 30-02 (Upload UI Component)
 Resume file: None
 
 ---
 
-*Last updated: 2026-02-01 after phase 29 verification*
+*Last updated: 2026-02-01 after 30-01 completion*
