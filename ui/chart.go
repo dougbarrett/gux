@@ -188,6 +188,107 @@ func LineChart(props LineChartProps) core.Node {
 	return wrapChartSVG(string(svgBytes), props.Title, props.Class)
 }
 
+// AreaChartProps configures an AreaChart component.
+type AreaChartProps struct {
+	Title      string        // Chart title (also used for accessibility)
+	Labels     []string      // X-axis labels
+	Series     []ChartSeries // Data series
+	Stacked    bool          // Stack series (cumulative sum, each layer fills to the one below)
+	Width      int           // SVG width in px (default: 600)
+	Height     int           // SVG height in px (default: 400)
+	ShowDots   bool          // Show data point markers
+	Opacity    uint8         // Fill opacity 0-255 (default: 128)
+	ShowLegend bool          // Show legend (default: true when multiple series)
+	Class      string        // Additional CSS classes on wrapper div
+}
+
+// AreaChart renders an area chart (filled line chart) as inline SVG.
+//
+// Example:
+//
+//	AreaChart(AreaChartProps{
+//	    Title:  "Traffic Over Time",
+//	    Labels: []string{"Jan", "Feb", "Mar", "Apr"},
+//	    Series: []ChartSeries{
+//	        {Name: "Organic", Values: []float64{120, 180, 240, 300}, Color: "green"},
+//	        {Name: "Paid", Values: []float64{60, 90, 120, 80}, Color: "blue"},
+//	    },
+//	    Stacked: true,
+//	})
+func AreaChart(props AreaChartProps) core.Node {
+	if len(props.Series) == 0 {
+		return core.Frag()
+	}
+
+	width, height := resolveChartDimensions(props.Width, props.Height)
+
+	// Build values as [][]float64
+	values := make([][]float64, len(props.Series))
+	seriesNames := make([]string, len(props.Series))
+	for i, s := range props.Series {
+		values[i] = s.Values
+		seriesNames[i] = s.Name
+	}
+
+	// Default opacity
+	opacity := props.Opacity
+	if opacity == 0 {
+		opacity = 128
+	}
+
+	// Build options
+	opts := []charts.OptionFunc{
+		charts.SVGOutputOptionFunc(),
+		charts.DimensionsOptionFunc(width, height),
+		// Enable area fill
+		func(opt *charts.ChartOption) {
+			opt.FillArea = charts.Ptr(true)
+			opt.FillOpacity = opacity
+			if props.Stacked {
+				opt.StackSeries = charts.Ptr(true)
+			}
+		},
+	}
+
+	if props.Title != "" {
+		opts = append(opts, charts.TitleTextOptionFunc(props.Title))
+	}
+	if len(props.Labels) > 0 {
+		opts = append(opts, charts.XAxisLabelsOptionFunc(props.Labels))
+	}
+
+	// Legend: show by default when multiple series
+	showLegend := props.ShowLegend || len(props.Series) > 1
+	if showLegend && len(seriesNames) > 0 {
+		opts = append(opts, charts.LegendLabelsOptionFunc(seriesNames))
+	}
+
+	// Show data point dots
+	if props.ShowDots {
+		opts = append(opts, func(opt *charts.ChartOption) {
+			opt.Symbol = "circle"
+		})
+	}
+
+	// Apply custom series colors via theme
+	seriesColors := resolveSeriesColors(props.Series)
+	opts = append(opts, charts.ThemeOptionFunc(
+		charts.GetTheme("light").WithSeriesColors(seriesColors),
+	))
+
+	p, err := charts.LineRender(values, opts...)
+	if err != nil {
+		return chartError(props.Title, err)
+	}
+
+	svgBytes, err := p.Bytes()
+	if err != nil {
+		return chartError(props.Title, err)
+	}
+
+	return wrapChartSVG(string(svgBytes), props.Title, props.Class)
+}
+
 // resolveChartDimensions returns width and height with defaults applied.
 func resolveChartDimensions(width, height int) (int, int) {
 	if width <= 0 {

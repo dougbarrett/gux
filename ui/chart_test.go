@@ -269,6 +269,189 @@ func TestChartAccessibility_Desc(t *testing.T) {
 	}
 }
 
+func TestAreaChart_BasicRender(t *testing.T) {
+	node := AreaChart(AreaChartProps{
+		Title:  "Traffic",
+		Labels: []string{"Jan", "Feb", "Mar"},
+		Series: []ChartSeries{
+			{Name: "Organic", Values: []float64{100, 200, 300}, Color: "green"},
+		},
+	})
+	html := renderHTML(node)
+
+	if !strings.Contains(html, "<svg") {
+		t.Errorf("expected SVG element, got: %s", truncate(html))
+	}
+	if !strings.Contains(html, `role="img"`) {
+		t.Errorf("expected role=img, got: %s", truncate(html))
+	}
+	if !strings.Contains(html, "<title>Traffic</title>") {
+		t.Errorf("expected title element, got: %s", truncate(html))
+	}
+}
+
+func TestAreaChart_EmptySeries(t *testing.T) {
+	node := AreaChart(AreaChartProps{
+		Title: "Empty",
+	})
+	html := renderHTML(node)
+
+	if strings.Contains(html, "<svg") {
+		t.Errorf("empty series should not produce SVG, got: %s", truncate(html))
+	}
+}
+
+func TestAreaChart_MultipleSeries(t *testing.T) {
+	node := AreaChart(AreaChartProps{
+		Title:  "Multi",
+		Labels: []string{"A", "B", "C"},
+		Series: []ChartSeries{
+			{Name: "S1", Values: []float64{10, 20, 30}, Color: "blue"},
+			{Name: "S2", Values: []float64{5, 15, 25}, Color: "red"},
+		},
+	})
+	html := renderHTML(node)
+
+	if !strings.Contains(html, "<svg") {
+		t.Errorf("expected SVG for multi-series area chart, got: %s", truncate(html))
+	}
+}
+
+func TestAreaChart_Stacked(t *testing.T) {
+	node := AreaChart(AreaChartProps{
+		Title:   "Stacked",
+		Labels:  []string{"Q1", "Q2", "Q3"},
+		Stacked: true,
+		Series: []ChartSeries{
+			{Name: "Product A", Values: []float64{100, 150, 200}, Color: "blue"},
+			{Name: "Product B", Values: []float64{50, 80, 120}, Color: "green"},
+		},
+	})
+	html := renderHTML(node)
+
+	if !strings.Contains(html, "<svg") {
+		t.Errorf("expected SVG for stacked area chart, got: %s", truncate(html))
+	}
+}
+
+func TestAreaChart_CustomOpacity(t *testing.T) {
+	node := AreaChart(AreaChartProps{
+		Title:   "Opacity",
+		Labels:  []string{"A", "B"},
+		Opacity: 200,
+		Series: []ChartSeries{
+			{Name: "S", Values: []float64{10, 20}, Color: "blue"},
+		},
+	})
+	html := renderHTML(node)
+
+	if !strings.Contains(html, "<svg") {
+		t.Errorf("expected SVG with custom opacity, got: %s", truncate(html))
+	}
+}
+
+func TestAreaChart_ShowDots(t *testing.T) {
+	node := AreaChart(AreaChartProps{
+		Title:    "Dots",
+		Labels:   []string{"A", "B", "C"},
+		ShowDots: true,
+		Series: []ChartSeries{
+			{Name: "S", Values: []float64{1, 2, 3}},
+		},
+	})
+	html := renderHTML(node)
+
+	if !strings.Contains(html, "<svg") {
+		t.Errorf("expected SVG with dots, got: %s", truncate(html))
+	}
+}
+
+func TestAreaChart_CustomClass(t *testing.T) {
+	node := AreaChart(AreaChartProps{
+		Title:  "Test",
+		Labels: []string{"A"},
+		Series: []ChartSeries{
+			{Name: "S", Values: []float64{10}},
+		},
+		Class: "area-chart-custom",
+	})
+	html := renderHTML(node)
+
+	if !strings.Contains(html, "area-chart-custom") {
+		t.Errorf("expected custom class, got: %s", truncate(html))
+	}
+}
+
+func TestAreaChart_CustomDimensions(t *testing.T) {
+	node := AreaChart(AreaChartProps{
+		Title:  "Custom Size",
+		Labels: []string{"A"},
+		Width:  900,
+		Height: 500,
+		Series: []ChartSeries{
+			{Name: "S", Values: []float64{10}},
+		},
+	})
+	html := renderHTML(node)
+
+	if !strings.Contains(html, "<svg") {
+		t.Errorf("expected SVG with custom dimensions, got: %s", truncate(html))
+	}
+}
+
+func TestAreaChart_DefaultOpacity(t *testing.T) {
+	// When Opacity is 0 (zero value), it should default to 128
+	node := AreaChart(AreaChartProps{
+		Title:  "Default Opacity",
+		Labels: []string{"A", "B"},
+		Series: []ChartSeries{
+			{Name: "S", Values: []float64{10, 20}},
+		},
+	})
+	html := renderHTML(node)
+
+	if !strings.Contains(html, "<svg") {
+		t.Errorf("expected SVG with default opacity, got: %s", truncate(html))
+	}
+}
+
+func TestAreaChart_ShowLegend(t *testing.T) {
+	node := AreaChart(AreaChartProps{
+		Title:      "Legend",
+		Labels:     []string{"A", "B"},
+		ShowLegend: true,
+		Series: []ChartSeries{
+			{Name: "Only One", Values: []float64{10, 20}, Color: "blue"},
+		},
+	})
+	html := renderHTML(node)
+
+	if !strings.Contains(html, "<svg") {
+		t.Errorf("expected SVG with legend, got: %s", truncate(html))
+	}
+}
+
+func TestAreaChart_Accessibility(t *testing.T) {
+	node := AreaChart(AreaChartProps{
+		Title:  "A11y Test",
+		Labels: []string{"A"},
+		Series: []ChartSeries{
+			{Name: "S", Values: []float64{10}},
+		},
+	})
+	html := renderHTML(node)
+
+	if !strings.Contains(html, `role="figure"`) {
+		t.Errorf("expected role=figure on wrapper, got: %s", truncate(html))
+	}
+	if !strings.Contains(html, `aria-label="A11y Test"`) {
+		t.Errorf("expected aria-label, got: %s", truncate(html))
+	}
+	if !strings.Contains(html, "<desc>Chart: A11y Test</desc>") {
+		t.Errorf("expected desc element, got: %s", truncate(html))
+	}
+}
+
 // truncate returns the first 500 chars of a string for error messages.
 func truncate(s string) string {
 	if len(s) > 500 {
