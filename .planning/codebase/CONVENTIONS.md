@@ -1,185 +1,282 @@
 # Coding Conventions
 
-**Analysis Date:** 2026-01-14
+**Analysis Date:** 2026-02-01
 
 ## Naming Patterns
 
 **Files:**
-- `snake_case.go` for multi-word names (`data_display.go`, `file_upload.go`, `virtual_list.go`)
-- `lowercase.go` for single-word names (`button.go`, `input.go`, `modal.go`)
-- `*_gen.go` for generated files (`posts_client_gen.go`, `posts_server_gen.go`)
-- `*_ws.go` for WebSocket handlers (`posts_ws.go`)
+- Lowercase with underscores for multi-word names: `html_renderer.go`, `dom_renderer.go`, `router_server.go`
+- Test files: `*_test.go` suffix (e.g., `button_test.go`, `endpoint_test.go`)
+- Component files match component names: `button.go` contains `Button()`, `form.go` contains `FormField()`
 
 **Functions:**
-- `PascalCase` for exported functions (`NewTable`, `PrimaryButton`)
-- `camelCase` for unexported functions
-- `New` prefix for constructors returning complex types (`NewPostsService`, `NewPostsWSHandler`)
-- Direct name for simple constructors (`Button`, `Input`, `Card`)
-- `With` prefix for option functions (`WithOnOpen`, `WithOnClose`, `WithOnError`)
+- Exported functions: PascalCase (e.g., `Text()`, `Button()`, `Input()`, `FormField()`)
+- Unexported helper functions: camelCase (e.g., `renderHTML()`, `writeTestFile()`, `matchRoute()`)
+- Constructor functions: `New` prefix for main types (e.g., `New()` returns `*App`)
+- Predicate functions use present tense (e.g., `isNumericParam()`, `isExported()`)
 
 **Variables:**
-- `camelCase` for local variables
-- Short names in tight scopes (`v`, `err`, `fn`, `sub`, `id`, `idx`)
-- Descriptive names for struct fields (`ClassName`, `OnClick`, `Disabled`)
+- Local variables: camelCase (e.g., `variant`, `size`, `buttonType`)
+- Constants: PascalCase for exported, UPPER_SNAKE_CASE for style maps: `buttonVariantClasses`, `buttonSizeClasses`, `buttonBaseClasses`
+- Package-level vars: camelCase or PascalCase based on export (e.g., `defaultWasmBinary`, `defaultWasmBundles`)
 
 **Types:**
-- `PascalCase` for all types (`ButtonProps`, `Store`, `PostsAPI`)
-- `[Type][Variant]` for grouped constants (`ButtonPrimary`, `InputText`, `TextMuted`)
-- No `I` prefix for interfaces (`PostsAPI`, not `IPostsAPI`)
+- Struct types: PascalCase (e.g., `ButtonProps`, `FormFieldProps`, `InputProps`)
+- Enum-like constants: PascalCase (e.g., `ButtonPrimary`, `ButtonSecondary`, `InputEmail`, `ButtonSM`)
+- Type aliases for enums: PascalCase suffix `string` (e.g., `ButtonVariant`, `ButtonSize`, `InputType`, `InputSize`)
+
+**Interfaces:**
+- Exported interfaces: PascalCase with `r` prefix when receiver parameter is standard (e.g., `Node` interface with `Render()` method)
 
 ## Code Style
 
 **Formatting:**
-- Standard `gofmt` formatting
-- Tab indentation (Go default)
-- No explicit line length limit (follows Go conventions)
-- Double quotes for strings
+- Go standard formatting (enforced by `gofmt`)
+- Imports organized in groups: stdlib, third-party, local
+- No single-letter variable names except in loop indices and short scopes
 
 **Linting:**
-- No explicit linting configuration (`.golangci.yml` not present)
-- Assumes IDE integration for `gofmt` and `goimports`
+- No explicit linter config detected, but code follows standard Go conventions
+- Unused imports will be caught by compiler
+
+**Comments:**
+- Package-level documentation above `package` declaration
+- Function documentation comments start with function name
+- Inline comments for complex logic or non-obvious decisions
+- Comments explain "why" not "what" (code shows "what")
+
+**Example comment style from `core/node.go`:**
+```go
+// Package core provides the fundamental abstractions for gux's universal rendering.
+//
+// The key insight: components return Nodes, not DOM elements or HTML strings.
+// Nodes are an intermediate representation that can be rendered to either target.
+package core
+
+// Node represents a renderable element in the UI tree.
+// This is the universal currency - components produce Nodes,
+// renderers consume them.
+type Node interface {
+    // Render converts this node to its final form using the given renderer.
+    // For HTML: returns a string node containing the markup.
+    // For DOM: returns a node wrapping the js.Value element.
+    Render(r Renderer) RenderResult
+}
+```
 
 ## Import Organization
 
 **Order:**
-1. Standard library (`fmt`, `context`, `encoding/json`)
-2. External packages (`github.com/gorilla/websocket`)
-3. Internal packages (`gux/api`, `gux/components`)
-
-**Grouping:**
-- Blank line between standard library and external
-- No explicit sorting enforced
+1. Standard library (e.g., `encoding/json`, `net/http`, `testing`)
+2. Third-party packages (e.g., `gorm.io/gorm`, `github.com/...`)
+3. Local imports (e.g., `"myapp/guxgen/models"`)
 
 **Path Aliases:**
-- None used (direct imports)
+- Used sparingly when name conflicts occur
+- Example from `build_test.go`: `usermodels "myapp/models"` when disambiguating between `models` and `guxgen/models`
+
+**Pattern:** Bare imports for standard packages:
+```go
+import (
+    "encoding/json"
+    "net/http"
+    "testing"
+
+    "gorm.io/gorm"
+
+    "myapp/guxgen/models"
+)
+```
 
 ## Error Handling
 
-**Patterns:**
-- Return errors, check at call site
-- Wrap errors with context: `fmt.Errorf("marshal payload: %w", err)`
-- Helper constructors for API errors: `api.NotFound()`, `api.BadRequest()`
+**Pattern: Constructor functions return errors**
+```go
+func (a *App) Run(addr string) error {
+    // Implementation
+}
+```
 
-**Error Types:**
-- `api.Error` struct with Status, Code, Message (`api/errors.go`)
-- Standard `error` interface throughout
-- Formatted errors with `%f` variants: `NotFoundf(format, args...)`
+**Pattern: API errors use typed *Error with HTTP status**
+- Location: `api/errors.go`
+- All API errors implement standard `error` interface
+- Use error constructors: `api.NotFound()`, `api.BadRequest()`, `api.Unauthorized()`, `api.InternalError()`
+- Error constructors have both plain and formatted variants: `NotFound(msg)` and `NotFoundf(format, args...)`
+
+**Example from `api/errors.go`:**
+```go
+func NotFound(message string) *Error {
+    return &Error{
+        Status: http.StatusNotFound,
+        Code:   "not_found",
+        Message: message,
+    }
+}
+
+func NotFoundf(format string, args ...any) *Error {
+    return NotFound(fmt.Sprintf(format, args...))
+}
+```
+
+**Pattern: Test errors use `t.Errorf()` or `t.Fatalf()`**
+- For assertion failures: `t.Errorf()` to continue test
+- For setup failures: `t.Fatalf()` to stop test
+- Error messages include expected vs. actual values
+
+**Example from `core/endpoint_test.go`:**
+```go
+if got != tt.want {
+    t.Errorf("convertColonParams(%q) = %q, want %q", tt.input, got, tt.want)
+}
+```
 
 ## Logging
 
-**Framework:**
-- `log.Printf` for server-side logging
-- `console.log` equivalent via `js.Global()` for WASM
-- No structured logging library
+**Framework:** `println()` for debug/demo code
 
 **Patterns:**
-- Log errors with context: `log.Printf("Failed to marshal: %v", err)`
-- Log connection events: `log.Printf("WebSocket client connected")`
+- Simple debugging: `println("message")`
+- No structured logging library detected
+- Errors returned via error values, not logged
 
-## Comments
+## Comments & Documentation
 
-**When to Comment:**
-- All exported types and functions (GoDoc convention)
-- Comments are complete sentences ending with periods
-- Package-level documentation at top of primary file
+**JSDoc/TSDoc:** Not applicable (Go codebase)
 
-**GoDoc Style:**
+**Go documentation style:**
+- All exported types and functions have documentation comments
+- Comments start with the name being documented
+- First sentence is a summary (appears in `godoc`)
+- Multi-line comments provide more detail
+- Package comments describe the overall purpose
+
+**Example from `ui/button.go`:**
 ```go
-// ButtonVariant defines button color variants
+// ButtonVariant defines the visual style of a button.
 type ButtonVariant string
 
-// NewTable creates a data table component with sortable columns
-func NewTable(props TableProps) *Table {
+// Button creates a button component with variants and sizes.
+//
+// Example:
+//
+//    Button(ButtonProps{
+//        Variant: ButtonPrimary,
+//        Size: ButtonMD,
+//        Children: []core.Node{core.Text("Click me")},
+//    })
+func Button(props ButtonProps) core.Node {
 ```
-
-**Inline Comments:**
-- Sparse, used for non-obvious logic
-- Example: `// Return unsubscribe function`
 
 ## Function Design
 
 **Size:**
-- Most functions under 50 lines
-- Larger functions in complex components (formbuilder, charts)
+- Helper functions like `renderHTML()` are 3-5 lines
+- Component rendering functions like `Button()` are 40-50 lines with setup + class building + return
+- No explicit line limit, but functions stay focused on single responsibility
 
 **Parameters:**
-- Props struct pattern for component configuration
-- Options pattern for configurable clients (`ws.Option`)
-- Max 3-4 positional parameters, then use struct
+- Props structs instead of many positional parameters: `Button(ButtonProps{...})`
+- Props structs hold optional fields (variant, size, class, disabled, etc.)
+- Children passed as slice: `Children []core.Node`
+- Event handlers passed as function pointers in props: `OnClick func()`
 
 **Return Values:**
-- Explicit returns (no naked returns)
-- Multiple returns: `(result, error)`
-- Single returns for simple getters
+- Single return for success path (e.g., `func Button(props ButtonProps) core.Node`)
+- Functions returning interfaces return the interface type, not concrete type
+- Error-returning functions return `error` as last return value
+
+**Example props struct pattern from `ui/button.go`:**
+```go
+type ButtonProps struct {
+    Variant  ButtonVariant // Visual style (default: primary)
+    Size     ButtonSize    // Size (default: md)
+    Class    string        // Additional classes (override defaults)
+    Disabled bool          // Disabled state
+    Type     string        // Button type: "button", "submit", "reset" (default: "button")
+    OnClick  func()        // Click handler (WASM only)
+    Children []core.Node   // Button content
+}
+```
+
+**Default application pattern:**
+```go
+// Apply defaults at function start
+variant := props.Variant
+if variant == "" {
+    variant = ButtonPrimary  // Default
+}
+
+size := props.Size
+if size == "" {
+    size = ButtonMD  // Default
+}
+```
 
 ## Module Design
 
 **Exports:**
-- Named exports for all public APIs
-- No default exports (Go standard)
-- One primary type per file typically
+- Only public API exported (PascalCase)
+- All components are functions returning `core.Node`
+- All props are exported structs
+- Helper functions (lowercase) remain internal to package
 
-**Build Tags:**
-- `//go:build js && wasm` for WASM-only code
-- Tag on first line of file
-- Blank line after tag
+**Pattern from `ui/button.go`:**
+- Exported: `Button()`, `ButtonProps`, `ButtonVariant`, `ButtonSize`, and constants like `ButtonPrimary`
+- Unexported: `buttonVariantClasses`, `buttonSizeClasses`, `buttonBaseClasses`, `buttonDisabledClasses`
 
-## Patterns
+**Barrel Files:** Not used; each component in its own file
 
-**Props Pattern:**
+**Type/Enum constants:**
+- Type alias: `type ButtonVariant string`
+- Constants: `const (ButtonPrimary ButtonVariant = "primary")`
+- Maps for metadata: `var buttonVariantClasses = map[ButtonVariant]string{...}`
+
+## Class Building Pattern
+
+**UI components use `MergeClasses()` utility** (from `ui/button.go`):
 ```go
-type ButtonProps struct {
-    Text      string
-    ClassName string
-    Variant   ButtonVariant
-    OnClick   func()
-}
-
-func Button(props ButtonProps) js.Value {
+class := MergeClasses(
+    buttonBaseClasses,
+    buttonVariantClasses[variant],
+    buttonSizeClasses[size],
+    ConditionalClass(props.Disabled, buttonDisabledClasses),
+    props.Class,
+)
 ```
 
-**Variant Maps:**
+**Helper functions:**
+- `MergeClasses(...string) string` - joins non-empty, trimmed strings
+- `ConditionalClass(condition bool, class string) string` - returns class if true, empty if false
+
+**Tailwind conventions:**
+- Base classes for all instances
+- Variant-specific classes (primary, secondary, outline, etc.)
+- Size-specific classes (sm, md, lg)
+- State classes (disabled, focus, hover)
+- Extra/custom classes appended last for override capability
+
+## Attribute Pattern
+
+**Attributes with structured props:**
 ```go
-var buttonVariantClasses = map[ButtonVariant]string{
-    ButtonPrimary:   "bg-blue-500 text-white hover:bg-blue-600",
-    ButtonSecondary: "bg-gray-200 dark:bg-gray-700...",
+attrs := core.Attrs{
+    Class:   class,
+    Type:    buttonType,
+    OnClick: props.OnClick,
 }
-```
 
-**Functional Options:**
-```go
-type Option func(*Client)
-
-func WithOnOpen(fn func()) Option {
-    return func(c *Client) { c.onOpen = fn }
-}
-
-client := ws.NewClient(url, WithOnOpen(handler))
-```
-
-**Middleware Chain:**
-```go
-func Chain(middlewares ...Middleware) Middleware {
-    return func(next http.Handler) http.Handler {
-        for i := len(middlewares) - 1; i >= 0; i-- {
-            next = middlewares[i](next)
-        }
-        return next
+if props.Disabled {
+    attrs.Extra = map[string]string{
+        "disabled": "disabled",
     }
 }
 ```
 
-**API Annotations:**
-```go
-// @client PostsClient
-// @basepath /api/posts
-type PostsAPI interface {
-    // @route GET /
-    GetAll(ctx context.Context) ([]Post, error)
-}
-```
+**Data attributes and extras:**
+- Standard HTML attributes: `ID`, `Class`, `Href`, `Src`, `Alt`, `Type`, `Name`, `Value`
+- Non-standard attributes in `Extra map[string]string`
+- Example: `attrs.Extra = map[string]string{"for": labelID, "role": "alert"}`
 
 ---
 
-*Convention analysis: 2026-01-14*
-*Update when patterns change*
+*Convention analysis: 2026-02-01*

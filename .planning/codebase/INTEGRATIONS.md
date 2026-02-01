@@ -1,134 +1,150 @@
 # External Integrations
 
-**Analysis Date:** 2026-01-14
+**Analysis Date:** 2026-02-01
 
 ## APIs & External Services
 
-**Payment Processing:**
-- Not detected
+**Not detected** - Gux framework itself does not ship with pre-built integrations to external APIs. Applications built with Gux can add integrations via custom typed API endpoints in `core/endpoint.go`.
 
-**Email/SMS:**
-- Not detected
-
-**External APIs:**
-- WebSocket Echo Service - Demo/testing only (`example/app/main.go`)
-  - URL: `wss://echo.websocket.org`
-  - Purpose: WebSocket functionality demonstration
-  - No persistent data or authentication
+**Custom API Pattern:**
+- Use `core.API()` and `core.APIGet()` for typed endpoints
+- Applications can integrate:
+  - Third-party HTTP APIs (via standard `net/http`)
+  - OAuth/OIDC providers (via custom auth handlers)
+  - Payment processors, analytics, etc. (application-specific)
 
 ## Data Storage
 
 **Databases:**
-- Not detected (in-memory storage in example)
-- Example uses Go maps: `example/server/posts.go`
+- SQLite (default) - File-based, zero-config database
+  - Connection: `gorm.io/driver/sqlite` (included)
+  - Client: GORM v1.31.1
+  - Connection string example: `guxgen/data.db` (file path)
+- PostgreSQL - Supported via optional GORM driver (not included by default)
+  - Connection: `gorm.io/driver/postgres` (user-added)
+  - Client: GORM v1.31.1
+  - Connection string: Standard PostgreSQL DSN
 
 **File Storage:**
-- Not detected
+- Local filesystem only - Assets served from `cmd/server/public/` or embedded binary
+- User files - Application-specific storage (no built-in S3, GCS, etc.)
+- Media handling - HTML5 video/audio via `core.Video()`, `core.Audio()` with local or external URLs
 
 **Caching:**
-- Browser localStorage for state persistence (`storage/local.go`)
-  - Local only, no cloud sync
-  - Used for auth state and persistent stores
+- None built-in - Applications can add Redis/Memcached via custom code
+- Session store interface (`core.SessionStore`) allows pluggable backends:
+  - In-memory (stub implementation)
+  - Redis (custom implementation)
+  - Database-backed (custom implementation)
 
 ## Authentication & Identity
 
 **Auth Provider:**
-- Custom implementation (`auth/auth.go`)
-- Token-based with access/refresh tokens
-- No third-party auth provider integration
+- Custom session-based (built-in)
+  - No OAuth/OIDC integration included by default
+  - `core.AuthConfig` configures session store, cookie settings, login redirect path
+  - `server/jwt.go` provides JWT claim parsing (for JWT-based auth if needed)
 
-**OAuth Integrations:**
-- Not detected
+**Implementation:**
+- Session cookie-based (`__gux_session` by default, configurable)
+- Password hashing via `golang.org/x/crypto` - bcrypt support included
+- Auth preset models auto-generate `SetPassword()` and `CheckPassword()` methods
+- Session propagation in SSR via `core.SSRSessionSetter` and `core.SSRSessionClearer`
+
+**Password Security:**
+- Field: `PasswordHash string` (hidden from API via DTOs)
+- Hashing: bcrypt (`golang.org/x/crypto/bcrypt`)
+- Verification: Custom login page validates via `CheckPassword()`
+- Password field only appears in create/edit forms via auth preset
 
 ## Monitoring & Observability
 
 **Error Tracking:**
-- Not detected (no Sentry, Bugsnag, etc.)
-
-**Analytics:**
-- Not detected
+- None built-in
+- Applications can integrate Sentry, Rollbar, etc. via custom middleware in `server/middleware.go`
 
 **Logs:**
-- Server-side: `log.Printf` to stdout
-- No external logging service
+- Standard library `log` package for request/panic logging
+- Request logger: `server.Logger()` middleware (logs method, path, duration)
+- Panic recovery: `server.Recover()` middleware (logs panics, returns 500)
+- No structured logging framework included (applications can add)
+
+**Request Tracing:**
+- Request ID via `server.RequestID()` middleware (sets `X-Request-ID` header)
+- No distributed tracing integration
 
 ## CI/CD & Deployment
 
 **Hosting:**
-- Fly.io configured (`fly.toml`)
-  - App name: `gux-example`
-  - Region: LAX
-  - Memory: 256MB
-  - HTTP on port 8080 with HTTPS enforcement
+- Self-hosted (recommended) - Run as single binary on any platform
+- Fly.io (example config in `fly.toml`) - Dockerfile-based deployment
+- Docker (supported) - Gux generates Dockerfile template for apps
+- Kubernetes (possible) - Requires container image, no special integration
 
 **CI Pipeline:**
-- Not detected (no GitHub Actions, etc.)
+- None built-in
+- Example Dockerfile in generated projects supports standard CI systems (GitHub Actions, GitLab CI, etc.)
 
-**Container Registry:**
-- Docker support via `example/Dockerfile`
-- No configured registry push
+**Build Process:**
+- `gux gen` - Generate API clients, CRUD code, admin pages from models
+- `gux build` - Compile WASM (TinyGo/Go), generate Tailwind CSS, embed assets
+- `gux dev` - Build + run server with hot reload on file changes
+- All commands are self-contained in `cmd/gux/main.go`
 
 ## Environment Configuration
 
-**Development:**
-- No required environment variables
-- Build flags only: `GOOS=js GOARCH=wasm`
-- Local development via `make dev-tinygo`
+**Required env vars (example):**
+- `PORT` - Server port (default: 8080)
+- `DATABASE_URL` - Database connection (SQLite path or PostgreSQL DSN)
+- Custom application secrets (not defined by framework)
 
-**Staging:**
-- Not configured
-
-**Production:**
-- Fly.io deployment
-- Auto-scaling: min_machines_running = 0
-- Health checks configured
-
-## Browser APIs (Internal Integrations)
-
-**JavaScript Interop:**
-- `syscall/js` for all browser communication
-
-**Storage APIs:**
-- localStorage - `storage/local.go`
-- sessionStorage - `storage/local.go`
-
-**Network APIs:**
-- Fetch API - `fetch/fetch.go`
-- WebSocket API - `ws/ws.go`, `state/websocket.go`
-
-**DOM APIs:**
-- Document manipulation via `js.Global().Get("document")`
-- Event handling via callbacks
+**Secrets location:**
+- `.env` file (loaded via `core.LoadEnv()`, optional, not versioned)
+- Environment variables at deployment time
+- No secrets manager integration (applications can add Vault, AWS Secrets Manager, etc.)
 
 ## Webhooks & Callbacks
 
 **Incoming:**
-- Not detected
+- Not built-in - Applications define custom webhook endpoints via typed API
 
 **Outgoing:**
-- Not detected
+- No built-in outgoing webhooks
+- Applications can make HTTP calls to external services using standard `net/http`
 
-## Third-Party Dependencies
+## CSRF Protection
 
-**Runtime:**
-- `github.com/gorilla/websocket` v1.5.3 - Server-side WebSocket (`go.sum`)
+**Automatic protection:**
+- Double Submit Cookie pattern (default, enabled)
+- Meta tag: `<meta name="csrf-token">` (rendered server-side)
+- Cookie: `__gux_csrf` (auto-set, configurable)
+- Header: `X-CSRF-Token` (auto-added by `fetch` package on POST/PUT/PATCH/DELETE)
 
-**Build-time:**
-- TinyGo compiler (optional, for optimized builds)
-- Standard Go toolchain
+**Implementation:**
+- `core/csrf.go` - Server-side generation and validation
+- `fetch/fetch.go` - Client-side auto-inclusion (WASM only)
+- Configuration: `app.EnableCSRF()` or `app.DisableCSRF()`
+- No external CSRF service needed
 
-## Summary
+## Media & Rich Content
 
-This is a **self-contained framework** with minimal external dependencies:
+**Video/Audio:**
+- HTML5 `<video>` and `<audio>` elements via `core.Video()`, `core.Audio()`
+- VideoJS integration (optional) - Enhanced player from CDN
+- Google IMA (optional) - Pre-roll/mid-roll ad insertion via `ui.VideoPlayer`
 
-- **Zero third-party services** - No payment, analytics, auth providers
-- **Single external dependency** - Gorilla WebSocket for server-side
-- **Browser-native** - Uses standard browser APIs directly
-- **Deployment-ready** - Fly.io configuration included
+**Charts:**
+- Chart rendering via `github.com/go-analyze/charts` (internal)
+- Chart component: `ui.Chart()` - Line, bar, pie charts for dashboards
 
-The framework is designed for users to integrate their own services rather than prescribing specific providers.
+## Security Headers
+
+**Server Middleware:**
+- CORS: `server.CORS()` middleware (configurable allow origin/methods/headers)
+- Gzip compression: `server.Gzip()` middleware (transparent)
+- Request ID tracking: `server.RequestID()` middleware
+- No built-in security headers (CSP, X-Frame-Options, etc.) - applications should add
 
 ---
 
-*Integration audit: 2026-01-14*
-*Update when adding/removing external services*
+*Integration audit: 2026-02-01*
