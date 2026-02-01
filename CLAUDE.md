@@ -753,6 +753,7 @@ ui.VideoPlayer(ui.VideoPlayerProps{
 | `OnPlay` | `func()` | Video started playing |
 | `OnPause` | `func()` | Video paused |
 | `OnEnded` | `func()` | Video finished |
+| `OnTimeUpdate` | `func(currentTime float64)` | Periodic playback position (~4x/sec) in seconds |
 | `OnError` | `func(msg string)` | Playback error |
 | `OnReady` | `func()` | Player fully initialized |
 

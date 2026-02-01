@@ -132,6 +132,13 @@ func attachPlayerEvents(player js.Value, props VideoPlayerProps) {
 			return nil
 		}))
 	}
+	if props.OnTimeUpdate != nil {
+		player.Call("on", "timeupdate", js.FuncOf(func(this js.Value, args []js.Value) any {
+			ct := player.Call("currentTime").Float()
+			props.OnTimeUpdate(ct)
+			return nil
+		}))
+	}
 	if props.OnError != nil {
 		player.Call("on", "error", js.FuncOf(func(this js.Value, args []js.Value) any {
 			errObj := player.Call("error")
@@ -387,6 +394,13 @@ func createNativeVideoHandlers(props VideoPlayerProps) func(el any) {
 		if props.OnEnded != nil {
 			v.Call("addEventListener", "ended", js.FuncOf(func(this js.Value, args []js.Value) any {
 				props.OnEnded()
+				return nil
+			}))
+		}
+		if props.OnTimeUpdate != nil {
+			v.Call("addEventListener", "timeupdate", js.FuncOf(func(this js.Value, args []js.Value) any {
+				ct := v.Get("currentTime").Float()
+				props.OnTimeUpdate(ct)
 				return nil
 			}))
 		}

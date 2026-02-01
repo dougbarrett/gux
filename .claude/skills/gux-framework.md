@@ -1412,7 +1412,7 @@ ui.VideoPlayer(ui.VideoPlayerProps{
 
 **VideoPlayerProps fields**: Sources, Poster, Width, Height, AutoPlay, Loop, Muted, Controls, Preload, Class, EnableVideoJS, VideoJSCSS, VideoJSScript, EnableAds, AdTagURL.
 
-**Video event callbacks** (WASM only): OnPlay, OnPause, OnEnded, OnError(msg), OnReady.
+**Video event callbacks** (WASM only): OnPlay, OnPause, OnEnded, OnTimeUpdate(currentTime float64), OnError(msg), OnReady.
 
 **IMA ad event callbacks** (WASM only, require EnableAds+EnableVideoJS): OnAdLoaded(AdInfo), OnAdStarted(AdInfo), OnAdComplete(AdInfo), OnAdSkipped(AdInfo), OnAdError(errMsg), OnAdProgress(AdInfo), OnAdClicked(AdInfo), OnContentPause(), OnContentResume().
 

@@ -51,11 +51,12 @@ type VideoPlayerProps struct {
 	AdTagURL  string // VAST/VMAP ad tag URL
 
 	// Event handlers (WASM only, ignored in SSR)
-	OnPlay  func()
-	OnPause func()
-	OnEnded func()
-	OnError func(msg string)
-	OnReady func() // Called when player is fully initialized
+	OnPlay       func()
+	OnPause      func()
+	OnEnded      func()
+	OnTimeUpdate func(currentTime float64) // Fires periodically during playback (~4x/sec) with current position in seconds
+	OnError      func(msg string)
+	OnReady      func() // Called when player is fully initialized
 
 	// Google IMA ad event handlers (WASM only, ignored in SSR)
 	// These fire during the ad lifecycle when EnableAds is true.
@@ -159,6 +160,7 @@ func VideoPlayer(props VideoPlayerProps) core.Node {
 
 func hasEventHandlers(props VideoPlayerProps) bool {
 	return props.OnPlay != nil || props.OnPause != nil ||
-		props.OnEnded != nil || props.OnError != nil || props.OnReady != nil ||
+		props.OnEnded != nil || props.OnTimeUpdate != nil ||
+		props.OnError != nil || props.OnReady != nil ||
 		props.OnAdLoaded != nil || props.OnAdStarted != nil || props.OnAdComplete != nil
 }
