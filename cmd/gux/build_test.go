@@ -798,3 +798,95 @@ type Widget struct {
 		t.Errorf("expected *string wrapping function in create code, got:\n%s", result)
 	}
 }
+
+// TestResolveTypeAlias_FollowsAlias tests that type aliases (type X = pkg.Y)
+// are resolved to the actual struct definition for pointer type detection (#53).
+func TestResolveTypeAlias_FollowsAlias(t *testing.T) {
+	// Create a temp project structure:
+	// go.mod
+	// dto/promotion.go          (actual struct with *string fields)
+	// guxgen/dto/promotion_gen.go (type alias to dto.PromotionDetail)
+	// models/promotion.go       (actual model with *float64 fields)
+	// guxgen/models/promotion_gen.go (type alias to models.Promotion)
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(origDir)
+
+	// go.mod
+	os.WriteFile("go.mod", []byte("module testapp\n\ngo 1.23\n"), 0644)
+
+	// dto/promotion.go - real struct with pointer fields
+	os.MkdirAll("dto", 0755)
+	os.WriteFile("dto/promotion.go", []byte(`package dto
+
+type PromotionDetail struct {
+	Name           string  `+"`"+`json:"name"`+"`"+`
+	AdTagURL       *string `+"`"+`json:"ad_tag_url"`+"`"+`
+	WebhookURL     *string `+"`"+`json:"webhook_url"`+"`"+`
+	SecondaryColor *string `+"`"+`json:"secondary_color"`+"`"+`
+}
+`), 0644)
+
+	// guxgen/dto/promotion_gen.go - type alias
+	os.MkdirAll(filepath.Join("guxgen", "dto"), 0755)
+	os.WriteFile(filepath.Join("guxgen", "dto", "promotion_gen.go"), []byte(`package dto
+
+import manualdto "testapp/dto"
+
+type PromotionDetail = manualdto.PromotionDetail
+`), 0644)
+
+	// models/promotion.go - real struct with pointer fields
+	os.MkdirAll("models", 0755)
+	os.WriteFile("models/promotion.go", []byte(`package models
+
+import "gorm.io/gorm"
+
+type Promotion struct {
+	gorm.Model
+	Name           string   `+"`"+`json:"name"`+"`"+`
+	AdTagURL       *string  `+"`"+`json:"ad_tag_url"`+"`"+`
+	MinWatchTimeSec *float64 `+"`"+`json:"min_watch_time_sec"`+"`"+`
+}
+`), 0644)
+
+	// guxgen/models/promotion_gen.go - type alias
+	os.MkdirAll(filepath.Join("guxgen", "models"), 0755)
+	os.WriteFile(filepath.Join("guxgen", "models", "promotion_gen.go"), []byte(`package models
+
+import customModels "testapp/models"
+
+type Promotion = customModels.Promotion
+`), 0644)
+
+	// Test getDTOFieldTypes resolves the alias
+	dtoFields, err := getDTOFieldTypes("PromotionDetail")
+	if err != nil {
+		t.Fatalf("getDTOFieldTypes: %v", err)
+	}
+
+	if dtoFields["AdTagURL"] != "*string" {
+		t.Errorf("getDTOFieldTypes: AdTagURL = %q, want *string", dtoFields["AdTagURL"])
+	}
+	if dtoFields["WebhookURL"] != "*string" {
+		t.Errorf("getDTOFieldTypes: WebhookURL = %q, want *string", dtoFields["WebhookURL"])
+	}
+	if dtoFields["Name"] != "string" {
+		t.Errorf("getDTOFieldTypes: Name = %q, want string", dtoFields["Name"])
+	}
+
+	// Test getModelFieldTypes resolves the alias
+	modelFieldTypesCache = make(map[string]map[string]string) // reset cache
+	modelFields, err := getModelFieldTypes("Promotion")
+	if err != nil {
+		t.Fatalf("getModelFieldTypes: %v", err)
+	}
+
+	if modelFields["AdTagURL"] != "*string" {
+		t.Errorf("getModelFieldTypes: AdTagURL = %q, want *string", modelFields["AdTagURL"])
+	}
+	if modelFields["MinWatchTimeSec"] != "*float64" {
+		t.Errorf("getModelFieldTypes: MinWatchTimeSec = %q, want *float64", modelFields["MinWatchTimeSec"])
+	}
+}

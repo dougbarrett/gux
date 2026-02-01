@@ -729,6 +729,11 @@ func getModelFieldTypes(modelName string) (map[string]string, error) {
 
 				structType, ok := typeSpec.Type.(*ast.StructType)
 				if !ok {
+					// Type alias (e.g., type X = pkg.Y) — follow the alias
+					if resolved := resolveTypeAlias(node, typeSpec); resolved != nil {
+						modelFieldTypesCache[modelName] = resolved
+						return resolved, nil
+					}
 					continue
 				}
 
@@ -822,6 +827,141 @@ func getModelFieldTypesFromCore(modelName string) (map[string]string, error) {
 	return nil, fmt.Errorf("model %s not found in core package", modelName)
 }
 
+// resolveTypeAlias follows a type alias (e.g., `type X = pkg.Y`) to find the actual struct
+// fields. Returns nil if the alias cannot be resolved.
+func resolveTypeAlias(node *ast.File, typeSpec *ast.TypeSpec) map[string]string {
+	// Check if this is a selector expression (pkg.Type)
+	sel, ok := typeSpec.Type.(*ast.SelectorExpr)
+	if !ok {
+		return nil
+	}
+	pkgIdent, ok := sel.X.(*ast.Ident)
+	if !ok {
+		return nil
+	}
+	targetPkg := pkgIdent.Name
+	targetType := sel.Sel.Name
+
+	// Resolve the import path for this package alias
+	var importPath string
+	for _, imp := range node.Imports {
+		path := strings.Trim(imp.Path.Value, `"`)
+		if imp.Name != nil && imp.Name.Name == targetPkg {
+			importPath = path
+			break
+		}
+		// Check if the default package name matches
+		parts := strings.Split(path, "/")
+		if parts[len(parts)-1] == targetPkg {
+			importPath = path
+			break
+		}
+	}
+	if importPath == "" {
+		return nil
+	}
+
+	// Resolve the import path to a directory on disk
+	// First check relative to the current module
+	dir := resolveImportToDir(importPath)
+	if dir == "" {
+		return nil
+	}
+
+	// Parse all Go files in that directory looking for the struct
+	return parseStructFromDir(dir, targetType)
+}
+
+// resolveImportToDir resolves a Go import path to a directory on disk.
+func resolveImportToDir(importPath string) string {
+	// Read go.mod to get the module path
+	modData, err := os.ReadFile("go.mod")
+	if err != nil {
+		return ""
+	}
+	lines := strings.Split(string(modData), "\n")
+	var modulePath string
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "module ") {
+			modulePath = strings.TrimPrefix(line, "module ")
+			break
+		}
+	}
+	if modulePath == "" {
+		return ""
+	}
+
+	// If the import is within our module, resolve to local directory
+	if strings.HasPrefix(importPath, modulePath) {
+		relPath := strings.TrimPrefix(importPath, modulePath)
+		relPath = strings.TrimPrefix(relPath, "/")
+		if relPath == "" {
+			return "."
+		}
+		if info, err := os.Stat(relPath); err == nil && info.IsDir() {
+			return relPath
+		}
+	}
+
+	return ""
+}
+
+// parseStructFromDir parses all Go files in a directory looking for a specific struct type.
+func parseStructFromDir(dir string, typeName string) map[string]string {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".go") {
+			continue
+		}
+		// Skip test files
+		if strings.HasSuffix(entry.Name(), "_test.go") {
+			continue
+		}
+
+		fset := token.NewFileSet()
+		filename := filepath.Join(dir, entry.Name())
+		node, err := parser.ParseFile(fset, filename, nil, parser.ParseComments)
+		if err != nil {
+			continue
+		}
+
+		for _, decl := range node.Decls {
+			genDecl, ok := decl.(*ast.GenDecl)
+			if !ok || genDecl.Tok != token.TYPE {
+				continue
+			}
+
+			for _, spec := range genDecl.Specs {
+				typeSpec, ok := spec.(*ast.TypeSpec)
+				if !ok || typeSpec.Name.Name != typeName {
+					continue
+				}
+
+				structType, ok := typeSpec.Type.(*ast.StructType)
+				if !ok {
+					continue
+				}
+
+				fieldTypes := make(map[string]string)
+				for _, field := range structType.Fields.List {
+					if len(field.Names) == 0 {
+						continue
+					}
+					fieldTypes[field.Names[0].Name] = formatType(field.Type)
+				}
+				return fieldTypes
+			}
+		}
+	}
+
+	return nil
+}
+
 // getDTOFieldTypes parses a DTO struct from dto/ or guxgen/dto/ and returns a map of field name → type.
 // Used to detect actual DTO types when generating admin pages for models with manual DTOs.
 func getDTOFieldTypes(dtoName string) (map[string]string, error) {
@@ -858,6 +998,10 @@ func getDTOFieldTypes(dtoName string) (map[string]string, error) {
 
 					structType, ok := typeSpec.Type.(*ast.StructType)
 					if !ok {
+						// Type alias (e.g., type X = pkg.Y) — follow the alias
+						if resolved := resolveTypeAlias(node, typeSpec); resolved != nil {
+							return resolved, nil
+						}
 						continue
 					}
 
