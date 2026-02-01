@@ -18,6 +18,7 @@ A full-stack Go framework for building modern web applications with WebAssembly.
 - [v2.1 Dead Code Cleanup](milestones/v2.1-ROADMAP.md) (Phases 24-26) - SHIPPED 2026-01-26
 - [v2.2 gux init Modernization](milestones/v2.2-ROADMAP.md) (Phase 27) - SHIPPED 2026-01-26
 - [v2.3 gux help Patterns](milestones/v2.3-ROADMAP.md) (Phase 28) - SHIPPED 2026-01-26
+- **v2.4 File Upload System** (Phases 29-32) - IN PROGRESS
 
 ## Phases
 
@@ -78,48 +79,13 @@ Full details: [milestones/v1.2-ROADMAP.md](milestones/v1.2-ROADMAP.md)
 **Milestone Goal:** Build a fresh component library on core's Node system with four example applications
 
 - [x] Phase 16: Component Foundation (3/3 plans) - Utilities, Button, Card, layout primitives
-  Plans:
-  - [x] 16-01-PLAN.md - Utility functions (MergeClasses, ConditionalClass)
-  - [x] 16-02-PLAN.md - Button component with variants and sizes
-  - [x] 16-03-PLAN.md - Card compound components and layout primitives
 - [x] Phase 17: Form Components (3/3 plans) - Input, Textarea, Select, Checkbox, Radio, Switch, FormField
-  Plans:
-  - [x] 17-01-PLAN.md - Input and FormField components
-  - [x] 17-02-PLAN.md - Textarea and Select components
-  - [x] 17-03-PLAN.md - Checkbox, RadioGroup, and Switch components
 - [x] Phase 18: Data Display Components (3/3 plans) - Badge, Avatar, Table, List, Pagination, DataTable[T]
-  Plans:
-  - [x] 18-01-PLAN.md - Badge and Avatar components
-  - [x] 18-02-PLAN.md - Table compound and List components
-  - [x] 18-03-PLAN.md - Pagination and DataTable[T] generic component
 - [x] Phase 19: Interactive Components (5/5 plans) - Modal, Dropdown, Tabs, Toast, Tooltip
-  Plans:
-  - [x] 19-01-PLAN.md - Modal compound components (Modal, ModalContent, ModalFooter)
-  - [x] 19-02-PLAN.md - Tooltip component with CSS-driven visibility
-  - [x] 19-03-PLAN.md - Tabs compound components (Tabs, TabList, Tab, TabPanel)
-  - [x] 19-04-PLAN.md - Dropdown compound components with menu semantics
-  - [x] 19-05-PLAN.md - Toast notification system with variants
 - [x] Phase 20: Auth Example (4/4 plans) - Login, Register, Password Reset, Verification
-  Plans:
-  - [x] 20-01-PLAN.md - Alert component for inline feedback
-  - [x] 20-02-PLAN.md - Auth app foundation (models, routes, layout)
-  - [x] 20-03-PLAN.md - Login and Register pages
-  - [x] 20-04-PLAN.md - Forgot, Reset, and Verify pages
 - [x] Phase 21: Marketing Example (3/3 plans) - Home, Features, Pricing, About, Contact
-  Plans:
-  - [x] 21-01-PLAN.md - App foundation with responsive Nav and Footer
-  - [x] 21-02-PLAN.md - Home and Features pages
-  - [x] 21-03-PLAN.md - Pricing, About, and Contact pages
 - [x] Phase 22: SaaS Dashboard Example (3/3 plans) - Dashboard, CRUD, Settings, Profile
-  Plans:
-  - [x] 22-01-PLAN.md - App foundation with Project model, routes, DashboardLayout
-  - [x] 22-02-PLAN.md - Dashboard and Projects CRUD pages
-  - [x] 22-03-PLAN.md - Settings with Tabs and Profile with Avatar
 - [x] Phase 23: Admin Panel Example (3/3 plans) - User Management, Activity Logs, Settings
-  Plans:
-  - [x] 23-01-PLAN.md - App foundation with User/ActivityLog models, DTOs, AdminLayout
-  - [x] 23-02-PLAN.md - Dashboard and User Management (list, detail, edit, new, bulk actions)
-  - [x] 23-03-PLAN.md - Activity Logs and Settings with role-based UI
 
 Full details: [milestones/v2.0-ROADMAP.md](milestones/v2.0-ROADMAP.md)
 
@@ -158,10 +124,82 @@ Full details: [milestones/v2.3-ROADMAP.md](milestones/v2.3-ROADMAP.md)
 
 </details>
 
+### v2.4 File Upload System (In Progress)
+
+**Milestone Goal:** Developers can add `"input": "file"` to a model field in gux.config.json and get complete file upload -- UI, storage, API, admin integration -- with zero manual wiring.
+
+- [ ] **Phase 29: Storage Foundation** - Storage interface, local backend, upload endpoint, file serving
+- [ ] **Phase 30: Upload Client & UI Component** - WASM upload with progress, drag-drop UI, image preview
+- [ ] **Phase 31: Code Generation & CRUD Integration** - Config-driven file fields, admin scaffolding, lifecycle hooks, auto-cleanup
+- [ ] **Phase 32: Multi-File & Configuration** - Multi-file fields, per-field config for types/size/directory
+
+#### Phase 29: Storage Foundation
+**Goal**: Developer can upload files through a server endpoint and serve them via HTTP, with a clean storage abstraction that decouples file location from application code
+**Depends on**: Nothing (first phase of v2.4)
+**Requirements**: STOR-01, STOR-02, STOR-03, STOR-04, STOR-05, STOR-06, UPLD-01, UPLD-02, UPLD-03, UPLD-04, UPLD-05, UPLD-06
+**Success Criteria** (what must be TRUE):
+  1. Developer calls `app.SetStorage(storage.NewLocalStorage("./uploads"))` and files are stored to that directory
+  2. A POST request with a multipart file to the upload endpoint returns a JSON response containing the stored file path
+  3. Files are accessible via browser at their served URL (e.g., `/__gux_api/files/abc123.jpg` returns the image)
+  4. Upload endpoint rejects files exceeding the size limit and files with disallowed content types (validated by magic bytes, not just headers)
+  5. Upload endpoint enforces CSRF protection and authentication when configured on the app
+**Plans**: TBD
+
+Plans:
+- [ ] 29-01: Storage interface and local filesystem backend
+- [ ] 29-02: Upload endpoint with validation and file serving handler
+
+#### Phase 30: Upload Client & UI Component
+**Goal**: User can select, preview, and upload files through an interactive UI component that works across SSR and WASM with upload progress feedback
+**Depends on**: Phase 29
+**Requirements**: UICM-01, UICM-02, UICM-03, UICM-04, UICM-05, UICM-06, UICM-07, UICM-08, UICM-09, UICM-10
+**Success Criteria** (what must be TRUE):
+  1. User can click to browse or drag-and-drop a file onto the upload zone, and sees a progress bar during upload
+  2. User sees an immediate validation error when selecting a file that is too large or has a disallowed type (before upload starts)
+  3. User sees an image thumbnail preview after selecting an image file, and can remove or replace the uploaded file
+  4. The upload zone renders as static HTML during SSR (no JavaScript errors) and gains full interactivity after WASM hydration
+  5. File bytes remain in JavaScript memory during upload (never copied into Go WASM heap)
+**Plans**: TBD
+
+Plans:
+- [ ] 30-01: WASM upload client (fetch/upload.go with FormData and CSRF)
+- [ ] 30-02: ui.FileUpload component with SSR/WASM split
+
+#### Phase 31: Code Generation & CRUD Integration
+**Goal**: Developer adds `"input": "file"` to a field in gux.config.json and `gux gen` produces complete upload integration across admin forms, detail views, list views, and CRUD lifecycle
+**Depends on**: Phase 30
+**Requirements**: CRUD-01, CRUD-02, CRUD-03, CRUD-04, CRUD-05, CRUD-06, CRUD-07, CRUD-08, CRUD-09, CRUD-10, HOOK-01, HOOK-02, HOOK-03, HOOK-04, HOOK-05, HOOK-06
+**Success Criteria** (what must be TRUE):
+  1. After adding `"input": "file"` to a field and running `gux gen`, the admin create and edit forms render a working `ui.FileUpload` component (with current file shown on edit)
+  2. Generated admin detail views show an image preview for image fields and a filename with download link for non-image fields
+  3. Generated admin list views show a thumbnail for image fields and a file icon or filename for non-image fields
+  4. When a record with file fields is deleted via CRUD, the associated files are automatically removed from storage
+  5. Developer can register BeforeUpload, AfterUpload, and BeforeDelete hooks that receive file metadata and follow the existing CRUD option pattern
+**Plans**: TBD
+
+Plans:
+- [ ] 31-01: gux.config.json file field type and model/DTO generation
+- [ ] 31-02: Admin form, detail, and list view generation for file fields
+- [ ] 31-03: CRUD auto-delete and lifecycle hooks
+
+#### Phase 32: Multi-File & Configuration
+**Goal**: Developer can define multi-file fields and configure per-field upload constraints (allowed types, max size, upload directory) in gux.config.json
+**Depends on**: Phase 31
+**Requirements**: MULT-01, MULT-02, MULT-03, MULT-04, CONF-01, CONF-02, CONF-03
+**Success Criteria** (what must be TRUE):
+  1. Developer adds `"input": "file[]"` to a field in gux.config.json and the admin form allows uploading multiple files
+  2. User can add and remove individual files from a multi-file field, with values stored as a JSON array of file paths
+  3. Per-field `"accept"`, `"maxSize"`, and `"directory"` configuration in gux.config.json controls upload validation and storage location
+**Plans**: TBD
+
+Plans:
+- [ ] 32-01: Multi-file field support (config, model, UI, storage)
+- [ ] 32-02: Per-field configuration (accept, maxSize, directory)
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 -> 2 -> ... -> 15 -> 16 -> ... -> 23 -> 24 -> 25 -> 26 -> 27 -> 28
+Phases execute in numeric order: 1 -> 2 -> ... -> 28 -> 29 -> 30 -> 31 -> 32
 
 | Phase | Milestone | Plans | Status | Completed |
 |-------|-----------|-------|--------|-----------|
@@ -193,3 +231,7 @@ Phases execute in numeric order: 1 -> 2 -> ... -> 15 -> 16 -> ... -> 23 -> 24 ->
 | 26. Dependency Cleanup | v2.1 | 1/1 | Complete | 2026-01-26 |
 | 27. gux init Templates | v2.2 | 3/3 | Complete | 2026-01-26 |
 | 28. Help Pattern Commands | v2.3 | 2/2 | Complete | 2026-01-26 |
+| 29. Storage Foundation | v2.4 | 0/2 | Not started | - |
+| 30. Upload Client & UI Component | v2.4 | 0/2 | Not started | - |
+| 31. Code Generation & CRUD Integration | v2.4 | 0/3 | Not started | - |
+| 32. Multi-File & Configuration | v2.4 | 0/2 | Not started | - |

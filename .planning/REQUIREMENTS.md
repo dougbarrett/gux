@@ -1,7 +1,7 @@
 # Requirements: Gux v2.4 File Upload System
 
 **Defined:** 2026-02-01
-**Core Value:** Developers can add `"input": "file"` to a model field in gux.config.json and get complete file upload — UI, storage, API, admin integration — with zero manual wiring.
+**Core Value:** Developers can add `"input": "file"` to a model field in gux.config.json and get complete file upload -- UI, storage, API, admin integration -- with zero manual wiring.
 
 ## v1 Requirements
 
@@ -114,13 +114,57 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| *(populated during roadmap creation)* | | |
+| STOR-01 | Phase 29 | Pending |
+| STOR-02 | Phase 29 | Pending |
+| STOR-03 | Phase 29 | Pending |
+| STOR-04 | Phase 29 | Pending |
+| STOR-05 | Phase 29 | Pending |
+| STOR-06 | Phase 29 | Pending |
+| UPLD-01 | Phase 29 | Pending |
+| UPLD-02 | Phase 29 | Pending |
+| UPLD-03 | Phase 29 | Pending |
+| UPLD-04 | Phase 29 | Pending |
+| UPLD-05 | Phase 29 | Pending |
+| UPLD-06 | Phase 29 | Pending |
+| UICM-01 | Phase 30 | Pending |
+| UICM-02 | Phase 30 | Pending |
+| UICM-03 | Phase 30 | Pending |
+| UICM-04 | Phase 30 | Pending |
+| UICM-05 | Phase 30 | Pending |
+| UICM-06 | Phase 30 | Pending |
+| UICM-07 | Phase 30 | Pending |
+| UICM-08 | Phase 30 | Pending |
+| UICM-09 | Phase 30 | Pending |
+| UICM-10 | Phase 30 | Pending |
+| CRUD-01 | Phase 31 | Pending |
+| CRUD-02 | Phase 31 | Pending |
+| CRUD-03 | Phase 31 | Pending |
+| CRUD-04 | Phase 31 | Pending |
+| CRUD-05 | Phase 31 | Pending |
+| CRUD-06 | Phase 31 | Pending |
+| CRUD-07 | Phase 31 | Pending |
+| CRUD-08 | Phase 31 | Pending |
+| CRUD-09 | Phase 31 | Pending |
+| CRUD-10 | Phase 31 | Pending |
+| HOOK-01 | Phase 31 | Pending |
+| HOOK-02 | Phase 31 | Pending |
+| HOOK-03 | Phase 31 | Pending |
+| HOOK-04 | Phase 31 | Pending |
+| HOOK-05 | Phase 31 | Pending |
+| HOOK-06 | Phase 31 | Pending |
+| MULT-01 | Phase 32 | Pending |
+| MULT-02 | Phase 32 | Pending |
+| MULT-03 | Phase 32 | Pending |
+| MULT-04 | Phase 32 | Pending |
+| CONF-01 | Phase 32 | Pending |
+| CONF-02 | Phase 32 | Pending |
+| CONF-03 | Phase 32 | Pending |
 
 **Coverage:**
-- v1 requirements: 37 total
-- Mapped to phases: 0
-- Unmapped: 37 (awaiting roadmap)
+- v1 requirements: 45 total
+- Mapped to phases: 45
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-02-01*
-*Last updated: 2026-02-01 after initial definition*
+*Last updated: 2026-02-01 after roadmap creation*

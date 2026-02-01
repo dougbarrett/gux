@@ -2,19 +2,19 @@
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-02-01 — Milestone v2.4 started
+Phase: 29 of 32 (Storage Foundation)
+Plan: 0 of 2 in current phase
+Status: Ready to plan
+Last activity: 2026-02-01 -- Roadmap created for v2.4 File Upload System
 
-Progress: Milestone initialization
+Progress: [░░░░░░░░░░] 0% (0/9 plans across 4 phases)
 
 ## Project Reference
 
 See: .planning/PROJECT.md (updated 2026-02-01)
 
 **Core value:** Developers can build complete web apps in Go with SSR + WASM
-**Current focus:** v2.4 File Upload System
+**Current focus:** v2.4 File Upload System - Phase 29 Storage Foundation
 
 ## Milestone History
 
@@ -28,22 +28,38 @@ See: .planning/PROJECT.md (updated 2026-02-01)
 
 **Total:** 28 phases, 72 plans shipped across 7 milestones
 
+## Performance Metrics
+
+**Velocity:**
+- Total plans completed: 0 (v2.4)
+- Average duration: --
+- Total execution time: --
+
+**By Phase:**
+
+| Phase | Plans | Total | Avg/Plan |
+|-------|-------|-------|----------|
+| - | - | - | - |
+
+*Updated after each plan completion*
+
 ## Accumulated Context
 
-### Key Decisions (Summary)
+### Decisions
 
-Full decision log preserved in milestone archives:
-- [v1.0-ROADMAP.md](milestones/v1.0-ROADMAP.md) - UX/UI patterns
-- [v1.1-ROADMAP.md](milestones/v1.1-ROADMAP.md) - Accessibility patterns
-- [v1.2-ROADMAP.md](milestones/v1.2-ROADMAP.md) - Documentation patterns
-- [v2.0-ROADMAP.md](milestones/v2.0-ROADMAP.md) - Component library patterns
-- [v2.1-ROADMAP.md](milestones/v2.1-ROADMAP.md) - Dead code cleanup patterns
-- [v2.2-ROADMAP.md](milestones/v2.2-ROADMAP.md) - gux init modernization patterns
-- [v2.3-ROADMAP.md](milestones/v2.3-ROADMAP.md) - gux help patterns
+Decisions are logged in PROJECT.md Key Decisions table.
+Recent decisions affecting current work:
 
-### Blockers/Concerns Carried Forward
+- [v2.4 Roadmap]: 4 phases (29-32), 45 requirements mapped. Storage foundation first, then UI, then codegen, then multi-file.
+- [v2.4 Research]: Separate upload endpoint (not multipart CRUD), XHR for progress (not Fetch API), file bytes stay in JS land.
 
-None
+### Pending Todos
+
+None yet.
+
+### Blockers/Concerns
+
+- [Research]: XHR upload progress from Go/WASM is less documented -- needs prototype validation in Phase 30 planning.
 
 ## Deferred Issues
 
@@ -53,9 +69,9 @@ v2.0 Tech Debt:
 ## Session Continuity
 
 Last session: 2026-02-01
-Stopped at: Defining v2.4 requirements
+Stopped at: Roadmap created for v2.4 File Upload System
 Resume file: None
 
 ---
 
-*Last updated: 2026-02-01 after v2.4 milestone start*
+*Last updated: 2026-02-01 after v2.4 roadmap creation*
