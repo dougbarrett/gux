@@ -149,11 +149,16 @@ func TestUpload_MultipleFiles(t *testing.T) {
 		t.Fatalf("expected 2 results, got %d", len(results))
 	}
 
-	if results[0].Filename != "first.txt" {
-		t.Errorf("expected first.txt, got %s", results[0].Filename)
+	// Check both filenames exist (order is non-deterministic due to map iteration)
+	filenames := map[string]bool{}
+	for _, r := range results {
+		filenames[r.Filename] = true
 	}
-	if results[1].Filename != "second.txt" {
-		t.Errorf("expected second.txt, got %s", results[1].Filename)
+	if !filenames["first.txt"] {
+		t.Error("missing first.txt in results")
+	}
+	if !filenames["second.txt"] {
+		t.Error("missing second.txt in results")
 	}
 }
 
