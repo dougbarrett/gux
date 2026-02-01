@@ -143,11 +143,11 @@ Full details: [milestones/v2.3-ROADMAP.md](milestones/v2.3-ROADMAP.md)
   3. Files are accessible via browser at their served URL (e.g., `/__gux_api/files/abc123.jpg` returns the image)
   4. Upload endpoint rejects files exceeding the size limit and files with disallowed content types (validated by magic bytes, not just headers)
   5. Upload endpoint enforces CSRF protection and authentication when configured on the app
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 29-01: Storage interface and local filesystem backend
-- [ ] 29-02: Upload endpoint with validation and file serving handler
+- [ ] 29-01-PLAN.md -- Storage interface, types, functional options, LocalStorage with content-hash filenames, magic bytes validation, image dimensions
+- [ ] 29-02-PLAN.md -- Upload endpoint (multipart POST), file serving handler (GET with caching), app.SetStorage(), auth/CSRF integration
 
 #### Phase 30: Upload Client & UI Component
 **Goal**: User can select, preview, and upload files through an interactive UI component that works across SSR and WASM with upload progress feedback
