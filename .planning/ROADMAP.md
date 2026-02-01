@@ -159,11 +159,11 @@ Plans:
   3. User sees an image thumbnail preview after selecting an image file, and can remove or replace the uploaded file
   4. The upload zone renders as static HTML during SSR (no JavaScript errors) and gains full interactivity after WASM hydration
   5. File bytes remain in JavaScript memory during upload (never copied into Go WASM heap)
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 30-01: WASM upload client (fetch/upload.go with FormData and CSRF)
-- [ ] 30-02: ui.FileUpload component with SSR/WASM split
+- [ ] 30-01-PLAN.md -- WASM upload client (fetch/upload.go with XHR progress and CSRF)
+- [ ] 30-02-PLAN.md -- ui.FileUpload component with SSR/WASM split (drag-drop, validation, preview, progress)
 
 #### Phase 31: Code Generation & CRUD Integration
 **Goal**: Developer adds `"input": "file"` to a field in gux.config.json and `gux gen` produces complete upload integration across admin forms, detail views, list views, and CRUD lifecycle
