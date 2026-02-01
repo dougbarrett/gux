@@ -420,8 +420,9 @@ func (rg *RouteGroup) Hybrid(path string, handler PageFunc) *RouteGroup {
 // buildTime is set when the server starts, used for hot reload detection
 var buildTime = fmt.Sprintf("%d", os.Getpid())
 
-// Run starts the HTTP server on the given address.
-func (a *App) Run(addr string) error {
+// Handler returns the configured http.Handler with all routes and middleware applied.
+// Useful for testing with httptest.NewServer or httptest.NewRecorder.
+func (a *App) Handler() http.Handler {
 	mux := http.NewServeMux()
 
 	// Register CRUD handlers
@@ -784,15 +785,19 @@ func (a *App) Run(addr string) error {
 		http.NotFound(w, r)
 	})
 
-	fmt.Printf("http://localhost%s\n", addr)
-
 	// Apply CSRF middleware if enabled
 	var handler http.Handler = mux
 	if a.csrfConfig.Enabled {
 		handler = CSRFMiddleware(a.csrfConfig)(mux)
 	}
 
-	return http.ListenAndServe(addr, handler)
+	return handler
+}
+
+// Run starts the HTTP server on the given address.
+func (a *App) Run(addr string) error {
+	fmt.Printf("http://localhost%s\n", addr)
+	return http.ListenAndServe(addr, a.Handler())
 }
 
 // Router provides page context and state management.
