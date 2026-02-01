@@ -3,11 +3,11 @@
 ## Current Position
 
 Phase: 29 of 32 (Storage Foundation)
-Plan: 1 of 2 in current phase
-Status: In progress
-Last activity: 2026-02-01 -- Completed 29-01-PLAN.md
+Plan: 2 of 2 in current phase
+Status: Phase complete
+Last activity: 2026-02-01 -- Completed 29-02-PLAN.md
 
-Progress: [█░░░░░░░░░] 11% (1/9 plans across 4 phases)
+Progress: [██░░░░░░░░] 22% (2/9 plans across 4 phases)
 
 ## Project Reference
 
@@ -31,15 +31,15 @@ See: .planning/PROJECT.md (updated 2026-02-01)
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 1 (v2.4)
-- Average duration: 2m 14s
-- Total execution time: 2m 14s
+- Total plans completed: 2 (v2.4)
+- Average duration: 3m 24s
+- Total execution time: 6m 48s
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 29 Storage Foundation | 1 | 2m 14s | 2m 14s |
+| 29 Storage Foundation | 2 | 6m 48s | 3m 24s |
 
 *Updated after each plan completion*
 
@@ -55,6 +55,9 @@ Recent decisions affecting current work:
 - [29-01]: Content-addressed storage with SHA-256 hash filenames and 2-char prefix subdirectories for deduplication and I/O distribution.
 - [29-01]: Magic bytes MIME detection (mimetype library) prevents malicious files disguised with wrong extensions.
 - [29-01]: Storage.Serve method returns io.ReadSeekCloser for efficient Range request support.
+- [29-02]: Upload endpoint protected by default when auth configured; file serving public by default (opt-in auth via WithServeAuth).
+- [29-02]: CSRF handled by existing CSRFMiddleware wrapping the mux - upload handler needs no custom CSRF logic.
+- [29-02]: Path traversal protection rejects keys containing ".." or starting with "/" before calling Storage.Serve.
 
 ### Pending Todos
 
@@ -72,9 +75,9 @@ v2.0 Tech Debt:
 ## Session Continuity
 
 Last session: 2026-02-01
-Stopped at: Completed 29-01-PLAN.md
+Stopped at: Completed 29-02-PLAN.md (Phase 29 complete)
 Resume file: None
 
 ---
 
-*Last updated: 2026-02-01 after completing 29-01-PLAN.md*
+*Last updated: 2026-02-01 after completing 29-02-PLAN.md*
