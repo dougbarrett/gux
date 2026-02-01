@@ -3,11 +3,11 @@
 ## Current Position
 
 Phase: 30 of 32 (Upload Client & UI Component)
-Plan: 1 of 2 in current phase
-Status: In progress
-Last activity: 2026-02-01 -- Completed 30-01-PLAN.md
+Plan: 2 of 2 in current phase
+Status: Phase complete
+Last activity: 2026-02-01 -- Completed 30-02-PLAN.md
 
-Progress: [███░░░░░░░] 33% (3/9 plans across 4 phases)
+Progress: [████░░░░░░] 44% (4/9 plans across 4 phases)
 
 ## Project Reference
 
@@ -31,16 +31,16 @@ See: .planning/PROJECT.md (updated 2026-02-01)
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 3 (v2.4)
-- Average duration: 4m 52s
-- Total execution time: 14m 36s
+- Total plans completed: 4 (v2.4)
+- Average duration: 4m 39s
+- Total execution time: 18m 36s
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 29 Storage Foundation | 2 | 6m 48s | 3m 24s |
-| 30 Upload Client & UI Component | 1 | 8m | 8m |
+| 30 Upload Client & UI Component | 2 | 12m | 6m |
 
 *Updated after each plan completion*
 
@@ -62,6 +62,9 @@ Recent decisions affecting current work:
 - [30-01]: XMLHttpRequest chosen over Fetch API because Fetch lacks upload.onprogress events - web platform limitation.
 - [30-01]: No stub file for fetch/upload.go - fetch package is WASM-only (same pattern as fetch.go).
 - [30-01]: File bytes never copied to Go WASM memory - js.Value File passed directly to FormData for memory efficiency.
+- [30-02]: Use Extra map for HTML attributes not in core.Attrs (accept, disabled, for, aria-*) - consistent with existing UI components.
+- [30-02]: Package-level objectURLs map stores cleanup functions to revoke old URLs when replacing image previews - prevents memory leaks.
+- [30-02]: Window-level drag prevention uses sync.Once - multiple FileUpload instances share same global listeners.
 
 ### Pending Todos
 
@@ -69,7 +72,7 @@ None yet.
 
 ### Blockers/Concerns
 
-None - XHR upload progress prototype validated in 30-01.
+None - Phase 30 complete. Ready for Phase 31 (Upload Codegen Integration).
 
 ## Deferred Issues
 
@@ -79,9 +82,9 @@ v2.0 Tech Debt:
 ## Session Continuity
 
 Last session: 2026-02-01
-Stopped at: Completed 30-01-PLAN.md. Next: 30-02 (Upload UI Component)
+Stopped at: Completed 30-02-PLAN.md. Phase 30 complete. Next: Phase 31 (Upload Codegen Integration)
 Resume file: None
 
 ---
 
-*Last updated: 2026-02-01 after 30-01 completion*
+*Last updated: 2026-02-01 after 30-02 completion*
