@@ -1,674 +1,396 @@
-# Pitfalls Research: Go/WASM Component Library with SSR + Hydration
+# Domain Pitfalls: File Upload System for Gux Framework
 
-**Domain:** Go/WASM component library, SSR + hydration, example applications
-**Researched:** 2026-01-22
-**Confidence:** MEDIUM-HIGH (based on codebase analysis + verified web research)
+**Domain:** File upload integration into Go/WASM framework with code generation, SSR, and storage abstraction
+**Researched:** 2026-02-01
+**Confidence:** HIGH (based on codebase analysis of fetch/, core/crud.go, core/csrf.go, core/endpoint.go, cmd/gux/modelgen.go + verified web research)
 
-## Component Library Pitfalls
+## Critical Pitfalls
 
-### CL-1: Props API That Fights Go's Type System
+Mistakes that cause rewrites or major breakage if not addressed upfront.
 
-**What goes wrong:** Porting React/Vue component patterns directly to Go creates awkward APIs. React components accept `any` props freely; Go requires explicit types. Developers try to use `map[string]interface{}` or `interface{}` everywhere, losing type safety.
+### P1: fetch/ Package Cannot Send FormData (Body Is string-Only)
 
-**Why it happens:** Go's type system is fundamentally different from JavaScript. React's `props` object pattern doesn't translate directly.
+**What goes wrong:** The existing `fetch/fetch.go` package has `Body string` in its `Options` struct (line 24). File uploads require sending `FormData` objects via the browser's Fetch API, which are not string-serializable. If you try to base64-encode files and send them as JSON strings, you double memory usage and hit WASM memory limits on large files.
+
+**Why it happens:** The fetch package was designed for JSON API calls. It converts Go HTTP options into browser `fetch()` calls, but the entire abstraction assumes text bodies. `FormData` is a browser-native object that must be passed as a `js.Value` directly to `fetch()`, not as a string.
 
 **Consequences:**
-- Runtime errors instead of compile-time errors
-- IDE autocomplete breaks
-- Documentation becomes essential (not optional)
-- Reflection overhead for dynamic prop handling
+- File uploads silently fail or corrupt data
+- Large files (>10MB) crash the WASM runtime from memory pressure
+- Base64 encoding inflates file size by ~33%, wasting bandwidth and memory
 
 **Warning signs:**
-- Frequent use of `interface{}` in component signatures
-- Type assertions scattered throughout component code
-- Components accepting `map[string]interface{}` for configuration
+- Attempting to `json.Marshal` file bytes into the request body
+- Creating workaround functions that bypass the fetch package entirely
+- Inconsistent CSRF token handling between the workaround and the standard fetch path
 
 **Prevention:**
-- Use explicit Props structs for each component (like `ButtonProps`, `InputProps`)
-- Leverage Go generics where appropriate (e.g., `AsyncStore[T]`)
-- Design APIs around Go idioms, not React idioms
-- Your existing `core.Attrs` pattern is correct - keep it explicit
+- Extend the fetch package to accept `js.Value` as body (for FormData), not just `string`
+- Add a dedicated `FetchFormData(url string, formData js.Value)` function or modify `Options` to support both string and js.Value bodies
+- Ensure CSRF token injection still works when Content-Type is not manually set (browser sets multipart boundary automatically)
+- Do NOT manually set `Content-Type: multipart/form-data` -- the browser must set it with the correct boundary parameter
 
-**Phase to address:** Phase 1 (Component Architecture) - establish patterns before building components
+**Detection:** If any code path sets `headers["Content-Type"] = "multipart/form-data"` manually, it is broken. The browser must auto-set the boundary.
 
-**Codebase evidence:** The existing `ButtonProps`, `FormProps` patterns are good. Maintain this approach.
+**Phase:** Must be addressed in the first implementation phase (storage/upload infrastructure), before any UI work.
 
 ---
 
-### CL-2: Variant Explosion Without Composition
+### P2: CSRF Token Injection Breaks with FormData Requests
 
-**What goes wrong:** Creating separate functions for every variant combination: `PrimaryButton`, `SecondaryButton`, `PrimarySmallButton`, `SecondaryLargeRoundedButton`. This doesn't scale.
+**What goes wrong:** The current CSRF system works because `fetch/fetch.go` sets `Content-Type: application/json` by default (lines 177-178) and includes the CSRF token as the `X-CSRF-Token` header (line 106). When switching to `FormData` for file uploads, the `Content-Type` must NOT be set manually (the browser auto-sets it with the multipart boundary). If the fetch extension inadvertently sets or strips the Content-Type, uploads break with garbled multipart boundaries.
 
-**Why it happens:** In React, variants often use string props. Developers port this as separate functions instead of composable options.
+Additionally, the CSRF middleware (`core/csrf.go`) validates by comparing the `X-CSRF-Token` header against the cookie (line 138-156). This header-based approach works for FormData uploads without changes, BUT only if the new fetch function still reads the CSRF meta tag and includes the header. If a developer creates a new upload path that bypasses the existing `getCSRFToken()` function, uploads will get 403 Forbidden.
+
+**Why it happens:** Developers often treat file upload as a special case and write separate HTTP code instead of extending the existing fetch abstraction. The CSRF token gets forgotten in the new code path.
 
 **Consequences:**
-- Combinatorial explosion of component variants
-- Inconsistent naming across components
-- Difficult to extend or customize
+- 403 Forbidden on all file uploads in production (CSRF rejection)
+- Uploads work in dev (if CSRF is disabled for testing) but fail when deployed
+- Debugging is confusing because the error message says "CSRF token invalid" not "missing header"
 
 **Warning signs:**
-- More than 3-4 convenience constructors per component
-- Variant combinations need new functions
-- Users can't combine options
+- File uploads work with `app.DisableCSRF()` but fail without it
+- New upload functions that don't call `getCSRFToken()`
+- Tests that disable CSRF to make upload tests pass
 
 **Prevention:**
-- Use option pattern: `Button(ButtonProps{Variant: ButtonPrimary, Size: ButtonLG})`
-- Provide convenience constructors only for the most common cases
-- Keep variant enums (like `ButtonVariant`, `ButtonSize`) consistent across components
+- Extend the existing `fetch/fetch.go` rather than creating a parallel upload function
+- Ensure the FormData fetch path calls `getCSRFToken()` and sets `X-CSRF-Token` header identically to the existing JSON path
+- Write an integration test that uploads a file WITH CSRF enabled
+- The header-based CSRF approach (Double Submit Cookie) works naturally with FormData -- do not switch to embedding tokens in form fields
 
-**Phase to address:** Phase 2 (Core Components) - design component APIs with composition in mind
-
-**Codebase evidence:** Current `Button` implementation already follows this pattern with `ButtonVariant` and `ButtonSize` enums.
+**Phase:** Must be validated in the storage infrastructure phase with an end-to-end upload test.
 
 ---
 
-### CL-3: Build Tag Splitting Creates API Divergence
+### P3: SSR Renders File Upload Component Without Browser APIs
 
-**What goes wrong:** Components have `//go:build js && wasm` versions that diverge from server-side implementations. Over time, the two implementations drift, causing hydration mismatches.
+**What goes wrong:** Gux renders pages on the server first (SSR), then hydrates with WASM. A file upload component needs browser APIs (`File`, `FileReader`, `FormData`, drag-and-drop events) that do not exist during SSR. If the component tries to access `js.Global()` during SSR, the server panics.
 
-**Why it happens:** Different implementations for different build targets. Go's build tag system makes this easy but doesn't enforce consistency.
+**Why it happens:** Gux's existing components handle this correctly (e.g., `video_player_stub.go` for non-WASM builds, `script_loader_wasm.go` with build tags). But file upload is more complex because it has both a meaningful SSR representation (styled drop zone, file list) AND interactive behavior (drag events, file reading, upload progress). Developers may forget to separate the two layers.
 
 **Consequences:**
-- Components behave differently server vs client
-- Hydration mismatches
-- Hard-to-debug production issues
-- Double maintenance burden
+- Server crashes on pages containing file upload components
+- Hydration mismatch if SSR output differs from WASM render (different HTML structure)
+- Event handlers attached to wrong elements after hydration
 
 **Warning signs:**
-- `_wasm.go` files with significantly different logic from base files
-- Feature parity tracking needed between builds
-- Manual testing required for both environments
+- Build tag `//go:build js && wasm` on the file upload component file but no corresponding stub
+- Direct `js.Global()` calls in the main component render function (not guarded by build tags)
+- SSR test failures on pages that include file upload
 
 **Prevention:**
-- Minimize build-tag-split code; keep core logic in shared files
-- Use interfaces to abstract platform differences (like `Renderer`)
-- Your current `core.Node` -> `HTMLRenderer`/`DOMRenderer` pattern is correct
-- Only split at the true platform boundary (DOM access)
+- Follow the existing `video_player.go` / `video_player_wasm.go` / `video_player_stub.go` pattern:
+  - `fileupload.go`: Props struct, SSR-safe render (static HTML for drop zone, no JS interop)
+  - `fileupload_wasm.go`: Browser interactivity (File API, drag-and-drop event listeners, FormData construction)
+  - `fileupload_stub.go` (if needed): No-op for non-WASM builds
+- SSR render should output the visual drop zone with placeholder text ("Drag files here or click to upload") but no event handlers
+- WASM hydration adds the interactive behavior via `OnMount`
+- Test: render the component in a non-WASM test to verify no panics
 
-**Phase to address:** Phase 1 (Component Architecture) - establish dual-render patterns
-
-**Codebase evidence:** `core/html_renderer.go` and `core/dom_renderer.go` show the correct split - only the rendering mechanism differs, not the component logic.
+**Phase:** UI component phase. Must be designed with build-tag separation from the start.
 
 ---
 
-### CL-4: Event Handler Leaks in WASM
+### P4: CRUD Endpoints Only Accept JSON -- No Multipart Support
 
-**What goes wrong:** Each `js.FuncOf` callback creates a Go function wrapper that must be explicitly released. Components that don't call `Func.Release()` leak memory.
+**What goes wrong:** The existing CRUD `handleCreate` and `handleUpdate` in `core/crud.go` (lines 551-633, 635-760) use `json.NewDecoder(r.Body).Decode()` exclusively. They cannot handle `multipart/form-data` requests. If you try to add a file field to a CRUD model, the create/update endpoints will return "Invalid JSON" because the body is multipart, not JSON.
 
-**Why it happens:** Go WASM's `js.FuncOf` returns a function that pins Go memory until released. This is documented but easy to forget.
+**Why it happens:** CRUD was designed for structured data (models with scalar fields). File upload introduces binary data that cannot be JSON-encoded efficiently. The two concerns (model field updates + file storage) need different transport mechanisms.
 
 **Consequences:**
-- Memory grows continuously with user interaction
-- Long-running apps eventually crash
-- Affects user experience in SPAs
+- Adding `"type": "file"` to a model in `gux.config.json` breaks the existing create/update flow
+- Generated admin forms send multipart but CRUD expects JSON
+- Workaround of separate upload endpoint creates two-request flow (upload file, then update model) with atomicity issues
 
 **Warning signs:**
-- `js.FuncOf` without corresponding cleanup
-- No component lifecycle/cleanup mechanism
-- Memory grows in browser DevTools over time
+- "Invalid JSON" errors when submitting forms with file fields
+- Hacks that separate file upload from model save into two API calls
+- Race conditions where the model references a file that hasn't finished uploading
 
 **Prevention:**
-- Track all `js.Func` values created by components
-- Implement component cleanup that releases functions
-- Document that event handlers should be reused when possible
-- Consider a component lifecycle hook for cleanup
+- Design a clear strategy upfront. Two viable approaches:
 
-**Phase to address:** Phase 2 (Core Components) - implement cleanup patterns
+  **Option A (Recommended): Separate upload endpoint + JSON CRUD**
+  - File upload goes to a dedicated `/__gux_api/upload` endpoint that returns a file URL/path
+  - CRUD create/update still receives JSON, with the file field containing the URL string
+  - The admin form uploads the file first, gets the URL, then submits the JSON form
+  - Pro: Minimal changes to existing CRUD. Con: Requires handling orphaned uploads (see P6)
 
-**Codebase evidence:** Current `dom_renderer.go` creates `js.FuncOf` callbacks in `RenderElement` without tracking them for cleanup. This needs attention.
+  **Option B: Multipart-aware CRUD**
+  - Modify `handleCreate`/`handleUpdate` to detect `Content-Type: multipart/form-data` and parse accordingly
+  - Extract file parts, upload to storage, replace with URLs, then process remaining fields as before
+  - Pro: Single atomic request. Con: Significant changes to core CRUD code, harder to test
 
-**Verified source:** [Go WASM Memory Leak Issue #74342](https://github.com/golang/go/issues/74342) - recent (June 2025) confirmed memory leak when passing JS pointers to Go WASM.
+- Either way, codegen must generate the correct client-side logic for the chosen approach
+
+**Phase:** Architecture decision required before any CRUD integration work. Should be settled in the storage infrastructure phase.
 
 ---
 
-## SSR + Hydration Pitfalls
+### P5: Code Generator Assumes All Fields Are Scalar Types
 
-### HY-1: State Serialization Type Mismatch
+**What goes wrong:** The `generateFormFieldCode` function in `cmd/gux/modelgen.go` (line 2295) handles input types like "text", "textarea", "select", "checkbox", "number", "email", "password". It has no concept of a "file" input type. The generated admin forms will either skip file fields entirely or render them as text inputs.
 
-**What goes wrong:** Server serializes state as JSON, client deserializes. JSON numbers become `float64`, not `int`. Component expects `int`, gets `float64`, breaks.
+Similarly, the DTO generation, detail page generation, and list page generation all assume fields are scalar values that can be JSON-serialized as strings, numbers, or booleans.
 
-**Why it happens:** JSON has no integer type. All numbers are float64 when unmarshaled to `interface{}` or `map[string]any`.
+**Why it happens:** The code generator was built for database-backed scalar fields. File fields are fundamentally different: the model stores a URL/path string, but the form needs a file picker, the detail page needs a preview/download link, and the list page might need a thumbnail.
 
 **Consequences:**
-- Type assertions fail: `val.(int)` panics on `float64`
-- State appears corrupted after hydration
-- Intermittent failures based on state content
+- Generated admin forms have text inputs where file pickers should be
+- Detail pages show raw file URLs instead of previews or download links
+- List pages show long URL strings in table cells
+- Developers must manually override every generated page for models with file fields
 
 **Warning signs:**
-- Type assertions without proper handling
-- `panic: interface conversion` errors in WASM console
-- State works on client-only navigation, fails on page refresh
+- `gux model regen` produces forms with `<input type="text">` for file fields
+- Detail pages display `/uploads/abc123.pdf` as plain text
+- Image fields show URLs instead of thumbnails
 
 **Prevention:**
-- Your existing `State[T].Get()` handles this with float64 -> int conversion
-- Ensure all state accessors handle JSON number types
-- Test hydration with various data types
-- Consider explicit serialization types for complex state
+- Add `"input": "file"` and `"input": "image"` as recognized types in `generateFormFieldCode`
+- For form generation: emit a `ui.FileUpload` component instead of `core.Input`
+- For detail generation: emit an image preview for image fields, a download link for other file types
+- For list generation: emit a thumbnail for images, a file icon for other types
+- For DTO generation: file fields are `string` type (URL/path) -- no special handling needed
+- The model field in GORM is also `string` -- it stores the file path/URL
 
-**Phase to address:** Phase 1 (Component Architecture) - validate state serialization handling
-
-**Codebase evidence:** `core/app.go` lines 587-607 already handle this conversion. Good pattern to maintain.
+**Phase:** Code generation phase, after the UI component and storage layer exist.
 
 ---
 
-### HY-2: Server-Only Data in Hydrated State
+## Moderate Pitfalls
 
-**What goes wrong:** Server includes data in state that shouldn't reach the client (database connections, internal IDs, session tokens). This data serializes into the HTML.
+Mistakes that cause delays, tech debt, or poor UX if not addressed.
 
-**Why it happens:** Server state is convenient for data loading. Easy to accidentally include sensitive data.
+### P6: Orphaned Files When Upload Succeeds but Model Save Fails
+
+**What goes wrong:** With the separate-upload-then-save approach (Option A from P4), a file gets uploaded to storage, then the model save fails (validation error, network issue, user navigates away). The file remains in storage with no database record pointing to it.
+
+**Why it happens:** File storage and database writes are not transactional. You cannot atomically write to S3 and SQLite in one operation.
 
 **Consequences:**
-- Security vulnerabilities (exposed tokens, internal data)
-- Hydration failures if data isn't JSON-serializable
-- Bloated page HTML size
-
-**Warning signs:**
-- Large `__gux_state` script tags in HTML
-- Database model objects in state instead of DTOs
-- `r.DB()` access results stored directly in state
+- Storage fills with orphaned files over time
+- Storage costs increase for S3 deployments
+- No way to distinguish "active" files from orphaned ones without scanning the database
 
 **Prevention:**
-- Only store serializable, client-safe data in state
-- Use DTOs for data passed to client (like current `UserList`, `UserDetail`)
-- Never store `r.DB()` results directly in state
-- Review state contents in rendered HTML during development
+- Implement a cleanup strategy from the start:
+  1. Store uploaded files with a "pending" status or in a temporary path
+  2. When the model save succeeds, move/mark the file as "active"
+  3. Run a periodic cleanup job (e.g., delete pending files older than 24 hours)
+- Alternative simpler approach: store the file reference in the model field only after successful upload, and run a daily background scan that removes files not referenced by any model
+- The `BeforeDelete` lifecycle hook should delete associated files when the model is deleted
+- Document this behavior so developers know to implement cleanup for custom upload flows
 
-**Phase to address:** All phases - ongoing discipline
-
-**Codebase evidence:** Current DTO pattern in `dto/user.go` correctly strips sensitive fields like `PasswordHash`. Maintain this pattern.
+**Phase:** Storage infrastructure phase. The cleanup mechanism should be designed alongside the upload flow.
 
 ---
 
-### HY-3: Conditional Rendering Hydration Mismatch
+### P7: Memory Pressure from Large File Reads in WASM
 
-**What goes wrong:** Server renders based on condition A, client hydrates with condition B. DOM doesn't match, hydration fails or causes visual glitches.
+**What goes wrong:** Reading a file in WASM via the JavaScript File API (`FileReader.readAsArrayBuffer`) loads the entire file contents into the WASM linear memory. For a 100MB video file, this means 100MB+ allocated in the WASM heap. Combined with the FormData copy, you effectively need 2x the file size in memory. WASM in browsers typically has a memory limit of 2-4GB, but practical limits are lower due to browser memory pressure.
 
-**Why it happens:**
-- Server-only code (e.g., auth checks) produces different results
-- Time-based rendering (timestamps, "posted 5 minutes ago")
-- Random values or UUIDs generated during render
+**Why it happens:** The JavaScript File API is designed for browser-native code that manages memory efficiently. WASM has a single linear memory that grows but never shrinks. Go's garbage collector running in WASM is less efficient than native GC.
 
 **Consequences:**
-- Visual flicker as client replaces server-rendered content
-- Console warnings/errors about mismatched content
-- React/Vue throw explicit errors; Go WASM silently produces wrong DOM
+- Browser tab crashes on large file uploads (>50-100MB)
+- Mobile browsers crash at even smaller sizes
+- Memory never reclaims after upload completes (WASM linear memory does not shrink)
 
 **Warning signs:**
-- Content "flashes" on page load
-- Server HTML differs from client first render
-- Components that use `time.Now()` or random values
+- Tests only use small files (<1MB)
+- No file size validation in the UI before starting the upload
+- `FileReader.readAsArrayBuffer` used instead of streaming approaches
 
 **Prevention:**
-- Ensure server and client render identical initial content
-- Use state hydration for any values that might differ
-- Don't use `time.Now()` or random values during render
-- Use the `r.OnLoad()` pattern to fetch data consistently
+- Enforce a maximum file size in the UI component (configurable, default 10MB)
+- For the JS interop layer, use `XMLHttpRequest` with `upload.onprogress` or `fetch` with a `ReadableStream` instead of reading the entire file into Go memory
+- Keep file data in JavaScript land as much as possible. Build the FormData object in JavaScript, pass it to fetch as a js.Value, and never copy the file bytes into Go
+- The Go WASM code should orchestrate the upload (construct FormData, call fetch) but not hold the file content in Go variables
+- For the upload progress UI, use JavaScript event callbacks that send progress updates back to Go
 
-**Phase to address:** Phase 3 (Advanced Components) - add client-only rendering capability
-
-**Verified sources:**
-- [Hydration Mismatch | Vike](https://vike.dev/hydration-mismatch)
-- [Next.js React Hydration Error](https://nextjs.org/docs/messages/react-hydration-error)
+**Phase:** UI component phase. The js.Value-based approach must be designed before implementing the file upload component.
 
 ---
 
-### HY-4: Browser API Access During SSR
+### P8: Storage Interface Leaks Provider-Specific Behavior
 
-**What goes wrong:** Component code accesses `window`, `document`, `localStorage` on server where they don't exist. Server panics or renders wrong content.
+**What goes wrong:** The storage abstraction (Local vs S3) works fine for simple Put/Get/Delete operations but breaks when provider differences surface: S3 requires pre-signed URLs for direct browser access, local storage uses file paths served by the Go HTTP server, S3 has eventual consistency for overwrites, local filesystem has immediate consistency.
 
-**Why it happens:** Go WASM components use `syscall/js` which only works in browser. Server-side rendering runs in regular Go.
+**Why it happens:** Storage abstractions often target the lowest common denominator (upload/download/delete) but real applications need provider-specific features: pre-signed URLs, CDN integration, thumbnail generation hooks, content-type detection.
 
 **Consequences:**
-- Server crashes during render
-- Build failures if WASM-only code imported
-- Different behavior SSR vs client
+- Image preview works locally (direct file path) but breaks on S3 (needs signed URL or public bucket)
+- File URLs stored in the database are provider-specific, making migration between providers impossible without a data migration
+- Tests pass with local storage but fail in production with S3
 
 **Warning signs:**
-- `js.Global()` calls in shared code
-- `syscall/js` imports in non-WASM-tagged files
-- Components that need browser state for rendering
+- File URLs in the database contain absolute filesystem paths (`/uploads/abc.jpg`)
+- No URL generation method on the storage interface
+- Tests only exercise the local storage adapter
 
 **Prevention:**
-- All `syscall/js` code behind `//go:build js && wasm` tags
-- Components return `core.Node`, not `js.Value`
-- Use `r.OnLoad()` for browser-dependent initialization
-- Your existing architecture handles this correctly
+- The storage interface must include a `URL(key string) string` method that returns an access URL appropriate for the provider
+- Store only the storage key (relative path) in the database, never the full URL
+- The URL method generates the appropriate access URL at runtime:
+  - Local: `/uploads/{key}` (served by the Go HTTP server)
+  - S3: pre-signed URL or CDN URL
+- Include both Local and S3 adapters in tests (S3 can use a mock or MinIO in tests)
+- Design the interface: `Upload(key string, reader io.Reader, contentType string) error`, `Delete(key string) error`, `URL(key string) string`
 
-**Phase to address:** Phase 1 (Component Architecture) - enforce build tag discipline
-
-**Codebase evidence:** The `core.Node` abstraction correctly isolates browser APIs. Components like `Button` in `components/button.go` should probably use this pattern instead of direct `js.Value`.
+**Phase:** Storage infrastructure phase. The interface design is a critical early decision.
 
 ---
 
-### HY-5: Re-render During Input Events Destroys Focus
+### P9: Generated Admin Form State Management for File Fields
 
-**What goes wrong:** User types in input, state updates, component re-renders, input loses focus. User must click back into input to continue typing.
+**What goes wrong:** Existing admin form generation uses `r.StateString()` for text fields and `r.StateBool()` for booleans. A file field has multiple states: the selected file object (js.Value, WASM-only), the file name (string, for display), upload progress (float, 0-100), upload status (idle/uploading/done/error), and the resulting URL (string, for the model). Managing all of these with separate `r.StateString` calls creates verbose, error-prone generated code.
 
-**Why it happens:** State change triggers re-render, which replaces DOM including the focused input element.
+**Why it happens:** File upload has inherently more complex state than scalar form fields. The code generator creates per-field state variables, and for file fields this multiplies by 4-5x.
 
 **Consequences:**
-- Terrible UX - impossible to type continuously
-- Users blame the app for being "broken"
-- Forms become unusable
+- Generated form code for models with file fields becomes extremely verbose
+- State synchronization bugs (progress shows 100% but URL is still empty)
+- Edit forms must handle "existing file" vs "new file" vs "remove file" states
 
 **Warning signs:**
-- Input losing focus on every keystroke
-- `OnChange` handlers that call `Set()` immediately
-- Forms requiring "submit" instead of live updates
+- 20+ state variables for a form with 3 file fields
+- Inconsistent state during upload (file name shows but progress is at 0)
+- Edit form does not show the existing file, only the upload control
 
 **Prevention:**
-- Your `SetInChangeEvent` pattern is correct - suppress re-renders during change events
-- Use `SetQuiet()` for input values that don't need re-render
-- Batch state updates
-- Restore focus after necessary re-renders (your code does this)
+- Create a `FileFieldState` composite state type that encapsulates all file-related state in one object
+- The code generator should emit a single `fileState := UseFileState(r, "avatar")` instead of multiple state variables
+- The `FileUpload` UI component should accept this composite state and manage its internal sub-states
+- For edit forms, initialize `FileFieldState` with the existing file URL from the model data
+- The composite state should expose: `FileName() string`, `URL() string`, `IsUploading() bool`, `Progress() float64`, `Error() string`
 
-**Phase to address:** Already addressed in core - document pattern for component authors
-
-**Codebase evidence:** `core/dom_renderer.go` lines 80-92 and `core/router_wasm.go` implement this correctly with `SetInChangeEvent`.
+**Phase:** Code generation phase, designed alongside the UI component.
 
 ---
 
-## Go/WASM Specific Pitfalls
+### P10: Content-Type Validation Only on Client Side
 
-### GW-1: WASM Binary Size Explosion
+**What goes wrong:** The file upload UI validates file types (accept="image/*") but the server does not validate. An attacker can bypass the WASM UI entirely and send any file type to the upload endpoint, including executable files, HTML files (XSS vector), or SVG files with embedded JavaScript.
 
-**What goes wrong:** Standard Go WASM binaries are 5-15+ MB. Users on slow connections experience long load times. Mobile users may abandon the app.
-
-**Why it happens:** Go runtime, garbage collector, and standard library all compile into WASM. Even "Hello World" is several MB.
+**Why it happens:** Client-side validation is for UX (immediate feedback). Developers assume it is also security. It is not.
 
 **Consequences:**
-- Slow initial page loads (especially mobile)
-- High bandwidth costs
-- Poor Core Web Vitals scores
-- User abandonment
+- Stored XSS via uploaded SVG/HTML files served from the same origin
+- Malicious files stored on the server
+- If files are served with incorrect Content-Type or without Content-Disposition, browsers may execute them
 
 **Warning signs:**
-- `app.wasm` grows beyond 5MB
-- Page load times > 3 seconds on average connections
-- Adding features causes disproportionate size increases
+- File type validation only in the UI component props
+- Server endpoint accepts any file without checking Content-Type or file magic bytes
+- Uploaded files served without `Content-Disposition: attachment` header
 
 **Prevention:**
-- Use TinyGo for significantly smaller binaries (often 10x reduction)
-- Split into multiple bundles (you already support this with `WithBundle`)
-- Implement lazy loading for non-critical routes
-- Use Brotli compression (4.6MB -> 32MB typical ratio)
-- Monitor WASM size in CI
+- Server-side validation: check file extension, Content-Type header, AND file magic bytes (first few bytes of the file)
+- Serve uploaded files with `Content-Disposition: attachment` for non-image types
+- Serve images with explicit `Content-Type` (do not trust the uploaded Content-Type header)
+- For SVG files specifically: either strip JavaScript/event handlers, or serve with `Content-Type: image/svg+xml` and `Content-Security-Policy: sandbox`
+- The `BeforeUpload` lifecycle hook should be the place where server-side validation runs
+- Configure allowed file types per model field in `gux.config.json` and enforce on the server
 
-**Phase to address:** Phase 1 (Component Architecture) - establish size budgets
-
-**Codebase evidence:** `buildWasmBundle` already supports TinyGo. Multiple WASM bundles via `RouteGroup` with `WithBundle` is implemented.
-
-**Verified source:** [Dagger: Replaced React with Go](https://dagger.io/blog/replaced-react-with-go) - discusses their 32MB -> 4.6MB compression journey.
+**Phase:** Storage infrastructure phase. Server-side validation must exist before any upload endpoint is exposed.
 
 ---
 
-### GW-2: WASM Memory Never Released to OS
+## Minor Pitfalls
 
-**What goes wrong:** Go WASM allocates memory but never releases it back to the browser. Memory usage only ever increases.
+Mistakes that cause annoyance but are fixable without major rework.
 
-**Why it happens:** Known Go WASM limitation - memory blocks freed by GC aren't returned to the OS/browser.
+### P11: File Upload Progress Not Working During SSR Page Load
 
-**Consequences:**
-- Long-running SPAs accumulate memory
-- Browser eventually crashes or kills tab
-- Users must refresh to reclaim memory
-
-**Warning signs:**
-- Memory in DevTools grows over time
-- Tab marked as "high memory" by browser
-- App becomes sluggish after extended use
+**What goes wrong:** If a user navigates to a page while a file is uploading in the background, the SSR page load replaces the DOM, and the upload progress indicator disappears. The upload continues in the background but the user has no visibility.
 
 **Prevention:**
-- Be aware this is a known Go limitation
-- Consider page reloads for very long sessions
-- Minimize object allocation in render loops
-- Reuse allocations where possible
-- Monitor memory usage during development
+- File uploads should be page-independent (not tied to a specific component instance)
+- Consider a global upload manager that persists across page navigations
+- Or, simpler: disable navigation while uploads are in progress (show a warning dialog)
 
-**Phase to address:** Phase 4 (Data Display) - be careful with large data sets
-
-**Verified source:** [Go Issue #59061](https://github.com/golang/go/issues/59061) - WASM does not return memory to the OS.
+**Phase:** UI component phase, polish iteration.
 
 ---
 
-### GW-3: Goroutine Blocking Freezes Browser
+### P12: Image Preview Generates Full-Size Thumbnails in Browser
 
-**What goes wrong:** A goroutine blocks (channel wait, network call without callback pattern), the browser's event loop freezes, and the page becomes unresponsive.
-
-**Why it happens:** Go WASM runs on the browser's main thread. Blocking operations block the entire thread.
-
-**Consequences:**
-- Page freezes during data loading
-- Browser "unresponsive page" warnings
-- Poor user experience
-
-**Warning signs:**
-- Page freezes during network requests
-- Synchronous patterns from server-side Go code
-- Missing callback patterns in async operations
+**What goes wrong:** To show image previews before upload, developers read the full image with `FileReader.readAsDataURL` and display it in an `<img>` tag. For a 5MB photo, this creates a 5MB+ data URL string in memory, which combined with the original file data means ~15MB per image preview.
 
 **Prevention:**
-- All async operations must use callback patterns
-- Never block waiting for channels from user code
-- Your `AsyncStore[T]` and `api.X.List(callback)` patterns are correct
-- Always use goroutines for I/O: `go func() { ... callback() }()`
+- Use `URL.createObjectURL(file)` instead of `FileReader.readAsDataURL` for previews
+- `URL.createObjectURL` creates a reference to the file without copying its contents
+- Call `URL.revokeObjectURL` in the `OnUnmount` callback to free the blob reference
+- For server-side thumbnails (in list views), generate actual thumbnails on upload rather than serving full-size images
 
-**Phase to address:** Phase 2 (Core Components) - enforce async patterns
-
-**Codebase evidence:** `state/async.go` and generated API client use correct callback patterns.
-
-**Verified source:** [syscall/js documentation](https://pkg.go.dev/syscall/js) - "if one wrapped function blocks, JavaScript's event loop is blocked."
+**Phase:** UI component phase.
 
 ---
 
-### GW-4: wasm_exec.js Version Mismatch
+### P13: Multi-File Field Ordering Not Preserved
 
-**What goes wrong:** The `wasm_exec.js` file doesn't match the Go version used to compile WASM. WASM fails to load with cryptic errors.
-
-**Why it happens:** Go's WASM ABI changes between versions. The runtime shim must match.
-
-**Consequences:**
-- WASM fails to instantiate
-- Errors like "expected magic word 00 61 73 6d"
-- "Imports argument must be present" errors
-
-**Warning signs:**
-- WASM works locally but fails in production
-- Different Go versions in dev vs CI
-- Manual wasm_exec.js copies
+**What goes wrong:** When a model has a multi-file field (e.g., "Product Images"), the order of files matters to the user but is not preserved. Files are stored as a JSON array of URLs, but upload order may differ from display order, and there is no drag-to-reorder in the admin UI.
 
 **Prevention:**
-- Always copy wasm_exec.js from the same Go version used to compile
-- Your `copyWasmExec` function does this correctly
-- Pin Go version in CI/CD
-- Include Go version check in build process
+- Store multi-file fields as a JSON array with explicit ordering (`["img1.jpg", "img2.jpg"]`)
+- The admin UI should display files in array order and support reordering
+- Do not use a separate join table for multi-file fields unless there is metadata per file (caption, alt text)
+- Use GORM's JSON column type (the existing `StringList` type in modelgen.go is already suitable)
 
-**Phase to address:** Already addressed in build tooling
-
-**Codebase evidence:** `copyWasmExec` in `build.go` correctly sources from `go env GOROOT` or TinyGo.
+**Phase:** Multi-file support phase, after single file upload works.
 
 ---
 
-### GW-5: Reflection Performance in WASM
+### P14: Local Storage File Serving Conflicts with Route Patterns
 
-**What goes wrong:** Heavy use of `reflect` package in WASM is significantly slower than native Go. Components using reflection become sluggish.
-
-**Why it happens:** WASM has different performance characteristics than native code. Reflection is already slow; WASM makes it worse.
-
-**Consequences:**
-- Slow component rendering
-- Laggy UI interactions
-- Poor perceived performance
-
-**Warning signs:**
-- Components using `reflect.ValueOf`, `reflect.TypeOf` in render paths
-- Generic components with heavy type inspection
-- DTO conversion in hot paths
+**What goes wrong:** The local storage adapter serves files from a directory (e.g., `/uploads/`). If this path is registered as a static file handler, it may conflict with Gux's routing patterns, especially with the catch-all WASM routing that handles all paths for client-side navigation.
 
 **Prevention:**
-- Avoid reflection in render-critical code
-- Use code generation instead of runtime reflection where possible
-- Your DTO conversion in `crud.go` uses reflection - consider generating the mapping code
-- Cache reflect results where appropriate
+- Use a dedicated prefix for file serving (e.g., `/__gux_uploads/`) that matches the existing `/__gux_api/` convention
+- Register the file serving handler before the catch-all WASM handler
+- Ensure the file handler sets correct cache headers for uploaded files
+- For S3, this is not an issue (files are served from a different domain)
 
-**Phase to address:** Phase 4 (Data Display) - optimize if performance issues arise
-
-**Codebase evidence:** `core/crud.go` uses reflection for DTO mapping. The generated API code in `build.go` partially addresses this.
+**Phase:** Storage infrastructure phase.
 
 ---
 
-## Example App Pitfalls
+### P15: Delete Model Does Not Delete Associated Files
 
-### EX-1: Over-Engineered Starter Template
-
-**What goes wrong:** Starter app includes every feature: auth, admin panel, multi-tenant, i18n, payments, dark mode. Users spend more time removing code than building.
-
-**Why it happens:** Desire to showcase framework capabilities. "Look how much you can do!"
-
-**Consequences:**
-- Intimidating for beginners
-- Hard to understand what's essential
-- Features they don't need create maintenance burden
-- Difficult to strip down to basics
-
-**Warning signs:**
-- Starter has 50+ files
-- Multiple "optional" features that are actually required
-- README says "just delete what you don't need"
+**What goes wrong:** The existing `handleDelete` in `core/crud.go` (line 762) only calls `db.Delete(item)`. It does not know about file fields and will not delete the associated files from storage. Over time, storage fills with files from deleted records.
 
 **Prevention:**
-- Keep starter apps minimal: one page, one component, one data fetch
-- Show the framework, not a finished app
-- Put advanced features in separate example repos
-- "Remove code" should never be the first step
+- The `BeforeDelete` or `AfterDelete` lifecycle hook must handle file cleanup
+- The code generator should auto-generate delete hooks for models with file fields
+- The hook should read the model's file field values before deletion and call `storage.Delete(key)` for each
+- Handle errors gracefully: if file deletion fails, log the error but do not block the model deletion (prefer database consistency over storage consistency, then clean up orphans later)
 
-**Phase to address:** Phase 5 (Example Apps) - resist scope creep
-
----
-
-### EX-2: Examples That Don't Build
-
-**What goes wrong:** Example code in documentation/starters doesn't compile against current framework version. Missing imports, deprecated APIs, wrong versions.
-
-**Why it happens:** Examples are written once and not updated with framework changes.
-
-**Consequences:**
-- New users can't get started
-- Loss of trust in framework quality
-- Support burden from "it doesn't work" issues
-
-**Warning signs:**
-- No CI for example apps
-- Version numbers in examples don't match releases
-- Copy-paste from examples fails
-
-**Prevention:**
-- Include example apps in CI
-- Test examples against framework changes
-- Use monorepo or submodules to keep examples in sync
-- Pin versions explicitly in example go.mod
-
-**Phase to address:** Phase 5 (Example Apps) - implement from start
-
----
-
-### EX-3: Unrealistic Data Patterns
-
-**What goes wrong:** Examples use patterns that don't scale: in-memory arrays, hardcoded data, no pagination. Users copy these patterns into production.
-
-**Why it happens:** Real database setup adds friction. Simpler to show concepts without infrastructure.
-
-**Consequences:**
-- Users learn bad patterns
-- "Works in example, breaks at scale" issues
-- Must unlearn then relearn proper patterns
-
-**Warning signs:**
-- `var users = []User{...}` as fake database
-- List endpoints returning all records
-- No pagination, filtering, or error handling
-
-**Prevention:**
-- Use real database (SQLite is fine for examples)
-- Show pagination even for small datasets
-- Include error handling in all examples
-- Document why patterns matter, not just how
-
-**Phase to address:** Phase 5 (Example Apps) - use real patterns from start
-
-**Codebase evidence:** Current minimal example uses real SQLite + GORM. Good pattern to continue.
-
----
-
-### EX-4: Missing "Why" in Examples
-
-**What goes wrong:** Examples show *what* to do but not *why*. Users copy code without understanding, then can't adapt it.
-
-**Why it happens:** Tutorial writers focus on steps, assume context is obvious.
-
-**Consequences:**
-- Cargo culting of patterns
-- Can't debug when things go wrong
-- Can't adapt examples to real needs
-
-**Warning signs:**
-- Code comments describe *what*, not *why*
-- No explanation of architectural decisions
-- Users ask "why do I need this?" in issues
-
-**Prevention:**
-- Add comments explaining intent, not just syntax
-- Include "why" sections in READMEs
-- Show alternative approaches and tradeoffs
-- Link to deeper documentation for concepts
-
-**Phase to address:** Phase 5 (Example Apps) - documentation quality
-
----
-
-### EX-5: Framework Lock-in in Examples
-
-**What goes wrong:** Examples demonstrate framework-specific patterns that don't represent good Go patterns. Users learn "Gux Go" not "Go."
-
-**Why it happens:** Framework authors focus on their APIs, forget idiomatic Go.
-
-**Consequences:**
-- Skills don't transfer to other projects
-- Code becomes coupled to framework internals
-- Framework changes break user code
-
-**Warning signs:**
-- Core Go patterns replaced by framework abstractions
-- "You must use X, Y, Z" instead of showing options
-- No escape hatches to standard library
-
-**Prevention:**
-- Show idiomatic Go patterns, enhanced by framework
-- Don't hide standard library behind abstractions
-- Allow opt-out of framework features
-- Examples should teach Go, not just the framework
-
-**Phase to address:** Phase 5 (Example Apps) - design principle
-
----
-
-## Prevention Strategies
-
-### Strategy 1: Build Tag Discipline
-
-**Applies to:** CL-3, HY-4
-
-Create clear boundaries:
-```
-// Components return core.Node - no build tags needed
-func MyComponent(props Props) core.Node { ... }
-
-// Only platform code needs build tags
-//go:build js && wasm
-func attachEventHandlers(el js.Value) { ... }
-```
-
-### Strategy 2: State Type Safety
-
-**Applies to:** HY-1, HY-2
-
-Validate state roundtrips:
-```go
-// Test that state survives JSON serialization
-func TestStateRoundtrip(t *testing.T) {
-    original := MyState{Count: 42, Name: "test"}
-    json, _ := json.Marshal(original)
-    var restored MyState
-    json.Unmarshal(json, &restored)
-    assert.Equal(t, original, restored)
-}
-```
-
-### Strategy 3: WASM Resource Cleanup
-
-**Applies to:** CL-4, GW-2
-
-Track and release resources:
-```go
-type Component struct {
-    callbacks []js.Func
-}
-
-func (c *Component) OnClick(fn func()) {
-    cb := js.FuncOf(func(this js.Value, args []js.Value) any {
-        fn()
-        return nil
-    })
-    c.callbacks = append(c.callbacks, cb)
-    // ... attach to element
-}
-
-func (c *Component) Cleanup() {
-    for _, cb := range c.callbacks {
-        cb.Release()
-    }
-}
-```
-
-### Strategy 4: WASM Size Budget
-
-**Applies to:** GW-1
-
-Add to CI:
-```bash
-# Check WASM size doesn't exceed budget
-max_size=5000000  # 5MB
-actual_size=$(stat -f%z .gux/dist/app.wasm)
-if [ $actual_size -gt $max_size ]; then
-    echo "WASM size $actual_size exceeds budget $max_size"
-    exit 1
-fi
-```
-
-### Strategy 5: Example CI Validation
-
-**Applies to:** EX-2
-
-Include examples in CI:
-```yaml
-- name: Build example apps
-  run: |
-    cd examples/minimal && gux build
-    cd examples/marketing && gux build
-    cd examples/admin && gux build
-```
+**Phase:** CRUD integration phase.
 
 ---
 
 ## Phase-Specific Warnings
 
-| Phase | Pitfalls to Watch | Primary Risk |
-|-------|-------------------|--------------|
-| Component Architecture | CL-1, CL-3, HY-4, GW-1 | Wrong patterns get baked in |
-| Core Components | CL-2, CL-4, GW-3 | Inconsistent APIs, memory leaks |
-| Advanced Components | HY-3, GW-5 | Performance issues, complexity |
-| Data Display | GW-2, GW-5 | Memory growth, slow rendering |
-| Example Apps | EX-1 through EX-5 | Poor first impressions |
-
----
+| Phase Topic | Likely Pitfall | Mitigation |
+|-------------|---------------|------------|
+| Storage infrastructure | P1 (fetch Body is string-only), P2 (CSRF breaks), P8 (leaky abstraction) | Extend fetch package first; design storage interface with URL generation; test with CSRF enabled |
+| Security | P10 (client-only validation) | Server-side file type validation from day one; BeforeUpload hook runs before storage |
+| UI component | P3 (SSR panics), P7 (memory pressure), P12 (preview memory) | Build-tag separation; keep file bytes in JS land; use createObjectURL for previews |
+| CRUD integration | P4 (JSON-only CRUD), P5 (scalar-only codegen), P15 (delete orphans) | Decide upload-then-save vs multipart-aware CRUD early; extend codegen for file input types |
+| Code generation | P5 (no file input type), P9 (state explosion) | Composite FileFieldState; codegen emits file-specific form fields, detail views, list thumbnails |
+| Multi-file support | P6 (orphaned files), P13 (ordering) | Cleanup job for orphans; JSON array storage with ordering |
+| Polish | P11 (progress across navigation), P14 (route conflicts) | Dedicated upload URL prefix; navigation warnings during upload |
 
 ## Sources
 
-**Verified (HIGH confidence):**
-- [Go WASM Memory Leak Issue #74342](https://github.com/golang/go/issues/74342)
-- [Go Issue #59061 - WASM memory not returned](https://github.com/golang/go/issues/59061)
-- [syscall/js Package Documentation](https://pkg.go.dev/syscall/js)
-- [Dagger: Replaced React with Go](https://dagger.io/blog/replaced-react-with-go)
-- [Vike Hydration Mismatch Documentation](https://vike.dev/hydration-mismatch)
-- [Next.js Hydration Error Documentation](https://nextjs.org/docs/messages/react-hydration-error)
-
-**Codebase analysis (HIGH confidence):**
-- `/Users/dougbarrett/projects/dbb1dev/goquery/core/node.go` - Node abstraction pattern
-- `/Users/dougbarrett/projects/dbb1dev/goquery/core/dom_renderer.go` - Event handling, change event suppression
-- `/Users/dougbarrett/projects/dbb1dev/goquery/core/app.go` - State management, hydration
-- `/Users/dougbarrett/projects/dbb1dev/goquery/cmd/gux/build.go` - Build tooling, bundle support
-
-**Web research (MEDIUM confidence):**
-- [Go's Type System: Interfaces vs Generics](https://medium.com/@speedcraft21/gos-type-system-for-humans-interfaces-vs-generics-98f033a1f7ad)
-- [Five Challenges with WebAssembly, Go, TypeScript](https://doray.me/articles/five-challenges-when-using-webassembly-golang-typescript-h5lA2/)
-- [Component Library Mistakes](https://www.sencha.com/blog/top-mistakes-developers-make-when-using-react-ui-component-library-and-how-to-avoid-them/)
+- Codebase analysis: `fetch/fetch.go` (Body string limitation, CSRF injection), `core/csrf.go` (Double Submit Cookie pattern), `core/crud.go` (JSON-only create/update), `core/endpoint.go` (APIContext), `cmd/gux/modelgen.go` (form field code generation)
+- [Uploading files using fetch and FormData](https://muffinman.io/blog/uploading-files-using-fetch-multipart-form-data/) - Do not manually set Content-Type
+- [Fix uploading files using fetch and multipart/form-data](https://thevalleyofcode.com/fix-formdata-multipart-fetch/) - Browser must set boundary
+- [Spring Security CSRF documentation](https://docs.spring.io/spring-security/reference/servlet/exploits/csrf.html) - Multipart + CSRF chicken-and-egg problem
+- [Handling Large File Uploads in Go with AWS S3](https://dev.to/neelp03/handling-large-file-uploads-in-go-with-aws-s3-stream-like-a-pro-3dle) - Streaming uploads, memory management
+- [Django Forum: Orphaned uploaded files](https://forum.djangoproject.com/t/correct-way-to-handle-orphaned-image-files-and-other-files/11903) - Cleanup strategies
+- [Caspio Orphan File Cleanup](https://howto.caspio.com/files-and-images/orphan-file-cleanup/) - Background cleanup approach
+- [Go Wiki: WebAssembly](https://go.dev/wiki/WebAssembly) - WASM limitations and fetch mapping

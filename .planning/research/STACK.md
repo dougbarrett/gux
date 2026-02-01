@@ -1,262 +1,210 @@
-# Stack Research: Gux Component Library + Example Apps
+# Technology Stack: File Upload System
 
-**Project:** Gux - Go Full-Stack Framework
-**Dimension:** Stack additions for component library and example applications
-**Researched:** 2026-01-22
+**Project:** Gux File Upload System
+**Researched:** 2026-02-01
 **Overall Confidence:** HIGH
 
 ## Executive Summary
 
-Gux already has a solid foundation with comprehensive components in `components/` and core rendering in `core/`. The existing stack is well-suited for the component library and example apps - **no major additions are required**. The key findings:
+The file upload system requires only **two new direct dependencies** (AWS SDK v2 for S3, rs/xid for file IDs). Everything else uses Go standard library or extends existing Gux infrastructure. The key architectural decision is to build a thin storage abstraction interface owned by Gux (not a third-party abstraction) with two backends: local filesystem (default, zero deps) and S3 (opt-in). On the WASM side, the upload component uses `XMLHttpRequest` via `syscall/js` rather than extending the existing `fetch` package, because the Fetch API does not support upload progress events.
 
-1. **Keep the current approach** - The existing component pattern (returning `js.Value` directly) and core Node system work well together
-2. **No external chart libraries needed** - SVG-based charts already exist in `components/charts.go` and avoid JS interop overhead
-3. **Form validation is already implemented** - `components/form.go` has validation rules; no need for `go-playground/validator`
-4. **Tailwind via CDN is acceptable for development** - Consider build-time CSS generation for production optimization
+## Recommended Stack
 
-## Current Stack (No Changes Needed)
+### Storage Abstraction (Server-Side)
 
-| Technology | Version | Purpose | Status |
-|------------|---------|---------|--------|
-| Go | 1.24.3 | Core language | Keep |
-| GORM | 1.31.1 | Database ORM | Keep |
-| SQLite | via go-sqlite3 | Development database | Keep |
-| Gorilla WebSocket | 1.5.3 | Hot reload | Keep |
-| Tailwind CSS | CDN (v3) | Styling | Keep, see optimization notes |
+| Technology | Version | Purpose | Why |
+|------------|---------|---------|-----|
+| Go `io` / `os` stdlib | Go 1.24.3 | Local filesystem storage | Zero dependencies. `io.Reader`/`io.Writer` interfaces are the foundation for any storage abstraction. Local FS is the default backend. |
+| `aws-sdk-go-v2/service/s3` | v1.96.0+ | S3 storage backend | Official AWS SDK. V1 reached EOL July 2025 -- must use V2. Works with any S3-compatible service (MinIO, DigitalOcean Spaces, Backblaze B2, Cloudflare R2). |
+| `aws-sdk-go-v2/config` | latest | AWS credential loading | Auto-discovers credentials from env, config files, IAM roles. Required companion to s3 service package. |
+| `aws-sdk-go-v2/feature/s3/manager` | v1.21.0+ | Multipart upload/download | Handles chunked uploads for large files (>5MB), concurrent part uploads, automatic retry. v1.21.0 optimized memory for single uploads. |
 
-## Recommended Additions
+**Why NOT MinIO Go SDK (`minio-go` v7.0.98):** While minio-go provides a simpler API, the AWS SDK v2 is the canonical S3 implementation. Using it means zero translation layer for AWS-native features (presigned URLs, SSE, lifecycle policies). Any S3-compatible provider works with the AWS SDK via custom endpoint configuration. Adding minio-go would be a second S3 client with no benefit.
 
-### 1. Production CSS Build (Optional, Post-MVP)
+**Why NOT third-party storage abstractions (`stow`, `go-storage`, `dstore`):** These add multi-cloud abstraction layers Gux does not need. The storage interface should be defined by Gux itself (a simple `Store` interface with `Put`/`Get`/`Delete`/`URL` methods). Two backends (local FS + S3) are sufficient. Adding a third-party abstraction constrains the interface design and adds dependency weight for no gain.
 
-**What:** Tailwind CSS CLI for production builds
-**Version:** v4.0+ (latest as of Jan 2026)
-**Why:** Current CDN approach works but has drawbacks:
-- Requires internet connection
-- Loads full Tailwind (~300KB)
-- No tree-shaking
+### File Naming / ID Generation
 
-**When to add:** After example apps are feature-complete, before production deployment.
+| Technology | Version | Purpose | Why |
+|------------|---------|---------|-----|
+| `github.com/rs/xid` | v1.6.0 | Unique storage path generation | 20-char, URL-safe, sortable (time-ordered), no hyphens, all lowercase alphanumeric. Better than UUID for file paths: shorter, sortable, filename-safe. |
 
-**Installation:**
+**Why NOT `google/uuid` (v1.6.0):** UUIDs are 36 chars with hyphens, not time-sortable. For storage paths, xid produces cleaner results (e.g., `cv1k7p6d7hs000a3q8cg.jpg` vs `550e8400-e29b-41d4-a716-446655440000.jpg`). Sortability aids debugging and log correlation.
+
+**Why NOT `crypto/rand` + encoding:** Reimplementing ID generation is unnecessary when xid is battle-tested and purpose-built.
+
+### Multipart Form Handling (Server-Side)
+
+| Technology | Version | Purpose | Why |
+|------------|---------|---------|-----|
+| Go `mime/multipart` stdlib | Go 1.24.3 | Parse multipart file uploads | `http.Request.ParseMultipartForm()` and `http.Request.FormFile()` are the canonical approach. No library needed. |
+| Go `net/http` stdlib | Go 1.24.3 | Request size limits, file serving | `http.MaxBytesReader` for upload size limits. `http.ServeFile` / `http.FileServer` for serving stored files. |
+| Go `mime` stdlib | Go 1.24.3 | MIME type detection | `mime.TypeByExtension()` and `http.DetectContentType()` for file type validation (content sniffing). |
+| Go `path/filepath` stdlib | Go 1.24.3 | Safe path construction | Path sanitization for local filesystem storage. Prevents directory traversal attacks. |
+
+### Image Validation (Server-Side)
+
+| Technology | Version | Purpose | Why |
+|------------|---------|---------|-----|
+| Go `image` stdlib | Go 1.24.3 | Image format detection, dimension reading | Already an indirect dependency (`golang.org/x/image` v0.24.0 in go.mod). Decode image headers for validation without loading full image into memory. |
+
+**Thumbnail generation is DEFERRED.** Rationale: Thumbnails (resize, crop) are a significant feature that should be a separate milestone. For the initial upload system, image validation (format, dimensions) using stdlib is sufficient. When thumbnails are needed later, `disintegration/imaging` (v1.6.2, pure Go, no CGO) is the recommended choice.
+
+**Why NOT `bimg` or `imagor`:** Both require libvips (CGO). Conflicts with Gux's simplicity goals and complicates cross-compilation.
+
+### WASM File Upload (Client-Side)
+
+| Technology | Version | Purpose | Why |
+|------------|---------|---------|-----|
+| `syscall/js` (Go stdlib) | Go 1.24.3 | Browser File API access, drag-drop events, XMLHttpRequest for progress | The existing pattern in `fetch/fetch.go` and `ui/video_player_wasm.go` proves this approach. |
+
+**Critical design decision: XMLHttpRequest, not Fetch API.** The browser Fetch API does not support upload progress events. `XMLHttpRequest.upload.onprogress` is the only way to track upload progress in the browser. The upload component uses XHR directly via `syscall/js` for progress tracking.
+
+**The existing `fetch` package does NOT need modification.** Its `Body` field is `string`-typed (JSON-focused). File uploads use a separate code path (XHR via syscall/js in the upload component). This avoids breaking existing API contracts.
+
+### CRUD Integration (Code Generation)
+
+| Technology | Version | Purpose | Why |
+|------------|---------|---------|-----|
+| Go `text/template` stdlib | Go 1.24.3 | Generate upload endpoint code | Already used by `cmd/gux/` for code generation. File field support extends existing templates. |
+| `gux.config.json` (existing) | N/A | Model field configuration | Add `"input": "file"` and `"input": "image"` field types. Consistent with existing `"input": "email"`, `"input": "select"`. |
+
+No new dependencies for code generation.
+
+## Complete New Dependencies
+
 ```bash
-# Node-based (recommended)
-npm install -D tailwindcss@latest
+# Storage - S3 backend (opt-in, only needed if using S3)
+go get github.com/aws/aws-sdk-go-v2
+go get github.com/aws/aws-sdk-go-v2/config
+go get github.com/aws/aws-sdk-go-v2/service/s3
+go get github.com/aws/aws-sdk-go-v2/feature/s3/manager
 
-# Or standalone CLI (no Node required)
-curl -sLO https://github.com/tailwindlabs/tailwindcss/releases/latest/download/tailwindcss-macos-arm64
-chmod +x tailwindcss-macos-arm64
+# File naming (always needed)
+go get github.com/rs/xid
 ```
 
-**Confidence:** HIGH - [Tailwind v4 documentation](https://tailwindcss.com/docs/upgrade-guide) confirms CSS-first configuration and standalone CLI.
+**Total new direct dependencies: 2** (AWS SDK v2, xid).
 
-### 2. WASM Size Optimization (Production)
+**S3 dependencies are opt-in at runtime.** The storage interface is designed so local filesystem is the default with zero additional imports. Users who configure S3 pull in AWS SDK; those who use local storage do not.
 
-**What:** TinyGo compiler + wasm-opt
-**Version:** TinyGo 0.40.1, wasm-opt (Binaryen) latest
-**Why:** Standard Go WASM binaries are large (~2-5MB). TinyGo can reduce to ~100-500KB.
+## Alternatives Considered
 
-**Trade-offs:**
-- TinyGo has limited standard library support
-- May require code adjustments (avoid `fmt`, `reflect` in WASM)
-- Current architecture uses `syscall/js` which TinyGo supports
-
-**When to add:** After core components are stable, as optimization pass.
-
-**Installation:**
-```bash
-# TinyGo
-brew install tinygo
-
-# wasm-opt (Binaryen)
-brew install binaryen
-```
-
-**Build command:**
-```bash
-tinygo build -o app.wasm -target=wasm -no-debug ./main.go
-wasm-opt -Oz -o app-opt.wasm app.wasm
-```
-
-**Confidence:** HIGH - [TinyGo WASM guide](https://tinygo.org/docs/guides/webassembly/wasm/) and [Binaryen optimization](https://github.com/WebAssembly/binaryen)
+| Category | Recommended | Alternative | Why Not |
+|----------|-------------|-------------|---------|
+| S3 Client | AWS SDK Go v2 | MinIO Go SDK (minio-go v7) | Second S3 client adds no value; AWS SDK works with all S3-compatible services |
+| Storage Abstraction | Custom `Store` interface | stow / go-storage / dstore | Unnecessary third-party layer; 2 backends don't justify it |
+| File IDs | rs/xid | google/uuid | UUID is longer (36 vs 20 chars), not sortable, has hyphens |
+| File IDs | rs/xid | crypto/rand + custom encoding | Reinventing what xid does well |
+| Image Thumbnails | Defer to future milestone | disintegration/imaging now | Separate concern; complexity can wait |
+| Image Thumbnails | N/A (deferred) | bimg / imagor (libvips) | CGO dependency conflicts with simplicity goals |
+| WASM Upload | XMLHttpRequest via syscall/js | Extend fetch package with FormData | XHR provides upload progress events; Fetch API does not |
+| Multipart Parsing | Go stdlib | third-party form parsers | Stdlib is complete for this use case |
+| MIME Detection | `http.DetectContentType` + `mime.TypeByExtension` | filetype library | Stdlib content sniffing reads first 512 bytes, sufficient for common types |
 
 ## Integration Points with Existing Stack
 
-### Component Library + Core Node System
+### core/crud.go
 
-The existing patterns work well together. Two approaches coexist:
+The `CRUDModel` struct gains file field metadata:
 
-1. **`core/` Node-based components** - Return `core.Node`, render to HTML (SSR) or DOM (WASM)
-   ```go
-   func MyComponent(attrs core.Attrs) core.Node {
-       return core.Div(attrs, core.Text("Hello"))
-   }
-   ```
-
-2. **`components/` WASM-only components** - Return `js.Value` directly
-   ```go
-   func Button(props ButtonProps) js.Value {
-       btn := document.Call("createElement", "button")
-       // ...
-       return btn
-   }
-   ```
-
-**Recommendation:** The component library should use **approach #1** (core Node system) for SSR support. WASM-only components like modals, tooltips can continue with approach #2.
-
-### Tailwind Integration
-
-Current approach in `components/tailwind.go`:
 ```go
-script.Set("src", "https://cdn.tailwindcss.com")
+type CRUDModel struct {
+    // ... existing fields ...
+    FileFields []FileFieldConfig // NEW: which fields are file uploads
+}
+
+type FileFieldConfig struct {
+    FieldName    string   // e.g., "Image", "Document"
+    MaxSize      int64    // bytes
+    AllowedTypes []string // e.g., ["image/jpeg", "image/png"]
+    StoragePath  string   // prefix path in storage
+}
 ```
 
-This works for development. For production:
-1. Extract used classes from Go source
-2. Generate minimal CSS with Tailwind CLI
-3. Embed in Go binary or serve as static file
+CRUD create/update handlers switch from JSON-only to multipart/form-data when file fields are present. File deletion hook fires when models with file fields are deleted.
 
-**No changes needed for component library development.**
+### core/app.go
 
-### Chart/Visualization (Already Complete)
+The `App` struct gains a `store` field:
 
-The existing `components/charts.go` provides:
-- `BarChart` (horizontal/vertical)
-- `LineChart` (SVG-based)
-- `PieChart` / `DonutChart`
-- `Sparkline` (in `sparkline.go`)
-
-**Why this is better than external libraries:**
-- No JavaScript dependency
-- No WASM<->JS interop overhead (syscall/js calls are slow)
-- Pure SVG renders on both SSR and WASM
-- Smaller bundle size
-
-**Confidence:** HIGH - Verified by reading existing implementation.
-
-### Form Handling (Already Complete)
-
-The existing `components/form.go` provides:
-- `ValidationRule` type with built-in rules (Required, Email, MinLength, MaxLength, Pattern)
-- `Form` component with field validation
-- Error display with accessibility (ARIA attributes)
-- Server-side error injection via `SetFieldError`
-
-**Why NOT add go-playground/validator:**
-- It's designed for server-side struct validation
-- Would add dependency without benefit for WASM client-side forms
-- Current regex-based validation is WASM-compatible
-- Server validation should happen in CRUD hooks, not client
-
-**Confidence:** HIGH - Verified by reading existing implementation.
-
-## NOT Recommended
-
-### External Chart Libraries
-
-| Library | Why Not |
-|---------|---------|
-| Chart.js | Requires JS interop, adds ~200KB, syscall/js overhead |
-| go-echarts | Server-side only, generates static HTML, no interactivity |
-| Plotters (Rust) | Wrong language, would need embedding |
-
-**Existing SVG charts are sufficient** for dashboards. They're lightweight, SSR-compatible, and avoid JS interop performance issues.
-
-### Heavy Validation Libraries
-
-| Library | Why Not |
-|---------|---------|
-| go-playground/validator v10 | Server-side focused, reflection-heavy, unnecessary in WASM |
-| ozzo-validation | Same issues |
-
-**Client-side validation needs:**
-- Simple string checks (length, pattern, required)
-- Already implemented in `components/form.go`
-
-**Server-side validation needs:**
-- Should happen in CRUD hooks (already supported)
-- Can use validator library there if needed (server code, not WASM)
-
-### DaisyUI / Headless UI
-
-| Library | Why Not |
-|---------|---------|
-| DaisyUI | CSS-only, but requires Tailwind plugin config; adds complexity |
-| Headless UI | React/Vue focused, no Go support |
-
-**Gux already has styled components.** Adding another component library creates inconsistency and maintenance burden.
-
-### gotailwindcss (Pure Go Tailwind)
-
-| Library | Why Not |
-|---------|---------|
-| gotailwindcss | Incomplete implementation, not actively maintained |
-
-**Use official Tailwind CLI** for production builds when needed.
-
-## WASM Size Considerations
-
-Current WASM binary considerations:
-
-| Factor | Impact | Mitigation |
-|--------|--------|------------|
-| `fmt` package | +400KB | Use `strconv` for number formatting |
-| `reflect` package | +200KB | Unavoidable for routing state |
-| `regexp` package | +100KB | Used for validation; acceptable |
-| Standard Go runtime | +1-2MB | TinyGo for production |
-
-**For development:** Standard Go compiler is fine, fast iteration is more valuable.
-
-**For production:** Consider TinyGo + wasm-opt for 60-80% size reduction.
-
-## Example App Technology Choices
-
-For the four example apps, use the existing stack:
-
-| App | Database | Auth | Special Needs |
-|-----|----------|------|---------------|
-| Marketing | None | None | Static pages, SEO (SSR handles this) |
-| SaaS Dashboard | SQLite | Session-based | Charts (existing), tables (existing) |
-| Admin Panel | SQLite | Session-based | CRUD (existing), forms (existing) |
-| Auth Flows | SQLite | Sessions + CSRF | Login/register forms (existing) |
-
-**No additional libraries needed.**
-
-## Versions Summary
-
-| Component | Current | Recommended | Notes |
-|-----------|---------|-------------|-------|
-| Go | 1.24.3 | Keep | Latest stable |
-| GORM | 1.31.1 | Keep | Works well |
-| Tailwind | CDN v3 | v4.0 CLI (production only) | CSS-first config in v4 |
-| TinyGo | - | 0.40.1 (production only) | WASM optimization |
-| wasm-opt | - | Latest (production only) | Binary size reduction |
-
-## Installation Commands (When Needed)
-
-```bash
-# Production CSS (when ready)
-npm init -y
-npm install -D tailwindcss@latest
-
-# WASM optimization (when ready)
-brew install tinygo binaryen
+```go
+type App struct {
+    // ... existing fields ...
+    store Storage // Storage backend (local FS default)
+}
 ```
+
+New configuration: `app.SetStorage(store)` or option in `core.New()`. Static file serving route auto-registered for local storage (e.g., `/uploads/` maps to upload directory).
+
+### fetch/fetch.go
+
+**No changes needed.** The upload component handles its own HTTP via XMLHttpRequest for progress support. The existing fetch package remains JSON-focused.
+
+### cmd/gux/ (Code Generation)
+
+- `gux.config.json` parser recognizes `"input": "file"` and `"input": "image"` field types
+- Model generation: file fields become `string` in Go model (storing file path/URL)
+- DTO generation: file fields include the resolved URL for reads
+- Admin page generation: file fields render `ui.FileUpload` component
+- API generation: endpoints with file fields use multipart instead of JSON
+
+### ui/ (Component Library)
+
+New `ui.FileUpload` component following existing patterns:
+
+- Props struct pattern (like `ui.VideoPlayerProps`)
+- SSR build: renders static `<input type="file">` for progressive enhancement
+- WASM build: drag-drop via `syscall/js`, progress via XHR, file preview
+- Platform split files: `file_upload.go`, `file_upload_wasm.go`, `file_upload_stub.go`
+
+### GORM Schema
+
+File metadata stored as simple string columns (path or URL), not separate tables:
+
+```go
+type Product struct {
+    gorm.Model
+    Name  string
+    Image string // "uploads/cv1k7p6d7hs000a3q8cg.jpg" or full S3 URL
+}
+```
+
+For multiple files per field, use a child model with existing CRUD parent-child pattern. Start with single-file fields only.
+
+## What NOT to Add
+
+| Do Not Add | Why |
+|------------|-----|
+| `tus` (resumable upload protocol) | Over-engineered for initial implementation. Standard multipart is sufficient. Add later if large file uploads become a requirement. |
+| `blurhash` / placeholder generation | Nice-to-have, not table stakes. Defer to thumbnail milestone. |
+| Virus scanning / file analysis | Enterprise feature. Document as a hook point (BeforeUpload) but do not implement. |
+| Client-side image resizing | Adds WASM binary size. Server-side processing (deferred) is the right approach. |
+| Presigned URL uploads (direct-to-S3) | Optimization for high traffic. Start with server-proxied uploads for simplicity. Can be added as enhancement later. |
+| CDN integration | Deployment concern, not framework concern. Document URL rewriting pattern. |
 
 ## Sources
 
-- [TinyGo Releases](https://github.com/tinygo-org/tinygo/releases) - v0.40.1 latest
-- [TinyGo WASM Guide](https://tinygo.org/docs/guides/webassembly/wasm/)
-- [Tailwind CSS v4](https://tailwindcss.com/blog/tailwindcss-v4) - CSS-first configuration
-- [syscall/js Performance](https://github.com/golang/go/issues/32591) - Known overhead issues
-- [Binaryen wasm-opt](https://github.com/WebAssembly/binaryen) - WASM optimization
-- [go-playground/validator](https://github.com/go-playground/validator) - v10.30.1 latest (not recommended for WASM)
+- [AWS SDK for Go v2 - S3 package](https://pkg.go.dev/github.com/aws/aws-sdk-go-v2/service/s3) - v1.96.0+, published Jan 28, 2026
+- [AWS SDK for Go v2 - S3 Transfer Manager](https://pkg.go.dev/github.com/aws/aws-sdk-go-v2/feature/s3/manager) - v1.21.0, memory optimization for single uploads
+- [AWS SDK for Go v2 - S3 Code Examples](https://docs.aws.amazon.com/code-library/latest/ug/go_2_s3_code_examples.html)
+- [AWS SDK Go v1 EOL](https://github.com/aws/aws-sdk-go/releases) - V1 end-of-life July 31, 2025
+- [MinIO Go SDK](https://github.com/minio/minio-go) - v7.0.98, Jan 2026 (considered, not recommended)
+- [rs/xid](https://pkg.go.dev/github.com/rs/xid) - v1.6.0, Aug 2024
+- [google/uuid](https://pkg.go.dev/github.com/google/uuid) - v1.6.0 (considered, not recommended)
+- [disintegration/imaging](https://pkg.go.dev/github.com/disintegration/imaging) - v1.6.2 (deferred for future thumbnail milestone)
+- [Go WASM File Input](https://donatstudios.com/Read-User-Files-With-Go-WASM) - Pattern for browser File API via syscall/js
+- [Go Multipart Upload](https://www.slingacademy.com/article/using-multipart-requests-for-file-uploads-in-go/) - stdlib multipart handling patterns
+- [S3 Upload Guide with SDK v2](https://www.buanacoding.com/2025/10/how-to-upload-files-to-aws-s3-in-go-with-sdk-v2.html) - Presigned URLs, multipart, production patterns
 
 ## Confidence Assessment
 
 | Area | Confidence | Reason |
 |------|------------|--------|
-| Keep existing stack | HIGH | Verified by code review of existing components |
-| No chart library needed | HIGH | Existing SVG charts verified functional |
-| No validation library needed | HIGH | Existing form validation verified complete |
-| TinyGo for production | MEDIUM | Requires testing with actual codebase |
-| Tailwind CLI for production | HIGH | Well-documented, straightforward migration |
+| AWS SDK v2 for S3 | HIGH | Official docs verified, pkg.go.dev version confirmed, actively maintained (Jan 2026 release) |
+| rs/xid for file IDs | HIGH | pkg.go.dev verified, well-established, API is stable |
+| Go stdlib for multipart/MIME | HIGH | Standard library, battle-tested, no version concerns |
+| XMLHttpRequest for WASM upload progress | MEDIUM | Standard browser API, proven pattern, but Go/WASM XHR progress handling is less documented than Fetch. Needs validation during implementation. |
+| Existing fetch package -- no changes | HIGH | Read source code directly; string-only Body field confirms separate upload path needed |
+| GORM string columns for file paths | HIGH | Standard pattern, consistent with existing model/DTO architecture |
+| Code generation integration | HIGH | Read existing cmd/gux/ tooling; extending config schema and templates is straightforward |
