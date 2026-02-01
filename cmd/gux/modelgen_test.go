@@ -1239,3 +1239,90 @@ func TestPrepareModelTemplateData_ConfigPointerTypeWorks(t *testing.T) {
 		}
 	}
 }
+
+// TestAuthPresetPasswordField verifies that auth preset models get a virtual
+// Password field injected into forms (#65).
+func TestAuthPresetPasswordField(t *testing.T) {
+	model := ModelDefinition{
+		Name:   "User",
+		Preset: "auth",
+		Sections: map[string][]ModelField{
+			"Account": {
+				{Name: "Email", Type: "string", Required: true, Table: true, Input: "email"},
+				{Name: "Name", Type: "string", Required: true, Table: true},
+				{Name: "Role", Type: "string", Table: true, Input: "select"},
+			},
+		},
+	}
+
+	data := prepareModelTemplateData(&model, "myapp", nil, nil, nil)
+
+	// Check that Password field was injected
+	var passwordField *TemplateField
+	for i, tf := range data.AllFields {
+		if tf.Name == "Password" {
+			passwordField = &data.AllFields[i]
+			break
+		}
+	}
+
+	if passwordField == nil {
+		t.Fatal("Password field not found in AllFields for auth preset model")
+	}
+
+	if !passwordField.FormOnly {
+		t.Error("Password field should be FormOnly=true")
+	}
+
+	if passwordField.DetailField != "" {
+		t.Error("Password field should have empty DetailField")
+	}
+
+	if passwordField.EditStateInit != `""` {
+		t.Errorf("Password EditStateInit = %q, want empty string literal", passwordField.EditStateInit)
+	}
+
+	if !strings.Contains(passwordField.FormField, "password") {
+		t.Errorf("Password FormField should contain 'password' input type, got: %s", passwordField.FormField)
+	}
+
+	// Check Password is in the first section's fields
+	if len(data.Sections) == 0 {
+		t.Fatal("expected at least one section")
+	}
+	found := false
+	for _, tf := range data.Sections[0].Fields {
+		if tf.Name == "Password" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("Password field not found in first section")
+	}
+}
+
+// TestAuthPresetPasswordFieldNotInDTO verifies that FormOnly fields are excluded
+// from non-auth models and that normal models don't get the password field.
+func TestNonAuthModelNoPasswordField(t *testing.T) {
+	model := ModelDefinition{
+		Name: "Product",
+		Sections: map[string][]ModelField{
+			"Info": {
+				{Name: "Name", Type: "string", Required: true, Table: true},
+				{Name: "Price", Type: "float64", Table: true},
+			},
+		},
+	}
+
+	data := prepareModelTemplateData(&model, "myapp", nil, nil, nil)
+
+	for _, tf := range data.AllFields {
+		if tf.Name == "Password" {
+			t.Error("non-auth model should not have a Password field")
+		}
+		if tf.FormOnly {
+			t.Errorf("non-auth model should not have FormOnly fields, found: %s", tf.Name)
+		}
+	}
+}

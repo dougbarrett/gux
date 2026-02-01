@@ -107,8 +107,8 @@ type {{.Name}}List struct {
 	DTODetail: `// {{.Name}}Detail is the DTO for single {{.NameLower}} responses.
 type {{.Name}}Detail struct {
 	ID uint ` + "`" + `json:"id" gux:"{{.Name}}.ID"` + "`" + `
-{{range .AllFields}}	{{.Name}} {{.DTOType}} ` + "`" + `json:"{{.JSONName}}" gux:"{{$.Name}}.{{.Name}}"{{if .Preload}} preload:"{{.Preload}}"{{end}}` + "`" + `
-{{end}}	CreatedAt time.Time ` + "`" + `json:"created_at" gux:"{{.Name}}.CreatedAt"` + "`" + `
+{{range .AllFields}}{{if not .FormOnly}}	{{.Name}} {{.DTOType}} ` + "`" + `json:"{{.JSONName}}" gux:"{{$.Name}}.{{.Name}}"{{if .Preload}} preload:"{{.Preload}}"{{end}}` + "`" + `
+{{end}}{{end}}	CreatedAt time.Time ` + "`" + `json:"created_at" gux:"{{.Name}}.CreatedAt"` + "`" + `
 	UpdatedAt time.Time ` + "`" + `json:"updated_at" gux:"{{.Name}}.UpdatedAt"` + "`" + `
 }
 `,
@@ -1589,6 +1589,7 @@ type TemplateField struct {
 	IsPointer            bool // True if the field type is a pointer (e.g., *string, *float64)
 	IsDisplayField       bool // True if this is the display field (should be clickable link)
 	FullWidth            bool // Span full width in grid layout
+	FormOnly             bool // True for virtual fields that only appear in forms (e.g., password)
 	Badge          *BadgeConfig
 }
 
@@ -2057,6 +2058,27 @@ func prepareModelTemplateData(model *ModelDefinition, modulePath string, display
 			Fields: sectionFields,
 		})
 		data.SectionedFields[sectionName] = sectionFields
+	}
+
+	// Inject virtual Password field for auth models
+	if model.Preset == "auth" {
+		passwordField := &ModelField{
+			Name:     "Password",
+			Type:     "string",
+			Input:    "password",
+			Required: true,
+		}
+		pwTf := convertToTemplateField(passwordField, model.Name, displayFields)
+		pwTf.FormOnly = true
+		pwTf.DetailField = ""    // Don't show in detail views
+		pwTf.EditStateInit = `""` // Password is always empty on edit (user provides new one)
+		data.AllFields = append(data.AllFields, pwTf)
+		// Add to the first section
+		if len(data.Sections) > 0 {
+			data.Sections[0].Fields = append(data.Sections[0].Fields, pwTf)
+			firstSectionName := data.Sections[0].Name
+			data.SectionedFields[firstSectionName] = data.Sections[0].Fields
+		}
 	}
 
 	data.FieldCount = len(data.AllFields)
