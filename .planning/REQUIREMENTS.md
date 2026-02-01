@@ -27,16 +27,16 @@ Requirements for v2.4 milestone. Each maps to roadmap phases.
 
 ### Upload UI Component
 
-- [ ] **UICM-01**: User can click to browse and select a file for upload
-- [ ] **UICM-02**: User can drag and drop a file onto the upload zone
-- [ ] **UICM-03**: User sees a progress indicator during file upload
-- [ ] **UICM-04**: User sees client-side validation errors for disallowed file types before upload starts
-- [ ] **UICM-05**: User sees client-side validation errors for oversized files before upload starts
-- [ ] **UICM-06**: User sees an image preview after selecting an image file (before upload)
-- [ ] **UICM-07**: User can remove or replace an existing uploaded file
-- [ ] **UICM-08**: Component renders a static upload zone in SSR (no browser API calls)
-- [ ] **UICM-09**: Component hydrates with full interactivity in WASM (drag-drop, progress, preview)
-- [ ] **UICM-10**: File bytes stay in JavaScript land during upload (not copied into Go WASM memory)
+- [x] **UICM-01**: User can click to browse and select a file for upload
+- [x] **UICM-02**: User can drag and drop a file onto the upload zone
+- [x] **UICM-03**: User sees a progress indicator during file upload
+- [x] **UICM-04**: User sees client-side validation errors for disallowed file types before upload starts
+- [x] **UICM-05**: User sees client-side validation errors for oversized files before upload starts
+- [x] **UICM-06**: User sees an image preview after selecting an image file (before upload)
+- [x] **UICM-07**: User can remove or replace an existing uploaded file
+- [x] **UICM-08**: Component renders a static upload zone in SSR (no browser API calls)
+- [x] **UICM-09**: Component hydrates with full interactivity in WASM (drag-drop, progress, preview)
+- [x] **UICM-10**: File bytes stay in JavaScript land during upload (not copied into Go WASM memory)
 
 ### Multi-File Support
 
@@ -126,16 +126,16 @@ Which phases cover which requirements. Updated during roadmap creation.
 | UPLD-04 | Phase 29 | Complete |
 | UPLD-05 | Phase 29 | Complete |
 | UPLD-06 | Phase 29 | Complete |
-| UICM-01 | Phase 30 | Pending |
-| UICM-02 | Phase 30 | Pending |
-| UICM-03 | Phase 30 | Pending |
-| UICM-04 | Phase 30 | Pending |
-| UICM-05 | Phase 30 | Pending |
-| UICM-06 | Phase 30 | Pending |
-| UICM-07 | Phase 30 | Pending |
-| UICM-08 | Phase 30 | Pending |
-| UICM-09 | Phase 30 | Pending |
-| UICM-10 | Phase 30 | Pending |
+| UICM-01 | Phase 30 | Complete |
+| UICM-02 | Phase 30 | Complete |
+| UICM-03 | Phase 30 | Complete |
+| UICM-04 | Phase 30 | Complete |
+| UICM-05 | Phase 30 | Complete |
+| UICM-06 | Phase 30 | Complete |
+| UICM-07 | Phase 30 | Complete |
+| UICM-08 | Phase 30 | Complete |
+| UICM-09 | Phase 30 | Complete |
+| UICM-10 | Phase 30 | Complete |
 | CRUD-01 | Phase 31 | Pending |
 | CRUD-02 | Phase 31 | Pending |
 | CRUD-03 | Phase 31 | Pending |
@@ -167,4 +167,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-02-01*
-*Last updated: 2026-02-01 after phase 29 completion*
+*Last updated: 2026-02-01 after phase 30 completion*

@@ -129,7 +129,7 @@ Full details: [milestones/v2.3-ROADMAP.md](milestones/v2.3-ROADMAP.md)
 **Milestone Goal:** Developers can add `"input": "file"` to a model field in gux.config.json and get complete file upload -- UI, storage, API, admin integration -- with zero manual wiring.
 
 - [x] **Phase 29: Storage Foundation** - Storage interface, local backend, upload endpoint, file serving
-- [ ] **Phase 30: Upload Client & UI Component** - WASM upload with progress, drag-drop UI, image preview
+- [x] **Phase 30: Upload Client & UI Component** - WASM upload with progress, drag-drop UI, image preview
 - [ ] **Phase 31: Code Generation & CRUD Integration** - Config-driven file fields, admin scaffolding, lifecycle hooks, auto-cleanup
 - [ ] **Phase 32: Multi-File & Configuration** - Multi-file fields, per-field config for types/size/directory
 
@@ -162,8 +162,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 30-01-PLAN.md -- WASM upload client (fetch/upload.go with XHR progress and CSRF)
-- [ ] 30-02-PLAN.md -- ui.FileUpload component with SSR/WASM split (drag-drop, validation, preview, progress)
+- [x] 30-01-PLAN.md -- WASM upload client (fetch/upload.go with XHR progress and CSRF)
+- [x] 30-02-PLAN.md -- ui.FileUpload component with SSR/WASM split (drag-drop, validation, preview, progress)
 
 #### Phase 31: Code Generation & CRUD Integration
 **Goal**: Developer adds `"input": "file"` to a field in gux.config.json and `gux gen` produces complete upload integration across admin forms, detail views, list views, and CRUD lifecycle
@@ -232,6 +232,6 @@ Phases execute in numeric order: 1 -> 2 -> ... -> 28 -> 29 -> 30 -> 31 -> 32
 | 27. gux init Templates | v2.2 | 3/3 | Complete | 2026-01-26 |
 | 28. Help Pattern Commands | v2.3 | 2/2 | Complete | 2026-01-26 |
 | 29. Storage Foundation | v2.4 | 2/2 | Complete | 2026-02-01 |
-| 30. Upload Client & UI Component | v2.4 | 0/2 | Not started | - |
+| 30. Upload Client & UI Component | v2.4 | 2/2 | Complete | 2026-02-01 |
 | 31. Code Generation & CRUD Integration | v2.4 | 0/3 | Not started | - |
 | 32. Multi-File & Configuration | v2.4 | 0/2 | Not started | - |
