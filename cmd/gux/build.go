@@ -254,10 +254,20 @@ type %s struct {
 			dtoType = "uint"
 		case "*uint", "*int":
 			dtoType = "*uint"
+		case "*int64", "*int32":
+			dtoType = "int"
+		case "*uint64", "*uint32":
+			dtoType = "uint"
 		case "float64", "float32":
+			dtoType = "float64"
+		case "*float64", "*float32":
 			dtoType = "float64"
 		case "bool":
 			dtoType = "bool"
+		case "*bool":
+			dtoType = "bool"
+		case "*string":
+			dtoType = "string"
 		case "time.Time", "*time.Time":
 			dtoType = "string" // Times are serialized as strings
 		default:
@@ -327,14 +337,22 @@ func generateServerAPICode(modelName, pluralName string) string {
 			modelToDTO = fmt.Sprintf("func() string { if item.%s != nil { return *item.%s }; return \"\" }()", f.Name, f.Name)
 			modelResultToDTO = fmt.Sprintf("func() string { if model.%s != nil { return *model.%s }; return \"\" }()", f.Name, f.Name)
 			dtoToModel = fmt.Sprintf("func() *string { s := item.%s; if s == \"\" { return nil }; return &s }()", f.Name)
-		case "*float64":
-			modelToDTO = fmt.Sprintf("func() float64 { if item.%s != nil { return *item.%s }; return 0 }()", f.Name, f.Name)
-			modelResultToDTO = fmt.Sprintf("func() float64 { if model.%s != nil { return *model.%s }; return 0 }()", f.Name, f.Name)
-			dtoToModel = fmt.Sprintf("func() *float64 { v := item.%s; if v == 0 { return nil }; return &v }()", f.Name)
-		case "*uint", "*int":
-			modelToDTO = fmt.Sprintf("func() *uint { if item.%s != nil { v := uint(*item.%s); return &v }; return nil }()", f.Name, f.Name)
-			modelResultToDTO = fmt.Sprintf("func() *uint { if model.%s != nil { v := uint(*model.%s); return &v }; return nil }()", f.Name, f.Name)
-			// dtoToModel stays the same for *uint
+		case "*float64", "*float32":
+			modelToDTO = fmt.Sprintf("func() float64 { if item.%s != nil { return float64(*item.%s) }; return 0 }()", f.Name, f.Name)
+			modelResultToDTO = fmt.Sprintf("func() float64 { if model.%s != nil { return float64(*model.%s) }; return 0 }()", f.Name, f.Name)
+			dtoToModel = fmt.Sprintf("func() %s { v := item.%s; if v == 0 { return nil }; p := %s(v); return &p }()", f.Type, f.Name, f.Type[1:])
+		case "*int", "*int64", "*int32":
+			modelToDTO = fmt.Sprintf("func() int { if item.%s != nil { return int(*item.%s) }; return 0 }()", f.Name, f.Name)
+			modelResultToDTO = fmt.Sprintf("func() int { if model.%s != nil { return int(*model.%s) }; return 0 }()", f.Name, f.Name)
+			dtoToModel = fmt.Sprintf("func() %s { v := item.%s; if v == 0 { return nil }; p := %s(v); return &p }()", f.Type, f.Name, f.Type[1:])
+		case "*uint", "*uint64", "*uint32":
+			modelToDTO = fmt.Sprintf("func() uint { if item.%s != nil { return uint(*item.%s) }; return 0 }()", f.Name, f.Name)
+			modelResultToDTO = fmt.Sprintf("func() uint { if model.%s != nil { return uint(*model.%s) }; return 0 }()", f.Name, f.Name)
+			dtoToModel = fmt.Sprintf("func() %s { v := item.%s; p := %s(v); return &p }()", f.Type, f.Name, f.Type[1:])
+		case "*bool":
+			modelToDTO = fmt.Sprintf("func() bool { if item.%s != nil { return *item.%s }; return false }()", f.Name, f.Name)
+			modelResultToDTO = fmt.Sprintf("func() bool { if model.%s != nil { return *model.%s }; return false }()", f.Name, f.Name)
+			dtoToModel = fmt.Sprintf("func() *bool { v := item.%s; return &v }()", f.Name)
 		}
 
 		// For List/Get: DTO field = model field (may need pointer dereference)
@@ -350,8 +368,14 @@ func generateServerAPICode(modelName, pluralName string) string {
 		switch f.Type {
 		case "*string":
 			updateModelAssignments.WriteString(fmt.Sprintf("\tmodel.%s = func() *string { s := item.%s; if s == \"\" { return nil }; return &s }()\n", f.Name, f.Name))
-		case "*float64":
-			updateModelAssignments.WriteString(fmt.Sprintf("\tmodel.%s = func() *float64 { v := item.%s; if v == 0 { return nil }; return &v }()\n", f.Name, f.Name))
+		case "*float64", "*float32":
+			updateModelAssignments.WriteString(fmt.Sprintf("\tmodel.%s = func() %s { v := item.%s; if v == 0 { return nil }; p := %s(v); return &p }()\n", f.Name, f.Type, f.Name, f.Type[1:]))
+		case "*int", "*int64", "*int32":
+			updateModelAssignments.WriteString(fmt.Sprintf("\tmodel.%s = func() %s { v := item.%s; if v == 0 { return nil }; p := %s(v); return &p }()\n", f.Name, f.Type, f.Name, f.Type[1:]))
+		case "*uint", "*uint64", "*uint32":
+			updateModelAssignments.WriteString(fmt.Sprintf("\tmodel.%s = func() %s { v := item.%s; p := %s(v); return &p }()\n", f.Name, f.Type, f.Name, f.Type[1:]))
+		case "*bool":
+			updateModelAssignments.WriteString(fmt.Sprintf("\tmodel.%s = func() *bool { v := item.%s; return &v }()\n", f.Name, f.Name))
 		default:
 			updateModelAssignments.WriteString(fmt.Sprintf("\tmodel.%s = item.%s\n", f.Name, f.Name))
 		}
