@@ -694,13 +694,17 @@ func (a *App) Run(addr string) error {
     </script>`
 				}
 
-				// Generate CSRF token and set cookie
+				// Get or generate CSRF token
 				csrfToken := ""
 				if a.csrfConfig.Enabled {
-					var err error
-					csrfToken, err = generateCSRFToken()
-					if err == nil {
-						setCSRFCookie(w, csrfToken, a.csrfConfig)
+					// Reuse existing cookie token to avoid meta/cookie desync
+					csrfToken = getCSRFFromCookie(r)
+					if csrfToken == "" {
+						var err error
+						csrfToken, err = generateCSRFToken()
+						if err == nil {
+							setCSRFCookie(w, csrfToken, a.csrfConfig)
+						}
 					}
 				}
 

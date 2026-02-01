@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 )
@@ -163,10 +164,15 @@ func isMutatingMethod(method string) bool {
 	return false
 }
 
-// isExemptPath checks if the path is exempt from CSRF validation
+// isExemptPath checks if the path is exempt from CSRF validation.
+// Supports exact matches and prefix patterns ending with * (e.g., "/api/*").
 func isExemptPath(path string, exemptPaths []string) bool {
 	for _, exempt := range exemptPaths {
-		if path == exempt {
+		if strings.HasSuffix(exempt, "*") {
+			if strings.HasPrefix(path, strings.TrimSuffix(exempt, "*")) {
+				return true
+			}
+		} else if path == exempt {
 			return true
 		}
 	}
