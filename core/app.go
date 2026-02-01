@@ -41,6 +41,7 @@ type App struct {
 	customHandlers map[string]http.HandlerFunc // Custom HTTP handlers
 	apiEndpoints   []APIEndpoint                // Registered typed API endpoints
 	auditMigrated  bool                         // Whether audit_entries table has been auto-migrated
+	storage        Storage                      // File storage backend (nil = disabled)
 	// Cache busting hashes
 	stylesHash     string            // Hash for styles.css
 	wasmHashes     map[string]string // Hash for each WASM bundle
@@ -210,6 +211,23 @@ func (a *App) HandleFunc(pattern string, handler http.HandlerFunc) *App {
 	}
 	a.customHandlers[pattern] = handler
 	return a
+}
+
+// SetStorage configures file storage for the application.
+// This enables the upload endpoint at /__gux_api/upload and file serving at /__gux_api/files/{key}.
+//
+// Usage:
+//
+//	storage := core.NewLocalStorage("uploads", core.WithMaxSize(10<<20), core.WithAllowedTypes("image/*"))
+//	app.SetStorage(storage)
+func (a *App) SetStorage(s Storage) *App {
+	a.storage = s
+	return a
+}
+
+// Storage returns the configured storage backend, or nil if not set.
+func (a *App) Storage() Storage {
+	return a.storage
 }
 
 // SetAssets sets the WASM binary and wasm_exec.js.
@@ -427,6 +445,11 @@ func (a *App) Handler() http.Handler {
 
 	// Register CRUD handlers
 	a.registerCRUDHandlers(mux)
+
+	// Register upload and file serving handlers (if storage configured)
+	if a.storage != nil {
+		a.registerUploadHandlers(mux)
+	}
 
 	// Register custom handlers — convert :param to {param} for Go 1.22+ ServeMux
 	for pattern, handler := range a.customHandlers {
