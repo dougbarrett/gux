@@ -24,11 +24,10 @@ func Login(r *core.Router) func() core.Node {
 		loading.Set(true)
 		errorMsg.Set("")
 
-		data := map[string]interface{}{
-			"email":    email.Get(),
-			"password": password.Get(),
-		}
-		api.Login(data, func(resp api.LoginResponse, err error) {
+		api.Login(api.LoginRequest{
+			Email:    email.Get(),
+			Password: password.Get(),
+		}, func(resp api.LoginResponse, err error) {
 			loading.Set(false)
 			if err != nil {
 				errorMsg.Set("Login failed. Please try again.")

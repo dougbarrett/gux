@@ -275,7 +275,7 @@ func generateGuxFiles() error {
 			crudNames[m.PluralName] = true
 		}
 
-		if err := generateEndpointClient(apiEndpoints, endpointDTOImports, crudNames); err != nil {
+		if err := generateEndpointClient(apiEndpoints, endpointDTOImports, crudNames, appFile); err != nil {
 			return fmt.Errorf("generating API endpoint client: %w", err)
 		}
 	}

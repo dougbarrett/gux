@@ -89,6 +89,7 @@ func main() {
 
 	// Audit entries — read-only for admins
 	app.CRUD(core.AuditEntry{},
+		core.WithListDTO(dto.AuditEntryList{}),
 		core.WithRoles("admin"),
 	)
 

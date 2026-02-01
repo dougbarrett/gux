@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"syscall/js"
 
 	"github.com/dougbarrett/gux/examples/audit/dto"
@@ -31,11 +32,13 @@ func fetch(method, url string, body []byte) ([]byte, error) {
 	var result []byte
 	var fetchErr error
 
+	// Create JS object for headers
 	jsOpts := js.Global().Get("Object").New()
 	jsOpts.Set("method", method)
 	headers := js.Global().Get("Object").New()
 	headers.Set("Content-Type", "application/json")
 
+	// Add CSRF token for mutating requests
 	if method == "POST" || method == "PUT" || method == "PATCH" || method == "DELETE" {
 		if token := getCSRFToken(); token != "" {
 			headers.Set("X-CSRF-Token", token)
@@ -47,8 +50,10 @@ func fetch(method, url string, body []byte) ([]byte, error) {
 		jsOpts.Set("body", string(body))
 	}
 
+	// Call fetch
 	promise := js.Global().Call("fetch", url, jsOpts)
 
+	// Handle response
 	var thenFunc, catchFunc js.Func
 	thenFunc = js.FuncOf(func(this js.Value, args []js.Value) interface{} {
 		resp := args[0]
@@ -57,6 +62,7 @@ func fetch(method, url string, body []byte) ([]byte, error) {
 			close(done)
 			return nil
 		}
+		// Get response text
 		resp.Call("text").Call("then", js.FuncOf(func(this js.Value, args []js.Value) interface{} {
 			result = []byte(args[0].String())
 			close(done)
@@ -77,6 +83,7 @@ func fetch(method, url string, body []byte) ([]byte, error) {
 }
 
 // Post makes a POST request to the given URL with JSON body.
+// Use this for custom API endpoints like authentication.
 func Post[T any](url string, data any, callback func(T, error)) {
 	go func() {
 		body, err := json.Marshal(data)
@@ -101,9 +108,7 @@ func Post[T any](url string, data any, callback func(T, error)) {
 	}()
 }
 
-// --- Users API ---
-
-// UsersAPI provides CRUD operations for User.
+// UsersAPI provides read operations for User with DTO responses.
 type UsersAPI struct {
 	baseURL string
 }
@@ -111,7 +116,7 @@ type UsersAPI struct {
 // Users is the API client for User operations.
 var Users = &UsersAPI{baseURL: "/__gux_api/crud/users"}
 
-// List returns all User records.
+// List returns all User records using UserList DTO.
 func (a *UsersAPI) List(callback func([]dto.UserList, error)) {
 	go func() {
 		resp, err := fetch("GET", a.baseURL, nil)
@@ -128,7 +133,32 @@ func (a *UsersAPI) List(callback func([]dto.UserList, error)) {
 	}()
 }
 
-// Get returns a single User by ID.
+// ListFiltered returns User records matching the given filters using UserList DTO.
+func (a *UsersAPI) ListFiltered(params map[string]string, callback func([]dto.UserList, error)) {
+	go func() {
+		endpoint := a.baseURL
+		if len(params) > 0 {
+			v := make([]string, 0, len(params))
+			for k, val := range params {
+				v = append(v, k+"="+val)
+			}
+			endpoint += "?" + strings.Join(v, "&")
+		}
+		resp, err := fetch("GET", endpoint, nil)
+		if err != nil {
+			callback(nil, err)
+			return
+		}
+		var items []dto.UserList
+		if err := json.Unmarshal(resp, &items); err != nil {
+			callback(nil, err)
+			return
+		}
+		callback(items, nil)
+	}()
+}
+
+// Get returns a single User by ID using UserDetail DTO.
 func (a *UsersAPI) Get(id uint, callback func(*dto.UserDetail, error)) {
 	go func() {
 		resp, err := fetch("GET", fmt.Sprintf("%s/%d", a.baseURL, id), nil)
@@ -145,7 +175,7 @@ func (a *UsersAPI) Get(id uint, callback func(*dto.UserDetail, error)) {
 	}()
 }
 
-// Create creates a new User.
+// Create creates a new User with the given data.
 func (a *UsersAPI) Create(data map[string]interface{}, callback func(*dto.UserDetail, error)) {
 	go func() {
 		body, _ := json.Marshal(data)
@@ -189,9 +219,7 @@ func (a *UsersAPI) Delete(id uint, callback func(error)) {
 	}()
 }
 
-// --- Documents API ---
-
-// DocumentsAPI provides CRUD operations for Document.
+// DocumentsAPI provides read operations for Document with DTO responses.
 type DocumentsAPI struct {
 	baseURL string
 }
@@ -199,7 +227,7 @@ type DocumentsAPI struct {
 // Documents is the API client for Document operations.
 var Documents = &DocumentsAPI{baseURL: "/__gux_api/crud/documents"}
 
-// List returns all Document records.
+// List returns all Document records using DocumentList DTO.
 func (a *DocumentsAPI) List(callback func([]dto.DocumentList, error)) {
 	go func() {
 		resp, err := fetch("GET", a.baseURL, nil)
@@ -216,7 +244,32 @@ func (a *DocumentsAPI) List(callback func([]dto.DocumentList, error)) {
 	}()
 }
 
-// Get returns a single Document by ID.
+// ListFiltered returns Document records matching the given filters using DocumentList DTO.
+func (a *DocumentsAPI) ListFiltered(params map[string]string, callback func([]dto.DocumentList, error)) {
+	go func() {
+		endpoint := a.baseURL
+		if len(params) > 0 {
+			v := make([]string, 0, len(params))
+			for k, val := range params {
+				v = append(v, k+"="+val)
+			}
+			endpoint += "?" + strings.Join(v, "&")
+		}
+		resp, err := fetch("GET", endpoint, nil)
+		if err != nil {
+			callback(nil, err)
+			return
+		}
+		var items []dto.DocumentList
+		if err := json.Unmarshal(resp, &items); err != nil {
+			callback(nil, err)
+			return
+		}
+		callback(items, nil)
+	}()
+}
+
+// Get returns a single Document by ID using DocumentDetail DTO.
 func (a *DocumentsAPI) Get(id uint, callback func(*dto.DocumentDetail, error)) {
 	go func() {
 		resp, err := fetch("GET", fmt.Sprintf("%s/%d", a.baseURL, id), nil)
@@ -233,7 +286,7 @@ func (a *DocumentsAPI) Get(id uint, callback func(*dto.DocumentDetail, error)) {
 	}()
 }
 
-// Create creates a new Document.
+// Create creates a new Document with the given data.
 func (a *DocumentsAPI) Create(data map[string]interface{}, callback func(*dto.DocumentDetail, error)) {
 	go func() {
 		body, _ := json.Marshal(data)
@@ -277,9 +330,7 @@ func (a *DocumentsAPI) Delete(id uint, callback func(error)) {
 	}()
 }
 
-// --- AuditEntries API ---
-
-// AuditEntriesAPI provides read operations for AuditEntry.
+// AuditEntriesAPI provides read operations for AuditEntry with DTO responses.
 type AuditEntriesAPI struct {
 	baseURL string
 }
@@ -287,7 +338,7 @@ type AuditEntriesAPI struct {
 // AuditEntries is the API client for AuditEntry operations.
 var AuditEntries = &AuditEntriesAPI{baseURL: "/__gux_api/crud/auditentries"}
 
-// List returns all AuditEntry records.
+// List returns all AuditEntry records using AuditEntryList DTO.
 func (a *AuditEntriesAPI) List(callback func([]dto.AuditEntryList, error)) {
 	go func() {
 		resp, err := fetch("GET", a.baseURL, nil)
@@ -304,27 +355,89 @@ func (a *AuditEntriesAPI) List(callback func([]dto.AuditEntryList, error)) {
 	}()
 }
 
-// LoginResponse is the response from the login API.
-type LoginResponse struct {
-	Success  bool   `json:"success"`
-	Error    string `json:"error,omitempty"`
-	Redirect string `json:"redirect,omitempty"`
-}
-
-// Login posts login credentials to /api/login.
-func Login(data map[string]interface{}, callback func(LoginResponse, error)) {
+// ListFiltered returns AuditEntry records matching the given filters using AuditEntryList DTO.
+func (a *AuditEntriesAPI) ListFiltered(params map[string]string, callback func([]dto.AuditEntryList, error)) {
 	go func() {
-		body, _ := json.Marshal(data)
-		resp, err := fetch("POST", "/api/login", body)
+		endpoint := a.baseURL
+		if len(params) > 0 {
+			v := make([]string, 0, len(params))
+			for k, val := range params {
+				v = append(v, k+"="+val)
+			}
+			endpoint += "?" + strings.Join(v, "&")
+		}
+		resp, err := fetch("GET", endpoint, nil)
 		if err != nil {
-			callback(LoginResponse{}, err)
+			callback(nil, err)
 			return
 		}
-		var result LoginResponse
-		if err := json.Unmarshal(resp, &result); err != nil {
-			callback(LoginResponse{}, err)
+		var items []dto.AuditEntryList
+		if err := json.Unmarshal(resp, &items); err != nil {
+			callback(nil, err)
 			return
 		}
-		callback(result, nil)
+		callback(items, nil)
 	}()
 }
+
+// Get returns a single AuditEntry by ID using AuditEntryList DTO.
+func (a *AuditEntriesAPI) Get(id uint, callback func(*dto.AuditEntryList, error)) {
+	go func() {
+		resp, err := fetch("GET", fmt.Sprintf("%s/%d", a.baseURL, id), nil)
+		if err != nil {
+			callback(nil, err)
+			return
+		}
+		var item dto.AuditEntryList
+		if err := json.Unmarshal(resp, &item); err != nil {
+			callback(nil, err)
+			return
+		}
+		callback(&item, nil)
+	}()
+}
+
+// Create creates a new AuditEntry with the given data.
+func (a *AuditEntriesAPI) Create(data map[string]interface{}, callback func(*dto.AuditEntryList, error)) {
+	go func() {
+		body, _ := json.Marshal(data)
+		resp, err := fetch("POST", a.baseURL, body)
+		if err != nil {
+			callback(nil, err)
+			return
+		}
+		var item dto.AuditEntryList
+		if err := json.Unmarshal(resp, &item); err != nil {
+			callback(nil, err)
+			return
+		}
+		callback(&item, nil)
+	}()
+}
+
+// Update updates an existing AuditEntry.
+func (a *AuditEntriesAPI) Update(id uint, data map[string]interface{}, callback func(*dto.AuditEntryList, error)) {
+	go func() {
+		body, _ := json.Marshal(data)
+		resp, err := fetch("PUT", fmt.Sprintf("%s/%d", a.baseURL, id), body)
+		if err != nil {
+			callback(nil, err)
+			return
+		}
+		var item dto.AuditEntryList
+		if err := json.Unmarshal(resp, &item); err != nil {
+			callback(nil, err)
+			return
+		}
+		callback(&item, nil)
+	}()
+}
+
+// Delete deletes a AuditEntry by ID.
+func (a *AuditEntriesAPI) Delete(id uint, callback func(error)) {
+	go func() {
+		_, err := fetch("DELETE", fmt.Sprintf("%s/%d", a.baseURL, id), nil)
+		callback(err)
+	}()
+}
+

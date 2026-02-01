@@ -117,6 +117,7 @@ type CRUDModel struct {
 	DetailDTO  string // e.g., "UserDetail" - DTO type for detail responses
 	DTOPackage string // e.g., "dto" - package name for DTOs
 	IsExternal    bool   // True if model package is NOT the guxgen/models path
+	IsCoreModel   bool   // True if model is from the core package (e.g., core.AuditEntry)
 	DTOIsExternal bool   // True if DTO package is NOT the guxgen/dto path
 	ModelImportPath string // Resolved import path for the model package
 	DTOImportPath   string // Resolved import path for the DTO package
@@ -307,12 +308,15 @@ func generateModelAssignments(fields []ModelFieldInfo, sourceVar, targetVar stri
 
 // generateServerAPICode generates server-side API code for models without DTOs
 // using the actual model fields instead of assuming Name/Description
-func generateServerAPICode(modelName, pluralName string) string {
+func generateServerAPICode(modelName, pluralName, modelPkgPrefix string) string {
+	if modelPkgPrefix == "" {
+		modelPkgPrefix = "models"
+	}
 	// Get actual fields from the model
 	fields, err := getModelFields(modelName)
 	if err != nil || len(fields) == 0 {
 		// Fallback: generate minimal API with just ID
-		return generateMinimalServerAPICode(modelName, pluralName)
+		return generateMinimalServerAPICode(modelName, pluralName, modelPkgPrefix)
 	}
 
 	var sb strings.Builder
@@ -394,7 +398,7 @@ func (a *%sAPI) List(callback func([]%s, error)) {
 		callback(nil, nil)
 		return
 	}
-	var items []models.%s
+	var items []%s.%s
 	if err := db.Find(&items).Error; err != nil {
 		callback(nil, err)
 		return
@@ -419,7 +423,7 @@ func (a *%sAPI) ListFiltered(params map[string]string, callback func([]%s, error
 	for k, v := range params {
 		query = query.Where(k+" = ?", v)
 	}
-	var items []models.%s
+	var items []%s.%s
 	if err := query.Find(&items).Error; err != nil {
 		callback(nil, err)
 		return
@@ -439,7 +443,7 @@ func (a *%sAPI) Get(id uint, callback func(*%s, error)) {
 		callback(nil, nil)
 		return
 	}
-	var item models.%s
+	var item %s.%s
 	if err := db.First(&item, id).Error; err != nil {
 		callback(nil, err)
 		return
@@ -456,7 +460,7 @@ func (a *%sAPI) Create(item *%s, callback func(*%s, error)) {
 		callback(nil, nil)
 		return
 	}
-	model := models.%s{
+	model := %s.%s{
 %s	}
 	if err := db.Create(&model).Error; err != nil {
 		callback(nil, err)
@@ -474,7 +478,7 @@ func (a *%sAPI) Update(item *%s, callback func(*%s, error)) {
 		callback(nil, nil)
 		return
 	}
-	var model models.%s
+	var model %s.%s
 	if err := db.First(&model, item.ID).Error; err != nil {
 		callback(nil, err)
 		return
@@ -495,7 +499,7 @@ func (a *%sAPI) Delete(id uint, callback func(error)) {
 		callback(nil)
 		return
 	}
-	callback(db.Delete(&models.%s{}, id).Error)
+	callback(db.Delete(&%s.%s{}, id).Error)
 }
 `,
 		pluralName, modelName, // type comment
@@ -504,34 +508,34 @@ func (a *%sAPI) Delete(id uint, callback func(error)) {
 		pluralName, pluralName, // var declaration
 		modelName,                  // List comment
 		pluralName, modelName,      // List signature
-		modelName,                  // List query
+		modelPkgPrefix, modelName,  // List query (pkg.Model)
 		modelName, modelName,       // List convert type
 		listFieldAssignments.String(), // List field assignments
 		modelName,                  // ListFiltered comment
 		pluralName, modelName,      // ListFiltered signature
-		modelName,                  // ListFiltered query
+		modelPkgPrefix, modelName,  // ListFiltered query (pkg.Model)
 		modelName, modelName,       // ListFiltered convert type
 		listFieldAssignments.String(), // ListFiltered field assignments
 		modelName,                  // Get comment
 		pluralName, modelName,      // Get signature
-		modelName,                  // Get query
+		modelPkgPrefix, modelName,  // Get query (pkg.Model)
 		modelName,                  // Get result type
 		getFieldAssignments.String(), // Get field assignments
 		modelName,                      // Create comment
 		pluralName, modelName, modelName, // Create signature
-		modelName,                      // Create model type
+		modelPkgPrefix, modelName,      // Create model type (pkg.Model)
 		createModelAssignments.String(), // Create model assignments
 		modelName,                       // Create result type
 		createResultAssignments.String(), // Create result assignments
 		modelName,                        // Update comment
 		pluralName, modelName, modelName, // Update signature
-		modelName,                       // Update query
+		modelPkgPrefix, modelName,       // Update query (pkg.Model)
 		updateModelAssignments.String(), // Update model assignments
 		modelName,                        // Update result type
 		updateResultAssignments.String(), // Update result assignments
 		modelName,                        // Delete comment
 		pluralName,                       // Delete signature
-		modelName,                        // Delete model
+		modelPkgPrefix, modelName,        // Delete model (pkg.Model)
 	))
 
 	return sb.String()
@@ -539,7 +543,10 @@ func (a *%sAPI) Delete(id uint, callback func(error)) {
 
 // generateMinimalServerAPICode generates server-side API code with only ID field
 // Used as fallback when model fields cannot be parsed
-func generateMinimalServerAPICode(modelName, pluralName string) string {
+func generateMinimalServerAPICode(modelName, pluralName, modelPkgPrefix string) string {
+	if modelPkgPrefix == "" {
+		modelPkgPrefix = "models"
+	}
 	return fmt.Sprintf(`
 // %sAPI provides CRUD operations for %s.
 type %sAPI struct{}
@@ -553,7 +560,7 @@ func (a *%sAPI) List(callback func([]%s, error)) {
 		callback(nil, nil)
 		return
 	}
-	var items []models.%s
+	var items []%s.%s
 	if err := db.Find(&items).Error; err != nil {
 		callback(nil, err)
 		return
@@ -575,7 +582,7 @@ func (a *%sAPI) ListFiltered(params map[string]string, callback func([]%s, error
 	for k, v := range params {
 		query = query.Where(k+" = ?", v)
 	}
-	var items []models.%s
+	var items []%s.%s
 	if err := query.Find(&items).Error; err != nil {
 		callback(nil, err)
 		return
@@ -593,7 +600,7 @@ func (a *%sAPI) Get(id uint, callback func(*%s, error)) {
 		callback(nil, nil)
 		return
 	}
-	var item models.%s
+	var item %s.%s
 	if err := db.First(&item, id).Error; err != nil {
 		callback(nil, err)
 		return
@@ -607,7 +614,7 @@ func (a *%sAPI) Create(item *%s, callback func(*%s, error)) {
 		callback(nil, nil)
 		return
 	}
-	model := models.%s{}
+	model := %s.%s{}
 	if err := db.Create(&model).Error; err != nil {
 		callback(nil, err)
 		return
@@ -621,7 +628,7 @@ func (a *%sAPI) Update(item *%s, callback func(*%s, error)) {
 		callback(nil, nil)
 		return
 	}
-	var model models.%s
+	var model %s.%s
 	if err := db.First(&model, item.ID).Error; err != nil {
 		callback(nil, err)
 		return
@@ -639,7 +646,7 @@ func (a *%sAPI) Delete(id uint, callback func(error)) {
 		callback(nil)
 		return
 	}
-	callback(db.Delete(&models.%s{}, id).Error)
+	callback(db.Delete(&%s.%s{}, id).Error)
 }
 `,
 		pluralName, modelName, // type comment
@@ -648,27 +655,27 @@ func (a *%sAPI) Delete(id uint, callback func(error)) {
 		pluralName, pluralName, // var declaration
 		modelName,             // List comment
 		pluralName, modelName, // List signature
-		modelName,             // List query
+		modelPkgPrefix, modelName, // List query (pkg.Model)
 		modelName, modelName,  // List convert
 		modelName,             // ListFiltered comment
 		pluralName, modelName, // ListFiltered signature
-		modelName,             // ListFiltered query
+		modelPkgPrefix, modelName, // ListFiltered query (pkg.Model)
 		modelName, modelName,  // ListFiltered convert
 		modelName,             // Get comment
 		pluralName, modelName, // Get signature
-		modelName,             // Get query
+		modelPkgPrefix, modelName, // Get query (pkg.Model)
 		modelName,             // Get result
 		modelName,                    // Create comment
 		pluralName, modelName, modelName, // Create signature
-		modelName, // Create model
+		modelPkgPrefix, modelName, // Create model (pkg.Model)
 		modelName, // Create result
 		modelName,                    // Update comment
 		pluralName, modelName, modelName, // Update signature
-		modelName, // Update query
+		modelPkgPrefix, modelName, // Update query (pkg.Model)
 		modelName, // Update result
 		modelName, // Delete comment
 		pluralName,
-		modelName, // Delete model
+		modelPkgPrefix, modelName, // Delete model (pkg.Model)
 	)
 }
 
@@ -741,7 +748,78 @@ func getModelFieldTypes(modelName string) (map[string]string, error) {
 		}
 	}
 
+	// Fallback: try to find the model in the gux core package
+	// This handles models like core.AuditEntry that live in the framework
+	if result, err := getModelFieldTypesFromCore(modelName); err == nil {
+		modelFieldTypesCache[modelName] = result
+		return result, nil
+	}
+
 	return nil, fmt.Errorf("model %s not found", modelName)
+}
+
+// getModelFieldTypesFromCore searches for a model type in the gux core package.
+// Uses `go list` to locate the package directory in the module cache.
+func getModelFieldTypesFromCore(modelName string) (map[string]string, error) {
+	// Run go list to find the core package directory
+	cmd := exec.Command("go", "list", "-m", "-f", "{{.Dir}}", "github.com/dougbarrett/gux")
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, err
+	}
+	modDir := strings.TrimSpace(string(out))
+	if modDir == "" {
+		return nil, fmt.Errorf("could not find gux module directory")
+	}
+
+	coreDir := filepath.Join(modDir, "core")
+	entries, err := os.ReadDir(coreDir)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".go") {
+			continue
+		}
+		// Skip test files and build-tagged files
+		if strings.HasSuffix(entry.Name(), "_test.go") {
+			continue
+		}
+
+		fset := token.NewFileSet()
+		filename := filepath.Join(coreDir, entry.Name())
+		node, parseErr := parser.ParseFile(fset, filename, nil, parser.ParseComments)
+		if parseErr != nil {
+			continue
+		}
+
+		for _, decl := range node.Decls {
+			genDecl, ok := decl.(*ast.GenDecl)
+			if !ok || genDecl.Tok != token.TYPE {
+				continue
+			}
+			for _, spec := range genDecl.Specs {
+				typeSpec, ok := spec.(*ast.TypeSpec)
+				if !ok || typeSpec.Name.Name != modelName {
+					continue
+				}
+				structType, ok := typeSpec.Type.(*ast.StructType)
+				if !ok {
+					continue
+				}
+				fieldTypes := make(map[string]string)
+				for _, field := range structType.Fields.List {
+					if len(field.Names) == 0 {
+						continue
+					}
+					fieldTypes[field.Names[0].Name] = formatType(field.Type)
+				}
+				return fieldTypes, nil
+			}
+		}
+	}
+	return nil, fmt.Errorf("model %s not found in core package", modelName)
 }
 
 // getDTOFieldTypes parses a DTO struct from dto/ or guxgen/dto/ and returns a map of field name → type.
@@ -1023,6 +1101,10 @@ func parseCRUDModels(filename string) ([]CRUDModel, string, string, error) {
 			modelsImport = path
 			modelsIdentToPath[ident] = path
 		}
+		// Also capture core package import for models like core.AuditEntry
+		if strings.HasSuffix(path, "/core") {
+			modelsIdentToPath[ident] = path
+		}
 		if strings.HasSuffix(path, "/dto") || strings.Contains(path, "/dto") {
 			dtoImport = path
 			dtoIdentToPath[ident] = path
@@ -1068,6 +1150,10 @@ func parseCRUDModels(filename string) ([]CRUDModel, string, string, error) {
 			if modelPkgIdent != "" {
 				if importPath, ok := modelsIdentToPath[modelPkgIdent]; ok {
 					model.ModelImportPath = importPath
+				}
+				// Detect core package models (e.g., core.AuditEntry)
+				if modelPkgIdent == "core" || strings.HasSuffix(model.ModelImportPath, "/core") {
+					model.IsCoreModel = true
 				}
 			}
 
@@ -1310,6 +1396,56 @@ func extractTypeName(expr ast.Expr) (typeName, pkg string) {
 		return "[]" + elemType, elemPkg
 	}
 	return "", ""
+}
+
+// extractMainPackageTypes extracts struct type definitions from the main package
+// for types used by endpoints that aren't in an imported package.
+// Returns Go source code for type definitions to embed in the generated api package.
+func extractMainPackageTypes(filename string, typeNames map[string]bool) (string, error) {
+	if len(typeNames) == 0 {
+		return "", nil
+	}
+
+	fset := token.NewFileSet()
+	node, err := parser.ParseFile(fset, filename, nil, parser.ParseComments)
+	if err != nil {
+		return "", err
+	}
+
+	var sb strings.Builder
+	for _, decl := range node.Decls {
+		genDecl, ok := decl.(*ast.GenDecl)
+		if !ok || genDecl.Tok != token.TYPE {
+			continue
+		}
+		for _, spec := range genDecl.Specs {
+			typeSpec, ok := spec.(*ast.TypeSpec)
+			if !ok {
+				continue
+			}
+			if !typeNames[typeSpec.Name.Name] {
+				continue
+			}
+			structType, ok := typeSpec.Type.(*ast.StructType)
+			if !ok {
+				continue
+			}
+
+			// Read the original source to preserve struct tags
+			start := fset.Position(genDecl.Pos())
+			end := fset.Position(genDecl.End())
+			src, readErr := os.ReadFile(filename)
+			if readErr != nil {
+				continue
+			}
+			sb.WriteString("\n")
+			sb.Write(src[start.Offset:end.Offset])
+			sb.WriteString("\n")
+			_ = structType // used above for type assertion
+		}
+	}
+
+	return sb.String(), nil
 }
 
 // extractPathParams extracts path parameter names from a path pattern
@@ -2442,7 +2578,9 @@ func generateServerDTOCode(m CRUDModel) string {
 	// (from guxgen/dto), or vice versa.
 	modelPkg := "models"
 	dtoPkg := "dto"
-	if m.IsExternal {
+	if m.IsCoreModel {
+		modelPkg = "core"
+	} else if m.IsExternal {
 		modelPkg = "extmodels"
 	}
 	if m.DTOIsExternal {
@@ -2699,6 +2837,10 @@ func generateFieldMapping(info *DTOInfo, varName string) string {
 		} else if modelType != "" && !strings.HasPrefix(modelType, "*") && strings.HasPrefix(dtoType, "*") {
 			// Model field is not pointer, DTO field is pointer — need to take address
 			sb.WriteString(fmt.Sprintf("\t\t\t%s: &%s.%s,\n", f.DTOField, varName, f.ModelField))
+		} else if modelType != "" && modelType != dtoType && !isPrimitiveType(modelType) && isPrimitiveType(dtoType) {
+			// Model field is a named type (e.g., AuditAction) but DTO expects a primitive (e.g., string)
+			// Need explicit type conversion
+			sb.WriteString(fmt.Sprintf("\t\t\t%s: %s(%s.%s),\n", f.DTOField, dtoType, varName, f.ModelField))
 		} else {
 			// Types match (both pointer or both non-pointer)
 			sb.WriteString(fmt.Sprintf("\t\t\t%s: %s.%s,\n", f.DTOField, varName, f.ModelField))
@@ -2868,7 +3010,7 @@ type %s struct {
 			}
 			detailType := m.DetailDTO
 			if detailType == "" {
-				detailType = m.Name
+				detailType = listType
 			}
 			dtoPkg := m.DTOPackage
 			if dtoPkg == "" {
@@ -3330,15 +3472,28 @@ type %s struct {
 		if m.ListDTO != "" || m.DetailDTO != "" {
 			continue // Skip - no parsed info available
 		}
-		stubCode.WriteString(generateServerAPICode(m.Name, m.PluralName))
+		pkg := "models"
+		if m.IsCoreModel {
+			pkg = "core"
+		} else if m.IsExternal {
+			pkg = "extmodels"
+		}
+		stubCode.WriteString(generateServerAPICode(m.Name, m.PluralName, pkg))
 	}
 
-	// Check if any CRUD models have external models or external DTOs
+	// Check if any CRUD models have external models, core models, or external DTOs
 	hasExternalModels := false
+	hasCoreModels := false
+	coreImportPath := ""
 	hasExternalDTOs := false
 	hasInternalDTOs := false
 	for _, m := range models {
-		if m.IsExternal {
+		if m.IsCoreModel {
+			hasCoreModels = true
+			if m.ModelImportPath != "" {
+				coreImportPath = m.ModelImportPath
+			}
+		} else if m.IsExternal {
 			hasExternalModels = true
 		}
 		if m.ListDTOInfo != nil || m.DetailDTOInfo != nil {
@@ -3360,6 +3515,12 @@ type %s struct {
 		extModelsPath := strings.TrimSuffix(modelsImport, "/guxgen/models") + "/models"
 		serverImports += fmt.Sprintf(`
 	extmodels "%s"`, extModelsPath)
+	}
+
+	// Add core import if any models come from the core package (e.g., core.AuditEntry)
+	if hasCoreModels && coreImportPath != "" {
+		serverImports += fmt.Sprintf(`
+	"%s"`, coreImportPath)
 	}
 
 	// Add dto import if any models use internal (guxgen) DTOs with parsed info
@@ -3409,7 +3570,7 @@ func Post[T any](url string, data any, callback func(T, error)) {
 }
 
 // generateEndpointClient generates guxgen/api/endpoints_gen.go for typed API endpoints
-func generateEndpointClient(endpoints []APIEndpointInfo, dtoImports map[string]string, crudNames map[string]bool) error {
+func generateEndpointClient(endpoints []APIEndpointInfo, dtoImports map[string]string, crudNames map[string]bool, appFilename string) error {
 	if len(endpoints) == 0 {
 		return nil
 	}
@@ -3475,6 +3636,27 @@ func generateEndpointClient(endpoints []APIEndpointInfo, dtoImports map[string]s
 		}
 	}
 
+	// Extract type definitions for main-package types (types not in a dto package)
+	mainPkgTypes := make(map[string]bool)
+	for _, ep := range endpoints {
+		if ep.Package == "" || ep.Package == "main" {
+			if ep.RequestType != "" {
+				mainPkgTypes[ep.RequestType] = true
+			}
+			if ep.ResponseType != "" {
+				mainPkgTypes[ep.ResponseType] = true
+			}
+		}
+	}
+	var mainTypeDefs string
+	if len(mainPkgTypes) > 0 && appFilename != "" {
+		var extractErr error
+		mainTypeDefs, extractErr = extractMainPackageTypes(appFilename, mainPkgTypes)
+		if extractErr != nil {
+			fmt.Printf("Warning: could not extract main package types: %v\n", extractErr)
+		}
+	}
+
 	// Generate endpoint functions
 	var funcCode strings.Builder
 	for _, ep := range endpoints {
@@ -3490,7 +3672,7 @@ package api
 import (
 	%s
 )
-
+%s
 // apiEndpointFetch makes an HTTP request and returns the response body
 func apiEndpointFetch(method, url string, body []byte) ([]byte, error) {
 	opts := &guxfetch.Options{
@@ -3513,7 +3695,7 @@ func apiEndpointFetch(method, url string, body []byte) ([]byte, error) {
 	return []byte(resp.Body), nil
 }
 %s
-`, imports, funcCode.String())
+`, imports, mainTypeDefs, funcCode.String())
 
 	if err := os.WriteFile("guxgen/api/endpoints_gen.go", []byte(code), 0644); err != nil {
 		return err
@@ -3647,7 +3829,7 @@ func endpointFetch(method, path string, body []byte) ([]byte, error) {
 
 	return respBody, nil
 }
-%s`, serverImports, serverFuncs.String())
+%s%s`, serverImports, mainTypeDefs, serverFuncs.String())
 
 	return os.WriteFile("guxgen/api/endpoints_server_gen.go", []byte(serverCode), 0644)
 }

@@ -776,7 +776,7 @@ type Widget struct {
 	os.WriteFile(filepath.Join("guxgen", "models", "widget.go"), []byte(modelContent), 0644)
 	modelFieldTypesCache = make(map[string]map[string]string)
 
-	result := generateServerAPICode("Widget", "Widgets")
+	result := generateServerAPICode("Widget", "Widgets", "models")
 
 	// *string should have pointer dereference in model-to-DTO
 	if !strings.Contains(result, "if item.Description != nil") {

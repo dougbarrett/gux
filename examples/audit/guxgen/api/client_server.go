@@ -5,31 +5,30 @@
 package api
 
 import (
-	"encoding/json"
-
 	"gorm.io/gorm"
 
-	"github.com/dougbarrett/gux/core"
-	"github.com/dougbarrett/gux/examples/audit/dto"
 	"github.com/dougbarrett/gux/examples/audit/models"
+	"github.com/dougbarrett/gux/core"
+
+	"github.com/dougbarrett/gux/examples/audit/dto"
 )
 
 var db *gorm.DB
 
 // Init initializes the API with a database connection.
-func Init(database interface{}) {
-	if gormDB, ok := database.(*gorm.DB); ok {
-		db = gormDB
-	}
+// Called automatically by the gux framework.
+func Init(database *gorm.DB) {
+	db = database
 }
 
 // Post is a stub for server-side builds.
+// The actual POST request happens client-side via WASM.
 func Post[T any](url string, data any, callback func(T, error)) {
+	// Server-side: this function is only called from WASM
+	// It's included here for compilation compatibility
 	var zero T
 	callback(zero, nil)
 }
-
-// --- Users API ---
 
 // UsersAPI provides CRUD operations for User.
 type UsersAPI struct{}
@@ -48,13 +47,42 @@ func (a *UsersAPI) List(callback func([]dto.UserList, error)) {
 		callback(nil, err)
 		return
 	}
+	// Convert to DTOs using field mappings from gux tags
 	result := make([]dto.UserList, len(items))
 	for i, item := range items {
 		result[i] = dto.UserList{
-			ID:        item.ID,
-			Email:     item.Email,
-			Name:      item.Name,
-			Role:      item.Role,
+			ID: item.ID,
+			Email: item.Email,
+			Name: item.Name,
+			Role: item.Role,
+			CreatedAt: item.CreatedAt,
+		}
+	}
+	callback(result, nil)
+}
+
+// ListFiltered returns User records matching the given filters.
+func (a *UsersAPI) ListFiltered(params map[string]string, callback func([]dto.UserList, error)) {
+	if db == nil {
+		callback(nil, nil)
+		return
+	}
+	query := db
+	for k, v := range params {
+		query = query.Where(k+" = ?", v)
+	}
+	var items []models.User
+	if err := query.Find(&items).Error; err != nil {
+		callback(nil, err)
+		return
+	}
+	result := make([]dto.UserList, len(items))
+	for i, item := range items {
+		result[i] = dto.UserList{
+			ID: item.ID,
+			Email: item.Email,
+			Name: item.Name,
+			Role: item.Role,
 			CreatedAt: item.CreatedAt,
 		}
 	}
@@ -73,32 +101,34 @@ func (a *UsersAPI) Get(id uint, callback func(*dto.UserDetail, error)) {
 		return
 	}
 	result := &dto.UserDetail{
-		ID:        item.ID,
-		Email:     item.Email,
-		Name:      item.Name,
-		Role:      item.Role,
-		CreatedAt: item.CreatedAt,
-		UpdatedAt: item.UpdatedAt,
+			ID: item.ID,
+			Email: item.Email,
+			Name: item.Name,
+			Role: item.Role,
+			CreatedAt: item.CreatedAt,
+			UpdatedAt: item.UpdatedAt,
 	}
 	callback(result, nil)
 }
 
-// Create creates a new User (server-side stub).
+// Create creates a new User (server-side stub - actual creation handled by CRUD endpoint).
 func (a *UsersAPI) Create(data map[string]interface{}, callback func(*dto.UserDetail, error)) {
+	// Server-side: this is typically not called directly
+	// The CRUD endpoint handles creation with hooks
 	callback(nil, nil)
 }
 
 // Update updates an existing User (server-side stub).
 func (a *UsersAPI) Update(id uint, data map[string]interface{}, callback func(*dto.UserDetail, error)) {
+	// Server-side: this is typically not called directly
 	callback(nil, nil)
 }
 
 // Delete deletes a User by ID (server-side stub).
 func (a *UsersAPI) Delete(id uint, callback func(error)) {
+	// Server-side: this is typically not called directly
 	callback(nil)
 }
-
-// --- Documents API ---
 
 // DocumentsAPI provides CRUD operations for Document.
 type DocumentsAPI struct{}
@@ -117,13 +147,42 @@ func (a *DocumentsAPI) List(callback func([]dto.DocumentList, error)) {
 		callback(nil, err)
 		return
 	}
+	// Convert to DTOs using field mappings from gux tags
 	result := make([]dto.DocumentList, len(items))
 	for i, item := range items {
 		result[i] = dto.DocumentList{
-			ID:        item.ID,
-			Title:     item.Title,
-			Status:    item.Status,
-			AuthorID:  item.AuthorID,
+			ID: item.ID,
+			Title: item.Title,
+			Status: item.Status,
+			AuthorID: item.AuthorID,
+			CreatedAt: item.CreatedAt,
+		}
+	}
+	callback(result, nil)
+}
+
+// ListFiltered returns Document records matching the given filters.
+func (a *DocumentsAPI) ListFiltered(params map[string]string, callback func([]dto.DocumentList, error)) {
+	if db == nil {
+		callback(nil, nil)
+		return
+	}
+	query := db
+	for k, v := range params {
+		query = query.Where(k+" = ?", v)
+	}
+	var items []models.Document
+	if err := query.Find(&items).Error; err != nil {
+		callback(nil, err)
+		return
+	}
+	result := make([]dto.DocumentList, len(items))
+	for i, item := range items {
+		result[i] = dto.DocumentList{
+			ID: item.ID,
+			Title: item.Title,
+			Status: item.Status,
+			AuthorID: item.AuthorID,
 			CreatedAt: item.CreatedAt,
 		}
 	}
@@ -142,35 +201,37 @@ func (a *DocumentsAPI) Get(id uint, callback func(*dto.DocumentDetail, error)) {
 		return
 	}
 	result := &dto.DocumentDetail{
-		ID:        item.ID,
-		Title:     item.Title,
-		Content:   item.Content,
-		Status:    item.Status,
-		AuthorID:  item.AuthorID,
-		CreatedAt: item.CreatedAt,
-		UpdatedAt: item.UpdatedAt,
+			ID: item.ID,
+			Title: item.Title,
+			Content: item.Content,
+			Status: item.Status,
+			AuthorID: item.AuthorID,
+			CreatedAt: item.CreatedAt,
+			UpdatedAt: item.UpdatedAt,
 	}
 	callback(result, nil)
 }
 
-// Create creates a new Document (server-side stub).
+// Create creates a new Document (server-side stub - actual creation handled by CRUD endpoint).
 func (a *DocumentsAPI) Create(data map[string]interface{}, callback func(*dto.DocumentDetail, error)) {
+	// Server-side: this is typically not called directly
+	// The CRUD endpoint handles creation with hooks
 	callback(nil, nil)
 }
 
 // Update updates an existing Document (server-side stub).
 func (a *DocumentsAPI) Update(id uint, data map[string]interface{}, callback func(*dto.DocumentDetail, error)) {
+	// Server-side: this is typically not called directly
 	callback(nil, nil)
 }
 
 // Delete deletes a Document by ID (server-side stub).
 func (a *DocumentsAPI) Delete(id uint, callback func(error)) {
+	// Server-side: this is typically not called directly
 	callback(nil)
 }
 
-// --- AuditEntries API ---
-
-// AuditEntriesAPI provides read operations for AuditEntry.
+// AuditEntriesAPI provides CRUD operations for AuditEntry.
 type AuditEntriesAPI struct{}
 
 // AuditEntries is the API client for AuditEntry operations.
@@ -183,38 +244,92 @@ func (a *AuditEntriesAPI) List(callback func([]dto.AuditEntryList, error)) {
 		return
 	}
 	var items []core.AuditEntry
-	if err := db.Order("created_at desc").Find(&items).Error; err != nil {
+	if err := db.Find(&items).Error; err != nil {
+		callback(nil, err)
+		return
+	}
+	// Convert to DTOs using field mappings from gux tags
+	result := make([]dto.AuditEntryList, len(items))
+	for i, item := range items {
+		result[i] = dto.AuditEntryList{
+			ID: item.ID,
+			CreatedAt: item.CreatedAt,
+			Action: string(item.Action),
+			EntityType: item.EntityType,
+			EntityID: item.EntityID,
+			UserID: item.UserID,
+			UserEmail: item.UserEmail,
+			IPAddress: item.IPAddress,
+			Changes: item.Changes,
+		}
+	}
+	callback(result, nil)
+}
+
+// ListFiltered returns AuditEntry records matching the given filters.
+func (a *AuditEntriesAPI) ListFiltered(params map[string]string, callback func([]dto.AuditEntryList, error)) {
+	if db == nil {
+		callback(nil, nil)
+		return
+	}
+	query := db
+	for k, v := range params {
+		query = query.Where(k+" = ?", v)
+	}
+	var items []core.AuditEntry
+	if err := query.Find(&items).Error; err != nil {
 		callback(nil, err)
 		return
 	}
 	result := make([]dto.AuditEntryList, len(items))
 	for i, item := range items {
 		result[i] = dto.AuditEntryList{
-			ID:         item.ID,
-			CreatedAt:  item.CreatedAt,
-			Action:     string(item.Action),
+			ID: item.ID,
+			CreatedAt: item.CreatedAt,
+			Action: string(item.Action),
 			EntityType: item.EntityType,
-			EntityID:   item.EntityID,
-			UserID:     item.UserID,
-			UserEmail:  item.UserEmail,
-			IPAddress:  item.IPAddress,
-			Changes:    item.Changes,
+			EntityID: item.EntityID,
+			UserID: item.UserID,
+			UserEmail: item.UserEmail,
+			IPAddress: item.IPAddress,
+			Changes: item.Changes,
 		}
 	}
 	callback(result, nil)
 }
 
-// LoginResponse is the response from the login API.
-type LoginResponse struct {
-	Success  bool   `json:"success"`
-	Error    string `json:"error,omitempty"`
-	Redirect string `json:"redirect,omitempty"`
+// Get returns a single AuditEntry by ID.
+func (a *AuditEntriesAPI) Get(id uint, callback func(*dto.AuditEntryList, error)) {
+	if db == nil {
+		callback(nil, nil)
+		return
+	}
+	var item core.AuditEntry
+	if err := db.First(&item, id).Error; err != nil {
+		callback(nil, err)
+		return
+	}
+	result := &dto.AuditEntryList{
+	}
+	callback(result, nil)
 }
 
-// Login is a no-op on server side (login happens via HTTP POST in browser).
-func Login(data map[string]interface{}, callback func(LoginResponse, error)) {
-	callback(LoginResponse{}, nil)
+// Create creates a new AuditEntry (server-side stub - actual creation handled by CRUD endpoint).
+func (a *AuditEntriesAPI) Create(data map[string]interface{}, callback func(*dto.AuditEntryList, error)) {
+	// Server-side: this is typically not called directly
+	// The CRUD endpoint handles creation with hooks
+	callback(nil, nil)
 }
 
-// Ensure imports are used.
-var _ json.Marshaler
+// Update updates an existing AuditEntry (server-side stub).
+func (a *AuditEntriesAPI) Update(id uint, data map[string]interface{}, callback func(*dto.AuditEntryList, error)) {
+	// Server-side: this is typically not called directly
+	callback(nil, nil)
+}
+
+// Delete deletes a AuditEntry by ID (server-side stub).
+func (a *AuditEntriesAPI) Delete(id uint, callback func(error)) {
+	// Server-side: this is typically not called directly
+	callback(nil)
+}
+
