@@ -128,7 +128,11 @@ core.Attrs{
     // Lifecycle hooks (WASM only, ignored in SSR)
     OnMount: func(el any) {
         // Called after element + children are created in DOM.
-        // el is js.Value in WASM. Must be idempotent (called on every render).
+        // el is js.Value in WASM. Called on every render.
+    },
+    OnUnmount: func() {
+        // Called before DOM tree is replaced on next render.
+        // Use for cleanup: disposing JS libraries, removing global listeners.
     },
 
     // Additional attributes
@@ -1338,9 +1342,9 @@ handle.Clear() // manual cancel
 
 All active timers are automatically cleared when the user navigates away (`Router.ClearState()`).
 
-### OnMount Lifecycle Hook
+### Lifecycle Hooks: OnMount & OnUnmount
 
-`OnMount` fires after the element and its children are created in the DOM (WASM only, ignored in SSR). The callback receives the DOM element as `any` (cast to `js.Value` in WASM). Since gux replaces DOM trees on re-render, `OnMount` fires on every render — initialization must be idempotent.
+`OnMount` fires after the element and its children are created in the DOM. `OnUnmount` fires before the DOM tree is replaced on the next render. Both are WASM only, ignored in SSR.
 
 ```go
 core.Div(core.Attrs{
@@ -1348,10 +1352,15 @@ core.Div(core.Attrs{
     OnMount: func(el any) {
         jsEl := el.(js.Value)
         // Initialize JS library on the DOM element
-        // Check for existing initialization to be idempotent
+    },
+    OnUnmount: func() {
+        // Clean up before DOM replacement
+        // Dispose JS libraries, remove global listeners, etc.
     },
 }, children...)
 ```
+
+`OnMount` fires on every render (gux replaces DOM trees). `OnUnmount` runs all registered callbacks before `innerHTML` is cleared, then drains the list. The VideoPlayer uses `OnUnmount` to call `videojs.dispose()` automatically.
 
 ### Script & CSS Loading (WASM)
 

@@ -132,9 +132,10 @@ func VideoPlayer(props VideoPlayerProps) core.Node {
 		Preload:  props.Preload,
 	}
 
-	// Set OnMount for WASM initialization (VideoJS or native events)
+	// Set OnMount/OnUnmount for WASM initialization (VideoJS or native events)
 	if props.EnableVideoJS {
 		attrs.OnMount = createVideoJSInitializer(videoID, props)
+		attrs.OnUnmount = createVideoJSDisposer(videoID)
 	} else if hasEventHandlers(props) {
 		attrs.OnMount = createNativeVideoHandlers(props)
 	}

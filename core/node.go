@@ -71,6 +71,11 @@ type Attrs struct {
 	// JS library initialization should be idempotent.
 	OnMount func(el any)
 
+	// OnUnmount is called before the element's DOM subtree is replaced
+	// (WASM only, ignored in SSR). Use for cleanup: disposing JS library
+	// instances, removing global event listeners, etc.
+	OnUnmount func()
+
 	// Additional attributes not covered above
 	Extra map[string]string
 }

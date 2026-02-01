@@ -1902,6 +1902,8 @@ func main() {
 			focusName = activeElement.Call("getAttribute", "name").String()
 		}
 
+		// Fire unmount callbacks before destroying DOM tree
+		core.FireUnmountCallbacks()
 		container.Set("innerHTML", "")
 
 		// Use cached component - closures remain stable across re-renders
@@ -2263,6 +2265,8 @@ func main() {
 			focusName = activeElement.Call("getAttribute", "name").String()
 		}
 
+		// Fire unmount callbacks before destroying DOM tree
+		core.FireUnmountCallbacks()
 		container.Set("innerHTML", "")
 
 		// Use cached component - closures remain stable across re-renders

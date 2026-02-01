@@ -14,23 +14,29 @@ const (
 	googleIMASDK         = "https://imasdk.googleapis.com/js/sdkloader/ima3.js"
 )
 
+// createVideoJSDisposer returns an OnUnmount callback that disposes the VideoJS player.
+func createVideoJSDisposer(videoID string) func() {
+	return func() {
+		videojs := js.Global().Get("videojs")
+		if videojs.IsUndefined() || videojs.IsNull() {
+			return
+		}
+		players := videojs.Get("players")
+		if players.IsUndefined() || players.IsNull() {
+			return
+		}
+		existing := players.Get(videoID)
+		if existing.IsUndefined() || existing.IsNull() {
+			return
+		}
+		existing.Call("dispose")
+	}
+}
+
 // createVideoJSInitializer returns an OnMount callback that loads and initializes VideoJS.
 func createVideoJSInitializer(videoID string, props VideoPlayerProps) func(el any) {
 	return func(el any) {
 		jsEl := el.(js.Value)
-
-		// Check if this element already has a VideoJS player instance
-		videojs := js.Global().Get("videojs")
-		if !videojs.IsUndefined() && !videojs.IsNull() {
-			players := videojs.Get("players")
-			if !players.IsUndefined() && !players.IsNull() {
-				existing := players.Get(videoID)
-				if !existing.IsUndefined() && !existing.IsNull() {
-					// Player already initialized — skip re-initialization
-					return
-				}
-			}
-		}
 
 		// Determine CSS and JS URLs
 		cssURL := defaultVideoJSCSS

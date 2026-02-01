@@ -633,25 +633,33 @@ go test ./... -count=1 -timeout 120s
 - **Temp directories**: Tests that need file system access should use `t.TempDir()` and `os.Chdir()` with defer to restore.
 - **Cache clearing**: Tests that use `getModelFieldTypes()` must reset `modelFieldTypesCache` before running.
 
-## OnMount Lifecycle Hook
+## Lifecycle Hooks: OnMount & OnUnmount
 
-`OnMount` is a callback on `Attrs` that fires after an element's DOM node is created and all children are appended. It only runs in WASM — it's ignored during SSR.
+`OnMount` fires after an element's DOM node is created and all children are appended. `OnUnmount` fires before the element's DOM tree is replaced on the next render. Both only run in WASM — they're ignored during SSR.
 
 ```go
 core.Div(core.Attrs{
     ID: "my-element",
     OnMount: func(el any) {
         // el is a syscall/js.Value in WASM
-        // Cast: jsEl := el.(js.Value)
         // Initialize JS libraries, add DOM listeners, etc.
+        jsEl := el.(js.Value)
+        initLibrary(jsEl)
+    },
+    OnUnmount: func() {
+        // Clean up before DOM replacement
+        // Dispose JS library instances, remove global listeners, etc.
+        disposeLibrary()
     },
 }, children...)
 ```
 
 **Key behavior:**
-- Called on **every render** (not just first mount), since gux replaces DOM trees on re-render
-- JS library initialization should be **idempotent** (e.g., VideoJS returns existing player if already initialized)
-- The `el` parameter is `any` — cast to `syscall/js.Value` in WASM code
+- `OnMount` is called on **every render** (gux replaces DOM trees on re-render)
+- `OnUnmount` is called **before** the next render clears the DOM — use it for cleanup
+- `OnMount` receives the DOM element as `any` (cast to `syscall/js.Value` in WASM)
+- `OnUnmount` takes no arguments — capture references in closures if needed
+- The VideoPlayer component uses `OnUnmount` to call `videojs.dispose()` automatically
 
 ## Script & CSS Loading
 

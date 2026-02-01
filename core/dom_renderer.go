@@ -8,6 +8,26 @@ import (
 
 var document = js.Global().Get("document")
 
+// unmountCallbacks collects cleanup functions registered during render.
+// Drained by FireUnmountCallbacks() before the next DOM replacement.
+var unmountCallbacks []func()
+
+// RegisterUnmount adds a cleanup callback to run before DOM replacement.
+func RegisterUnmount(fn func()) {
+	if fn != nil {
+		unmountCallbacks = append(unmountCallbacks, fn)
+	}
+}
+
+// FireUnmountCallbacks runs all registered unmount callbacks and clears the list.
+// Called from generated WASM main() before container.innerHTML is cleared.
+func FireUnmountCallbacks() {
+	for _, fn := range unmountCallbacks {
+		fn()
+	}
+	unmountCallbacks = nil
+}
+
 // SVG namespace URI
 const svgNamespace = "http://www.w3.org/2000/svg"
 
@@ -226,6 +246,11 @@ func (r *DOMRenderer) RenderElement(tag string, attrs Attrs, children []Node) Re
 	// Lifecycle hook: called after element and children are created
 	if attrs.OnMount != nil {
 		attrs.OnMount(el)
+	}
+
+	// Register unmount callback for cleanup before next DOM replacement
+	if attrs.OnUnmount != nil {
+		RegisterUnmount(attrs.OnUnmount)
 	}
 
 	return &domResult{value: el}
