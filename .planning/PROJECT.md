@@ -39,7 +39,15 @@ Developers can build complete web applications in Go — from marketing sites to
 
 ### Active
 
-<!-- No active requirements — milestone complete, awaiting next milestone definition -->
+<!-- Current scope: v2.4 File Upload System -->
+
+- [ ] File upload UI component with drag-and-drop, progress, file type validation
+- [ ] Storage abstraction layer (Local + S3 implementations)
+- [ ] CRUD integration — new `"type": "file"` field type in gux.config.json
+- [ ] Multi-file support (single and multi-file fields)
+- [ ] Image preview/thumbnails in admin UI
+- [ ] File lifecycle hooks (BeforeUpload, AfterUpload, BeforeDelete)
+- [ ] Storage config in gux.config.json with code overrides
 
 ### Out of Scope
 
@@ -54,6 +62,12 @@ Developers can build complete web applications in Go — from marketing sites to
 - Breadcrumb/ButtonGroup/IconButton — v2.0 tech debt, not needed by examples
 
 ## Context
+
+### Current Milestone: v2.4 File Upload System
+
+**Goal:** Add a complete file upload system — UI component, storage abstraction, CRUD integration, and lifecycle hooks — so developers can add file fields to models and get working uploads out of the box.
+
+**GitHub Issue:** #43
 
 ### Current State (v2.3)
 
@@ -114,4 +128,4 @@ Completed v2.3 gux help Patterns. Codebase is clean with full CLI tooling:
 
 ---
 
-*Last updated: 2026-01-26 after v2.3 milestone completion*
+*Last updated: 2026-02-01 after v2.4 milestone start*
