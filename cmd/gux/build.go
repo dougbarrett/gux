@@ -687,68 +687,64 @@ func getModelFieldTypes(modelName string) (map[string]string, error) {
 		return cached, nil
 	}
 
-	// Parse models directory (guxgen/models for generated, models for manual)
-	entries, err := os.ReadDir(filepath.Join("guxgen", "models"))
-	if err != nil {
-		// Fall back to models/ for backwards compatibility
-		entries, err = os.ReadDir("models")
-		if err != nil {
-			return nil, fmt.Errorf("read models dir: %w", err)
-		}
-	}
-
-	modelsDir := filepath.Join("guxgen", "models")
-	if _, err := os.Stat(modelsDir); os.IsNotExist(err) {
-		modelsDir = "models"
-	}
-
-	for _, entry := range entries {
-		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".go") {
-			continue
-		}
-
-		fset := token.NewFileSet()
-		filename := filepath.Join(modelsDir, entry.Name())
-		node, err := parser.ParseFile(fset, filename, nil, parser.ParseComments)
+	// Search models/ (user-defined) first, then guxgen/models/ (generated).
+	// User-defined structs are the source of truth for field types (e.g., pointer
+	// types like *float64 that the generated code from config may not preserve).
+	modelsDirs := []string{"models", filepath.Join("guxgen", "models")}
+	for _, modelsDir := range modelsDirs {
+		entries, err := os.ReadDir(modelsDir)
 		if err != nil {
 			continue
 		}
 
-		// Look for the target struct
-		for _, decl := range node.Decls {
-			genDecl, ok := decl.(*ast.GenDecl)
-			if !ok || genDecl.Tok != token.TYPE {
+		for _, entry := range entries {
+			if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".go") {
 				continue
 			}
 
-			for _, spec := range genDecl.Specs {
-				typeSpec, ok := spec.(*ast.TypeSpec)
-				if !ok || typeSpec.Name.Name != modelName {
+			fset := token.NewFileSet()
+			filename := filepath.Join(modelsDir, entry.Name())
+			node, err := parser.ParseFile(fset, filename, nil, parser.ParseComments)
+			if err != nil {
+				continue
+			}
+
+			// Look for the target struct
+			for _, decl := range node.Decls {
+				genDecl, ok := decl.(*ast.GenDecl)
+				if !ok || genDecl.Tok != token.TYPE {
 					continue
 				}
 
-				structType, ok := typeSpec.Type.(*ast.StructType)
-				if !ok {
-					// Type alias (e.g., type X = pkg.Y) — follow the alias
-					if resolved := resolveTypeAlias(node, typeSpec); resolved != nil {
-						modelFieldTypesCache[modelName] = resolved
-						return resolved, nil
-					}
-					continue
-				}
-
-				fieldTypes := make(map[string]string)
-				for _, field := range structType.Fields.List {
-					if len(field.Names) == 0 {
+				for _, spec := range genDecl.Specs {
+					typeSpec, ok := spec.(*ast.TypeSpec)
+					if !ok || typeSpec.Name.Name != modelName {
 						continue
 					}
-					fieldName := field.Names[0].Name
-					fieldTypes[fieldName] = formatType(field.Type)
-				}
 
-				// Cache and return
-				modelFieldTypesCache[modelName] = fieldTypes
-				return fieldTypes, nil
+					structType, ok := typeSpec.Type.(*ast.StructType)
+					if !ok {
+						// Type alias (e.g., type X = pkg.Y) — follow the alias
+						if resolved := resolveTypeAlias(node, typeSpec); resolved != nil {
+							modelFieldTypesCache[modelName] = resolved
+							return resolved, nil
+						}
+						continue
+					}
+
+					fieldTypes := make(map[string]string)
+					for _, field := range structType.Fields.List {
+						if len(field.Names) == 0 {
+							continue
+						}
+						fieldName := field.Names[0].Name
+						fieldTypes[fieldName] = formatType(field.Type)
+					}
+
+					// Cache and return
+					modelFieldTypesCache[modelName] = fieldTypes
+					return fieldTypes, nil
+				}
 			}
 		}
 	}

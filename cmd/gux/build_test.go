@@ -890,3 +890,150 @@ type Promotion = customModels.Promotion
 		t.Errorf("getModelFieldTypes: MinWatchTimeSec = %q, want *float64", modelFields["MinWatchTimeSec"])
 	}
 }
+
+// TestGetModelFieldTypes_UserDefinedOverridesGenerated tests that when both
+// models/ and guxgen/models/ contain a struct with the same name (no alias),
+// the user-defined struct in models/ takes precedence (#53).
+func TestGetModelFieldTypes_UserDefinedOverridesGenerated(t *testing.T) {
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(origDir)
+
+	os.WriteFile("go.mod", []byte("module testapp\n\ngo 1.23\n"), 0644)
+
+	// models/promotion_video.go - user-defined with pointer types
+	os.MkdirAll("models", 0755)
+	os.WriteFile("models/promotion_video.go", []byte(`package models
+
+import "gorm.io/gorm"
+
+type PromotionVideo struct {
+	gorm.Model
+	Title           string   `+"`"+`json:"title"`+"`"+`
+	MinWatchTimeSec *float64 `+"`"+`json:"min_watch_time_sec"`+"`"+`
+	AdTagURL        *string  `+"`"+`json:"ad_tag_url"`+"`"+`
+	PromotionID     *uint    `+"`"+`json:"promotion_id"`+"`"+`
+}
+`), 0644)
+
+	// guxgen/models/promotion_video_gen.go - generated without pointer types
+	os.MkdirAll(filepath.Join("guxgen", "models"), 0755)
+	os.WriteFile(filepath.Join("guxgen", "models", "promotion_video_gen.go"), []byte(`package models
+
+import "gorm.io/gorm"
+
+type PromotionVideo struct {
+	gorm.Model
+	Title           string  `+"`"+`json:"title"`+"`"+`
+	MinWatchTimeSec float64 `+"`"+`json:"min_watch_time_sec"`+"`"+`
+	AdTagURL        string  `+"`"+`json:"ad_tag_url"`+"`"+`
+	PromotionID     uint    `+"`"+`json:"promotion_id"`+"`"+`
+}
+`), 0644)
+
+	// Reset cache
+	modelFieldTypesCache = make(map[string]map[string]string)
+
+	fields, err := getModelFieldTypes("PromotionVideo")
+	if err != nil {
+		t.Fatalf("getModelFieldTypes: %v", err)
+	}
+
+	// User-defined pointer types should win
+	tests := []struct {
+		field string
+		want  string
+	}{
+		{"Title", "string"},
+		{"MinWatchTimeSec", "*float64"},
+		{"AdTagURL", "*string"},
+		{"PromotionID", "*uint"},
+	}
+
+	for _, tt := range tests {
+		if got := fields[tt.field]; got != tt.want {
+			t.Errorf("getModelFieldTypes: %s = %q, want %q", tt.field, got, tt.want)
+		}
+	}
+}
+
+// TestGetModelFieldTypes_OnlyGenerated tests that when only guxgen/models/
+// exists (no user-defined models/), the generated struct is used correctly.
+func TestGetModelFieldTypes_OnlyGenerated(t *testing.T) {
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(origDir)
+
+	os.WriteFile("go.mod", []byte("module testapp\n\ngo 1.23\n"), 0644)
+
+	// Only guxgen/models/ exists
+	os.MkdirAll(filepath.Join("guxgen", "models"), 0755)
+	os.WriteFile(filepath.Join("guxgen", "models", "product_gen.go"), []byte(`package models
+
+import "gorm.io/gorm"
+
+type Product struct {
+	gorm.Model
+	Name  string
+	Price float64
+}
+`), 0644)
+
+	modelFieldTypesCache = make(map[string]map[string]string)
+
+	fields, err := getModelFieldTypes("Product")
+	if err != nil {
+		t.Fatalf("getModelFieldTypes: %v", err)
+	}
+
+	if fields["Name"] != "string" {
+		t.Errorf("Name = %q, want string", fields["Name"])
+	}
+	if fields["Price"] != "float64" {
+		t.Errorf("Price = %q, want float64", fields["Price"])
+	}
+}
+
+// TestGetModelFieldTypes_OnlyUserDefined tests that when only models/ exists
+// (no guxgen/models/), the user struct is used correctly.
+func TestGetModelFieldTypes_OnlyUserDefined(t *testing.T) {
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(origDir)
+
+	os.WriteFile("go.mod", []byte("module testapp\n\ngo 1.23\n"), 0644)
+
+	// Only models/ exists
+	os.MkdirAll("models", 0755)
+	os.WriteFile("models/order.go", []byte(`package models
+
+import "gorm.io/gorm"
+
+type Order struct {
+	gorm.Model
+	Total    *float64
+	Discount *float64
+	Note     *string
+}
+`), 0644)
+
+	modelFieldTypesCache = make(map[string]map[string]string)
+
+	fields, err := getModelFieldTypes("Order")
+	if err != nil {
+		t.Fatalf("getModelFieldTypes: %v", err)
+	}
+
+	if fields["Total"] != "*float64" {
+		t.Errorf("Total = %q, want *float64", fields["Total"])
+	}
+	if fields["Discount"] != "*float64" {
+		t.Errorf("Discount = %q, want *float64", fields["Discount"])
+	}
+	if fields["Note"] != "*string" {
+		t.Errorf("Note = %q, want *string", fields["Note"])
+	}
+}
