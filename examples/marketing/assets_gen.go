@@ -18,5 +18,5 @@ var stylesCSS []byte
 
 func init() {
 	core.SetDefaultAssets(wasmBinary, wasmExecJS, stylesCSS)
-	core.SetDefaultAssetHashes("b52080cc", map[string]string{"app": "03e6d143", })
+	core.SetDefaultAssetHashes("b52080cc", map[string]string{"app": "a847ef2f", })
 }

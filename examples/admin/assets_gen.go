@@ -7,15 +7,16 @@ import (
 	"github.com/dougbarrett/gux/core"
 )
 
-//go:embed .gux/dist/app.wasm
+//go:embed guxgen/dist/app.wasm
 var wasmBinary []byte
 
-//go:embed .gux/dist/wasm_exec.js
+//go:embed guxgen/dist/wasm_exec.js
 var wasmExecJS []byte
 
-//go:embed .gux/dist/styles.css
+//go:embed guxgen/dist/styles.css
 var stylesCSS []byte
 
-	func init() {
-		core.SetDefaultAssets(wasmBinary, wasmExecJS, stylesCSS)
-	}
+func init() {
+	core.SetDefaultAssets(wasmBinary, wasmExecJS, stylesCSS)
+	core.SetDefaultAssetHashes("34af0a1f", map[string]string{"app": "2c4df841", })
+}
