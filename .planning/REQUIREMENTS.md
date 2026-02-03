@@ -40,10 +40,10 @@ Requirements for v2.4 milestone. Each maps to roadmap phases.
 
 ### Multi-File Support
 
-- [ ] **MULT-01**: Developer can define a multi-file field using `"input": "file[]"` or equivalent in gux.config.json
-- [ ] **MULT-02**: User can upload multiple files to a multi-file field
-- [ ] **MULT-03**: User can remove individual files from a multi-file field
-- [ ] **MULT-04**: Multi-file values are stored as a JSON array of file paths in the database
+- [x] **MULT-01**: Developer can define a multi-file field using `"input": "file[]"` or equivalent in gux.config.json
+- [x] **MULT-02**: User can upload multiple files to a multi-file field
+- [x] **MULT-03**: User can remove individual files from a multi-file field
+- [x] **MULT-04**: Multi-file values are stored as a JSON array of file paths in the database
 
 ### CRUD & Code Generation Integration
 
@@ -69,9 +69,9 @@ Requirements for v2.4 milestone. Each maps to roadmap phases.
 
 ### Configuration
 
-- [ ] **CONF-01**: File field accepts configurable allowed file types per field (e.g., `"accept": "image/*"`)
-- [ ] **CONF-02**: File field accepts configurable max file size per field (e.g., `"maxSize": "5MB"`)
-- [ ] **CONF-03**: File field accepts configurable upload directory per field (e.g., `"directory": "avatars"`)
+- [x] **CONF-01**: File field accepts configurable allowed file types per field (e.g., `"accept": "image/*"`)
+- [x] **CONF-02**: File field accepts configurable max file size per field (e.g., `"maxSize": "5MB"`)
+- [x] **CONF-03**: File field accepts configurable upload directory per field (e.g., `"directory": "avatars"`)
 
 ## v2 Requirements
 
@@ -152,13 +152,13 @@ Which phases cover which requirements. Updated during roadmap creation.
 | HOOK-04 | Phase 31 | Complete |
 | HOOK-05 | Phase 31 | Complete |
 | HOOK-06 | Phase 31 | Complete |
-| MULT-01 | Phase 32 | Pending |
-| MULT-02 | Phase 32 | Pending |
-| MULT-03 | Phase 32 | Pending |
-| MULT-04 | Phase 32 | Pending |
-| CONF-01 | Phase 32 | Pending |
-| CONF-02 | Phase 32 | Pending |
-| CONF-03 | Phase 32 | Pending |
+| MULT-01 | Phase 32 | Complete |
+| MULT-02 | Phase 32 | Complete |
+| MULT-03 | Phase 32 | Complete |
+| MULT-04 | Phase 32 | Complete |
+| CONF-01 | Phase 32 | Complete |
+| CONF-02 | Phase 32 | Complete |
+| CONF-03 | Phase 32 | Complete |
 
 **Coverage:**
 - v1 requirements: 45 total

@@ -18,7 +18,7 @@ A full-stack Go framework for building modern web applications with WebAssembly.
 - [v2.1 Dead Code Cleanup](milestones/v2.1-ROADMAP.md) (Phases 24-26) - SHIPPED 2026-01-26
 - [v2.2 gux init Modernization](milestones/v2.2-ROADMAP.md) (Phase 27) - SHIPPED 2026-01-26
 - [v2.3 gux help Patterns](milestones/v2.3-ROADMAP.md) (Phase 28) - SHIPPED 2026-01-26
-- **v2.4 File Upload System** (Phases 29-32) - IN PROGRESS
+- **v2.4 File Upload System** (Phases 29-32) - SHIPPED 2026-02-03
 
 ## Phases
 
@@ -124,14 +124,14 @@ Full details: [milestones/v2.3-ROADMAP.md](milestones/v2.3-ROADMAP.md)
 
 </details>
 
-### v2.4 File Upload System (In Progress)
+### v2.4 File Upload System (SHIPPED 2026-02-03)
 
 **Milestone Goal:** Developers can add `"input": "file"` to a model field in gux.config.json and get complete file upload -- UI, storage, API, admin integration -- with zero manual wiring.
 
 - [x] **Phase 29: Storage Foundation** - Storage interface, local backend, upload endpoint, file serving
 - [x] **Phase 30: Upload Client & UI Component** - WASM upload with progress, drag-drop UI, image preview
 - [x] **Phase 31: Code Generation & CRUD Integration** - Config-driven file fields, admin scaffolding, lifecycle hooks, auto-cleanup
-- [ ] **Phase 32: Multi-File & Configuration** - Multi-file fields, per-field config for types/size/directory
+- [x] **Phase 32: Multi-File & Configuration** - Multi-file fields, per-field config for types/size/directory
 
 #### Phase 29: Storage Foundation
 **Goal**: Developer can upload files through a server endpoint and serve them via HTTP, with a clean storage abstraction that decouples file location from application code
@@ -192,8 +192,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 32-01-PLAN.md -- MultiFileUpload UI component (SSR + WASM), CRUD multi-file lifecycle (JSON array cleanup), upload directory routing
-- [ ] 32-02-PLAN.md -- Code generation for file[] fields (forms, detail, list), per-field accept/maxSize/directory config, parseSizeString
+- [x] 32-01-PLAN.md -- MultiFileUpload UI component (SSR + WASM), CRUD multi-file lifecycle (JSON array cleanup), upload directory routing
+- [x] 32-02-PLAN.md -- Code generation for file[] fields (forms, detail, list), per-field accept/maxSize/directory config, parseSizeString
 
 ## Progress
 
@@ -233,4 +233,4 @@ Phases execute in numeric order: 1 -> 2 -> ... -> 28 -> 29 -> 30 -> 31 -> 32
 | 29. Storage Foundation | v2.4 | 2/2 | Complete | 2026-02-01 |
 | 30. Upload Client & UI Component | v2.4 | 2/2 | Complete | 2026-02-01 |
 | 31. Code Generation & CRUD Integration | v2.4 | 2/2 | Complete | 2026-02-03 |
-| 32. Multi-File & Configuration | v2.4 | 0/2 | Not started | - |
+| 32. Multi-File & Configuration | v2.4 | 2/2 | Complete | 2026-02-03 |
