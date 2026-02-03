@@ -1,11 +1,16 @@
 package core
 
 import (
+	"context"
+	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestToSnakeCase(t *testing.T) {
@@ -182,5 +187,452 @@ func TestHandleList_NoDB_WithQueryParams(t *testing.T) {
 	// Should return 500 because no DB, not panic
 	if w.Code != http.StatusInternalServerError {
 		t.Errorf("expected 500 with no DB, got %d", w.Code)
+	}
+}
+
+// Mock storage for testing
+type mockStorage struct {
+	deleted []string
+	files   map[string]*mockFileInfo
+}
+
+type mockFileInfo struct {
+	size int64
+	name string
+}
+
+func (m *mockFileInfo) Name() string       { return m.name }
+func (m *mockFileInfo) Size() int64        { return m.size }
+func (m *mockFileInfo) Mode() os.FileMode  { return 0644 }
+func (m *mockFileInfo) ModTime() time.Time { return time.Time{} }
+func (m *mockFileInfo) IsDir() bool        { return false }
+func (m *mockFileInfo) Sys() interface{}   { return nil }
+
+type mockReadSeekCloser struct {
+	io.Reader
+}
+
+func (m *mockReadSeekCloser) Seek(offset int64, whence int) (int64, error) {
+	return 0, nil
+}
+
+func (m *mockReadSeekCloser) Close() error {
+	return nil
+}
+
+func (ms *mockStorage) Put(ctx context.Context, filename string, data io.Reader, size int64) (*UploadResult, error) {
+	return &UploadResult{Key: filename, URL: "/files/" + filename, Filename: filename, Size: size}, nil
+}
+
+func (ms *mockStorage) Delete(ctx context.Context, key string) error {
+	ms.deleted = append(ms.deleted, key)
+	return nil
+}
+
+func (ms *mockStorage) URL(key string) string {
+	return "/files/" + key
+}
+
+func (ms *mockStorage) Serve(key string) (io.ReadSeekCloser, os.FileInfo, error) {
+	if file, ok := ms.files[key]; ok {
+		return &mockReadSeekCloser{strings.NewReader("")}, file, nil
+	}
+	return nil, nil, errors.New("file not found")
+}
+
+func TestWithFileFields(t *testing.T) {
+	model := CRUDModel{}
+	opt := WithFileFields("Avatar", "Document")
+	opt(&model)
+
+	if len(model.FileFields) != 2 {
+		t.Errorf("expected 2 file fields, got %d", len(model.FileFields))
+	}
+	if model.FileFields[0] != "Avatar" || model.FileFields[1] != "Document" {
+		t.Errorf("file fields not set correctly: %v", model.FileFields)
+	}
+}
+
+func TestWithBeforeUpload(t *testing.T) {
+	called := false
+	hook := func(meta UploadMeta) error {
+		called = true
+		return nil
+	}
+
+	model := CRUDModel{}
+	opt := WithBeforeUpload(hook)
+	opt(&model)
+
+	if model.OnBeforeUpload == nil {
+		t.Error("OnBeforeUpload hook not set")
+	}
+
+	// Call the hook to verify it works
+	model.OnBeforeUpload(UploadMeta{Filename: "test.jpg"})
+	if !called {
+		t.Error("hook was not called")
+	}
+}
+
+func TestWithAfterUpload(t *testing.T) {
+	called := false
+	hook := func(result UploadResult) error {
+		called = true
+		return nil
+	}
+
+	model := CRUDModel{}
+	opt := WithAfterUpload(hook)
+	opt(&model)
+
+	if model.OnAfterUpload == nil {
+		t.Error("OnAfterUpload hook not set")
+	}
+
+	// Call the hook to verify it works
+	model.OnAfterUpload(UploadResult{Key: "test.jpg"})
+	if !called {
+		t.Error("hook was not called")
+	}
+}
+
+func TestWithBeforeFileDelete(t *testing.T) {
+	called := false
+	hook := func(key string) error {
+		called = true
+		return nil
+	}
+
+	model := CRUDModel{}
+	opt := WithBeforeFileDelete(hook)
+	opt(&model)
+
+	if model.OnBeforeFileDelete == nil {
+		t.Error("OnBeforeFileDelete hook not set")
+	}
+
+	// Call the hook to verify it works
+	model.OnBeforeFileDelete("test.jpg")
+	if !called {
+		t.Error("hook was not called")
+	}
+}
+
+func TestWithNoAutoCleanup(t *testing.T) {
+	model := CRUDModel{}
+	opt := WithNoAutoCleanup()
+	opt(&model)
+
+	if !model.DisableAutoCleanup {
+		t.Error("DisableAutoCleanup not set to true")
+	}
+}
+
+func TestGetFileFieldValues(t *testing.T) {
+	type TestModel struct {
+		ID       uint
+		Name     string
+		Avatar   string
+		Document string
+		NotFile  int
+	}
+
+	tests := []struct {
+		name       string
+		model      TestModel
+		fileFields []string
+		want       map[string]string
+	}{
+		{
+			name:       "extract multiple file fields",
+			model:      TestModel{Avatar: "avatar.jpg", Document: "doc.pdf"},
+			fileFields: []string{"Avatar", "Document"},
+			want:       map[string]string{"Avatar": "avatar.jpg", "Document": "doc.pdf"},
+		},
+		{
+			name:       "empty field values",
+			model:      TestModel{Avatar: "", Document: ""},
+			fileFields: []string{"Avatar", "Document"},
+			want:       map[string]string{"Avatar": "", "Document": ""},
+		},
+		{
+			name:       "missing field name",
+			model:      TestModel{Avatar: "avatar.jpg"},
+			fileFields: []string{"Avatar", "NonExistent"},
+			want:       map[string]string{"Avatar": "avatar.jpg"},
+		},
+		{
+			name:       "no file fields",
+			model:      TestModel{Avatar: "avatar.jpg"},
+			fileFields: []string{},
+			want:       map[string]string{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := getFileFieldValues(tt.model, tt.fileFields)
+			if len(got) != len(tt.want) {
+				t.Errorf("got %d fields, want %d", len(got), len(tt.want))
+			}
+			for k, v := range tt.want {
+				if got[k] != v {
+					t.Errorf("field %s: got %q, want %q", k, got[k], v)
+				}
+			}
+		})
+	}
+}
+
+func TestDeleteFileIfExists(t *testing.T) {
+	tests := []struct {
+		name        string
+		key         string
+		storage     Storage
+		hook        BeforeFileDeleteHook
+		noCleanup   bool
+		wantDeleted bool
+	}{
+		{
+			name:        "empty key - no op",
+			key:         "",
+			storage:     &mockStorage{},
+			wantDeleted: false,
+		},
+		{
+			name:        "nil storage - no op",
+			key:         "test.jpg",
+			storage:     nil,
+			wantDeleted: false,
+		},
+		{
+			name:        "successful delete",
+			key:         "test.jpg",
+			storage:     &mockStorage{},
+			wantDeleted: true,
+		},
+		{
+			name:    "hook prevents delete",
+			key:     "test.jpg",
+			storage: &mockStorage{},
+			hook: func(key string) error {
+				return errors.New("cannot delete")
+			},
+			wantDeleted: false,
+		},
+		{
+			name:        "disable auto cleanup",
+			key:         "test.jpg",
+			storage:     &mockStorage{},
+			noCleanup:   true,
+			wantDeleted: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var ms *mockStorage
+			if tt.storage != nil {
+				ms = tt.storage.(*mockStorage)
+				ms.deleted = []string{}
+			}
+
+			app := &App{storage: tt.storage}
+			model := CRUDModel{
+				OnBeforeFileDelete: tt.hook,
+				DisableAutoCleanup: tt.noCleanup,
+			}
+
+			app.deleteFileIfExists(model, tt.key)
+
+			if ms != nil {
+				deleted := len(ms.deleted) > 0
+				if deleted != tt.wantDeleted {
+					t.Errorf("deleted = %v, want %v", deleted, tt.wantDeleted)
+				}
+				if tt.wantDeleted && len(ms.deleted) > 0 && ms.deleted[0] != tt.key {
+					t.Errorf("deleted key = %q, want %q", ms.deleted[0], tt.key)
+				}
+			}
+		})
+	}
+}
+
+func TestFileInfoFromKey(t *testing.T) {
+	ms := &mockStorage{
+		files: map[string]*mockFileInfo{
+			"abc123/test.jpg": {size: 1024, name: "test.jpg"},
+		},
+	}
+
+	tests := []struct {
+		name    string
+		storage Storage
+		key     string
+		want    *FileInfo
+	}{
+		{
+			name:    "empty key returns nil",
+			storage: ms,
+			key:     "",
+			want:    nil,
+		},
+		{
+			name:    "nil storage returns nil",
+			storage: nil,
+			key:     "test.jpg",
+			want:    nil,
+		},
+		{
+			name:    "valid key with file info",
+			storage: ms,
+			key:     "abc123/test.jpg",
+			want: &FileInfo{
+				URL:         "/files/abc123/test.jpg",
+				Filename:    "test.jpg",
+				Size:        1024,
+				ContentType: "image/jpeg",
+			},
+		},
+		{
+			name:    "missing file - partial info",
+			storage: ms,
+			key:     "missing.jpg",
+			want: &FileInfo{
+				URL:         "/files/missing.jpg",
+				Filename:    "missing.jpg",
+				Size:        0,
+				ContentType: "",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := FileInfoFromKey(tt.storage, tt.key)
+			if tt.want == nil {
+				if got != nil {
+					t.Errorf("expected nil, got %+v", got)
+				}
+				return
+			}
+			if got == nil {
+				t.Errorf("expected FileInfo, got nil")
+				return
+			}
+			if got.URL != tt.want.URL {
+				t.Errorf("URL = %q, want %q", got.URL, tt.want.URL)
+			}
+			if got.Filename != tt.want.Filename {
+				t.Errorf("Filename = %q, want %q", got.Filename, tt.want.Filename)
+			}
+			if tt.storage.(*mockStorage).files[tt.key] != nil {
+				// Only check size and content type if file exists
+				if got.Size != tt.want.Size {
+					t.Errorf("Size = %d, want %d", got.Size, tt.want.Size)
+				}
+				if got.ContentType != tt.want.ContentType {
+					t.Errorf("ContentType = %q, want %q", got.ContentType, tt.want.ContentType)
+				}
+			}
+		})
+	}
+}
+
+func TestPopulateFileInfoFields(t *testing.T) {
+	type Model struct {
+		ID       uint
+		Avatar   string
+		Document string
+	}
+
+	type DTO struct {
+		ID       uint
+		Avatar   *FileInfo
+		Document *FileInfo
+		NotFile  string
+	}
+
+	ms := &mockStorage{
+		files: map[string]*mockFileInfo{
+			"avatar.jpg": {size: 2048, name: "avatar.jpg"},
+			"doc.pdf":    {size: 4096, name: "doc.pdf"},
+		},
+	}
+
+	app := &App{storage: ms}
+
+	tests := []struct {
+		name       string
+		model      Model
+		dto        DTO
+		fileFields []string
+		wantAvatar bool
+		wantDoc    bool
+	}{
+		{
+			name:       "populate single file field",
+			model:      Model{Avatar: "avatar.jpg"},
+			dto:        DTO{},
+			fileFields: []string{"Avatar"},
+			wantAvatar: true,
+			wantDoc:    false,
+		},
+		{
+			name:       "populate multiple file fields",
+			model:      Model{Avatar: "avatar.jpg", Document: "doc.pdf"},
+			dto:        DTO{},
+			fileFields: []string{"Avatar", "Document"},
+			wantAvatar: true,
+			wantDoc:    true,
+		},
+		{
+			name:       "empty key results in nil",
+			model:      Model{Avatar: ""},
+			dto:        DTO{},
+			fileFields: []string{"Avatar"},
+			wantAvatar: false,
+			wantDoc:    false,
+		},
+		{
+			name:       "no file fields",
+			model:      Model{Avatar: "avatar.jpg"},
+			dto:        DTO{},
+			fileFields: []string{},
+			wantAvatar: false,
+			wantDoc:    false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dto := tt.dto
+			app.populateFileInfoFields(&dto, tt.model, tt.fileFields)
+
+			if tt.wantAvatar {
+				if dto.Avatar == nil {
+					t.Error("Avatar FileInfo should be populated")
+				} else if dto.Avatar.URL != "/files/avatar.jpg" {
+					t.Errorf("Avatar URL = %q, want %q", dto.Avatar.URL, "/files/avatar.jpg")
+				}
+			} else {
+				if dto.Avatar != nil {
+					t.Errorf("Avatar should be nil, got %+v", dto.Avatar)
+				}
+			}
+
+			if tt.wantDoc {
+				if dto.Document == nil {
+					t.Error("Document FileInfo should be populated")
+				} else if dto.Document.URL != "/files/doc.pdf" {
+					t.Errorf("Document URL = %q, want %q", dto.Document.URL, "/files/doc.pdf")
+				}
+			} else {
+				if dto.Document != nil {
+					t.Errorf("Document should be nil, got %+v", dto.Document)
+				}
+			}
+		})
 	}
 }
