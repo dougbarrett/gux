@@ -369,6 +369,27 @@ func {{$.Name}}Cell{{.Name}}(item dto.{{$.Name}}List) core.Node {
 	}
 	return tableCell{{$.Name}}(text)
 	{{- end}}
+{{- else if .IsFile}}
+	fi := item.{{.DTOFieldName}}
+	if fi == nil {
+		return tableCell{{$.Name}}("-")
+	}
+	if isImageFile(fi.Filename) {
+		return core.Td(core.Class("px-6 py-4 whitespace-nowrap"),
+			core.Img(core.Attrs{
+				Src:   fi.URL,
+				Class: "h-10 w-10 rounded object-cover",
+				Alt:   "{{.Label}}",
+			}),
+		)
+	}
+	fileName := fi.Filename
+	return core.Td(core.Class("px-6 py-4 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300"),
+		core.Span(core.Class("inline-flex items-center gap-1"),
+			core.Span(core.Class("text-gray-400"), core.Text("\U0001F4CE")),
+			core.Text(fileName),
+		),
+	)
 {{- else if .IsTime}}
 	return tableCell{{$.Name}}(item.{{.DTOFieldName}}.Format("Jan 2, 2006"))
 {{- else if .IsDisplayField}}
@@ -709,6 +730,9 @@ package admin
 import (
 	"encoding/json"
 	"fmt"
+{{- if .HasFileFields}}
+	"path/filepath"
+{{- end}}
 	"strconv"
 	"strings"
 
@@ -1070,6 +1094,17 @@ func {{.NameLower}}DetailRow(label, value string) core.Node {
 	)
 {{- end}}
 }
+
+{{if .HasFileFields}}
+func isImageFile(path string) bool {
+	ext := strings.ToLower(filepath.Ext(path))
+	switch ext {
+	case ".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg":
+		return true
+	}
+	return false
+}
+{{end}}
 
 // {{.NameLower}}GetInitials extracts initials from a name for avatar display
 func {{.NameLower}}GetInitials(name string) string {
@@ -2469,6 +2504,32 @@ func generateDetailFieldCode(field *ModelField, tf TemplateField, modelNameLower
 	indent := "\t\t\t\t\t\t"
 
 	switch {
+	case field.Input == "file":
+		// File field - show image preview or download link
+		fileDetailCode := fmt.Sprintf(`func() core.Node {
+	fi := displayItem.%s
+	if fi == nil {
+		return %sDetailRow("%s", "-")
+	}
+	if isImageFile(fi.Filename) {
+		return core.Div(core.Class("py-3 px-6"),
+			core.Div(core.Class("text-sm font-medium text-gray-500 dark:text-gray-400 mb-2"), core.Text("%s")),
+			core.A(core.Attrs{Href: fi.URL, Class: "inline-block", Extra: map[string]string{"target": "_blank"}},
+				core.Img(core.Attrs{Src: fi.URL, Class: "max-w-xs rounded-lg border border-gray-200 dark:border-gray-700", Alt: "%s"}),
+			),
+		)
+	}
+	return core.Div(core.Class("py-3 px-6"),
+		core.Div(core.Class("text-sm font-medium text-gray-500 dark:text-gray-400 mb-2"), core.Text("%s")),
+		core.A(core.Attrs{Href: fi.URL, Class: "inline-flex items-center gap-2 text-blue-600 dark:text-blue-400 hover:underline", Extra: map[string]string{"download": "", "target": "_blank"}},
+			core.Span(core.Class("text-lg"), core.Text("\U0001F4CE")),
+			core.Text(fi.Filename),
+		),
+	)
+}(),
+`, tf.DTOFieldName, modelNameLower, tf.Label, tf.Label, tf.Label, tf.Label)
+		return indent + fileDetailCode
+
 	case field.Relation != "" && !IsSliceType(field.Type):
 		// FK relation - show related display field with nil check
 		preloadName := strings.TrimSuffix(field.Name, "ID")
