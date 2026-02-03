@@ -175,12 +175,11 @@ Plans:
   3. Generated admin list views show a thumbnail for image fields and a file icon or filename for non-image fields
   4. When a record with file fields is deleted via CRUD, the associated files are automatically removed from storage
   5. Developer can register BeforeUpload, AfterUpload, and BeforeDelete hooks that receive file metadata and follow the existing CRUD option pattern
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 31-01: gux.config.json file field type and model/DTO generation
-- [ ] 31-02: Admin form, detail, and list view generation for file fields
-- [ ] 31-03: CRUD auto-delete and lifecycle hooks
+- [ ] 31-01-PLAN.md -- CRUD file lifecycle hooks, auto-cleanup on delete/update, rollback on DB failure
+- [ ] 31-02-PLAN.md -- Code gen for file input: form fields (FileUpload), detail views (preview/download), list cells (thumbnail/icon), CRUD WithFileFields
 
 #### Phase 32: Multi-File & Configuration
 **Goal**: Developer can define multi-file fields and configure per-field upload constraints (allowed types, max size, upload directory) in gux.config.json
@@ -233,5 +232,5 @@ Phases execute in numeric order: 1 -> 2 -> ... -> 28 -> 29 -> 30 -> 31 -> 32
 | 28. Help Pattern Commands | v2.3 | 2/2 | Complete | 2026-01-26 |
 | 29. Storage Foundation | v2.4 | 2/2 | Complete | 2026-02-01 |
 | 30. Upload Client & UI Component | v2.4 | 2/2 | Complete | 2026-02-01 |
-| 31. Code Generation & CRUD Integration | v2.4 | 0/3 | Not started | - |
+| 31. Code Generation & CRUD Integration | v2.4 | 0/2 | Not started | - |
 | 32. Multi-File & Configuration | v2.4 | 0/2 | Not started | - |
