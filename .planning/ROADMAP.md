@@ -189,11 +189,11 @@ Plans:
   1. Developer adds `"input": "file[]"` to a field in gux.config.json and the admin form allows uploading multiple files
   2. User can add and remove individual files from a multi-file field, with values stored as a JSON array of file paths
   3. Per-field `"accept"`, `"maxSize"`, and `"directory"` configuration in gux.config.json controls upload validation and storage location
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 32-01: Multi-file field support (config, model, UI, storage)
-- [ ] 32-02: Per-field configuration (accept, maxSize, directory)
+- [ ] 32-01-PLAN.md -- MultiFileUpload UI component (SSR + WASM), CRUD multi-file lifecycle (JSON array cleanup), upload directory routing
+- [ ] 32-02-PLAN.md -- Code generation for file[] fields (forms, detail, list), per-field accept/maxSize/directory config, parseSizeString
 
 ## Progress
 
