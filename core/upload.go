@@ -37,6 +37,33 @@ func (a *App) handleUpload(w http.ResponseWriter, r *http.Request) {
 
 	// CSRF is already handled by CSRFMiddleware wrapping the mux
 
+	// Check for optional directory parameter
+	dir := r.URL.Query().Get("dir")
+	if dir != "" {
+		// Validate directory: reject path traversal attempts and invalid characters
+		if strings.Contains(dir, "..") || strings.Contains(dir, "/") || strings.Contains(dir, "\\") {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]string{
+				"error":   "invalid_directory",
+				"message": "Directory contains invalid characters",
+			})
+			return
+		}
+		// Only allow alphanumeric, underscore, and hyphen
+		for _, ch := range dir {
+			if !((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') || ch == '_' || ch == '-') {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusBadRequest)
+				json.NewEncoder(w).Encode(map[string]string{
+					"error":   "invalid_directory",
+					"message": "Directory contains invalid characters",
+				})
+				return
+			}
+		}
+	}
+
 	// Parse multipart form (32MB max in memory)
 	if err := r.ParseMultipartForm(32 << 20); err != nil {
 		w.Header().Set("Content-Type", "application/json")
@@ -78,8 +105,19 @@ func (a *App) handleUpload(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
-			// Upload to storage
-			result, err := a.storage.Put(r.Context(), header.Filename, file, header.Size)
+			// Upload to storage (with optional directory)
+			var result *UploadResult
+			if dir != "" {
+				// Check if storage supports DirPutter
+				if dirPutter, ok := a.storage.(DirPutter); ok {
+					result, err = dirPutter.PutInDir(dir, header.Filename, file, header.Size)
+				} else {
+					// Fallback to regular Put if storage doesn't support directories
+					result, err = a.storage.Put(r.Context(), header.Filename, file, header.Size)
+				}
+			} else {
+				result, err = a.storage.Put(r.Context(), header.Filename, file, header.Size)
+			}
 			file.Close()
 
 			// Check for storage errors

@@ -88,6 +88,109 @@ func TestApplyQueryFilters_FieldMapping(t *testing.T) {
 	}
 }
 
+// TestParseFileKeys tests JSON array parsing for multi-file fields.
+func TestParseFileKeys(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  []string
+	}{
+		{"valid JSON array", `["a","b","c"]`, []string{"a", "b", "c"}},
+		{"empty string", "", nil},
+		{"empty array", "[]", []string{}},
+		{"invalid JSON", "invalid", nil},
+		{"not an array", `"string"`, nil},
+		{"single item", `["single"]`, []string{"single"}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := ParseFileKeys(tt.input)
+			if tt.want == nil && got != nil {
+				t.Errorf("ParseFileKeys(%q) = %v, want nil", tt.input, got)
+			} else if tt.want != nil && got == nil {
+				t.Errorf("ParseFileKeys(%q) = nil, want %v", tt.input, tt.want)
+			} else if len(tt.want) != len(got) {
+				t.Errorf("ParseFileKeys(%q) length = %d, want %d", tt.input, len(got), len(tt.want))
+			} else {
+				for i := range tt.want {
+					if tt.want[i] != got[i] {
+						t.Errorf("ParseFileKeys(%q)[%d] = %q, want %q", tt.input, i, got[i], tt.want[i])
+					}
+				}
+			}
+		})
+	}
+}
+
+// TestSerializeFileKeys tests JSON array serialization for multi-file fields.
+func TestSerializeFileKeys(t *testing.T) {
+	tests := []struct {
+		name  string
+		input []string
+		want  string
+	}{
+		{"valid slice", []string{"a", "b", "c"}, `["a","b","c"]`},
+		{"nil slice", nil, "[]"},
+		{"empty slice", []string{}, "[]"},
+		{"single item", []string{"single"}, `["single"]`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := SerializeFileKeys(tt.input)
+			if got != tt.want {
+				t.Errorf("SerializeFileKeys(%v) = %q, want %q", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
+// TestWithMultiFileFields tests the WithMultiFileFields option.
+func TestWithMultiFileFields(t *testing.T) {
+	m := &CRUDModel{}
+	opt := WithMultiFileFields("Gallery", "Attachments")
+	opt(m)
+
+	if len(m.MultiFileFields) != 2 {
+		t.Errorf("MultiFileFields length = %d, want 2", len(m.MultiFileFields))
+	}
+	if m.MultiFileFields[0] != "Gallery" || m.MultiFileFields[1] != "Attachments" {
+		t.Errorf("MultiFileFields = %v, want [Gallery Attachments]", m.MultiFileFields)
+	}
+}
+
+// TestGetMultiFileFieldValues tests extraction of multi-file keys from models.
+func TestGetMultiFileFieldValues(t *testing.T) {
+	type TestModel struct {
+		Gallery     string
+		Attachments string
+		Single      string
+	}
+
+	item := &TestModel{
+		Gallery:     `["ab/abc.jpg","cd/def.png"]`,
+		Attachments: `["xy/xyz.pdf"]`,
+		Single:      "single.jpg",
+	}
+
+	result := getMultiFileFieldValues(item, []string{"Gallery", "Attachments"})
+
+	if len(result) != 2 {
+		t.Fatalf("getMultiFileFieldValues returned %d fields, want 2", len(result))
+	}
+
+	galleryKeys := result["Gallery"]
+	if len(galleryKeys) != 2 || galleryKeys[0] != "ab/abc.jpg" || galleryKeys[1] != "cd/def.png" {
+		t.Errorf("Gallery keys = %v, want [ab/abc.jpg cd/def.png]", galleryKeys)
+	}
+
+	attachKeys := result["Attachments"]
+	if len(attachKeys) != 1 || attachKeys[0] != "xy/xyz.pdf" {
+		t.Errorf("Attachments keys = %v, want [xy/xyz.pdf]", attachKeys)
+	}
+}
+
 // TestApplyQueryFilters_NoQueryParams verifies no modification with empty query.
 func TestApplyQueryFilters_NoQueryParams(t *testing.T) {
 	type TestModel struct {

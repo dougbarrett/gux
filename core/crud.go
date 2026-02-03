@@ -92,6 +92,7 @@ type CRUDModel struct {
 	Roles              []string             // Roles required to access (any of these roles)
 	AuditConfig        *AuditConfig         // Audit logging config (nil = disabled)
 	FileFields         []string             // Field names that store file storage keys
+	MultiFileFields    []string             // Field names that store JSON arrays of file storage keys
 	OnBeforeUpload     BeforeUploadHook     // Optional hook called before file upload
 	OnAfterUpload      AfterUploadHook      // Optional hook called after file upload
 	OnBeforeFileDelete BeforeFileDeleteHook // Optional hook called before file deletion
@@ -175,6 +176,14 @@ func WithRoles(roles ...string) CRUDOption {
 func WithFileFields(fields ...string) CRUDOption {
 	return func(m *CRUDModel) {
 		m.FileFields = fields
+	}
+}
+
+// WithMultiFileFields marks the specified fields as multi-file storage keys.
+// Each field stores a JSON array of storage keys. Enables automatic cleanup.
+func WithMultiFileFields(fields ...string) CRUDOption {
+	return func(m *CRUDModel) {
+		m.MultiFileFields = fields
 	}
 }
 
@@ -284,6 +293,28 @@ func getFileFieldValues(item interface{}, fileFields []string) map[string]string
 		f := v.FieldByName(fieldName)
 		if f.IsValid() && f.Kind() == reflect.String {
 			values[fieldName] = f.String()
+		}
+	}
+	return values
+}
+
+// getMultiFileFieldValues extracts multi-file field values from a model instance.
+// Each field is expected to contain a JSON array string.
+// Returns a map of field name to slice of storage keys.
+func getMultiFileFieldValues(item interface{}, multiFileFields []string) map[string][]string {
+	values := make(map[string][]string)
+	v := reflect.ValueOf(item)
+	if v.Kind() == reflect.Ptr {
+		v = v.Elem()
+	}
+	for _, fieldName := range multiFileFields {
+		f := v.FieldByName(fieldName)
+		if f.IsValid() && f.Kind() == reflect.String {
+			jsonStr := f.String()
+			keys := ParseFileKeys(jsonStr)
+			if len(keys) > 0 {
+				values[fieldName] = keys
+			}
 		}
 	}
 	return values
@@ -479,13 +510,15 @@ func (a *App) handleList(w http.ResponseWriter, r *http.Request, model CRUDModel
 	if model.ListDTO != nil {
 		output = a.convertToDTO(output, model.ListDTO)
 		// Populate FileInfo fields if any
-		if len(model.FileFields) > 0 {
+		allFileFields := append([]string(nil), model.FileFields...)
+		allFileFields = append(allFileFields, model.MultiFileFields...)
+		if len(allFileFields) > 0 {
 			outputVal := reflect.ValueOf(output)
 			modelsVal := reflect.ValueOf(results).Elem()
 			for i := 0; i < outputVal.Len(); i++ {
 				dtoItem := outputVal.Index(i)
 				modelItem := modelsVal.Index(i)
-				a.populateFileInfoFields(dtoItem.Addr().Interface(), modelItem.Interface(), model.FileFields)
+				a.populateFileInfoFields(dtoItem.Addr().Interface(), modelItem.Interface(), allFileFields)
 			}
 		}
 	}
@@ -541,8 +574,10 @@ func (a *App) handleGet(w http.ResponseWriter, r *http.Request, model CRUDModel,
 	if model.DetailDTO != nil {
 		output = a.convertSingleToDTO(output, model.DetailDTO)
 		// Populate FileInfo fields if any
-		if len(model.FileFields) > 0 {
-			a.populateFileInfoFields(&output, result, model.FileFields)
+		allFileFields := append([]string(nil), model.FileFields...)
+		allFileFields = append(allFileFields, model.MultiFileFields...)
+		if len(allFileFields) > 0 {
+			a.populateFileInfoFields(&output, result, allFileFields)
 		}
 	}
 
@@ -664,8 +699,9 @@ func (a *App) convertSingleToDTO(model interface{}, dtoType reflect.Type) interf
 }
 
 // populateFileInfoFields populates FileInfo fields in a DTO from the source model's file fields.
-// For each file field, checks if the DTO has a field of type *FileInfo and populates it
-// by calling FileInfoFromKey with the storage key from the model.
+// For single-file fields: checks if the DTO has a field of type *FileInfo and populates it.
+// For multi-file fields: checks if the DTO has a field of type []*FileInfo and populates it
+// by parsing the JSON array from the model and converting each key to *FileInfo.
 func (a *App) populateFileInfoFields(dto interface{}, srcModel interface{}, fileFields []string) {
 	if len(fileFields) == 0 || a.storage == nil {
 		return
@@ -679,18 +715,42 @@ func (a *App) populateFileInfoFields(dto interface{}, srcModel interface{}, file
 		modelVal = modelVal.Elem()
 	}
 	fileInfoType := reflect.TypeOf((*FileInfo)(nil))
+	fileInfoSliceType := reflect.TypeOf([]*FileInfo(nil))
+
 	for _, fieldName := range fileFields {
 		dtoField := dtoVal.FieldByName(fieldName)
-		if !dtoField.IsValid() || dtoField.Type() != fileInfoType {
+		if !dtoField.IsValid() {
 			continue
 		}
 		modelField := modelVal.FieldByName(fieldName)
 		if !modelField.IsValid() || modelField.Kind() != reflect.String {
 			continue
 		}
-		key := modelField.String()
-		info := FileInfoFromKey(a.storage, key)
-		dtoField.Set(reflect.ValueOf(info))
+
+		// Check if DTO field is *FileInfo (single file)
+		if dtoField.Type() == fileInfoType {
+			key := modelField.String()
+			info := FileInfoFromKey(a.storage, key)
+			dtoField.Set(reflect.ValueOf(info))
+		} else if dtoField.Type() == fileInfoSliceType {
+			// Check if DTO field is []*FileInfo (multi-file)
+			jsonStr := modelField.String()
+			keys := ParseFileKeys(jsonStr)
+			if keys == nil {
+				// Set empty slice
+				dtoField.Set(reflect.ValueOf([]*FileInfo{}))
+			} else {
+				// Convert each key to *FileInfo
+				infos := make([]*FileInfo, 0, len(keys))
+				for _, key := range keys {
+					info := FileInfoFromKey(a.storage, key)
+					if info != nil {
+						infos = append(infos, info)
+					}
+				}
+				dtoField.Set(reflect.ValueOf(infos))
+			}
+		}
 	}
 }
 
@@ -792,8 +852,9 @@ func (a *App) handleUpdate(w http.ResponseWriter, r *http.Request, model CRUDMod
 	}
 
 	var item interface{}
-	var auditBeforeJSON []byte      // snapshot for audit diff
-	var oldFileKeys map[string]string // old file keys for cleanup
+	var auditBeforeJSON []byte           // snapshot for audit diff
+	var oldFileKeys map[string]string    // old file keys for cleanup
+	var oldMultiFileKeys map[string][]string // old multi-file keys for cleanup
 	dbVal := reflect.ValueOf(a.db)
 
 	if model.OnUpdate != nil {
@@ -817,6 +878,10 @@ func (a *App) handleUpdate(w http.ResponseWriter, r *http.Request, model CRUDMod
 		// Capture old file keys before update
 		if len(model.FileFields) > 0 {
 			oldFileKeys = getFileFieldValues(existing, model.FileFields)
+		}
+		// Capture old multi-file keys before update
+		if len(model.MultiFileFields) > 0 {
+			oldMultiFileKeys = getMultiFileFieldValues(existing, model.MultiFileFields)
 		}
 
 		// Capture before-state for audit diff
@@ -859,6 +924,10 @@ func (a *App) handleUpdate(w http.ResponseWriter, r *http.Request, model CRUDMod
 		if len(model.FileFields) > 0 {
 			oldFileKeys = getFileFieldValues(item, model.FileFields)
 		}
+		// Capture old multi-file keys before update
+		if len(model.MultiFileFields) > 0 {
+			oldMultiFileKeys = getMultiFileFieldValues(item, model.MultiFileFields)
+		}
 
 		// Capture before-state for audit diff
 		if model.AuditConfig != nil && model.AuditConfig.Enabled {
@@ -899,6 +968,24 @@ func (a *App) handleUpdate(w http.ResponseWriter, r *http.Request, model CRUDMod
 			// If the field changed and old key was non-empty, delete old file
 			if oldKey != "" && oldKey != newKey {
 				a.deleteFileIfExists(model, oldKey)
+			}
+		}
+	}
+	// Clean up removed files from multi-file fields
+	if len(oldMultiFileKeys) > 0 {
+		newMultiFileKeys := getMultiFileFieldValues(item, model.MultiFileFields)
+		for fieldName, oldKeys := range oldMultiFileKeys {
+			newKeys := newMultiFileKeys[fieldName]
+			// Build a set of new keys for efficient lookup
+			newKeySet := make(map[string]bool)
+			for _, key := range newKeys {
+				newKeySet[key] = true
+			}
+			// Delete keys that were removed (present in old but not in new)
+			for _, oldKey := range oldKeys {
+				if oldKey != "" && !newKeySet[oldKey] {
+					a.deleteFileIfExists(model, oldKey)
+				}
 			}
 		}
 	}
@@ -945,7 +1032,8 @@ func (a *App) handleDelete(w http.ResponseWriter, r *http.Request, model CRUDMod
 
 	// If model has file fields, fetch the record first to read file keys
 	var fileKeys map[string]string
-	if len(model.FileFields) > 0 {
+	var multiFileKeys map[string][]string
+	if len(model.FileFields) > 0 || len(model.MultiFileFields) > 0 {
 		item := reflect.New(model.ModelType).Interface()
 		firstMethod := dbVal.MethodByName("First")
 		if firstMethod.IsValid() {
@@ -960,7 +1048,12 @@ func (a *App) handleDelete(w http.ResponseWriter, r *http.Request, model CRUDMod
 					}
 				}
 			}
-			fileKeys = getFileFieldValues(item, model.FileFields)
+			if len(model.FileFields) > 0 {
+				fileKeys = getFileFieldValues(item, model.FileFields)
+			}
+			if len(model.MultiFileFields) > 0 {
+				multiFileKeys = getMultiFileFieldValues(item, model.MultiFileFields)
+			}
 		}
 	}
 
@@ -995,6 +1088,14 @@ func (a *App) handleDelete(w http.ResponseWriter, r *http.Request, model CRUDMod
 	if len(fileKeys) > 0 {
 		for _, key := range fileKeys {
 			a.deleteFileIfExists(model, key)
+		}
+	}
+	// Clean up multi-file fields
+	if len(multiFileKeys) > 0 {
+		for _, keys := range multiFileKeys {
+			for _, key := range keys {
+				a.deleteFileIfExists(model, key)
+			}
 		}
 	}
 

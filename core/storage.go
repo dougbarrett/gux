@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"mime"
 	"os"
@@ -22,6 +23,12 @@ type Storage interface {
 
 	// Serve opens a file for serving. Returns the file, its info, and any error.
 	Serve(key string) (io.ReadSeekCloser, os.FileInfo, error)
+}
+
+// DirPutter is an optional interface for storage backends that support
+// directory-scoped uploads. The returned key includes the directory prefix.
+type DirPutter interface {
+	PutInDir(dir, filename string, data io.Reader, size int64) (*UploadResult, error)
 }
 
 // UploadResult contains metadata about an uploaded file.
@@ -138,6 +145,32 @@ func detectContentType(key string) string {
 		return "application/octet-stream"
 	}
 	return ct
+}
+
+// ParseFileKeys parses a JSON-encoded string array into a slice of strings.
+// Returns nil if the input is empty or invalid JSON.
+func ParseFileKeys(jsonStr string) []string {
+	if jsonStr == "" {
+		return nil
+	}
+	var keys []string
+	if err := json.Unmarshal([]byte(jsonStr), &keys); err != nil {
+		return nil
+	}
+	return keys
+}
+
+// SerializeFileKeys JSON-marshals a string slice to a JSON array string.
+// Returns "[]" for nil or empty slices.
+func SerializeFileKeys(keys []string) string {
+	if len(keys) == 0 {
+		return "[]"
+	}
+	data, err := json.Marshal(keys)
+	if err != nil {
+		return "[]"
+	}
+	return string(data)
 }
 
 // matchMimePattern checks if a MIME type matches a pattern.

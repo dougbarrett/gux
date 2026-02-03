@@ -183,3 +183,28 @@ func (s *LocalStorage) Serve(key string) (io.ReadSeekCloser, os.FileInfo, error)
 
 	return file, info, nil
 }
+
+// PutInDir stores a file in a specific directory subdirectory.
+// The returned key includes the directory prefix (e.g., "gallery/ab/abc123.jpg").
+func (s *LocalStorage) PutInDir(dir, filename string, data io.Reader, size int64) (*UploadResult, error) {
+	// Create a temporary LocalStorage with the directory as a subdirectory of baseDir
+	dirStorage := &LocalStorage{
+		baseDir:      filepath.Join(s.baseDir, dir),
+		baseURL:      s.baseURL,
+		maxSize:      s.maxSize,
+		allowedTypes: s.allowedTypes,
+		serveAuth:    s.serveAuth,
+	}
+
+	// Use the existing Put logic
+	result, err := dirStorage.Put(context.Background(), filename, data, size)
+	if err != nil {
+		return nil, err
+	}
+
+	// Prepend the directory to the key
+	result.Key = filepath.Join(dir, result.Key)
+	result.URL = s.URL(result.Key)
+
+	return result, nil
+}
