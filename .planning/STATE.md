@@ -2,12 +2,12 @@
 
 ## Current Position
 
-Phase: 30 of 32 (Upload Client & UI Component)
-Plan: 2 of 2 in current phase
-Status: Phase complete, verified
-Last activity: 2026-02-01 -- Phase 30 verified and completed
+Phase: 31 of 32 (Code Generation & CRUD Integration)
+Plan: 1 of 2 in current phase
+Status: In progress
+Last activity: 2026-02-03 -- Completed 31-01-PLAN.md
 
-Progress: [████░░░░░░] 44% (4/9 plans across 4 phases)
+Progress: [█████░░░░░] 56% (5/9 plans across 4 phases)
 
 ## Project Reference
 
@@ -31,9 +31,9 @@ See: .planning/PROJECT.md (updated 2026-02-01)
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 4 (v2.4)
-- Average duration: 4m 39s
-- Total execution time: 18m 36s
+- Total plans completed: 5 (v2.4)
+- Average duration: 5m
+- Total execution time: 24m 36s
 
 **By Phase:**
 
@@ -41,6 +41,7 @@ See: .planning/PROJECT.md (updated 2026-02-01)
 |-------|-------|-------|----------|
 | 29 Storage Foundation | 2 | 6m 48s | 3m 24s |
 | 30 Upload Client & UI Component | 2 | 12m | 6m |
+| 31 Code Generation & CRUD Integration | 1 | 6m | 6m |
 
 *Updated after each plan completion*
 
@@ -65,6 +66,10 @@ Recent decisions affecting current work:
 - [30-02]: Use Extra map for HTML attributes not in core.Attrs (accept, disabled, for, aria-*) - consistent with existing UI components.
 - [30-02]: Package-level objectURLs map stores cleanup functions to revoke old URLs when replacing image previews - prevents memory leaks.
 - [30-02]: Window-level drag prevention uses sync.Once - multiple FileUpload instances share same global listeners.
+- [31-01]: FileInfo struct has URL, Filename, Size, ContentType (no Width/Height) - simpler than UploadResult for DTO usage.
+- [31-01]: Filename extracted from storage key (last path segment) - original filename not persisted in Phase 31, can be enhanced later.
+- [31-01]: populateFileInfoFields converts string keys to *FileInfo in DTOs via reflection - transparent to developers.
+- [31-01]: File cleanup automatic by default, opt-out via WithNoAutoCleanup for archival/compliance use cases.
 
 ### Pending Todos
 
@@ -72,7 +77,7 @@ None yet.
 
 ### Blockers/Concerns
 
-None - Phase 30 complete. Ready for Phase 31 (Upload Codegen Integration).
+None - Plan 31-01 complete. Ready for Plan 31-02 (Code Generator Updates).
 
 ## Deferred Issues
 
@@ -81,10 +86,10 @@ v2.0 Tech Debt:
 
 ## Session Continuity
 
-Last session: 2026-02-01
-Stopped at: Phase 30 complete and verified. Next: Phase 31 (Code Generation & CRUD Integration)
+Last session: 2026-02-03
+Stopped at: Completed 31-01-PLAN.md
 Resume file: None
 
 ---
 
-*Last updated: 2026-02-01 after phase 30 verification*
+*Last updated: 2026-02-03 after 31-01 completion*
