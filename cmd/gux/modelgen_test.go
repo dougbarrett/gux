@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -1365,5 +1366,125 @@ func TestParseSizeString(t *testing.T) {
 				t.Errorf("parseSizeString(%q) = %d, want %d", tt.input, got, tt.expected)
 			}
 		})
+	}
+}
+
+// TestConvertToTemplateField_MultiFile tests that file[] fields generate correct
+// template field with IsMultiFile=true and DTOType="[]*core.FileInfo".
+func TestConvertToTemplateField_MultiFile(t *testing.T) {
+	field := &ModelField{Name: "Gallery", Type: "string", Input: "file[]"}
+	tf := convertToTemplateField(field, "Product", nil)
+
+	if !tf.IsMultiFile {
+		t.Error("IsMultiFile should be true for file[] input")
+	}
+	if tf.DTOType != "[]*core.FileInfo" {
+		t.Errorf("DTOType = %q, want %q", tf.DTOType, "[]*core.FileInfo")
+	}
+	if tf.GoType != "string" {
+		t.Errorf("GoType = %q, want %q (stores JSON array)", tf.GoType, "string")
+	}
+	if tf.StateType != "String" {
+		t.Errorf("StateType = %q, want %q", tf.StateType, "String")
+	}
+	if !strings.Contains(tf.EditStateInit, "json.Marshal") {
+		t.Errorf("EditStateInit should reconstruct JSON array from []*FileInfo, got: %s", tf.EditStateInit)
+	}
+}
+
+// TestConvertToTemplateField_FileWithConfig tests that file fields with
+// Accept, MaxSize, Directory config populate TemplateField correctly.
+func TestConvertToTemplateField_FileWithConfig(t *testing.T) {
+	field := &ModelField{
+		Name:      "Avatar",
+		Type:      "string",
+		Input:     "file",
+		Accept:    "image/*",
+		MaxSize:   "5MB",
+		Directory: "avatars",
+	}
+	tf := convertToTemplateField(field, "User", nil)
+
+	if tf.FileAccept != "image/*" {
+		t.Errorf("FileAccept = %q, want %q", tf.FileAccept, "image/*")
+	}
+	if tf.FileMaxSize != 5*1024*1024 {
+		t.Errorf("FileMaxSize = %d, want %d", tf.FileMaxSize, 5*1024*1024)
+	}
+	if tf.FileDir != "avatars" {
+		t.Errorf("FileDir = %q, want %q", tf.FileDir, "avatars")
+	}
+}
+
+// TestGenerateFormFieldCode_MultiFile tests that multi-file fields generate
+// ui.MultiFileUpload with JSON state management.
+func TestGenerateFormFieldCode_MultiFile(t *testing.T) {
+	field := &ModelField{Name: "Gallery", Type: "string", Input: "file[]"}
+	tf := convertToTemplateField(field, "Product", nil)
+	tf.StateVar = "galleryState"
+
+	code := generateFormFieldCode(field, tf, "product")
+
+	if !strings.Contains(code, "ui.MultiFileUpload") {
+		t.Error("multi-file field should generate ui.MultiFileUpload")
+	}
+	if !strings.Contains(code, "json.Unmarshal") {
+		t.Error("multi-file field should unmarshal JSON keys")
+	}
+	if !strings.Contains(code, "OnUploadComplete") {
+		t.Error("multi-file field should have OnUploadComplete handler")
+	}
+	if !strings.Contains(code, "OnRemove") {
+		t.Error("multi-file field should have OnRemove handler")
+	}
+}
+
+// TestGenerateFormFieldCode_FileWithConfig tests that single file fields with
+// per-field config emit correct FileUpload props.
+func TestGenerateFormFieldCode_FileWithConfig(t *testing.T) {
+	field := &ModelField{
+		Name:      "Avatar",
+		Type:      "string",
+		Input:     "file",
+		Accept:    "image/*",
+		MaxSize:   "10MB",
+		Directory: "avatars",
+	}
+	tf := convertToTemplateField(field, "User", nil)
+	tf.StateVar = "avatarState"
+
+	code := generateFormFieldCode(field, tf, "user")
+
+	if !strings.Contains(code, `Accept: []string{"image/*"}`) {
+		t.Error("file field with Accept should emit Accept prop")
+	}
+	if !strings.Contains(code, fmt.Sprintf("MaxSize: %d", 10*1024*1024)) {
+		t.Error("file field with MaxSize should emit MaxSize prop")
+	}
+	if !strings.Contains(code, `"/__gux_api/upload?dir=avatars"`) {
+		t.Error("file field with Directory should emit UploadURL with dir param")
+	}
+}
+
+// TestGenerateDetailFieldCode_MultiFile tests that multi-file detail view
+// generates gallery rendering code.
+func TestGenerateDetailFieldCode_MultiFile(t *testing.T) {
+	field := &ModelField{Name: "Gallery", Type: "string", Input: "file[]"}
+	tf := convertToTemplateField(field, "Product", nil)
+	tf.DTOFieldName = "Gallery"
+
+	code := generateDetailFieldCode(field, tf, "product")
+
+	if !strings.Contains(code, "displayItem.Gallery") {
+		t.Error("detail code should reference Gallery field")
+	}
+	if !strings.Contains(code, "isImageFile") {
+		t.Error("detail code should check for images")
+	}
+	if !strings.Contains(code, "flex flex-wrap gap-2") {
+		t.Error("detail code should render image gallery")
+	}
+	if !strings.Contains(code, "h-20 w-20") {
+		t.Error("detail code should render thumbnails")
 	}
 }

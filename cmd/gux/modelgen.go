@@ -390,6 +390,39 @@ func {{$.Name}}Cell{{.Name}}(item dto.{{$.Name}}List) core.Node {
 			core.Text(fileName),
 		),
 	)
+{{- else if .IsMultiFile}}
+	files := item.{{.DTOFieldName}}
+	if files == nil || len(files) == 0 {
+		return tableCell{{$.Name}}("-")
+	}
+	// Show first thumbnail if image, or file count
+	count := len(files)
+	if isImageFile(files[0].Filename) {
+		// Show first thumbnail + count indicator if more than 1
+		if count == 1 {
+			return core.Td(core.Class("px-6 py-4 whitespace-nowrap"),
+				core.Img(core.Attrs{
+					Src:   files[0].URL,
+					Class: "h-10 w-10 rounded object-cover",
+					Alt:   "{{.Label}}",
+				}),
+			)
+		}
+		return core.Td(core.Class("px-6 py-4 whitespace-nowrap"),
+			core.Div(core.Class("flex items-center gap-2"),
+				core.Img(core.Attrs{
+					Src:   files[0].URL,
+					Class: "h-10 w-10 rounded object-cover",
+					Alt:   "{{.Label}}",
+				}),
+				core.Span(core.Class("text-xs text-gray-500 dark:text-gray-400"),
+					core.Text(fmt.Sprintf("+%d", count-1)),
+				),
+			),
+		)
+	}
+	// Non-image files: show count
+	return tableCell{{$.Name}}(fmt.Sprintf("%d files", count))
 {{- else if .IsTime}}
 	return tableCell{{$.Name}}(item.{{.DTOFieldName}}.Format("Jan 2, 2006"))
 {{- else if .IsDisplayField}}
@@ -454,7 +487,7 @@ func Nav() core.Node {
 package admin
 
 import (
-{{- if .HasRelations}}
+{{- if or .HasRelations .HasMultiFileFields}}
 	"encoding/json"
 {{- end}}
 {{- if or .HasSelectRelations .ParentField}}
@@ -1635,12 +1668,16 @@ type TemplateField struct {
 	IsBool               bool
 	IsTime               bool
 	IsSlice              bool
-	IsPointer            bool // True if the field type is a pointer (e.g., *string, *float64)
-	IsDisplayField       bool // True if this is the display field (should be clickable link)
-	FullWidth            bool // Span full width in grid layout
-	FormOnly             bool // True for virtual fields that only appear in forms (e.g., password)
-	IsFile               bool // True if Input == "file"
-	Badge          *BadgeConfig
+	IsPointer            bool   // True if the field type is a pointer (e.g., *string, *float64)
+	IsDisplayField       bool   // True if this is the display field (should be clickable link)
+	FullWidth            bool   // Span full width in grid layout
+	IsFile               bool   // True if Input == "file"
+	IsMultiFile          bool   // True if Input == "file[]"
+	FileAccept           string // Accept MIME pattern from config (e.g., "image/*")
+	FileMaxSize          int64  // MaxSize in bytes (parsed at gen time)
+	FileDir              string // Upload directory from config
+	FormOnly             bool   // True for virtual fields that only appear in forms (e.g., password)
+	Badge                *BadgeConfig
 }
 
 // TemplateSection represents a section for template rendering
@@ -1691,9 +1728,10 @@ type ModelTemplateData struct {
 	Parent            string       // Parent model name (if this is a child model)
 	ParentField       string       // FK field to parent (e.g., "OrderID")
 	ParentFieldSnake  string       // FK field snake_case (e.g., "order_id") for query params
-	ParentRoutePlural string       // Parent route plural (e.g., "orders") for navigation
-	HideSidebar       bool         // If true, hide from sidebar navigation
-	HasFileFields     bool         // True if any field has Input == "file"
+	ParentRoutePlural  string // Parent route plural (e.g., "orders") for navigation
+	HideSidebar        bool   // If true, hide from sidebar navigation
+	HasFileFields      bool   // True if any field has Input == "file" or "file[]"
+	HasMultiFileFields bool   // True if any field has Input == "file[]"
 }
 
 // ChildModel describes a child model for inline management on parent detail pages
@@ -2102,8 +2140,11 @@ func prepareModelTemplateData(model *ModelDefinition, modulePath string, display
 			if tf.IsSlice && tf.Type == "[]string" {
 				data.HasJSON = true
 			}
-			if tf.IsFile {
+			if tf.IsFile || tf.IsMultiFile {
 				data.HasFileFields = true
+			}
+			if tf.IsMultiFile {
+				data.HasMultiFileFields = true
 			}
 		}
 
@@ -2164,7 +2205,19 @@ func convertToTemplateField(field *ModelField, modelName string, displayFields m
 		IsTime:       field.Type == "time.Time" || field.Type == "*time.Time",
 		IsSlice:      IsSliceType(field.Type),
 		IsFile:       field.Input == "file",
+		IsMultiFile:  field.Input == "file[]",
 		Badge:        field.Badge,
+	}
+
+	// Set file configuration for both single and multi-file fields
+	if field.Input == "file" || field.Input == "file[]" {
+		tf.FileAccept = field.Accept
+		if field.MaxSize != "" {
+			if size, err := parseSizeString(field.MaxSize); err == nil {
+				tf.FileMaxSize = size
+			} // If parse fails, leave as 0 (no max size limit)
+		}
+		tf.FileDir = field.Directory
 	}
 
 	// Set display field for relations
@@ -2180,6 +2233,12 @@ func convertToTemplateField(field *ModelField, modelName string, displayFields m
 	// Override DTO type for file fields
 	if field.Input == "file" {
 		tf.DTOType = "*core.FileInfo"
+	} else if field.Input == "file[]" {
+		tf.DTOType = "[]*core.FileInfo"
+		// Multi-file fields store JSON arrays in string field
+		tf.GoType = "string"
+		tf.StateType = "String"
+		tf.StateDefault = `""`
 	}
 
 	// Generate GORM tag
@@ -2199,6 +2258,31 @@ func convertToTemplateField(field *ModelField, modelName string, displayFields m
 		// Note: The DTO field is *core.FileInfo, but the model field (which we edit) is string
 		// The edit form needs to extract the key from FileInfo
 		tf.EditStateInit = fmt.Sprintf("func() string { if displayItem.%s != nil { return displayItem.%s.Key }; return \"\" }()", tf.DTOFieldName, tf.DTOFieldName)
+		// Generate form and detail field code for file fields
+		modelNameLower := strings.ToLower(modelName)
+		tf.FormField = generateFormFieldCode(field, tf, modelNameLower)
+		tf.DetailField = generateDetailFieldCode(field, tf, modelNameLower)
+		return tf
+	} else if field.Input == "file[]" {
+		// Multi-file field - reconstruct JSON array of keys from []*FileInfo
+		tf.EditStateInit = fmt.Sprintf(`func() string {
+		if displayItem.%s != nil {
+			keys := make([]string, len(displayItem.%s))
+			for i, fi := range displayItem.%s {
+				keys[i] = fi.Key
+			}
+			data, _ := json.Marshal(keys)
+			return string(data)
+		}
+		return ""
+	}()`, tf.DTOFieldName, tf.DTOFieldName, tf.DTOFieldName)
+		tf.EmptyValue = `""`
+		tf.DataValue = tf.StateVar + ".Get()"
+		// Generate form and detail field code for multi-file fields
+		modelNameLower := strings.ToLower(modelName)
+		tf.FormField = generateFormFieldCode(field, tf, modelNameLower)
+		tf.DetailField = generateDetailFieldCode(field, tf, modelNameLower)
+		return tf
 	}
 
 	switch field.Type {
@@ -2376,13 +2460,26 @@ func generateFormFieldCode(field *ModelField, tf TemplateField, modelNameLower s
 
 	switch {
 	case field.Input == "file":
-		// Generate file upload field
+		// Generate single file upload field with per-field config
+		uploadURL := `"/__gux_api/upload"`
+		if tf.FileDir != "" {
+			uploadURL = fmt.Sprintf(`"/__gux_api/upload?dir=%s"`, tf.FileDir)
+		}
 		fileUploadCode := fmt.Sprintf(`core.Div(core.Class("%s"),
 	core.Label(core.Class("block text-gray-700 dark:text-gray-300 text-sm font-medium mb-2"),
 		core.Text("%s"),
 	),
 	ui.FileUpload(ui.FileUploadProps{
-		UploadURL: "/__gux_api/upload",
+		UploadURL: %s,`, wrapperClass, tf.Label, uploadURL)
+		if tf.FileAccept != "" {
+			fileUploadCode += fmt.Sprintf(`
+		Accept: []string{"%s"},`, tf.FileAccept)
+		}
+		if tf.FileMaxSize > 0 {
+			fileUploadCode += fmt.Sprintf(`
+		MaxSize: %d,`, tf.FileMaxSize)
+		}
+		fileUploadCode += fmt.Sprintf(`
 		Value: func() string {
 			if %s.Get() != "" {
 				return "/__gux_api/files/" + %s.Get()
@@ -2397,8 +2494,63 @@ func generateFormFieldCode(field *ModelField, tf TemplateField, modelNameLower s
 		},
 	}),
 ),
-`, wrapperClass, tf.Label, tf.StateVar, tf.StateVar, tf.StateVar, tf.StateVar)
+`, tf.StateVar, tf.StateVar, tf.StateVar, tf.StateVar)
 		buf.WriteString(indent + fileUploadCode)
+
+	case field.Input == "file[]":
+		// Generate multi-file upload field with per-field config
+		uploadURL := `"/__gux_api/upload"`
+		if tf.FileDir != "" {
+			uploadURL = fmt.Sprintf(`"/__gux_api/upload?dir=%s"`, tf.FileDir)
+		}
+		multiFileCode := fmt.Sprintf(`core.Div(core.Class("%s"),
+	core.Label(core.Class("block text-gray-700 dark:text-gray-300 text-sm font-medium mb-2"),
+		core.Text("%s"),
+	),
+	func() core.Node {
+		var keys []string
+		if %s.Get() != "" {
+			json.Unmarshal([]byte(%s.Get()), &keys)
+		}
+		urls := make([]string, len(keys))
+		for i, k := range keys {
+			urls[i] = "/__gux_api/files/" + k
+		}
+		return ui.MultiFileUpload(ui.MultiFileUploadProps{
+			Values: urls,
+			UploadURL: %s,`, wrapperClass, tf.Label, tf.StateVar, tf.StateVar, uploadURL)
+		if tf.FileAccept != "" {
+			multiFileCode += fmt.Sprintf(`
+			Accept: []string{"%s"},`, tf.FileAccept)
+		}
+		if tf.FileMaxSize > 0 {
+			multiFileCode += fmt.Sprintf(`
+			MaxSize: %d,`, tf.FileMaxSize)
+		}
+		multiFileCode += fmt.Sprintf(`
+			OnUploadComplete: func(result ui.UploadResult) {
+				var keys []string
+				if %s.Get() != "" {
+					json.Unmarshal([]byte(%s.Get()), &keys)
+				}
+				keys = append(keys, result.Key)
+				data, _ := json.Marshal(keys)
+				%s.Set(string(data))
+			},
+			OnRemove: func(index int) {
+				var keys []string
+				if %s.Get() != "" {
+					json.Unmarshal([]byte(%s.Get()), &keys)
+				}
+				keys = append(keys[:index], keys[index+1:]...)
+				data, _ := json.Marshal(keys)
+				%s.Set(string(data))
+			},
+		})
+	}(),
+),
+`, tf.StateVar, tf.StateVar, tf.StateVar, tf.StateVar, tf.StateVar, tf.StateVar)
+		buf.WriteString(indent + multiFileCode)
 
 	case field.Input == "textarea":
 		buf.WriteString(fmt.Sprintf(`%score.Div(core.Class("%s"),
@@ -2529,6 +2681,57 @@ func generateDetailFieldCode(field *ModelField, tf TemplateField, modelNameLower
 }(),
 `, tf.DTOFieldName, modelNameLower, tf.Label, tf.Label, tf.Label, tf.Label)
 		return indent + fileDetailCode
+
+	case field.Input == "file[]":
+		// Multi-file field - show gallery for images or list for files
+		multiFileDetailCode := fmt.Sprintf(`func() core.Node {
+	files := displayItem.%s
+	if files == nil || len(files) == 0 {
+		return %sDetailRow("%s", "-")
+	}
+	var imageNodes []core.Node
+	var fileNodes []core.Node
+	for _, fi := range files {
+		if isImageFile(fi.Filename) {
+			imageNodes = append(imageNodes, core.A(
+				core.Attrs{Href: fi.URL, Class: "inline-block", Extra: map[string]string{"target": "_blank"}},
+				core.Img(core.Attrs{
+					Src:   fi.URL,
+					Class: "h-20 w-20 rounded object-cover border border-gray-200 dark:border-gray-700",
+					Alt:   fi.Filename,
+				}),
+			))
+		} else {
+			fileNodes = append(fileNodes, core.Div(core.Class("mb-1"),
+				core.A(core.Attrs{
+					Href:  fi.URL,
+					Class: "inline-flex items-center gap-2 text-blue-600 dark:text-blue-400 hover:underline",
+					Extra: map[string]string{"download": "", "target": "_blank"},
+				},
+					core.Span(core.Class("text-gray-400"), core.Text("\U0001F4CE")),
+					core.Text(fi.Filename),
+				),
+			))
+		}
+	}
+	content := []core.Node{}
+	if len(imageNodes) > 0 {
+		content = append(content, core.Div(core.Class("flex flex-wrap gap-2"), imageNodes...))
+	}
+	if len(fileNodes) > 0 {
+		if len(imageNodes) > 0 {
+			content = append(content, core.Div(core.Class("mt-4"), fileNodes...))
+		} else {
+			content = append(content, core.Div(core.Attrs{}, fileNodes...))
+		}
+	}
+	return core.Div(core.Class("py-3 px-6"),
+		core.Div(core.Class("text-sm font-medium text-gray-500 dark:text-gray-400 mb-2"), core.Text("%s")),
+		core.Frag(content...),
+	)
+}(),
+`, tf.DTOFieldName, modelNameLower, tf.Label, tf.Label)
+		return indent + multiFileDetailCode
 
 	case field.Relation != "" && !IsSliceType(field.Type):
 		// FK relation - show related display field with nil check
