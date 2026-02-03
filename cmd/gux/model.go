@@ -32,7 +32,7 @@ type ModelField struct {
 	Name       string         `json:"name"`                 // Field name (PascalCase)
 	Type       string         `json:"type"`                 // Go type (string, int, *uint, []string, etc.)
 	Required   bool           `json:"required,omitempty"`   // Is required
-	Input      string         `json:"input,omitempty"`      // Input type override (date, email, tel, textarea, select, multiselect)
+	Input      string         `json:"input,omitempty"`      // Input type override (date, email, tel, textarea, select, multiselect, file, file[])
 	Relation   string         `json:"relation,omitempty"`   // FK relation model name
 	Label      string         `json:"label,omitempty"`      // Display label (defaults to field name)
 	Table      bool           `json:"table,omitempty"`      // Show in table list view
@@ -46,6 +46,9 @@ type ModelField struct {
 	Badge      *BadgeConfig   `json:"badge,omitempty"`      // Badge display config for booleans
 	Many2Many  string         `json:"many2many,omitempty"`  // Join table name for M2M relations
 	FullWidth  bool           `json:"fullWidth,omitempty"`  // Span full width in grid layout
+	Accept     string         `json:"accept,omitempty"`     // Allowed MIME patterns (e.g., "image/*") for file fields
+	MaxSize    string         `json:"maxSize,omitempty"`    // Max file size (e.g., "5MB") for file fields
+	Directory  string         `json:"directory,omitempty"`  // Upload subdirectory (e.g., "avatars") for file fields
 	Section    string         `json:"-"`                    // Form section (set during parsing)
 }
 
@@ -1153,4 +1156,59 @@ func BuildDisplayFieldsMap(dir string) map[string]string {
 		}
 	}
 	return displayFields
+}
+
+// parseSizeString converts a human-readable size string (e.g., "5MB") to bytes.
+// Supported suffixes: B, KB, MB, GB (case-insensitive).
+// Plain numbers are treated as bytes.
+func parseSizeString(s string) (int64, error) {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return 0, fmt.Errorf("empty size string")
+	}
+
+	// Convert to uppercase for suffix matching
+	upper := strings.ToUpper(s)
+
+	// Define multipliers - check longest suffixes first
+	multipliers := []struct {
+		suffix     string
+		multiplier int64
+	}{
+		{"GB", 1024 * 1024 * 1024},
+		{"MB", 1024 * 1024},
+		{"KB", 1024},
+		{"B", 1},
+	}
+
+	for _, m := range multipliers {
+		if strings.HasSuffix(upper, m.suffix) {
+			// Extract number part (remove suffix and any whitespace)
+			numStr := strings.TrimSpace(upper[:len(upper)-len(m.suffix)])
+			var num int64
+			n, err := fmt.Sscanf(numStr, "%d", &num)
+			if err != nil || n != 1 {
+				return 0, fmt.Errorf("invalid number in size string: %s", s)
+			}
+			// Ensure we consumed the entire number string
+			expected := fmt.Sprintf("%d", num)
+			if numStr != expected {
+				return 0, fmt.Errorf("invalid number in size string: %s", s)
+			}
+			return num * m.multiplier, nil
+		}
+	}
+
+	// No suffix - treat as plain bytes
+	var num int64
+	n, err := fmt.Sscanf(s, "%d", &num)
+	if err != nil || n != 1 {
+		return 0, fmt.Errorf("invalid size string: %s", s)
+	}
+	// Ensure we consumed the entire string
+	expected := fmt.Sprintf("%d", num)
+	if s != expected {
+		return 0, fmt.Errorf("invalid size string: %s", s)
+	}
+	return num, nil
 }

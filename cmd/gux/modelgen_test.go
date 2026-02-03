@@ -1326,3 +1326,44 @@ func TestNonAuthModelNoPasswordField(t *testing.T) {
 		}
 	}
 }
+
+// TestParseSizeString verifies that parseSizeString correctly converts human-readable
+// size strings to bytes (e.g., "5MB" -> 5242880).
+func TestParseSizeString(t *testing.T) {
+	tests := []struct {
+		input       string
+		expected    int64
+		expectError bool
+	}{
+		{"5MB", 5 * 1024 * 1024, false},
+		{"5mb", 5 * 1024 * 1024, false},
+		{"5 MB", 5 * 1024 * 1024, false},
+		{"1GB", 1024 * 1024 * 1024, false},
+		{"500KB", 500 * 1024, false},
+		{"1024", 1024, false},
+		{"1024B", 1024, false},
+		{"0", 0, false},
+		{"", 0, true},
+		{"abc", 0, true},
+		{"5XB", 0, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			got, err := parseSizeString(tt.input)
+			if tt.expectError {
+				if err == nil {
+					t.Errorf("parseSizeString(%q) expected error, got none", tt.input)
+				}
+				return
+			}
+			if err != nil {
+				t.Errorf("parseSizeString(%q) unexpected error: %v", tt.input, err)
+				return
+			}
+			if got != tt.expected {
+				t.Errorf("parseSizeString(%q) = %d, want %d", tt.input, got, tt.expected)
+			}
+		})
+	}
+}
