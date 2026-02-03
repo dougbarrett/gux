@@ -581,6 +581,60 @@ app.CRUD(core.AuditEntry{}, core.WithRoles("admin"))
 - Async logging (never blocks responses)
 - Configurable field exclusion
 
+## File Upload & CRUD Integration
+
+Models with file fields store a storage key (string) in the database. DTOs expose `*core.FileInfo` with resolved URL, filename, size, and content type for rendering.
+
+### Config (`gux.config.json`)
+
+Use `"input": "file"` on any string field:
+
+```json
+{
+  "name": "Avatar",
+  "type": "string",
+  "input": "file"
+}
+```
+
+### What Gets Auto-Generated
+
+When `gux model regen` runs for a model with file fields:
+
+- **Forms**: `ui.FileUpload` component with accept/maxSize from field config
+- **Detail pages**: Image preview (for image types) or download link via `FileInfo.URL`
+- **List pages**: Thumbnail (h-10 w-10) for images, file icon for others
+- **DTOs**: Field type becomes `*core.FileInfo` instead of `string`
+
+### Manual CRUD Configuration Required
+
+File lifecycle hooks (auto-cleanup on delete/update, rollback on failed create) require `WithFileFields()` in your `app.CRUD()` call. This follows the same pattern as all other CRUD options (`WithAuditLog`, `WithRoles`, `WithCreateHook`, etc.) — they are manually configured in user-owned `app.go`:
+
+```go
+app.CRUD(models.User{},
+    core.WithFileFields("Avatar"),          // Enable auto-cleanup for Avatar field
+    core.WithBeforeUpload(func(ctx context.Context, meta core.UploadMeta) error {
+        // Optional: validate before upload
+        return nil
+    }),
+)
+```
+
+**Available file options:**
+
+| Option | Purpose |
+|--------|---------|
+| `WithFileFields("Field1", "Field2")` | Register file fields for auto-cleanup |
+| `WithBeforeUpload(hook)` | Validate/reject before upload |
+| `WithAfterUpload(hook)` | Post-upload processing |
+| `WithBeforeFileDelete(hook)` | Intercept before file deletion |
+| `WithNoAutoCleanup()` | Disable automatic file cleanup |
+
+**Auto-cleanup behavior** (when `WithFileFields` is configured):
+- **Delete**: Old files removed from storage after record deletion
+- **Update**: Replaced files cleaned up after successful save
+- **Create**: Files rolled back if DB save fails
+
 ## CRUD Query Parameter Filtering
 
 CRUD list endpoints support URL query parameter filtering:

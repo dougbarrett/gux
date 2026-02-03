@@ -130,7 +130,7 @@ Full details: [milestones/v2.3-ROADMAP.md](milestones/v2.3-ROADMAP.md)
 
 - [x] **Phase 29: Storage Foundation** - Storage interface, local backend, upload endpoint, file serving
 - [x] **Phase 30: Upload Client & UI Component** - WASM upload with progress, drag-drop UI, image preview
-- [ ] **Phase 31: Code Generation & CRUD Integration** - Config-driven file fields, admin scaffolding, lifecycle hooks, auto-cleanup
+- [x] **Phase 31: Code Generation & CRUD Integration** - Config-driven file fields, admin scaffolding, lifecycle hooks, auto-cleanup
 - [ ] **Phase 32: Multi-File & Configuration** - Multi-file fields, per-field config for types/size/directory
 
 #### Phase 29: Storage Foundation
@@ -178,8 +178,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 31-01-PLAN.md -- CRUD file lifecycle hooks, auto-cleanup on delete/update, rollback on DB failure
-- [ ] 31-02-PLAN.md -- Code gen for file input: form fields (FileUpload), detail views (preview/download), list cells (thumbnail/icon), CRUD WithFileFields
+- [x] 31-01-PLAN.md -- CRUD file lifecycle hooks, auto-cleanup on delete/update, rollback on DB failure
+- [x] 31-02-PLAN.md -- Code gen for file input: form fields (FileUpload), detail views (preview/download), list cells (thumbnail/icon), CRUD WithFileFields
 
 #### Phase 32: Multi-File & Configuration
 **Goal**: Developer can define multi-file fields and configure per-field upload constraints (allowed types, max size, upload directory) in gux.config.json
@@ -232,5 +232,5 @@ Phases execute in numeric order: 1 -> 2 -> ... -> 28 -> 29 -> 30 -> 31 -> 32
 | 28. Help Pattern Commands | v2.3 | 2/2 | Complete | 2026-01-26 |
 | 29. Storage Foundation | v2.4 | 2/2 | Complete | 2026-02-01 |
 | 30. Upload Client & UI Component | v2.4 | 2/2 | Complete | 2026-02-01 |
-| 31. Code Generation & CRUD Integration | v2.4 | 0/2 | Not started | - |
+| 31. Code Generation & CRUD Integration | v2.4 | 2/2 | Complete | 2026-02-03 |
 | 32. Multi-File & Configuration | v2.4 | 0/2 | Not started | - |

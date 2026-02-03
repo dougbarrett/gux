@@ -47,25 +47,25 @@ Requirements for v2.4 milestone. Each maps to roadmap phases.
 
 ### CRUD & Code Generation Integration
 
-- [ ] **CRUD-01**: Developer adds `"input": "file"` to a field in gux.config.json and `gux gen` produces working upload integration
-- [ ] **CRUD-02**: Generated model uses `string` type for single-file fields (stores file path)
-- [ ] **CRUD-03**: Generated DTOs include the file path/URL for file fields
-- [ ] **CRUD-04**: Generated admin create forms render `ui.FileUpload` for file fields
-- [ ] **CRUD-05**: Generated admin edit forms render `ui.FileUpload` with current file displayed
-- [ ] **CRUD-06**: Generated admin detail views show image preview for image file fields
-- [ ] **CRUD-07**: Generated admin detail views show filename + download link for non-image file fields
-- [ ] **CRUD-08**: Generated admin list views show thumbnail for image file fields
-- [ ] **CRUD-09**: Generated admin list views show file icon or filename for non-image file fields
-- [ ] **CRUD-10**: Files are automatically deleted from storage when the parent record is deleted via CRUD
+- [x] **CRUD-01**: Developer adds `"input": "file"` to a field in gux.config.json and `gux gen` produces working upload integration
+- [x] **CRUD-02**: Generated model uses `string` type for single-file fields (stores file path)
+- [x] **CRUD-03**: Generated DTOs include the file path/URL for file fields
+- [x] **CRUD-04**: Generated admin create forms render `ui.FileUpload` for file fields
+- [x] **CRUD-05**: Generated admin edit forms render `ui.FileUpload` with current file displayed
+- [x] **CRUD-06**: Generated admin detail views show image preview for image file fields
+- [x] **CRUD-07**: Generated admin detail views show filename + download link for non-image file fields
+- [x] **CRUD-08**: Generated admin list views show thumbnail for image file fields
+- [x] **CRUD-09**: Generated admin list views show file icon or filename for non-image file fields
+- [x] **CRUD-10**: Files are automatically deleted from storage when the parent record is deleted via CRUD
 
 ### Lifecycle Hooks
 
-- [ ] **HOOK-01**: Developer can register a BeforeUpload hook that validates or rejects a file before it is stored
-- [ ] **HOOK-02**: Developer can register an AfterUpload hook that processes a file after it is stored (e.g., document conversion, metadata extraction)
-- [ ] **HOOK-03**: Developer can register a BeforeDelete hook that runs before a file is removed from storage
-- [ ] **HOOK-04**: BeforeUpload hook receives file metadata (name, size, content type)
-- [ ] **HOOK-05**: AfterUpload hook receives stored file info (path, URL, original name, size, content type)
-- [ ] **HOOK-06**: Hooks follow the existing `WithCreateHook` / CRUD option pattern
+- [x] **HOOK-01**: Developer can register a BeforeUpload hook that validates or rejects a file before it is stored
+- [x] **HOOK-02**: Developer can register an AfterUpload hook that processes a file after it is stored (e.g., document conversion, metadata extraction)
+- [x] **HOOK-03**: Developer can register a BeforeDelete hook that runs before a file is removed from storage
+- [x] **HOOK-04**: BeforeUpload hook receives file metadata (name, size, content type)
+- [x] **HOOK-05**: AfterUpload hook receives stored file info (path, URL, original name, size, content type)
+- [x] **HOOK-06**: Hooks follow the existing `WithCreateHook` / CRUD option pattern
 
 ### Configuration
 
@@ -136,22 +136,22 @@ Which phases cover which requirements. Updated during roadmap creation.
 | UICM-08 | Phase 30 | Complete |
 | UICM-09 | Phase 30 | Complete |
 | UICM-10 | Phase 30 | Complete |
-| CRUD-01 | Phase 31 | Pending |
-| CRUD-02 | Phase 31 | Pending |
-| CRUD-03 | Phase 31 | Pending |
-| CRUD-04 | Phase 31 | Pending |
-| CRUD-05 | Phase 31 | Pending |
-| CRUD-06 | Phase 31 | Pending |
-| CRUD-07 | Phase 31 | Pending |
-| CRUD-08 | Phase 31 | Pending |
-| CRUD-09 | Phase 31 | Pending |
-| CRUD-10 | Phase 31 | Pending |
-| HOOK-01 | Phase 31 | Pending |
-| HOOK-02 | Phase 31 | Pending |
-| HOOK-03 | Phase 31 | Pending |
-| HOOK-04 | Phase 31 | Pending |
-| HOOK-05 | Phase 31 | Pending |
-| HOOK-06 | Phase 31 | Pending |
+| CRUD-01 | Phase 31 | Complete |
+| CRUD-02 | Phase 31 | Complete |
+| CRUD-03 | Phase 31 | Complete |
+| CRUD-04 | Phase 31 | Complete |
+| CRUD-05 | Phase 31 | Complete |
+| CRUD-06 | Phase 31 | Complete |
+| CRUD-07 | Phase 31 | Complete |
+| CRUD-08 | Phase 31 | Complete |
+| CRUD-09 | Phase 31 | Complete |
+| CRUD-10 | Phase 31 | Complete |
+| HOOK-01 | Phase 31 | Complete |
+| HOOK-02 | Phase 31 | Complete |
+| HOOK-03 | Phase 31 | Complete |
+| HOOK-04 | Phase 31 | Complete |
+| HOOK-05 | Phase 31 | Complete |
+| HOOK-06 | Phase 31 | Complete |
 | MULT-01 | Phase 32 | Pending |
 | MULT-02 | Phase 32 | Pending |
 | MULT-03 | Phase 32 | Pending |
@@ -167,4 +167,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-02-01*
-*Last updated: 2026-02-01 after phase 30 completion*
+*Last updated: 2026-02-03 after phase 31 completion*
