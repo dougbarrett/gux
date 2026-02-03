@@ -3,11 +3,11 @@
 ## Current Position
 
 Phase: 31 of 32 (Code Generation & CRUD Integration)
-Plan: 1 of 2 in current phase
-Status: In progress
-Last activity: 2026-02-03 -- Completed 31-01-PLAN.md
+Plan: 2 of 2 in current phase
+Status: Phase complete
+Last activity: 2026-02-03 -- Completed 31-02-PLAN.md
 
-Progress: [█████░░░░░] 56% (5/9 plans across 4 phases)
+Progress: [██████░░░░] 67% (6/9 plans across 4 phases)
 
 ## Project Reference
 
@@ -31,9 +31,9 @@ See: .planning/PROJECT.md (updated 2026-02-01)
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 5 (v2.4)
-- Average duration: 5m
-- Total execution time: 24m 36s
+- Total plans completed: 6 (v2.4)
+- Average duration: 5m 9s
+- Total execution time: 30m 56s
 
 **By Phase:**
 
@@ -41,7 +41,7 @@ See: .planning/PROJECT.md (updated 2026-02-01)
 |-------|-------|-------|----------|
 | 29 Storage Foundation | 2 | 6m 48s | 3m 24s |
 | 30 Upload Client & UI Component | 2 | 12m | 6m |
-| 31 Code Generation & CRUD Integration | 1 | 6m | 6m |
+| 31 Code Generation & CRUD Integration | 2 | 12m 20s | 6m 10s |
 
 *Updated after each plan completion*
 
@@ -70,6 +70,10 @@ Recent decisions affecting current work:
 - [31-01]: Filename extracted from storage key (last path segment) - original filename not persisted in Phase 31, can be enhanced later.
 - [31-01]: populateFileInfoFields converts string keys to *FileInfo in DTOs via reflection - transparent to developers.
 - [31-01]: File cleanup automatic by default, opt-out via WithNoAutoCleanup for archival/compliance use cases.
+- [31-02]: Model fields remain string type (stores storage key); DTOs use *core.FileInfo for rich metadata - clean separation of concerns.
+- [31-02]: Form state stores key as string via r.StateString; Value prop converts key to URL for FileUpload display.
+- [31-02]: Edit forms extract key from FileInfo.Key for state initialization with nil-safe pattern.
+- [31-02]: isImageFile helper checks 6 extensions: .jpg, .jpeg, .png, .gif, .webp, .svg - generated conditionally based on HasFileFields flag.
 
 ### Pending Todos
 
@@ -77,7 +81,7 @@ None yet.
 
 ### Blockers/Concerns
 
-None - Plan 31-01 complete. Ready for Plan 31-02 (Code Generator Updates).
+None - Phase 31 complete. Ready for Phase 32 (Multi-file Support and Per-field Configuration).
 
 ## Deferred Issues
 
@@ -87,9 +91,9 @@ v2.0 Tech Debt:
 ## Session Continuity
 
 Last session: 2026-02-03
-Stopped at: Completed 31-01-PLAN.md
+Stopped at: Completed 31-02-PLAN.md. Phase 31 complete.
 Resume file: None
 
 ---
 
-*Last updated: 2026-02-03 after 31-01 completion*
+*Last updated: 2026-02-03 after 31-02 completion*
