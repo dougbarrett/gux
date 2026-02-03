@@ -3,7 +3,9 @@ package core
 import (
 	"context"
 	"io"
+	"mime"
 	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -82,6 +84,60 @@ type StorageError struct {
 
 func (e *StorageError) Error() string {
 	return e.Message
+}
+
+// FileInfo represents file metadata exposed in DTOs for file fields.
+// Models store a storage key (string), but DTOs expose FileInfo with
+// resolved URL and metadata for rendering in admin views.
+type FileInfo struct {
+	URL         string `json:"url"`
+	Filename    string `json:"filename"`
+	Size        int64  `json:"size"`
+	ContentType string `json:"content_type"`
+}
+
+// FileInfoFromKey builds a FileInfo from a storage key using the Storage interface.
+// Returns nil if key is empty. Uses Serve() to get file metadata (size, content type).
+// If Serve fails (file missing), returns a FileInfo with just the URL and filename derived from key.
+func FileInfoFromKey(s Storage, key string) *FileInfo {
+	if key == "" || s == nil {
+		return nil
+	}
+	info := &FileInfo{
+		URL:      s.URL(key),
+		Filename: extractFilename(key),
+	}
+	// Try to get full metadata from storage
+	reader, fileInfo, err := s.Serve(key)
+	if err == nil {
+		reader.Close()
+		info.Size = fileInfo.Size()
+		// Content type detection from filename
+		info.ContentType = detectContentType(key)
+	}
+	return info
+}
+
+// extractFilename extracts the filename from a storage key.
+// Returns the last path segment (the hash-based filename).
+func extractFilename(key string) string {
+	if idx := strings.LastIndex(key, "/"); idx >= 0 {
+		return key[idx+1:]
+	}
+	return key
+}
+
+// detectContentType detects MIME type from file extension.
+func detectContentType(key string) string {
+	ext := filepath.Ext(key)
+	if ext == "" {
+		return "application/octet-stream"
+	}
+	ct := mime.TypeByExtension(ext)
+	if ct == "" {
+		return "application/octet-stream"
+	}
+	return ct
 }
 
 // matchMimePattern checks if a MIME type matches a pattern.

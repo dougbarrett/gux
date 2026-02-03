@@ -1,7 +1,9 @@
 package core
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"reflect"
 	"strconv"
@@ -55,21 +57,45 @@ type CreateHook func(data map[string]interface{}) (interface{}, error)
 // The hook receives the existing model and decoded JSON, returns the model to save.
 type UpdateHook func(existing interface{}, data map[string]interface{}) (interface{}, error)
 
+// BeforeUploadHook is called before a file is written to storage.
+// Receives file metadata and can reject the upload by returning an error.
+type BeforeUploadHook func(meta UploadMeta) error
+
+// AfterUploadHook is called after a file is saved to storage.
+// Receives the upload result and can perform post-processing.
+type AfterUploadHook func(result UploadResult) error
+
+// BeforeFileDeleteHook is called before a file is removed from storage.
+// Returning an error prevents the file from being deleted.
+type BeforeFileDeleteHook func(key string) error
+
+// UploadMeta contains metadata about a file being uploaded.
+type UploadMeta struct {
+	Filename    string
+	Size        int64
+	ContentType string
+}
+
 // CRUDModel represents a registered CRUD model
 type CRUDModel struct {
-	Name           string       // e.g., "Counter"
-	Path           string       // e.g., "counters"
-	ModelType      reflect.Type // The struct type
-	SliceType      reflect.Type // Slice of the struct type
-	ListDTO        reflect.Type // Optional DTO for list responses
-	DetailDTO      reflect.Type // Optional DTO for single item responses
-	ListPreloads   []string     // Preloads for list queries
-	DetailPreloads []string     // Preloads for detail queries
-	OnCreate       CreateHook   // Optional hook for custom create logic
-	OnUpdate       UpdateHook   // Optional hook for custom update logic
-	Public         bool         // If true, no authentication required
-	Roles          []string     // Roles required to access (any of these roles)
-	AuditConfig    *AuditConfig // Audit logging config (nil = disabled)
+	Name               string               // e.g., "Counter"
+	Path               string               // e.g., "counters"
+	ModelType          reflect.Type         // The struct type
+	SliceType          reflect.Type         // Slice of the struct type
+	ListDTO            reflect.Type         // Optional DTO for list responses
+	DetailDTO          reflect.Type         // Optional DTO for single item responses
+	ListPreloads       []string             // Preloads for list queries
+	DetailPreloads     []string             // Preloads for detail queries
+	OnCreate           CreateHook           // Optional hook for custom create logic
+	OnUpdate           UpdateHook           // Optional hook for custom update logic
+	Public             bool                 // If true, no authentication required
+	Roles              []string             // Roles required to access (any of these roles)
+	AuditConfig        *AuditConfig         // Audit logging config (nil = disabled)
+	FileFields         []string             // Field names that store file storage keys
+	OnBeforeUpload     BeforeUploadHook     // Optional hook called before file upload
+	OnAfterUpload      AfterUploadHook      // Optional hook called after file upload
+	OnBeforeFileDelete BeforeFileDeleteHook // Optional hook called before file deletion
+	DisableAutoCleanup bool                 // If true, don't automatically delete files on record delete/update
 }
 
 // WithListDTO sets a DTO type for list responses.
@@ -144,6 +170,45 @@ func WithRoles(roles ...string) CRUDOption {
 	}
 }
 
+// WithFileFields marks the specified fields as file storage keys.
+// Enables automatic file cleanup on record delete and file replacement.
+func WithFileFields(fields ...string) CRUDOption {
+	return func(m *CRUDModel) {
+		m.FileFields = fields
+	}
+}
+
+// WithBeforeUpload sets a hook that is called before a file is written to storage.
+// The hook receives file metadata and can reject the upload by returning an error.
+func WithBeforeUpload(hook BeforeUploadHook) CRUDOption {
+	return func(m *CRUDModel) {
+		m.OnBeforeUpload = hook
+	}
+}
+
+// WithAfterUpload sets a hook that is called after a file is saved to storage.
+// The hook receives the upload result and can perform post-processing.
+func WithAfterUpload(hook AfterUploadHook) CRUDOption {
+	return func(m *CRUDModel) {
+		m.OnAfterUpload = hook
+	}
+}
+
+// WithBeforeFileDelete sets a hook that is called before a file is removed from storage.
+// Returning an error prevents the file from being deleted.
+func WithBeforeFileDelete(hook BeforeFileDeleteHook) CRUDOption {
+	return func(m *CRUDModel) {
+		m.OnBeforeFileDelete = hook
+	}
+}
+
+// WithNoAutoCleanup disables automatic file cleanup on record delete and file replacement.
+func WithNoAutoCleanup() CRUDOption {
+	return func(m *CRUDModel) {
+		m.DisableAutoCleanup = true
+	}
+}
+
 // DB interface for database operations (compatible with GORM)
 type DB interface {
 	Find(dest interface{}, conds ...interface{}) DB
@@ -186,6 +251,42 @@ func (a *App) getUserFromRequest(r *http.Request) *SessionUser {
 	}
 	user, _ := a.authConfig.SessionStore.Get(sessionID)
 	return user
+}
+
+// deleteFileIfExists deletes a file from storage if it exists.
+// Respects the model's OnBeforeFileDelete hook and DisableAutoCleanup flag.
+func (a *App) deleteFileIfExists(model CRUDModel, key string) {
+	if key == "" || a.storage == nil {
+		return
+	}
+	if model.OnBeforeFileDelete != nil {
+		if err := model.OnBeforeFileDelete(key); err != nil {
+			return
+		}
+	}
+	if !model.DisableAutoCleanup {
+		ctx := context.Background()
+		if err := a.storage.Delete(ctx, key); err != nil {
+			fmt.Printf("gux: warning: failed to delete file %s: %v\n", key, err)
+		}
+	}
+}
+
+// getFileFieldValues extracts file field values from a model instance.
+// Returns a map of field name to storage key.
+func getFileFieldValues(item interface{}, fileFields []string) map[string]string {
+	values := make(map[string]string)
+	v := reflect.ValueOf(item)
+	if v.Kind() == reflect.Ptr {
+		v = v.Elem()
+	}
+	for _, fieldName := range fileFields {
+		f := v.FieldByName(fieldName)
+		if f.IsValid() && f.Kind() == reflect.String {
+			values[fieldName] = f.String()
+		}
+	}
+	return values
 }
 
 // checkCRUDAuth checks if the request is authorized for a CRUD model.
@@ -377,6 +478,16 @@ func (a *App) handleList(w http.ResponseWriter, r *http.Request, model CRUDModel
 	output := reflect.ValueOf(results).Elem().Interface()
 	if model.ListDTO != nil {
 		output = a.convertToDTO(output, model.ListDTO)
+		// Populate FileInfo fields if any
+		if len(model.FileFields) > 0 {
+			outputVal := reflect.ValueOf(output)
+			modelsVal := reflect.ValueOf(results).Elem()
+			for i := 0; i < outputVal.Len(); i++ {
+				dtoItem := outputVal.Index(i)
+				modelItem := modelsVal.Index(i)
+				a.populateFileInfoFields(dtoItem.Addr().Interface(), modelItem.Interface(), model.FileFields)
+			}
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -429,6 +540,10 @@ func (a *App) handleGet(w http.ResponseWriter, r *http.Request, model CRUDModel,
 	output := reflect.ValueOf(result).Elem().Interface()
 	if model.DetailDTO != nil {
 		output = a.convertSingleToDTO(output, model.DetailDTO)
+		// Populate FileInfo fields if any
+		if len(model.FileFields) > 0 {
+			a.populateFileInfoFields(&output, result, model.FileFields)
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -548,6 +663,37 @@ func (a *App) convertSingleToDTO(model interface{}, dtoType reflect.Type) interf
 	return dtoVal.Interface()
 }
 
+// populateFileInfoFields populates FileInfo fields in a DTO from the source model's file fields.
+// For each file field, checks if the DTO has a field of type *FileInfo and populates it
+// by calling FileInfoFromKey with the storage key from the model.
+func (a *App) populateFileInfoFields(dto interface{}, srcModel interface{}, fileFields []string) {
+	if len(fileFields) == 0 || a.storage == nil {
+		return
+	}
+	dtoVal := reflect.ValueOf(dto)
+	if dtoVal.Kind() == reflect.Ptr {
+		dtoVal = dtoVal.Elem()
+	}
+	modelVal := reflect.ValueOf(srcModel)
+	if modelVal.Kind() == reflect.Ptr {
+		modelVal = modelVal.Elem()
+	}
+	fileInfoType := reflect.TypeOf((*FileInfo)(nil))
+	for _, fieldName := range fileFields {
+		dtoField := dtoVal.FieldByName(fieldName)
+		if !dtoField.IsValid() || dtoField.Type() != fileInfoType {
+			continue
+		}
+		modelField := modelVal.FieldByName(fieldName)
+		if !modelField.IsValid() || modelField.Kind() != reflect.String {
+			continue
+		}
+		key := modelField.String()
+		info := FileInfoFromKey(a.storage, key)
+		dtoField.Set(reflect.ValueOf(info))
+	}
+}
+
 func (a *App) handleCreate(w http.ResponseWriter, r *http.Request, model CRUDModel) {
 	if a.db == nil {
 		http.Error(w, "Database not configured", http.StatusInternalServerError)
@@ -592,6 +738,13 @@ func (a *App) handleCreate(w http.ResponseWriter, r *http.Request, model CRUDMod
 		if errField.IsValid() {
 			errVal := errField.Call(nil)
 			if len(errVal) > 0 && !errVal[0].IsNil() {
+				// Rollback: delete any uploaded files on create failure
+				if len(model.FileFields) > 0 {
+					fileKeys := getFileFieldValues(item, model.FileFields)
+					for _, key := range fileKeys {
+						a.deleteFileIfExists(model, key)
+					}
+				}
 				// Get actual error message
 				errInterface := errVal[0].Interface()
 				if err, ok := errInterface.(error); ok {
@@ -639,7 +792,8 @@ func (a *App) handleUpdate(w http.ResponseWriter, r *http.Request, model CRUDMod
 	}
 
 	var item interface{}
-	var auditBeforeJSON []byte // snapshot for audit diff
+	var auditBeforeJSON []byte      // snapshot for audit diff
+	var oldFileKeys map[string]string // old file keys for cleanup
 	dbVal := reflect.ValueOf(a.db)
 
 	if model.OnUpdate != nil {
@@ -658,6 +812,11 @@ func (a *App) handleUpdate(w http.ResponseWriter, r *http.Request, model CRUDMod
 					}
 				}
 			}
+		}
+
+		// Capture old file keys before update
+		if len(model.FileFields) > 0 {
+			oldFileKeys = getFileFieldValues(existing, model.FileFields)
 		}
 
 		// Capture before-state for audit diff
@@ -696,6 +855,11 @@ func (a *App) handleUpdate(w http.ResponseWriter, r *http.Request, model CRUDMod
 			}
 		}
 
+		// Capture old file keys before update
+		if len(model.FileFields) > 0 {
+			oldFileKeys = getFileFieldValues(item, model.FileFields)
+		}
+
 		// Capture before-state for audit diff
 		if model.AuditConfig != nil && model.AuditConfig.Enabled {
 			auditBeforeJSON, _ = json.Marshal(reflect.ValueOf(item).Elem().Interface())
@@ -723,6 +887,18 @@ func (a *App) handleUpdate(w http.ResponseWriter, r *http.Request, model CRUDMod
 			if len(errVal) > 0 && !errVal[0].IsNil() {
 				http.Error(w, "Update failed", http.StatusInternalServerError)
 				return
+			}
+		}
+	}
+
+	// Clean up replaced files after successful save
+	if len(oldFileKeys) > 0 {
+		newFileKeys := getFileFieldValues(item, model.FileFields)
+		for fieldName, oldKey := range oldFileKeys {
+			newKey := newFileKeys[fieldName]
+			// If the field changed and old key was non-empty, delete old file
+			if oldKey != "" && oldKey != newKey {
+				a.deleteFileIfExists(model, oldKey)
 			}
 		}
 	}
@@ -765,6 +941,29 @@ func (a *App) handleDelete(w http.ResponseWriter, r *http.Request, model CRUDMod
 		return
 	}
 
+	dbVal := reflect.ValueOf(a.db)
+
+	// If model has file fields, fetch the record first to read file keys
+	var fileKeys map[string]string
+	if len(model.FileFields) > 0 {
+		item := reflect.New(model.ModelType).Interface()
+		firstMethod := dbVal.MethodByName("First")
+		if firstMethod.IsValid() {
+			ret := firstMethod.Call([]reflect.Value{reflect.ValueOf(item), reflect.ValueOf(id)})
+			if len(ret) > 0 {
+				errField := ret[0].MethodByName("Error")
+				if errField.IsValid() {
+					errVal := errField.Call(nil)
+					if len(errVal) > 0 && !errVal[0].IsNil() {
+						http.Error(w, "Not found", http.StatusNotFound)
+						return
+					}
+				}
+			}
+			fileKeys = getFileFieldValues(item, model.FileFields)
+		}
+	}
+
 	// Create instance with ID
 	item := reflect.New(model.ModelType).Interface()
 	itemVal := reflect.ValueOf(item).Elem()
@@ -774,7 +973,6 @@ func (a *App) handleDelete(w http.ResponseWriter, r *http.Request, model CRUDMod
 	}
 
 	// Call db.Delete(item)
-	dbVal := reflect.ValueOf(a.db)
 	deleteMethod := dbVal.MethodByName("Delete")
 	if !deleteMethod.IsValid() {
 		http.Error(w, "Database does not support Delete", http.StatusInternalServerError)
@@ -790,6 +988,13 @@ func (a *App) handleDelete(w http.ResponseWriter, r *http.Request, model CRUDMod
 				http.Error(w, "Delete failed", http.StatusInternalServerError)
 				return
 			}
+		}
+	}
+
+	// Clean up associated files after successful delete
+	if len(fileKeys) > 0 {
+		for _, key := range fileKeys {
+			a.deleteFileIfExists(model, key)
 		}
 	}
 
