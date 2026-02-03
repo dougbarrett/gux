@@ -1037,3 +1037,178 @@ type Order struct {
 		t.Errorf("Note = %q, want *string", fields["Note"])
 	}
 }
+
+// TestGenerateFormFieldCode_File tests file input generation in forms
+func TestGenerateFormFieldCode_File(t *testing.T) {
+	field := &ModelField{
+		Name:  "Avatar",
+		Type:  "string",
+		Input: "file",
+		Label: "Profile Picture",
+	}
+
+	tf := TemplateField{
+		Name:         "Avatar",
+		Type:         "string",
+		DTOFieldName: "Avatar",
+		Label:        "Profile Picture",
+		StateVar:     "avatarState",
+		IsFile:       true,
+	}
+
+	code := generateFormFieldCode(field, tf, "user")
+
+	// Check for key components of file upload field
+	tests := []struct {
+		name   string
+		needle string
+	}{
+		{"FileUpload component", "ui.FileUpload(ui.FileUploadProps{"},
+		{"Upload URL", `UploadURL: "/__gux_api/upload"`},
+		{"Value function", "Value: func() string {"},
+		{"Key to URL conversion", `"/__gux_api/files/" + avatarState.Get()`},
+		{"OnUploadComplete handler", "OnUploadComplete: func(result ui.UploadResult) {"},
+		{"Set storage key", "avatarState.Set(result.Key)"},
+		{"OnRemove handler", "OnRemove: func() {"},
+		{"Clear state", `avatarState.Set("")`},
+	}
+
+	for _, tc := range tests {
+		if !strings.Contains(code, tc.needle) {
+			t.Errorf("%s: expected code to contain %q", tc.name, tc.needle)
+		}
+	}
+}
+
+// TestGenerateDetailFieldCode_File tests file input generation in detail views
+func TestGenerateDetailFieldCode_File(t *testing.T) {
+	field := &ModelField{
+		Name:  "Avatar",
+		Type:  "string",
+		Input: "file",
+		Label: "Profile Picture",
+	}
+
+	tf := TemplateField{
+		Name:         "Avatar",
+		Type:         "string",
+		DTOFieldName: "Avatar",
+		DTOType:      "*core.FileInfo",
+		Label:        "Profile Picture",
+		IsFile:       true,
+	}
+
+	code := generateDetailFieldCode(field, tf, "user")
+
+	// Check for key components of file detail display
+	tests := []struct {
+		name   string
+		needle string
+	}{
+		{"FileInfo access", "fi := displayItem.Avatar"},
+		{"Nil check", "if fi == nil {"},
+		{"isImageFile check", "if isImageFile(fi.Filename) {"},
+		{"Image preview", "core.Img(core.Attrs{Src: fi.URL"},
+		{"Image alt text", `Alt: "Profile Picture"`},
+		{"Download link", `Extra: map[string]string{"download": "", "target": "_blank"}`},
+		{"Paperclip icon", `core.Text("\U0001F4CE")`},
+		{"Filename display", "core.Text(fi.Filename)"},
+	}
+
+	for _, tc := range tests {
+		if !strings.Contains(code, tc.needle) {
+			t.Errorf("%s: expected code to contain %q", tc.name, tc.needle)
+		}
+	}
+}
+
+// TestConvertToTemplateField_File tests that file fields get IsFile flag
+func TestConvertToTemplateField_File(t *testing.T) {
+	field := &ModelField{
+		Name:  "Document",
+		Type:  "string",
+		Input: "file",
+	}
+
+	tf := convertToTemplateField(field, "Contract", nil)
+
+	if !tf.IsFile {
+		t.Error("expected IsFile to be true for file input field")
+	}
+
+	if tf.DTOType != "*core.FileInfo" {
+		t.Errorf("DTOType = %q, want *core.FileInfo", tf.DTOType)
+	}
+
+	if tf.StateType != "String" {
+		t.Errorf("StateType = %q, want String", tf.StateType)
+	}
+
+	// State should store the storage key
+	if tf.StateDefault != `""` {
+		t.Errorf("StateDefault = %q, want empty string", tf.StateDefault)
+	}
+}
+
+// TestDTOGeneration_FileField tests that DTOs use *core.FileInfo for file fields
+func TestDTOGeneration_FileField(t *testing.T) {
+	modelDef := &ModelDefinition{
+		Name: "Profile",
+		Sections: map[string][]ModelField{
+			"Main": {
+				{Name: "Name", Type: "string", Table: true},
+				{Name: "Avatar", Type: "string", Input: "file", Table: true},
+			},
+		},
+	}
+
+	data := prepareModelTemplateData(modelDef, "testapp", nil, nil, nil)
+
+	if !data.HasFileFields {
+		t.Error("expected HasFileFields to be true")
+	}
+
+	// Find the Avatar field in TableFields
+	var avatarField *TemplateField
+	for i := range data.TableFields {
+		if data.TableFields[i].Name == "Avatar" {
+			avatarField = &data.TableFields[i]
+			break
+		}
+	}
+
+	if avatarField == nil {
+		t.Fatal("Avatar field not found in TableFields")
+	}
+
+	if avatarField.DTOType != "*core.FileInfo" {
+		t.Errorf("Avatar DTOType = %q, want *core.FileInfo", avatarField.DTOType)
+	}
+
+	if !avatarField.IsFile {
+		t.Error("Avatar field should have IsFile = true")
+	}
+}
+
+// TestListCellGeneration_FileField tests list view file field rendering
+func TestListCellGeneration_FileField(t *testing.T) {
+	// The list cell code is generated via template, so we test the template field setup
+	field := &ModelField{
+		Name:  "Photo",
+		Type:  "string",
+		Input: "file",
+		Table: true,
+	}
+
+	tf := convertToTemplateField(field, "Product", nil)
+
+	if !tf.IsFile {
+		t.Error("expected IsFile to be true")
+	}
+
+	// The template checks .IsFile and accesses .URL and .Filename
+	// We verify the DTOType is set correctly for FileInfo access
+	if tf.DTOType != "*core.FileInfo" {
+		t.Errorf("DTOType = %q, want *core.FileInfo (needed for .URL and .Filename access)", tf.DTOType)
+	}
+}
