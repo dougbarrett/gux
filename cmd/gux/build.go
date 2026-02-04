@@ -2321,7 +2321,14 @@ func generateBundleWasmEntryPoint(bundleName string, bundle *BundleInfo, apiImpo
 	// Wire up load tracker - render after all async loads complete
 	api.OnAllLoadsComplete = func() { render() }
 	loadPage()
-	attachLinks() // Intercept links on SSR DOM without destroying it`
+	if !api.HasPendingLoads() {
+		// No async loads (e.g., login page) - render immediately to attach event handlers
+		render()
+	} else {
+		// Async loads pending - preserve SSR DOM, just intercept links for now
+		// render() will be called by OnAllLoadsComplete when data arrives
+		attachLinks()
+	}`
 
 	} else {
 		// No async API: keep current behavior with fetchLoader

@@ -2672,23 +2672,14 @@ func TestGenerateBundleWasmEntryPoint_WithAPIImport(t *testing.T) {
 		}
 	})
 
-	t.Run("initial boot does not call render directly", func(t *testing.T) {
-		// Find the section after popstate handler - the initial boot section
-		// It should NOT have a bare render() call (only inside OnAllLoadsComplete)
-		popstateIdx := strings.Index(code, "popstate")
-		if popstateIdx < 0 {
-			t.Fatal("could not find popstate handler")
+	t.Run("initial boot renders conditionally on HasPendingLoads (#84)", func(t *testing.T) {
+		// Check that initial boot has the HasPendingLoads conditional pattern
+		if !strings.Contains(code, "api.OnAllLoadsComplete = func() { render() }\n\tloadPage()\n\tif !api.HasPendingLoads()") {
+			t.Error("boot section should wire OnAllLoadsComplete, call loadPage(), then check HasPendingLoads()")
 		}
-		afterPopstate := code[popstateIdx:]
-		// Find "attachLinks()" in boot section - render() should not appear between
-		// "OnAllLoadsComplete" and "select {}"
-		bootSection := afterPopstate[strings.Index(afterPopstate, "OnAllLoadsComplete"):]
-		selectIdx := strings.Index(bootSection, "select {}")
-		bootSection = bootSection[:selectIdx]
-		// Count render() calls - should only be inside OnAllLoadsComplete callback
-		renderCalls := strings.Count(bootSection, "render()")
-		if renderCalls != 1 {
-			t.Errorf("expected exactly 1 render() call in boot section (inside OnAllLoadsComplete), got %d", renderCalls)
+		// attachLinks() should be in the else branch (async loads pending)
+		if !strings.Contains(code, "attachLinks()\n\t}") {
+			t.Error("boot section should call attachLinks() in else branch for async case")
 		}
 	})
 
