@@ -264,37 +264,9 @@ func ToPlural(s string) string {
 	return s + "s"
 }
 
-// GoTypeToInputType returns the default HTML input type for a Go type
-func GoTypeToInputType(goType string) string {
-	switch goType {
-	case "time.Time", "*time.Time":
-		return "date"
-	case "int", "int32", "int64", "uint", "uint32", "uint64":
-		return "number"
-	case "float32", "float64":
-		return "number"
-	case "bool":
-		return "checkbox"
-	default:
-		return "text"
-	}
-}
-
-// IsPointerType returns true if the type is a pointer
-func IsPointerType(goType string) bool {
-	return strings.HasPrefix(goType, "*")
-}
-
 // IsSliceType returns true if the type is a slice
 func IsSliceType(goType string) bool {
 	return strings.HasPrefix(goType, "[]")
-}
-
-// GetBaseType returns the base type without pointer or slice prefix
-func GetBaseType(goType string) string {
-	goType = strings.TrimPrefix(goType, "*")
-	goType = strings.TrimPrefix(goType, "[]")
-	return goType
 }
 
 // runModelCommand handles the gux model subcommands

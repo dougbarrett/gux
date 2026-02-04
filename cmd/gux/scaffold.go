@@ -101,18 +101,6 @@ func ConfigExists(dir string) bool {
 	return err == nil
 }
 
-// ParseAuthMode converts a string auth mode to AuthMode
-func ParseAuthMode(auth string) AuthMode {
-	switch auth {
-	case "private":
-		return AuthModePrivate
-	case "public":
-		return AuthModePublic
-	default:
-		return AuthModeNone
-	}
-}
-
 // authModeToString converts AuthMode to string for config storage
 func authModeToString(mode AuthMode) string {
 	switch mode {
