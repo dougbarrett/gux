@@ -2170,6 +2170,11 @@ func parseRoutesAndBundles(filename string) (map[string]*BundleInfo, map[string]
 			}
 		}
 
+		// Ensure path is never empty — root route "/" must stay "/"
+		if path == "" {
+			path = "/"
+		}
+
 		route := PageRoute{
 			Path:     path,
 			Handler:  handler,
@@ -2552,10 +2557,14 @@ func generateBundleWasmEntryPoint(bundleName string, bundle *BundleInfo) error {
 		// Separate exact routes from parameterized routes
 		var exactRoutes, paramRoutes []PageRoute
 		for _, route := range routes {
-			if strings.Contains(route.Path, ":") {
-				paramRoutes = append(paramRoutes, route)
+			r := route
+			if r.Path == "" {
+				r.Path = "/" // Ensure root route is never empty
+			}
+			if strings.Contains(r.Path, ":") {
+				paramRoutes = append(paramRoutes, r)
 			} else {
-				exactRoutes = append(exactRoutes, route)
+				exactRoutes = append(exactRoutes, r)
 			}
 		}
 
@@ -2627,11 +2636,15 @@ func generateBundleWasmEntryPoint(bundleName string, bundle *BundleInfo) error {
 	bundleRoutesCode.WriteString("\tsuffix string // Suffix for parameterized routes\n")
 	bundleRoutesCode.WriteString("}{\n")
 	for _, route := range routes {
-		if strings.Contains(route.Path, ":") {
-			prefix, suffix := splitParamRoute(route.Path)
+		routePath := route.Path
+		if routePath == "" {
+			routePath = "/" // Ensure root route is never empty
+		}
+		if strings.Contains(routePath, ":") {
+			prefix, suffix := splitParamRoute(routePath)
 			bundleRoutesCode.WriteString(fmt.Sprintf("\t{prefix: %q, suffix: %q},\n", prefix, suffix))
 		} else {
-			bundleRoutesCode.WriteString(fmt.Sprintf("\t{exact: %q},\n", route.Path))
+			bundleRoutesCode.WriteString(fmt.Sprintf("\t{exact: %q},\n", routePath))
 		}
 	}
 	bundleRoutesCode.WriteString("}\n")

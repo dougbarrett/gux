@@ -2076,3 +2076,217 @@ func main() {
 		t.Errorf("expected /api/health, got %s", endpoints[0].Path)
 	}
 }
+
+// TestParseRoutesAndBundles_RootRouteInRouteGroup verifies that Hybrid("/", ...) inside a
+// RouteGroup produces the group prefix, not an empty string (#80).
+func TestParseRoutesAndBundles_RootRouteInRouteGroup(t *testing.T) {
+	src := `package main
+
+import (
+	"myapp/pages"
+	"myapp/admin"
+	"github.com/dougbarrett/gux/core"
+)
+
+func main() {
+	app := core.New()
+
+	// Root route without RouteGroup
+	app.Routes().
+		Hybrid("/", pages.Home).
+		Hybrid("/about", pages.About)
+
+	// Root route inside RouteGroup
+	app.RouteGroup("/admin", core.WithBundle("admin")).
+		Hybrid("/", admin.Dashboard).
+		Hybrid("/users", admin.Users)
+}
+`
+	path := writeTestFile(t, src)
+
+	bundles, _, err := parseRoutesAndBundles(path)
+	if err != nil {
+		t.Fatalf("parseRoutesAndBundles: %v", err)
+	}
+
+	// Check "app" bundle — root route should be "/"
+	appBundle := bundles["app"]
+	if appBundle == nil {
+		t.Fatal("expected 'app' bundle")
+	}
+	for _, r := range appBundle.Routes {
+		if r.Path == "" {
+			t.Errorf("app bundle has empty path route; expected '/' not ''")
+		}
+	}
+	// Verify "/" route exists
+	foundRoot := false
+	for _, r := range appBundle.Routes {
+		if r.Path == "/" {
+			foundRoot = true
+		}
+	}
+	if !foundRoot {
+		t.Errorf("app bundle missing '/' route; routes: %+v", appBundle.Routes)
+	}
+
+	// Check "admin" bundle — root route should be "/admin", not ""
+	adminBundle := bundles["admin"]
+	if adminBundle == nil {
+		t.Fatal("expected 'admin' bundle")
+	}
+	for _, r := range adminBundle.Routes {
+		if r.Path == "" {
+			t.Errorf("admin bundle has empty path route; expected '/admin' not ''")
+		}
+	}
+	// Verify "/admin" route exists (from Hybrid("/", ...) in RouteGroup("/admin", ...))
+	foundAdminRoot := false
+	for _, r := range adminBundle.Routes {
+		if r.Path == "/admin" {
+			foundAdminRoot = true
+		}
+	}
+	if !foundAdminRoot {
+		t.Errorf("admin bundle missing '/admin' route; routes: %+v", adminBundle.Routes)
+	}
+}
+
+// TestGenerateBundleWasmEntryPoint_RootRoute verifies that the generated WASM code
+// uses "/" not "" for the root route path (#80).
+func TestGenerateBundleWasmEntryPoint_RootRoute(t *testing.T) {
+	t.Run("normal root path", func(t *testing.T) {
+		dir := t.TempDir()
+		origDir, _ := os.Getwd()
+		os.Chdir(dir)
+		defer os.Chdir(origDir)
+
+		bundle := &BundleInfo{
+			Name: "app",
+			Routes: []PageRoute{
+				{Path: "/", Handler: "pages.Home", IsHybrid: true, Bundle: "app"},
+				{Path: "/about", Handler: "pages.About", IsHybrid: true, Bundle: "app"},
+			},
+			Imports: []BundleImport{
+				{Path: "myapp/pages"},
+			},
+		}
+
+		err := generateBundleWasmEntryPoint("app", bundle)
+		if err != nil {
+			t.Fatalf("generateBundleWasmEntryPoint: %v", err)
+		}
+
+		content, err := os.ReadFile("guxgen/wasm/main.go")
+		if err != nil {
+			t.Fatalf("read generated file: %v", err)
+		}
+
+		code := string(content)
+
+		if strings.Contains(code, `{exact: ""}`) {
+			t.Errorf("generated code contains {exact: \"\"} — should be {exact: \"/\"}")
+		}
+		if !strings.Contains(code, `{exact: "/"}`) {
+			t.Errorf("generated code missing {exact: \"/\"}")
+		}
+		if strings.Contains(code, `case "":`) {
+			t.Errorf("generated code contains case \"\": — should be case \"/\":")
+		}
+		if !strings.Contains(code, `case "/":`) {
+			t.Errorf("generated code missing case \"/\":")
+		}
+	})
+
+	t.Run("empty path becomes root slash", func(t *testing.T) {
+		dir := t.TempDir()
+		origDir, _ := os.Getwd()
+		os.Chdir(dir)
+		defer os.Chdir(origDir)
+
+		// Simulate a route with empty path (e.g., from RouteGroup with empty prefix)
+		bundle := &BundleInfo{
+			Name: "app",
+			Routes: []PageRoute{
+				{Path: "", Handler: "pages.Home", IsHybrid: true, Bundle: "app"},
+				{Path: "/about", Handler: "pages.About", IsHybrid: true, Bundle: "app"},
+			},
+			Imports: []BundleImport{
+				{Path: "myapp/pages"},
+			},
+		}
+
+		err := generateBundleWasmEntryPoint("app", bundle)
+		if err != nil {
+			t.Fatalf("generateBundleWasmEntryPoint: %v", err)
+		}
+
+		content, err := os.ReadFile("guxgen/wasm/main.go")
+		if err != nil {
+			t.Fatalf("read generated file: %v", err)
+		}
+
+		code := string(content)
+
+		// Empty path must be normalized to "/"
+		if strings.Contains(code, `{exact: ""}`) {
+			t.Errorf("generated code contains {exact: \"\"} — empty path should be normalized to \"/\"")
+		}
+		if !strings.Contains(code, `{exact: "/"}`) {
+			t.Errorf("generated code missing {exact: \"/\"}")
+		}
+		if strings.Contains(code, `case "":`) {
+			t.Errorf("generated code contains case \"\": — empty path should be normalized to \"/\"")
+		}
+		if !strings.Contains(code, `case "/":`) {
+			t.Errorf("generated code missing case \"/\":")
+		}
+	})
+}
+
+// TestParseRoutesAndBundles_RouteGroupEmptyPrefix verifies that RouteGroup with
+// empty prefix doesn't produce empty route paths (#80).
+func TestParseRoutesAndBundles_RouteGroupEmptyPrefix(t *testing.T) {
+	src := `package main
+
+import (
+	"myapp/pages"
+	"github.com/dougbarrett/gux/core"
+)
+
+func main() {
+	app := core.New()
+	app.RouteGroup("", core.WithBundle("app")).
+		Hybrid("/", pages.Home).
+		Hybrid("/about", pages.About)
+}
+`
+	path := writeTestFile(t, src)
+
+	bundles, _, err := parseRoutesAndBundles(path)
+	if err != nil {
+		t.Fatalf("parseRoutesAndBundles: %v", err)
+	}
+
+	appBundle := bundles["app"]
+	if appBundle == nil {
+		t.Fatal("expected 'app' bundle")
+	}
+
+	for _, r := range appBundle.Routes {
+		if r.Path == "" {
+			t.Errorf("route has empty path; should be '/' not ''")
+		}
+	}
+
+	// Verify root route is "/"
+	foundRoot := false
+	for _, r := range appBundle.Routes {
+		if r.Path == "/" {
+			foundRoot = true
+		}
+	}
+	if !foundRoot {
+		t.Errorf("missing '/' route; routes: %+v", appBundle.Routes)
+	}
+}
