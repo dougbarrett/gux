@@ -1358,32 +1358,38 @@ func TestGenerateAssetsFile_NoWASM(t *testing.T) {
 		t.Fatalf("generateAssetsFile: %v", err)
 	}
 
-	content, err := os.ReadFile("assets_gen.go")
+	// Check embed_gen.go (in guxgen/dist/)
+	embedContent, err := os.ReadFile("guxgen/dist/embed_gen.go")
+	if err != nil {
+		t.Fatalf("read embed_gen.go: %v", err)
+	}
+	embedCode := string(embedContent)
+
+	if strings.Contains(embedCode, "app.wasm") {
+		t.Error("SSR-only embed should not reference app.wasm")
+	}
+	if strings.Contains(embedCode, "wasm_exec.js") {
+		t.Error("SSR-only embed should not reference wasm_exec.js")
+	}
+	if !strings.Contains(embedCode, "styles.css") {
+		t.Error("SSR-only embed should reference styles.css")
+	}
+
+	// Check assets_gen.go (init file)
+	initContent, err := os.ReadFile("assets_gen.go")
 	if err != nil {
 		t.Fatalf("read assets_gen.go: %v", err)
 	}
+	initCode := string(initContent)
 
-	code := string(content)
-
-	// Should NOT embed WASM files
-	if strings.Contains(code, "app.wasm") {
-		t.Error("SSR-only assets should not embed app.wasm")
+	if !strings.Contains(initCode, "dist.StylesCSS") {
+		t.Error("SSR-only init should reference dist.StylesCSS")
 	}
-	if strings.Contains(code, "wasm_exec.js") {
-		t.Error("SSR-only assets should not embed wasm_exec.js")
+	if !strings.Contains(initCode, "core.SetDefaultAssets(nil, nil, dist.StylesCSS)") {
+		t.Error("SSR-only init should call SetDefaultAssets(nil, nil, dist.StylesCSS)")
 	}
-	if strings.Contains(code, "wasmBinary") {
-		t.Error("SSR-only assets should not reference wasmBinary")
-	}
-
-	// Should embed CSS
-	if !strings.Contains(code, "styles.css") {
-		t.Error("SSR-only assets should embed styles.css")
-	}
-
-	// Should use nil for WASM args
-	if !strings.Contains(code, "core.SetDefaultAssets(nil, nil, stylesCSS)") {
-		t.Error("SSR-only assets should call SetDefaultAssets(nil, nil, stylesCSS)")
+	if strings.Contains(initCode, "WasmBinary") {
+		t.Error("SSR-only init should not reference WasmBinary")
 	}
 }
 
@@ -1405,25 +1411,83 @@ func TestGenerateAssetsFile_WithWASM(t *testing.T) {
 		t.Fatalf("generateAssetsFile: %v", err)
 	}
 
-	content, err := os.ReadFile("assets_gen.go")
+	// Check embed_gen.go
+	embedContent, err := os.ReadFile("guxgen/dist/embed_gen.go")
+	if err != nil {
+		t.Fatalf("read embed_gen.go: %v", err)
+	}
+	embedCode := string(embedContent)
+
+	if !strings.Contains(embedCode, "app.wasm") {
+		t.Error("hybrid embed should reference app.wasm")
+	}
+	if !strings.Contains(embedCode, "wasm_exec.js") {
+		t.Error("hybrid embed should reference wasm_exec.js")
+	}
+	if !strings.Contains(embedCode, "styles.css") {
+		t.Error("hybrid embed should reference styles.css")
+	}
+
+	// Check assets_gen.go
+	initContent, err := os.ReadFile("assets_gen.go")
 	if err != nil {
 		t.Fatalf("read assets_gen.go: %v", err)
 	}
+	initCode := string(initContent)
 
-	code := string(content)
+	if !strings.Contains(initCode, "dist.WasmBinary") {
+		t.Error("hybrid init should reference dist.WasmBinary")
+	}
+	if !strings.Contains(initCode, "dist.WasmExecJS") {
+		t.Error("hybrid init should reference dist.WasmExecJS")
+	}
+	if !strings.Contains(initCode, "core.SetDefaultAssets(dist.WasmBinary, dist.WasmExecJS, dist.StylesCSS)") {
+		t.Error("hybrid init should call SetDefaultAssets with all dist exports")
+	}
+}
 
-	// Should embed all assets
-	if !strings.Contains(code, "app.wasm") {
-		t.Error("hybrid assets should embed app.wasm")
+// TestGenerateAssetsFile_CustomServerDir tests that custom serverDir places assets_gen.go correctly.
+func TestGenerateAssetsFile_CustomServerDir(t *testing.T) {
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(origDir)
+
+	os.MkdirAll("guxgen/dist", 0755)
+	os.MkdirAll("cmd/platform", 0755)
+	os.WriteFile("guxgen/dist/styles.css", []byte("body{}"), 0644)
+	os.WriteFile("guxgen/dist/app.wasm", []byte("wasm"), 0644)
+	os.WriteFile("guxgen/dist/wasm_exec.js", []byte("js"), 0644)
+
+	err := generateAssetsFile("github.com/test/app", []string{"app"}, "cmd/platform", true)
+	if err != nil {
+		t.Fatalf("generateAssetsFile: %v", err)
 	}
-	if !strings.Contains(code, "wasm_exec.js") {
-		t.Error("hybrid assets should embed wasm_exec.js")
+
+	// embed_gen.go should be at guxgen/dist/ (no .. paths)
+	embedContent, err := os.ReadFile("guxgen/dist/embed_gen.go")
+	if err != nil {
+		t.Fatalf("read embed_gen.go: %v", err)
 	}
-	if !strings.Contains(code, "styles.css") {
-		t.Error("hybrid assets should embed styles.css")
+	embedCode := string(embedContent)
+
+	if strings.Contains(embedCode, "..") {
+		t.Error("embed_gen.go should not contain .. paths")
 	}
-	if !strings.Contains(code, "core.SetDefaultAssets(wasmBinary, wasmExecJS, stylesCSS)") {
-		t.Error("hybrid assets should call SetDefaultAssets with all three args")
+
+	// assets_gen.go should be at cmd/platform/
+	initContent, err := os.ReadFile("cmd/platform/assets_gen.go")
+	if err != nil {
+		t.Fatalf("read cmd/platform/assets_gen.go: %v", err)
+	}
+	initCode := string(initContent)
+
+	// Should use import, not //go:embed
+	if strings.Contains(initCode, "//go:embed") {
+		t.Error("assets_gen.go should import dist package, not use //go:embed")
+	}
+	if !strings.Contains(initCode, "github.com/test/app/guxgen/dist") {
+		t.Error("assets_gen.go should import the guxgen/dist package")
 	}
 }
 
