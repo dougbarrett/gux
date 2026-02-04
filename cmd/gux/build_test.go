@@ -2691,6 +2691,31 @@ func TestGenerateBundleWasmEntryPoint_WithAPIImport(t *testing.T) {
 			t.Errorf("expected exactly 1 render() call in boot section (inside OnAllLoadsComplete), got %d", renderCalls)
 		}
 	})
+
+	t.Run("attachLinks defined before render (#83)", func(t *testing.T) {
+		attachLinksIdx := strings.Index(code, "attachLinks := func()")
+		renderIdx := strings.Index(code, "render = func()")
+		if attachLinksIdx < 0 || renderIdx < 0 {
+			t.Fatal("could not find attachLinks or render definition")
+		}
+		if attachLinksIdx > renderIdx {
+			t.Error("attachLinks must be defined before render to avoid forward reference")
+		}
+	})
+
+	t.Run("popstate does not declare unused path variable (#83)", func(t *testing.T) {
+		popstateIdx := strings.Index(code, "popstate")
+		if popstateIdx < 0 {
+			t.Fatal("could not find popstate handler")
+		}
+		// Find the popstate handler body (up to "return nil")
+		popstateSection := code[popstateIdx:]
+		returnIdx := strings.Index(popstateSection, "return nil")
+		popstateBody := popstateSection[:returnIdx]
+		if strings.Contains(popstateBody, "path :=") {
+			t.Error("popstate handler should not declare path variable (unused)")
+		}
+	})
 }
 
 // TestGenerateBundleWasmEntryPoint_WithoutAPIImport verifies fetchLoader is kept when no API.

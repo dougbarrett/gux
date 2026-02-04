@@ -2311,7 +2311,6 @@ func generateBundleWasmEntryPoint(bundleName string, bundle *BundleInfo, apiImpo
 		// Clear page-specific state for browser history navigation
 		router.ClearState()
 		api.ResetLoads()
-		path := window.Get("location").Get("pathname").String()
 		loadPage()
 		if !api.HasPendingLoads() {
 			render()
@@ -2531,7 +2530,7 @@ func main() {
 
 	// Scroll-to-top flag: true by default, set to false by links with data-gux-preserve-scroll
 	scrollAfterNavigate := true
-
+%s
 	render = func() {
 		// Save focus state before re-render
 		activeElement := document.Get("activeElement")
@@ -2561,7 +2560,7 @@ func main() {
 			}
 		}
 	}
-%s
+
 	// Navigate fetches page data then renders
 	// For cross-bundle navigation, do a full page redirect
 	navigate := func(path string) {%s
@@ -2590,7 +2589,7 @@ func main() {
 %s
 	select {}
 }
-`, importSection.String(), bundleRoutesCode.String(), fetchLoaderSection, routeCode.String(), renderLinkCode, attachLinksSection, navigateBody, popstateBody, initialBootCode)
+`, importSection.String(), bundleRoutesCode.String(), fetchLoaderSection, routeCode.String(), attachLinksSection, renderLinkCode, navigateBody, popstateBody, initialBootCode)
 
 	return os.WriteFile(wasmDir+"/main.go", []byte(code), 0644)
 }
