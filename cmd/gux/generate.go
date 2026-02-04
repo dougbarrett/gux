@@ -12,9 +12,9 @@ import (
 )
 
 // runGenNew generates all guxgen files without building WASM or binary
-func runGenNew(watch bool, updateDockerfile bool) {
+func runGenNew(watch bool, updateDockerfile bool, serverDir string) {
 	// Initial generation
-	if err := generateGuxFiles(); err != nil {
+	if err := generateGuxFiles(serverDir); err != nil {
 		fmt.Printf("Error: %v\n", err)
 		os.Exit(1)
 	}
@@ -35,11 +35,12 @@ func runGenNew(watch bool, updateDockerfile bool) {
 
 	// Watch mode
 	fmt.Println("\nWatching for file changes... (Ctrl+C to stop)")
-	watchAndRegenerate(false, nil)
+	watchAndRegenerate(false, nil, serverDir)
 }
 
-// generateGuxFiles generates all files in the guxgen directory
-func generateGuxFiles() error {
+// generateGuxFiles generates all files in the guxgen directory.
+// serverDir optionally specifies a subdirectory containing the app entry point.
+func generateGuxFiles(serverDir string) error {
 	// Get module path
 	modulePath, err := getModulePath()
 	if err != nil {
@@ -112,7 +113,7 @@ func generateGuxFiles() error {
 	}
 
 	// Find main app file
-	appFile, err := findMainAppFile()
+	appFile, err := findMainAppFile(serverDir)
 	if err != nil {
 		return fmt.Errorf("finding app file: %w", err)
 	}
@@ -299,7 +300,7 @@ func generateGuxFiles() error {
 
 	// Generate assets_gen.go with all bundles
 	fmt.Println("Generating assets...")
-	if err := generateAssetsFile(modulePath, bundleNames); err != nil {
+	if err := generateAssetsFile(modulePath, bundleNames, serverDir); err != nil {
 		return fmt.Errorf("generating assets: %w", err)
 	}
 
@@ -309,7 +310,7 @@ func generateGuxFiles() error {
 // watchAndRegenerate watches for file changes and regenerates/rebuilds
 // If fullBuild is true, it rebuilds WASM and binary (for dev mode)
 // If notifyReload is not nil, it's called after successful rebuild
-func watchAndRegenerate(fullBuild bool, notifyReload func()) {
+func watchAndRegenerate(fullBuild bool, notifyReload func(), serverDir string) {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		fmt.Printf("Error creating watcher: %v\n", err)
@@ -373,7 +374,7 @@ func watchAndRegenerate(fullBuild bool, notifyReload func()) {
 					}
 				} else {
 					// Just regenerate guxgen files
-					if err := generateGuxFiles(); err != nil {
+					if err := generateGuxFiles(serverDir); err != nil {
 						fmt.Printf("Error regenerating: %v\n", err)
 					} else {
 						fmt.Println("Regeneration complete!")

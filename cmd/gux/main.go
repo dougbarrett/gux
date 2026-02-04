@@ -126,9 +126,14 @@ func main() {
 		genCmd := flag.NewFlagSet("gen", flag.ExitOnError)
 		watch := genCmd.Bool("watch", false, "Watch for file changes and regenerate")
 		updateDockerfile := genCmd.Bool("update-dockerfile", false, "Regenerate Dockerfile from template")
+		serverDir := genCmd.String("server", "", "Server entry point directory (default: current directory)")
 		genCmd.Parse(os.Args[2:])
 
-		runGenNew(*watch, *updateDockerfile)
+		sd := *serverDir
+		if sd == "" && genCmd.NArg() > 0 {
+			sd = genCmd.Arg(0)
+		}
+		runGenNew(*watch, *updateDockerfile, sd)
 
 	case "pages":
 		pagesCmd := flag.NewFlagSet("pages", flag.ExitOnError)
@@ -140,17 +145,27 @@ func main() {
 	case "build":
 		buildCmd := flag.NewFlagSet("build", flag.ExitOnError)
 		useGo := buildCmd.Bool("go", false, "Use standard Go instead of TinyGo (~5MB vs ~500KB)")
+		serverDir := buildCmd.String("server", "", "Server entry point directory (default: current directory)")
 		buildCmd.Parse(os.Args[2:])
 
-		runBuildNew(!*useGo) // TinyGo is default
+		sd := *serverDir
+		if sd == "" && buildCmd.NArg() > 0 {
+			sd = buildCmd.Arg(0)
+		}
+		runBuildNew(!*useGo, sd) // TinyGo is default
 
 	case "dev":
 		devCmd := flag.NewFlagSet("dev", flag.ExitOnError)
 		useGo := devCmd.Bool("go", false, "Use standard Go instead of TinyGo")
 		watch := devCmd.Bool("watch", false, "Watch for file changes and hot reload")
+		serverDir := devCmd.String("server", "", "Server entry point directory (default: current directory)")
 		devCmd.Parse(os.Args[2:])
 
-		runDevNew(!*useGo, *watch) // TinyGo is default
+		sd := *serverDir
+		if sd == "" && devCmd.NArg() > 0 {
+			sd = devCmd.Arg(0)
+		}
+		runDevNew(!*useGo, *watch, sd) // TinyGo is default
 
 	case "clean":
 		runClean()
@@ -202,8 +217,10 @@ Usage:
     gux model add                                 Interactive model builder
     gux model add --from-config                   Generate models from gux.config.json
     gux model list                                List models in config
-    gux build [--go]                              Build WASM and server binary
-    gux dev [--go] [--watch]                      Build and run server
+    gux build [--go] [--server <dir>]             Build WASM and server binary
+    gux build [--go] <dir>                        Build with custom entry point directory
+    gux dev [--go] [--watch] [--server <dir>]     Build and run server
+    gux dev [--go] [--watch] <dir>                Dev with custom entry point directory
     gux clean                                     Remove generated files
     gux claude                                    Install Claude Code skill and CLAUDE.md
     gux update [--check]                          Update gux to latest version
@@ -220,6 +237,14 @@ Init options:
     --port <port>       Server port (default: 8080)
     --yes               Non-interactive mode with defaults (no auth, no admin)
     --config            Use settings from gux.config.json (auto-detected with '.')
+
+Build/Dev options:
+    --go                Use standard Go instead of TinyGo for WASM (~5MB vs ~500KB)
+    --watch             (dev only) Watch for file changes and hot reload
+    --server <dir>      Server entry point directory (default: current directory)
+                        Useful for monorepos where the gux app is at a non-standard path
+                        Example: gux dev ./cmd/platform
+                        Can also be passed as a positional argument
 
 Interactive mode:
     Running 'gux init myapp' without flags launches an interactive setup wizard

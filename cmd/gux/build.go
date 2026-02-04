@@ -74,15 +74,25 @@ func parseGoModModule() (string, error) {
 	return "", fmt.Errorf("module directive not found in go.mod")
 }
 
-// findMainAppFile finds the main app file (app.go or main.go with core.New())
-func findMainAppFile() (string, error) {
+// findMainAppFile finds the main app file (app.go or main.go with core.New()).
+// If serverDir is non-empty, it searches inside that directory instead of cwd.
+func findMainAppFile(serverDir string) (string, error) {
+	dir := "."
+	if serverDir != "" {
+		dir = serverDir
+	}
 	// Check app.go first
-	if _, err := os.Stat("app.go"); err == nil {
-		return "app.go", nil
+	appPath := filepath.Join(dir, "app.go")
+	if _, err := os.Stat(appPath); err == nil {
+		return appPath, nil
 	}
 	// Check main.go
-	if _, err := os.Stat("main.go"); err == nil {
-		return "main.go", nil
+	mainPath := filepath.Join(dir, "main.go")
+	if _, err := os.Stat(mainPath); err == nil {
+		return mainPath, nil
+	}
+	if serverDir != "" {
+		return "", fmt.Errorf("no app.go or main.go found in %s", serverDir)
 	}
 	return "", fmt.Errorf("no app.go or main.go found in current directory")
 }
@@ -4229,9 +4239,23 @@ func computeFileHash(path string) string {
 }
 
 // generateAssetsFile generates assets_gen.go with support for multiple bundles
-func generateAssetsFile(modulePath string, bundles []string) error {
+func generateAssetsFile(modulePath string, bundles []string, serverDir string) error {
 	var embedCode strings.Builder
 	var initCode strings.Builder
+
+	// Compute relative prefix for embed paths when serverDir is set.
+	// go:embed paths are relative to the file's directory.
+	embedPrefix := ""
+	if serverDir != "" {
+		// Count directory depth to build relative path back to project root
+		depth := len(filepath.SplitList(filepath.ToSlash(serverDir)))
+		// filepath.SplitList splits by os.PathListSeparator, not path separator
+		// Use strings.Count instead
+		depth = strings.Count(filepath.Clean(serverDir), string(filepath.Separator)) + 1
+		for i := 0; i < depth; i++ {
+			embedPrefix += "../"
+		}
+	}
 
 	// Compute hashes for cache busting
 	stylesHash := computeFileHash("guxgen/dist/styles.css")
@@ -4244,23 +4268,23 @@ func generateAssetsFile(modulePath string, bundles []string) error {
 	}
 
 	// Default bundle (app.wasm)
-	embedCode.WriteString(`//go:embed guxgen/dist/app.wasm
+	embedCode.WriteString(fmt.Sprintf(`//go:embed %sguxgen/dist/app.wasm
 var wasmBinary []byte
 
-//go:embed guxgen/dist/wasm_exec.js
+//go:embed %sguxgen/dist/wasm_exec.js
 var wasmExecJS []byte
 
-//go:embed guxgen/dist/styles.css
+//go:embed %sguxgen/dist/styles.css
 var stylesCSS []byte
-`)
+`, embedPrefix, embedPrefix, embedPrefix))
 
 	// Additional bundles
 	for _, bundle := range bundles {
 		if bundle != "app" {
 			embedCode.WriteString(fmt.Sprintf(`
-//go:embed guxgen/dist/%s.wasm
+//go:embed %sguxgen/dist/%s.wasm
 var wasm%s []byte
-`, bundle, strings.Title(bundle)))
+`, embedPrefix, bundle, strings.Title(bundle)))
 		}
 	}
 
@@ -4296,7 +4320,11 @@ import (
 %s
 %s`, embedCode.String(), initCode.String())
 
-	return os.WriteFile("assets_gen.go", []byte(code), 0644)
+	outPath := "assets_gen.go"
+	if serverDir != "" {
+		outPath = filepath.Join(serverDir, "assets_gen.go")
+	}
+	return os.WriteFile(outPath, []byte(code), 0644)
 }
 
 // buildWasmNew builds the WASM module using TinyGo
@@ -4502,10 +4530,14 @@ func buildTailwind() error {
 }
 
 // buildBinary builds the final server binary
-func buildBinary() error {
+func buildBinary(serverDir string) error {
 	fmt.Println("Building binary...")
 
-	cmd := exec.Command("go", "build", "-o", "bin/app", ".")
+	buildTarget := "."
+	if serverDir != "" {
+		buildTarget = "./" + serverDir
+	}
+	cmd := exec.Command("go", "build", "-o", "bin/app", buildTarget)
 	cmd.Env = append(os.Environ(), "CGO_ENABLED=0")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -4524,11 +4556,12 @@ func buildBinary() error {
 	return nil
 }
 
-// runBuildNew is the new build command for the simplified architecture
-func runBuildNew(tinygo bool) {
+// runBuildNew is the new build command for the simplified architecture.
+// serverDir optionally specifies a subdirectory containing the app entry point.
+func runBuildNew(tinygo bool, serverDir string) {
 	// Run full generation pipeline first (models, DTOs, admin, API client, etc.)
 	// This ensures guxgen/models/, guxgen/dto/, guxgen/admin/ are created from gux.config.json
-	if err := generateGuxFiles(); err != nil {
+	if err := generateGuxFiles(serverDir); err != nil {
 		fmt.Printf("Error generating files: %v\n", err)
 		os.Exit(1)
 	}
@@ -4541,7 +4574,7 @@ func runBuildNew(tinygo bool) {
 	}
 
 	// Find main app file
-	appFile, err := findMainAppFile()
+	appFile, err := findMainAppFile(serverDir)
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)
 		os.Exit(1)
@@ -4728,7 +4761,7 @@ func runBuildNew(tinygo bool) {
 
 	// Generate assets_gen.go with all bundles
 	fmt.Println("Generating assets...")
-	if err := generateAssetsFile(modulePath, bundleNames); err != nil {
+	if err := generateAssetsFile(modulePath, bundleNames, serverDir); err != nil {
 		fmt.Printf("Error generating assets: %v\n", err)
 		os.Exit(1)
 	}
@@ -4743,7 +4776,7 @@ func runBuildNew(tinygo bool) {
 	}
 
 	// Build final binary
-	if err := buildBinary(); err != nil {
+	if err := buildBinary(serverDir); err != nil {
 		fmt.Printf("Error: %v\n", err)
 		os.Exit(1)
 	}
@@ -4778,10 +4811,11 @@ func runClean() {
 	}
 }
 
-// runDevNew builds and runs the server (does NOT clean up on exit to preserve guxgen files)
-func runDevNew(tinygo bool, watch bool) {
+// runDevNew builds and runs the server (does NOT clean up on exit to preserve guxgen files).
+// serverDir optionally specifies a subdirectory containing the app entry point.
+func runDevNew(tinygo bool, watch bool, serverDir string) {
 	// Build first
-	runBuildNew(tinygo)
+	runBuildNew(tinygo, serverDir)
 
 	// Handle Ctrl+C
 	sigChan := make(chan os.Signal, 1)
@@ -4802,7 +4836,7 @@ func runDevNew(tinygo bool, watch bool) {
 			case rebuildChan <- struct{}{}:
 			default:
 			}
-		})
+		}, serverDir)
 	}
 
 	for {
@@ -4837,7 +4871,7 @@ func runDevNew(tinygo bool, watch bool) {
 			fmt.Println("\nRebuilding...")
 			cmd.Process.Signal(os.Interrupt)
 			<-done
-			runBuildNew(tinygo)
+			runBuildNew(tinygo, serverDir)
 			fmt.Println("\nRestarting server...")
 			continue // Restart loop
 		case err := <-done:

@@ -158,6 +158,11 @@ goquery/
 gux dev           # Build and run with hot reload
 gux build         # Production build (always runs gux gen first)
 gux gen           # Generate API client/server code
+
+# Custom entry point (for monorepos)
+gux dev ./cmd/platform          # Dev with app at cmd/platform/
+gux build ./cmd/platform        # Build with app at cmd/platform/
+gux dev --server ./cmd/platform # Equivalent flag form
 ```
 
 **Note**: `gux build` always runs `gux gen` first, regenerating all files in `guxgen/`. Never manually edit files in `guxgen/` — they will be overwritten.

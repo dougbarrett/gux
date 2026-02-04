@@ -105,9 +105,9 @@ Keep this list updated when adding new features to ensure Claude Code has accura
 - [x] gux init (interactive and non-interactive)
 - [x] gux init --auth, --auth-public, --admin
 - [x] gux init --claude
-- [x] gux dev (with --go, --watch)
-- [x] gux build (with --go) — always runs gux gen first
-- [x] gux gen (with --watch)
+- [x] gux dev (with --go, --watch, --server)
+- [x] gux build (with --go, --server) — always runs gux gen first
+- [x] gux gen (with --watch, --server)
 - [x] gux clean
 - [x] gux claude
 - [x] gux update (with --check)

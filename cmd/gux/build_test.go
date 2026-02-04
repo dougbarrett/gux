@@ -1212,3 +1212,132 @@ func TestListCellGeneration_FileField(t *testing.T) {
 		t.Errorf("DTOType = %q, want *core.FileInfo (needed for .URL and .Filename access)", tf.DTOType)
 	}
 }
+
+// TestFindMainAppFile tests findMainAppFile with default and custom serverDir.
+func TestFindMainAppFile(t *testing.T) {
+	t.Run("finds app.go in current directory", func(t *testing.T) {
+		dir := t.TempDir()
+		os.WriteFile(filepath.Join(dir, "app.go"), []byte("package main"), 0644)
+
+		origDir, _ := os.Getwd()
+		os.Chdir(dir)
+		defer os.Chdir(origDir)
+
+		got, err := findMainAppFile("")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if got != "app.go" {
+			t.Errorf("got %q, want %q", got, "app.go")
+		}
+	})
+
+	t.Run("finds main.go in current directory", func(t *testing.T) {
+		dir := t.TempDir()
+		os.WriteFile(filepath.Join(dir, "main.go"), []byte("package main"), 0644)
+
+		origDir, _ := os.Getwd()
+		os.Chdir(dir)
+		defer os.Chdir(origDir)
+
+		got, err := findMainAppFile("")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if got != "main.go" {
+			t.Errorf("got %q, want %q", got, "main.go")
+		}
+	})
+
+	t.Run("prefers app.go over main.go", func(t *testing.T) {
+		dir := t.TempDir()
+		os.WriteFile(filepath.Join(dir, "app.go"), []byte("package main"), 0644)
+		os.WriteFile(filepath.Join(dir, "main.go"), []byte("package main"), 0644)
+
+		origDir, _ := os.Getwd()
+		os.Chdir(dir)
+		defer os.Chdir(origDir)
+
+		got, err := findMainAppFile("")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if got != "app.go" {
+			t.Errorf("got %q, want %q", got, "app.go")
+		}
+	})
+
+	t.Run("error when no file found", func(t *testing.T) {
+		dir := t.TempDir()
+
+		origDir, _ := os.Getwd()
+		os.Chdir(dir)
+		defer os.Chdir(origDir)
+
+		_, err := findMainAppFile("")
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+		if !strings.Contains(err.Error(), "current directory") {
+			t.Errorf("error should mention 'current directory', got: %v", err)
+		}
+	})
+
+	t.Run("finds app.go in custom serverDir", func(t *testing.T) {
+		dir := t.TempDir()
+		subDir := filepath.Join(dir, "cmd", "platform")
+		os.MkdirAll(subDir, 0755)
+		os.WriteFile(filepath.Join(subDir, "app.go"), []byte("package main"), 0644)
+
+		origDir, _ := os.Getwd()
+		os.Chdir(dir)
+		defer os.Chdir(origDir)
+
+		got, err := findMainAppFile("cmd/platform")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		want := filepath.Join("cmd", "platform", "app.go")
+		if got != want {
+			t.Errorf("got %q, want %q", got, want)
+		}
+	})
+
+	t.Run("finds main.go in custom serverDir", func(t *testing.T) {
+		dir := t.TempDir()
+		subDir := filepath.Join(dir, "cmd", "server")
+		os.MkdirAll(subDir, 0755)
+		os.WriteFile(filepath.Join(subDir, "main.go"), []byte("package main"), 0644)
+
+		origDir, _ := os.Getwd()
+		os.Chdir(dir)
+		defer os.Chdir(origDir)
+
+		got, err := findMainAppFile("cmd/server")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		want := filepath.Join("cmd", "server", "main.go")
+		if got != want {
+			t.Errorf("got %q, want %q", got, want)
+		}
+	})
+
+	t.Run("error with custom serverDir not found", func(t *testing.T) {
+		dir := t.TempDir()
+		subDir := filepath.Join(dir, "cmd", "platform")
+		os.MkdirAll(subDir, 0755)
+
+		origDir, _ := os.Getwd()
+		os.Chdir(dir)
+		defer os.Chdir(origDir)
+
+		_, err := findMainAppFile("cmd/platform")
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+		if !strings.Contains(err.Error(), "cmd/platform") {
+			t.Errorf("error should mention 'cmd/platform', got: %v", err)
+		}
+	})
+}

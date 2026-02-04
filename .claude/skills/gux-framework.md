@@ -694,9 +694,9 @@ go install github.com/dougbarrett/gux/cmd/gux@latest
 |---------|-------------|
 | `gux init <name>` | Create new Gux application (interactive) |
 | `gux init [--auth\|--auth-public] [--admin] [--claude] <name>` | Create with explicit options |
-| `gux gen [--watch]` | Generate API client/server code and WASM entry points |
-| `gux build [--go]` | Build WASM and server binary with embedded assets |
-| `gux dev [--go] [--watch]` | Build and run dev server (with optional hot reload) |
+| `gux gen [--watch] [--server <dir>]` | Generate API client/server code and WASM entry points |
+| `gux build [--go] [--server <dir>]` | Build WASM and server binary with embedded assets |
+| `gux dev [--go] [--watch] [--server <dir>]` | Build and run dev server (with optional hot reload) |
 | `gux model add` | Interactive model builder |
 | `gux model add --from-config` | Generate all models from gux.config.json |
 | `gux model regen <Name>` | Regenerate files for a model |
@@ -721,6 +721,10 @@ gux init --auth-public --module github.com/user/app myapp
 # Start development server
 cd myapp
 gux dev
+
+# Custom entry point (monorepo usage)
+gux dev ./cmd/platform
+gux build --server ./cmd/platform
 ```
 
 ### Config File (`gux.config.json`)

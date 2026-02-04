@@ -25,6 +25,10 @@ gux gen              # Regenerate API client
 gux model add        # Interactive model builder
 gux model regen <N>  # Regenerate model files
 gux clean            # Remove generated files
+
+# Custom entry point (for monorepos)
+gux dev ./cmd/myapp            # Dev with custom entry point
+gux build --server ./cmd/myapp # Build with custom entry point
 ```
 
 ## Project Structure
