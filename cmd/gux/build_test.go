@@ -1374,6 +1374,57 @@ type Agent struct {
 	}
 }
 
+// TestGenerateAPIClient_NoGenerics verifies that generated client code does not
+// contain generic functions like Post[T] which panic in TinyGo WASM (#78).
+func TestGenerateAPIClient_NoGenerics(t *testing.T) {
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(origDir)
+
+	os.WriteFile("go.mod", []byte("module testapp\n\ngo 1.23\n"), 0644)
+	os.MkdirAll("guxgen/api", 0755)
+	os.MkdirAll("models", 0755)
+	os.WriteFile("models/item.go", []byte(`package models
+import "gorm.io/gorm"
+type Item struct {
+	gorm.Model
+	Name string
+}
+`), 0644)
+
+	modelFieldTypesCache = make(map[string]map[string]string)
+
+	models := []CRUDModel{{
+		Name:       "Item",
+		PluralName: "Items",
+		Path:       "items",
+	}}
+
+	err := generateAPIClient("testapp/models", "testapp/dto", models)
+	if err != nil {
+		t.Fatalf("generateAPIClient: %v", err)
+	}
+
+	// Check client.go (WASM)
+	clientData, err := os.ReadFile("guxgen/api/client.go")
+	if err != nil {
+		t.Fatalf("reading client.go: %v", err)
+	}
+	if strings.Contains(string(clientData), "Post[T") {
+		t.Error("client.go should not contain generic Post[T] — causes TinyGo WASM panic")
+	}
+
+	// Check client_server.go
+	serverData, err := os.ReadFile("guxgen/api/client_server.go")
+	if err != nil {
+		t.Fatalf("reading client_server.go: %v", err)
+	}
+	if strings.Contains(string(serverData), "Post[T") {
+		t.Error("client_server.go should not contain generic Post[T] — causes TinyGo WASM panic")
+	}
+}
+
 // TestGenerateFormFieldCode_File tests file input generation in forms
 func TestGenerateFormFieldCode_File(t *testing.T) {
 	field := &ModelField{

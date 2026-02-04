@@ -3730,31 +3730,6 @@ func fetch(method, url string, body []byte) ([]byte, error) {
 	return result, fetchErr
 }
 
-// Post makes a POST request to the given URL with JSON body.
-// Use this for custom API endpoints like authentication.
-func Post[T any](url string, data any, callback func(T, error)) {
-	go func() {
-		body, err := json.Marshal(data)
-		if err != nil {
-			var zero T
-			callback(zero, err)
-			return
-		}
-		resp, err := fetch("POST", url, body)
-		if err != nil {
-			var zero T
-			callback(zero, err)
-			return
-		}
-		var result T
-		if err := json.Unmarshal(resp, &result); err != nil {
-			var zero T
-			callback(zero, err)
-			return
-		}
-		callback(result, nil)
-	}()
-}
 %s%s
 `, imports, dtoCode.String(), modelCode.String())
 
@@ -3881,14 +3856,6 @@ func Init(database *gorm.DB) {
 	db = database
 }
 
-// Post is a stub for server-side builds.
-// The actual POST request happens client-side via WASM.
-func Post[T any](url string, data any, callback func(T, error)) {
-	// Server-side: this function is only called from WASM
-	// It's included here for compilation compatibility
-	var zero T
-	callback(zero, nil)
-}
 %s%s
 `, serverImports, stubDtoCode.String(), stubCode.String())
 
