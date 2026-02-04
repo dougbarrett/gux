@@ -771,6 +771,7 @@ func (a *App) Handler() http.Handler {
 					fmt.Fprintf(w, `<!DOCTYPE html>
 <html%s>
 <head>
+    <meta charset="utf-8">
     <title>%s</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     %s
@@ -792,6 +793,7 @@ func (a *App) Handler() http.Handler {
 					fmt.Fprintf(w, `<!DOCTYPE html>
 <html%s>
 <head>
+    <meta charset="utf-8">
     <title>%s</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     %s
