@@ -4749,8 +4749,11 @@ func runBuildNew(tinygo bool, serverDir string) {
 		}
 	}
 
+	// Parse API endpoints to check if any async API calls exist
+	apiEndpoints, _, _ := parseAPIEndpointsWithImportFollowing(appFile)
+
 	// Determine API import for WASM entry points
-	hasAsyncAPI := len(crudModels) > 0
+	hasAsyncAPI := len(crudModels) > 0 || len(apiEndpoints) > 0
 	apiImportPath := ""
 	if hasAsyncAPI {
 		if err := generateLoadTracker(); err != nil {
