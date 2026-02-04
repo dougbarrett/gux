@@ -776,7 +776,7 @@ type Widget struct {
 	os.WriteFile(filepath.Join("guxgen", "models", "widget.go"), []byte(modelContent), 0644)
 	modelFieldTypesCache = make(map[string]map[string]string)
 
-	result := generateServerAPICode("Widget", "Widgets", "models")
+	result := generateServerAPICode("Widget", "Widgets", "models", "")
 
 	// *string should have pointer dereference in model-to-DTO
 	if !strings.Contains(result, "if item.Description != nil") {
@@ -1035,6 +1035,167 @@ type Order struct {
 	}
 	if fields["Note"] != "*string" {
 		t.Errorf("Note = %q, want *string", fields["Note"])
+	}
+}
+
+// TestGetModelFieldTypesForImport_ResolvesCorrectPackage verifies that when a model
+// import path is provided, getModelFieldTypesForImport searches the correct directory
+// and does NOT fall back to core (which would pick up core.App for a user's models.App).
+func TestGetModelFieldTypesForImport_ResolvesCorrectPackage(t *testing.T) {
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(origDir)
+
+	os.WriteFile("go.mod", []byte("module testapp\n\ngo 1.23\n"), 0644)
+
+	// Create a user model named "App" (same name as core.App)
+	os.MkdirAll("models", 0755)
+	os.WriteFile("models/app.go", []byte(`package models
+
+import "gorm.io/gorm"
+
+type App struct {
+	gorm.Model
+	Name      string
+	Subdomain string
+	Status    string
+	Active    bool
+}
+`), 0644)
+
+	modelFieldTypesCache = make(map[string]map[string]string)
+
+	// With import path pointing to models/, should find the user's App
+	fields, err := getModelFieldTypesForImport("App", "testapp/models")
+	if err != nil {
+		t.Fatalf("getModelFieldTypesForImport with import path: %v", err)
+	}
+
+	// Should have user model fields
+	if fields["Name"] != "string" {
+		t.Errorf("expected Name=string, got %q", fields["Name"])
+	}
+	if fields["Subdomain"] != "string" {
+		t.Errorf("expected Subdomain=string, got %q", fields["Subdomain"])
+	}
+	if fields["Status"] != "string" {
+		t.Errorf("expected Status=string, got %q", fields["Status"])
+	}
+	if fields["Active"] != "bool" {
+		t.Errorf("expected Active=bool, got %q", fields["Active"])
+	}
+
+	// Should NOT have core.App fields
+	for _, coreField := range []string{"wasmBundles", "apiPrefix", "csrfConfig", "darkMode", "storage"} {
+		if _, exists := fields[coreField]; exists {
+			t.Errorf("found core.App field %q in user model — import-aware resolution failed", coreField)
+		}
+	}
+}
+
+// TestGetModelFieldTypesForImport_NoCoreFallback verifies that when an import path
+// is provided for a non-core package, we don't fall back to core even if the model
+// name matches a core type.
+func TestGetModelFieldTypesForImport_NoCoreFallback(t *testing.T) {
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(origDir)
+
+	os.WriteFile("go.mod", []byte("module testapp\n\ngo 1.23\n"), 0644)
+
+	// models/ directory exists but does NOT contain an "App" struct
+	os.MkdirAll("models", 0755)
+	os.WriteFile("models/agent.go", []byte(`package models
+
+type Agent struct {
+	Name string
+}
+`), 0644)
+
+	modelFieldTypesCache = make(map[string]map[string]string)
+
+	// Should error — not found in models/, and should NOT fall back to core
+	_, err := getModelFieldTypesForImport("App", "testapp/models")
+	if err == nil {
+		t.Fatal("expected error when model not found in specified import path, got nil")
+	}
+}
+
+// TestGetModelFieldTypesForImport_CoreModelStillWorks verifies that core models
+// (like AuditEntry) still resolve correctly when no import path is provided.
+func TestGetModelFieldTypesForImport_CoreModelStillWorks(t *testing.T) {
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(origDir)
+
+	os.WriteFile("go.mod", []byte("module testapp\n\ngo 1.23\n\nrequire github.com/dougbarrett/gux v1.28.33\n"), 0644)
+
+	modelFieldTypesCache = make(map[string]map[string]string)
+
+	// Empty import path should still search core as fallback
+	fields, err := getModelFieldTypesForImport("AuditEntry", "")
+	if err != nil {
+		// Core package may not be available in test env — skip if so
+		t.Skipf("core package not available in test environment: %v", err)
+	}
+
+	// Should have AuditEntry fields
+	if fields["Action"] == "" {
+		t.Error("expected AuditEntry to have Action field")
+	}
+}
+
+// TestGetModelFieldsForImport_FiltersCorrectly verifies that getModelFieldsForImport
+// properly filters out gorm.Model fields and relation fields.
+func TestGetModelFieldsForImport_FiltersCorrectly(t *testing.T) {
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(origDir)
+
+	os.WriteFile("go.mod", []byte("module testapp\n\ngo 1.23\n"), 0644)
+
+	os.MkdirAll("models", 0755)
+	os.WriteFile("models/app.go", []byte(`package models
+
+import "gorm.io/gorm"
+
+type App struct {
+	gorm.Model
+	Name      string
+	Subdomain string
+	Status    string
+	OwnerID   uint
+}
+`), 0644)
+
+	modelFieldTypesCache = make(map[string]map[string]string)
+
+	fields, err := getModelFieldsForImport("App", "testapp/models")
+	if err != nil {
+		t.Fatalf("getModelFieldsForImport: %v", err)
+	}
+
+	// Should have user fields
+	fieldNames := make(map[string]bool)
+	for _, f := range fields {
+		fieldNames[f.Name] = true
+	}
+
+	for _, expected := range []string{"Name", "Subdomain", "Status", "OwnerID"} {
+		if !fieldNames[expected] {
+			t.Errorf("expected field %q not found in results", expected)
+		}
+	}
+
+	// Should NOT have gorm.Model fields
+	for _, excluded := range []string{"ID", "CreatedAt", "UpdatedAt", "DeletedAt", "Model"} {
+		if fieldNames[excluded] {
+			t.Errorf("gorm.Model field %q should be excluded", excluded)
+		}
 	}
 }
 

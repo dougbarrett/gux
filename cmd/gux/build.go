@@ -137,10 +137,11 @@ type CRUDModel struct {
 
 // DTOInfo holds parsed information about a DTO struct
 type DTOInfo struct {
-	Name      string            // e.g., "UserList"
-	ModelName string            // e.g., "User" (extracted from first field's gux tag)
-	Fields    []DTOFieldMapping // Field mappings
-	Preloads  []string          // Preload directives from tags
+	Name            string            // e.g., "UserList"
+	ModelName       string            // e.g., "User" (extracted from first field's gux tag)
+	ModelImportPath string            // Resolved import path for the model package
+	Fields          []DTOFieldMapping // Field mappings
+	Preloads        []string          // Preload directives from tags
 }
 
 // DTOFieldMapping represents a single field mapping from DTO to model
@@ -191,6 +192,50 @@ type ModelFieldInfo struct {
 // getModelFields returns the fields of a model (excluding gorm.Model embedded fields)
 func getModelFields(modelName string) ([]ModelFieldInfo, error) {
 	fieldTypes, err := getModelFieldTypes(modelName)
+	if err != nil {
+		return nil, err
+	}
+
+	// Fields to exclude (from gorm.Model)
+	excludedFields := map[string]bool{
+		"ID":        true,
+		"CreatedAt": true,
+		"UpdatedAt": true,
+		"DeletedAt": true,
+		"Model":     true, // embedded gorm.Model
+	}
+
+	var fields []ModelFieldInfo
+	for name, typ := range fieldTypes {
+		if excludedFields[name] {
+			continue
+		}
+		// Skip embedded structs and relation fields (non-primitive pointer types)
+		if strings.Contains(typ, ".") || (strings.HasPrefix(typ, "*") && !isPrimitiveType(strings.TrimPrefix(typ, "*"))) {
+			// Check if it's a simple FK pointer like *uint - those we keep
+			trimmed := strings.TrimPrefix(typ, "*")
+			if trimmed != "uint" && trimmed != "int" && trimmed != "string" {
+				continue
+			}
+		}
+		// Skip slice types (M2M relations)
+		if strings.HasPrefix(typ, "[]") {
+			continue
+		}
+
+		fields = append(fields, ModelFieldInfo{
+			Name:     name,
+			Type:     typ,
+			JSONName: toSnakeCase(name),
+		})
+	}
+
+	return fields, nil
+}
+
+// getModelFieldsForImport returns the fields of a model using import path for precise resolution.
+func getModelFieldsForImport(modelName string, importPath string) ([]ModelFieldInfo, error) {
+	fieldTypes, err := getModelFieldTypesForImport(modelName, importPath)
 	if err != nil {
 		return nil, err
 	}
@@ -318,12 +363,12 @@ func generateModelAssignments(fields []ModelFieldInfo, sourceVar, targetVar stri
 
 // generateServerAPICode generates server-side API code for models without DTOs
 // using the actual model fields instead of assuming Name/Description
-func generateServerAPICode(modelName, pluralName, modelPkgPrefix string) string {
+func generateServerAPICode(modelName, pluralName, modelPkgPrefix, modelImportPath string) string {
 	if modelPkgPrefix == "" {
 		modelPkgPrefix = "models"
 	}
-	// Get actual fields from the model
-	fields, err := getModelFields(modelName)
+	// Get actual fields from the model using import-aware resolution
+	fields, err := getModelFieldsForImport(modelName, modelImportPath)
 	if err != nil || len(fields) == 0 {
 		// Fallback: generate minimal API with just ID
 		return generateMinimalServerAPICode(modelName, pluralName, modelPkgPrefix)
@@ -692,81 +737,114 @@ func (a *%sAPI) Delete(id uint, callback func(error)) {
 // getModelFieldTypes parses a model file and returns a map of field name -> field type
 // This is used to determine if foreign key fields are pointers
 func getModelFieldTypes(modelName string) (map[string]string, error) {
+	return getModelFieldTypesForImport(modelName, "")
+}
+
+// getModelFieldTypesForImport returns the field types for a model, using the
+// model's import path to resolve the correct package directory. This prevents
+// name collisions (e.g., user's models.App vs core.App).
+func getModelFieldTypesForImport(modelName string, importPath string) (map[string]string, error) {
+	// Build cache key that includes import path to avoid cross-package collisions
+	cacheKey := modelName
+	if importPath != "" {
+		cacheKey = importPath + "." + modelName
+	}
+
 	// Check cache first
-	if cached, ok := modelFieldTypesCache[modelName]; ok {
+	if cached, ok := modelFieldTypesCache[cacheKey]; ok {
 		return cached, nil
 	}
 
-	// Search models/ (user-defined) first, then guxgen/models/ (generated).
+	// If an import path is provided and it's not a core path, resolve to directory
+	if importPath != "" && !strings.HasSuffix(importPath, "/core") {
+		dir := resolveImportToDir(importPath)
+		if dir != "" {
+			if result := findStructInDir(modelName, dir); result != nil {
+				modelFieldTypesCache[cacheKey] = result
+				return result, nil
+			}
+		}
+		// Don't fall through to core — wrong package
+		return nil, fmt.Errorf("model %s not found in import path %s", modelName, importPath)
+	}
+
+	// Default search: models/ (user-defined) first, then guxgen/models/ (generated).
 	// User-defined structs are the source of truth for field types (e.g., pointer
 	// types like *float64 that the generated code from config may not preserve).
 	modelsDirs := []string{"models", filepath.Join("guxgen", "models")}
 	for _, modelsDir := range modelsDirs {
-		entries, err := os.ReadDir(modelsDir)
-		if err != nil {
-			continue
-		}
-
-		for _, entry := range entries {
-			if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".go") {
-				continue
-			}
-
-			fset := token.NewFileSet()
-			filename := filepath.Join(modelsDir, entry.Name())
-			node, err := parser.ParseFile(fset, filename, nil, parser.ParseComments)
-			if err != nil {
-				continue
-			}
-
-			// Look for the target struct
-			for _, decl := range node.Decls {
-				genDecl, ok := decl.(*ast.GenDecl)
-				if !ok || genDecl.Tok != token.TYPE {
-					continue
-				}
-
-				for _, spec := range genDecl.Specs {
-					typeSpec, ok := spec.(*ast.TypeSpec)
-					if !ok || typeSpec.Name.Name != modelName {
-						continue
-					}
-
-					structType, ok := typeSpec.Type.(*ast.StructType)
-					if !ok {
-						// Type alias (e.g., type X = pkg.Y) — follow the alias
-						if resolved := resolveTypeAlias(node, typeSpec); resolved != nil {
-							modelFieldTypesCache[modelName] = resolved
-							return resolved, nil
-						}
-						continue
-					}
-
-					fieldTypes := make(map[string]string)
-					for _, field := range structType.Fields.List {
-						if len(field.Names) == 0 {
-							continue
-						}
-						fieldName := field.Names[0].Name
-						fieldTypes[fieldName] = formatType(field.Type)
-					}
-
-					// Cache and return
-					modelFieldTypesCache[modelName] = fieldTypes
-					return fieldTypes, nil
-				}
-			}
+		if result := findStructInDir(modelName, modelsDir); result != nil {
+			modelFieldTypesCache[cacheKey] = result
+			return result, nil
 		}
 	}
 
 	// Fallback: try to find the model in the gux core package
 	// This handles models like core.AuditEntry that live in the framework
 	if result, err := getModelFieldTypesFromCore(modelName); err == nil {
-		modelFieldTypesCache[modelName] = result
+		modelFieldTypesCache[cacheKey] = result
 		return result, nil
 	}
 
 	return nil, fmt.Errorf("model %s not found", modelName)
+}
+
+// findStructInDir searches for a struct definition by name in all .go files within a directory.
+func findStructInDir(modelName string, dir string) map[string]string {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".go") {
+			continue
+		}
+
+		fset := token.NewFileSet()
+		filename := filepath.Join(dir, entry.Name())
+		node, err := parser.ParseFile(fset, filename, nil, parser.ParseComments)
+		if err != nil {
+			continue
+		}
+
+		// Look for the target struct
+		for _, decl := range node.Decls {
+			genDecl, ok := decl.(*ast.GenDecl)
+			if !ok || genDecl.Tok != token.TYPE {
+				continue
+			}
+
+			for _, spec := range genDecl.Specs {
+				typeSpec, ok := spec.(*ast.TypeSpec)
+				if !ok || typeSpec.Name.Name != modelName {
+					continue
+				}
+
+				structType, ok := typeSpec.Type.(*ast.StructType)
+				if !ok {
+					// Type alias (e.g., type X = pkg.Y) — follow the alias
+					if resolved := resolveTypeAlias(node, typeSpec); resolved != nil {
+						return resolved
+					}
+					continue
+				}
+
+				fieldTypes := make(map[string]string)
+				for _, field := range structType.Fields.List {
+					if len(field.Names) == 0 {
+						continue
+					}
+					fieldName := field.Names[0].Name
+					fieldTypes[fieldName] = formatType(field.Type)
+				}
+
+				return fieldTypes
+			}
+		}
+	}
+
+	return nil
 }
 
 // getModelFieldTypesFromCore searches for a model type in the gux core package.
@@ -3056,8 +3134,8 @@ func generateFieldMapping(info *DTOInfo, varName string) string {
 		return ""
 	}
 
-	// Get model field types to detect pointer mismatches
-	modelFieldTypes, _ := getModelFieldTypes(info.ModelName)
+	// Get model field types to detect pointer mismatches (import-aware)
+	modelFieldTypes, _ := getModelFieldTypesForImport(info.ModelName, info.ModelImportPath)
 
 	var sb strings.Builder
 	for _, f := range info.Fields {
@@ -3124,8 +3202,8 @@ func generateNestedDTOMapping(info *DTOInfo, resultVar, itemVar string, forList 
 		return ""
 	}
 
-	// Get model field types to determine if FK fields are pointers
-	modelFieldTypes, _ := getModelFieldTypes(info.ModelName)
+	// Get model field types to determine if FK fields are pointers (import-aware)
+	modelFieldTypes, _ := getModelFieldTypesForImport(info.ModelName, info.ModelImportPath)
 
 	var sb strings.Builder
 	for _, f := range info.Fields {
@@ -3250,7 +3328,7 @@ func generateAPIClient(modelsImport string, dtoImport string, models []CRUDModel
 			continue
 		}
 		// Parse actual model fields
-		fields, err := getModelFields(m.Name)
+		fields, err := getModelFieldsForImport(m.Name, m.ModelImportPath)
 		if err != nil || len(fields) == 0 {
 			// Fallback to minimal DTO with just ID
 			dtoCode.WriteString(fmt.Sprintf(`
@@ -3712,7 +3790,7 @@ func Post[T any](url string, data any, callback func(T, error)) {
 			continue
 		}
 		// Parse actual model fields instead of hardcoding Name/Description
-		fields, err := getModelFields(m.Name)
+		fields, err := getModelFieldsForImport(m.Name, m.ModelImportPath)
 		if err != nil {
 			// If we can't parse the model, generate empty DTO
 			stubDtoCode.WriteString(fmt.Sprintf(`
@@ -3746,7 +3824,7 @@ type %s struct {
 		} else if m.IsExternal {
 			pkg = "extmodels"
 		}
-		stubCode.WriteString(generateServerAPICode(m.Name, m.PluralName, pkg))
+		stubCode.WriteString(generateServerAPICode(m.Name, m.PluralName, pkg, m.ModelImportPath))
 	}
 
 	// Check if any CRUD models have external models, core models, or external DTOs
@@ -4847,6 +4925,7 @@ func runBuildNew(tinygo bool, serverDir string) {
 				if err != nil {
 					fmt.Printf("Warning: could not parse DTO %s: %v\n", m.ListDTO, err)
 				} else {
+					info.ModelImportPath = m.ModelImportPath
 					m.ListDTOInfo = info
 				}
 			}
@@ -4859,6 +4938,7 @@ func runBuildNew(tinygo bool, serverDir string) {
 				if err != nil {
 					fmt.Printf("Warning: could not parse DTO %s: %v\n", m.DetailDTO, err)
 				} else {
+					info.ModelImportPath = m.ModelImportPath
 					m.DetailDTOInfo = info
 				}
 			}
