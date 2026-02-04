@@ -1089,6 +1089,50 @@ func parseCRUDModelsWithImportFollowing(appFile string) ([]CRUDModel, string, st
 	return models, modelsImport, dtoImport, nil
 }
 
+// parseAPIEndpointsWithImportFollowing parses the entry point file for typed API
+// endpoints, then follows local imports to find core.API/APIGet/APIDelete calls.
+func parseAPIEndpointsWithImportFollowing(appFile string) ([]APIEndpointInfo, map[string]string, error) {
+	endpoints, dtoImports, err := parseAPIEndpoints(appFile)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// If endpoints were found directly, no need to follow imports
+	if len(endpoints) > 0 {
+		return endpoints, dtoImports, nil
+	}
+
+	// Get imports from entry point to follow
+	fset := token.NewFileSet()
+	node, parseErr := parser.ParseFile(fset, appFile, nil, parser.ParseComments)
+	if parseErr != nil {
+		return endpoints, dtoImports, nil
+	}
+
+	for _, imp := range node.Imports {
+		importPath := strings.Trim(imp.Path.Value, `"`)
+		dir := resolveImportToDir(importPath)
+		if dir == "" {
+			continue
+		}
+		for _, file := range listGoFiles(dir) {
+			fileEndpoints, fileDTOImports, err := parseAPIEndpoints(file)
+			if err != nil || len(fileEndpoints) == 0 {
+				continue
+			}
+			endpoints = append(endpoints, fileEndpoints...)
+			// Merge DTO imports
+			for alias, path := range fileDTOImports {
+				if _, exists := dtoImports[alias]; !exists {
+					dtoImports[alias] = path
+				}
+			}
+		}
+	}
+
+	return endpoints, dtoImports, nil
+}
+
 // parseStructFromDir parses all Go files in a directory looking for a specific struct type.
 func parseStructFromDir(dir string, typeName string) map[string]string {
 	entries, err := os.ReadDir(dir)

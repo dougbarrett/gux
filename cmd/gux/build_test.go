@@ -1963,3 +1963,116 @@ func main() {
 		t.Errorf("expected route path '/', got %q", appBundle.Routes[0].Path)
 	}
 }
+
+// TestParseAPIEndpointsWithImportFollowing tests that API endpoints in imported packages are discovered.
+func TestParseAPIEndpointsWithImportFollowing(t *testing.T) {
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(origDir)
+
+	// Create go.mod
+	os.WriteFile("go.mod", []byte("module testapp\n\ngo 1.21\n"), 0644)
+
+	// Create entry point that imports a local package
+	os.MkdirAll("cmd/server", 0755)
+	os.WriteFile("cmd/server/main.go", []byte(`package main
+
+import (
+	"testapp/internal/routes"
+)
+
+func main() {
+	routes.Setup()
+}
+`), 0644)
+
+	// Create the imported package with API endpoint registrations
+	os.MkdirAll("internal/routes", 0755)
+	os.WriteFile("internal/routes/api.go", []byte(`package routes
+
+import (
+	"testapp/dto"
+	"github.com/dougbarrett/gux/core"
+)
+
+func Setup() {
+	app := core.New()
+	core.API(app, "POST", "/api/login", func(ctx *core.APIContext, req dto.LoginRequest) (dto.LoginResponse, error) {
+		return dto.LoginResponse{}, nil
+	})
+	core.APIGet(app, "/api/users/:id", func(ctx *core.APIContext) (dto.UserDetail, error) {
+		return dto.UserDetail{}, nil
+	})
+}
+`), 0644)
+
+	// Parse with import following
+	endpoints, dtoImports, err := parseAPIEndpointsWithImportFollowing("cmd/server/main.go")
+	if err != nil {
+		t.Fatalf("parseAPIEndpointsWithImportFollowing: %v", err)
+	}
+
+	// Should find the endpoints from the imported package
+	if len(endpoints) != 2 {
+		t.Fatalf("expected 2 endpoints, got %d", len(endpoints))
+	}
+
+	// Verify first endpoint
+	if endpoints[0].Method != "POST" {
+		t.Errorf("expected POST, got %s", endpoints[0].Method)
+	}
+	if endpoints[0].Path != "/api/login" {
+		t.Errorf("expected /api/login, got %s", endpoints[0].Path)
+	}
+	if endpoints[0].RequestType != "LoginRequest" {
+		t.Errorf("expected LoginRequest, got %s", endpoints[0].RequestType)
+	}
+	if endpoints[0].ResponseType != "LoginResponse" {
+		t.Errorf("expected LoginResponse, got %s", endpoints[0].ResponseType)
+	}
+
+	// Verify second endpoint
+	if endpoints[1].Method != "GET" {
+		t.Errorf("expected GET, got %s", endpoints[1].Method)
+	}
+	if endpoints[1].Path != "/api/users/:id" {
+		t.Errorf("expected /api/users/:id, got %s", endpoints[1].Path)
+	}
+
+	// Verify DTO imports were collected
+	if _, ok := dtoImports["dto"]; !ok {
+		t.Errorf("expected 'dto' in dtoImports, got: %v", dtoImports)
+	}
+}
+
+// TestParseAPIEndpointsWithImportFollowing_DirectEndpoints tests that direct endpoints skip import following.
+func TestParseAPIEndpointsWithImportFollowing_DirectEndpoints(t *testing.T) {
+	src := `package main
+
+import (
+	"myapp/dto"
+	"github.com/dougbarrett/gux/core"
+)
+
+func main() {
+	app := core.New()
+	core.APIGet(app, "/api/health", func(ctx *core.APIContext) (dto.HealthResponse, error) {
+		return dto.HealthResponse{}, nil
+	})
+}
+`
+	path := writeTestFile(t, src)
+
+	endpoints, _, err := parseAPIEndpointsWithImportFollowing(path)
+	if err != nil {
+		t.Fatalf("parseAPIEndpointsWithImportFollowing: %v", err)
+	}
+
+	if len(endpoints) != 1 {
+		t.Fatalf("expected 1 endpoint, got %d", len(endpoints))
+	}
+	if endpoints[0].Path != "/api/health" {
+		t.Errorf("expected /api/health, got %s", endpoints[0].Path)
+	}
+}

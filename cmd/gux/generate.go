@@ -256,8 +256,8 @@ func generateGuxFiles(serverDir string) error {
 		}
 	}
 
-	// Parse typed API endpoints from app file
-	apiEndpoints, endpointDTOImports, err := parseAPIEndpoints(appFile)
+	// Parse typed API endpoints from app file (follows imports if needed)
+	apiEndpoints, endpointDTOImports, err := parseAPIEndpointsWithImportFollowing(appFile)
 	if err != nil {
 		return fmt.Errorf("parsing API endpoints: %w", err)
 	}
