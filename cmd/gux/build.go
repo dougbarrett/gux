@@ -913,6 +913,124 @@ func resolveImportToDir(importPath string) string {
 	return ""
 }
 
+// listGoFiles returns all non-test, non-generated .go files in a directory.
+func listGoFiles(dir string) []string {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil
+	}
+	var files []string
+	for _, e := range entries {
+		name := e.Name()
+		if e.IsDir() || !strings.HasSuffix(name, ".go") {
+			continue
+		}
+		if strings.HasSuffix(name, "_test.go") {
+			continue
+		}
+		files = append(files, filepath.Join(dir, name))
+	}
+	return files
+}
+
+// parseRoutesWithImportFollowing parses the entry point file for routes, then
+// follows local imports (within the module) to find Hybrid() calls in imported packages.
+func parseRoutesWithImportFollowing(appFile string) (map[string]*BundleInfo, map[string]string, error) {
+	bundles, imports, err := parseRoutesAndBundles(appFile)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Count routes found in the entry point
+	totalRoutes := 0
+	for _, bundle := range bundles {
+		totalRoutes += len(bundle.Routes)
+	}
+
+	// If routes were found directly, no need to follow imports
+	if totalRoutes > 0 {
+		return bundles, imports, nil
+	}
+
+	// Follow local imports to find route registrations
+	for _, importPath := range imports {
+		dir := resolveImportToDir(importPath)
+		if dir == "" {
+			continue // external dependency
+		}
+		for _, file := range listGoFiles(dir) {
+			fileBundles, fileImports, err := parseRoutesAndBundles(file)
+			if err != nil {
+				continue // skip files that fail to parse
+			}
+			// Merge routes into our bundles
+			for name, fileBundle := range fileBundles {
+				if len(fileBundle.Routes) == 0 {
+					continue
+				}
+				if existing, ok := bundles[name]; ok {
+					existing.Routes = append(existing.Routes, fileBundle.Routes...)
+					existing.Imports = append(existing.Imports, fileBundle.Imports...)
+				} else {
+					bundles[name] = fileBundle
+				}
+			}
+			// Merge imports
+			for alias, path := range fileImports {
+				if _, exists := imports[alias]; !exists {
+					imports[alias] = path
+				}
+			}
+		}
+	}
+
+	return bundles, imports, nil
+}
+
+// parseCRUDModelsWithImportFollowing parses the entry point file for CRUD models,
+// then follows local imports to find app.CRUD() calls in imported packages.
+func parseCRUDModelsWithImportFollowing(appFile string) ([]CRUDModel, string, string, error) {
+	models, modelsImport, dtoImport, err := parseCRUDModels(appFile)
+	if err != nil {
+		return nil, "", "", err
+	}
+
+	// If CRUD models were found directly, no need to follow imports
+	if len(models) > 0 {
+		return models, modelsImport, dtoImport, nil
+	}
+
+	// Get imports from entry point to follow
+	fset := token.NewFileSet()
+	node, parseErr := parser.ParseFile(fset, appFile, nil, parser.ParseComments)
+	if parseErr != nil {
+		return models, modelsImport, dtoImport, nil // return what we have
+	}
+
+	for _, imp := range node.Imports {
+		importPath := strings.Trim(imp.Path.Value, `"`)
+		dir := resolveImportToDir(importPath)
+		if dir == "" {
+			continue
+		}
+		for _, file := range listGoFiles(dir) {
+			fileModels, fileModelsImport, fileDTOImport, err := parseCRUDModels(file)
+			if err != nil || len(fileModels) == 0 {
+				continue
+			}
+			models = append(models, fileModels...)
+			if modelsImport == "" {
+				modelsImport = fileModelsImport
+			}
+			if dtoImport == "" {
+				dtoImport = fileDTOImport
+			}
+		}
+	}
+
+	return models, modelsImport, dtoImport, nil
+}
+
 // parseStructFromDir parses all Go files in a directory looking for a specific struct type.
 func parseStructFromDir(dir string, typeName string) map[string]string {
 	entries, err := os.ReadDir(dir)
@@ -4238,8 +4356,9 @@ func computeFileHash(path string) string {
 	return hash
 }
 
-// generateAssetsFile generates assets_gen.go with support for multiple bundles
-func generateAssetsFile(modulePath string, bundles []string, serverDir string) error {
+// generateAssetsFile generates assets_gen.go with support for multiple bundles.
+// When hasWASM is false, only CSS is embedded (no WASM binary or wasm_exec.js).
+func generateAssetsFile(modulePath string, bundles []string, serverDir string, hasWASM bool) error {
 	var embedCode strings.Builder
 	var initCode strings.Builder
 
@@ -4248,10 +4367,7 @@ func generateAssetsFile(modulePath string, bundles []string, serverDir string) e
 	embedPrefix := ""
 	if serverDir != "" {
 		// Count directory depth to build relative path back to project root
-		depth := len(filepath.SplitList(filepath.ToSlash(serverDir)))
-		// filepath.SplitList splits by os.PathListSeparator, not path separator
-		// Use strings.Count instead
-		depth = strings.Count(filepath.Clean(serverDir), string(filepath.Separator)) + 1
+		depth := strings.Count(filepath.Clean(serverDir), string(filepath.Separator)) + 1
 		for i := 0; i < depth; i++ {
 			embedPrefix += "../"
 		}
@@ -4260,33 +4376,39 @@ func generateAssetsFile(modulePath string, bundles []string, serverDir string) e
 	// Compute hashes for cache busting
 	stylesHash := computeFileHash("guxgen/dist/styles.css")
 	wasmHashes := make(map[string]string)
-	wasmHashes["app"] = computeFileHash("guxgen/dist/app.wasm")
-	for _, bundle := range bundles {
-		if bundle != "app" {
-			wasmHashes[bundle] = computeFileHash(fmt.Sprintf("guxgen/dist/%s.wasm", bundle))
-		}
-	}
 
-	// Default bundle (app.wasm)
-	embedCode.WriteString(fmt.Sprintf(`//go:embed %sguxgen/dist/app.wasm
+	if hasWASM {
+		wasmHashes["app"] = computeFileHash("guxgen/dist/app.wasm")
+		for _, bundle := range bundles {
+			if bundle != "app" {
+				wasmHashes[bundle] = computeFileHash(fmt.Sprintf("guxgen/dist/%s.wasm", bundle))
+			}
+		}
+
+		// Default bundle (app.wasm)
+		embedCode.WriteString(fmt.Sprintf(`//go:embed %sguxgen/dist/app.wasm
 var wasmBinary []byte
 
 //go:embed %sguxgen/dist/wasm_exec.js
 var wasmExecJS []byte
 
-//go:embed %sguxgen/dist/styles.css
-var stylesCSS []byte
-`, embedPrefix, embedPrefix, embedPrefix))
+`, embedPrefix, embedPrefix))
 
-	// Additional bundles
-	for _, bundle := range bundles {
-		if bundle != "app" {
-			embedCode.WriteString(fmt.Sprintf(`
+		// Additional bundles
+		for _, bundle := range bundles {
+			if bundle != "app" {
+				embedCode.WriteString(fmt.Sprintf(`
 //go:embed %sguxgen/dist/%s.wasm
 var wasm%s []byte
 `, embedPrefix, bundle, strings.Title(bundle)))
+			}
 		}
 	}
+
+	// CSS is always embedded
+	embedCode.WriteString(fmt.Sprintf(`//go:embed %sguxgen/dist/styles.css
+var stylesCSS []byte
+`, embedPrefix))
 
 	// Build hash map code
 	var hashMapCode strings.Builder
@@ -4298,11 +4420,15 @@ var wasm%s []byte
 
 	// Init function
 	initCode.WriteString("func init() {\n")
-	initCode.WriteString("\tcore.SetDefaultAssets(wasmBinary, wasmExecJS, stylesCSS)\n")
-	for _, bundle := range bundles {
-		if bundle != "app" {
-			initCode.WriteString(fmt.Sprintf("\tcore.SetDefaultBundle(%q, wasm%s)\n", bundle, strings.Title(bundle)))
+	if hasWASM {
+		initCode.WriteString("\tcore.SetDefaultAssets(wasmBinary, wasmExecJS, stylesCSS)\n")
+		for _, bundle := range bundles {
+			if bundle != "app" {
+				initCode.WriteString(fmt.Sprintf("\tcore.SetDefaultBundle(%q, wasm%s)\n", bundle, strings.Title(bundle)))
+			}
 		}
+	} else {
+		initCode.WriteString("\tcore.SetDefaultAssets(nil, nil, stylesCSS)\n")
 	}
 	// Set asset hashes for cache busting
 	initCode.WriteString(fmt.Sprintf("\tcore.SetDefaultAssetHashes(%q, %s)\n", stylesHash, hashMapCode.String()))
@@ -4580,8 +4706,8 @@ func runBuildNew(tinygo bool, serverDir string) {
 		os.Exit(1)
 	}
 
-	// Parse routes and bundles from app file
-	bundles, imports, err := parseRoutesAndBundles(appFile)
+	// Parse routes and bundles from app file (follows imports if needed)
+	bundles, imports, err := parseRoutesWithImportFollowing(appFile)
 	if err != nil {
 		fmt.Printf("Error parsing routes: %v\n", err)
 		os.Exit(1)
@@ -4596,14 +4722,17 @@ func runBuildNew(tinygo bool, serverDir string) {
 		fmt.Println("Warning: no Hybrid routes found")
 	}
 
-	// Collect bundle names
+	// Collect bundle names (only bundles that have routes)
 	bundleNames := make([]string, 0, len(bundles))
-	for name := range bundles {
-		bundleNames = append(bundleNames, name)
+	for name, bundle := range bundles {
+		if len(bundle.Routes) > 0 {
+			bundleNames = append(bundleNames, name)
+		}
 	}
+	hasWASM := len(bundleNames) > 0
 
-	// Parse CRUD models from app file
-	crudModels, modelsImport, dtoImport, err := parseCRUDModels(appFile)
+	// Parse CRUD models from app file (follows imports if needed)
+	crudModels, modelsImport, dtoImport, err := parseCRUDModelsWithImportFollowing(appFile)
 	if err != nil {
 		fmt.Printf("Error parsing CRUD models: %v\n", err)
 		os.Exit(1)
@@ -4723,34 +4852,39 @@ func runBuildNew(tinygo bool, serverDir string) {
 		}
 	}
 
-	// Generate WASM entry points for each bundle
-	fmt.Println("Generating WASM entry points...")
-	for name, bundle := range bundles {
-		if len(bundle.Routes) == 0 {
-			continue // Skip bundles with no routes
+	// Generate and build WASM only if there are routes
+	if hasWASM {
+		// Generate WASM entry points for each bundle
+		fmt.Println("Generating WASM entry points...")
+		for name, bundle := range bundles {
+			if len(bundle.Routes) == 0 {
+				continue // Skip bundles with no routes
+			}
+			if err := generateBundleWasmEntryPoint(name, bundle); err != nil {
+				fmt.Printf("Error generating WASM entry for bundle %s: %v\n", name, err)
+				os.Exit(1)
+			}
+			fmt.Printf("  Generated entry point for bundle: %s (%d routes)\n", name, len(bundle.Routes))
 		}
-		if err := generateBundleWasmEntryPoint(name, bundle); err != nil {
-			fmt.Printf("Error generating WASM entry for bundle %s: %v\n", name, err)
+
+		// Copy wasm_exec.js
+		if err := copyWasmExec(tinygo); err != nil {
+			fmt.Printf("Error copying wasm_exec.js: %v\n", err)
 			os.Exit(1)
 		}
-		fmt.Printf("  Generated entry point for bundle: %s (%d routes)\n", name, len(bundle.Routes))
-	}
 
-	// Copy wasm_exec.js
-	if err := copyWasmExec(tinygo); err != nil {
-		fmt.Printf("Error copying wasm_exec.js: %v\n", err)
-		os.Exit(1)
-	}
-
-	// Build WASM for each bundle
-	for name, bundle := range bundles {
-		if len(bundle.Routes) == 0 {
-			continue // Skip bundles with no routes
+		// Build WASM for each bundle
+		for name, bundle := range bundles {
+			if len(bundle.Routes) == 0 {
+				continue // Skip bundles with no routes
+			}
+			if err := buildWasmBundle(name, tinygo); err != nil {
+				fmt.Printf("Error: %v\n", err)
+				os.Exit(1)
+			}
 		}
-		if err := buildWasmBundle(name, tinygo); err != nil {
-			fmt.Printf("Error: %v\n", err)
-			os.Exit(1)
-		}
+	} else {
+		fmt.Println("No Hybrid routes — skipping WASM build")
 	}
 
 	// Build Tailwind CSS
@@ -4761,7 +4895,7 @@ func runBuildNew(tinygo bool, serverDir string) {
 
 	// Generate assets_gen.go with all bundles
 	fmt.Println("Generating assets...")
-	if err := generateAssetsFile(modulePath, bundleNames, serverDir); err != nil {
+	if err := generateAssetsFile(modulePath, bundleNames, serverDir, hasWASM); err != nil {
 		fmt.Printf("Error generating assets: %v\n", err)
 		os.Exit(1)
 	}

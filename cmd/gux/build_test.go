@@ -1341,3 +1341,174 @@ func TestFindMainAppFile(t *testing.T) {
 		}
 	})
 }
+
+// TestGenerateAssetsFile_NoWASM tests that SSR-only apps get CSS-only assets.
+func TestGenerateAssetsFile_NoWASM(t *testing.T) {
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(origDir)
+
+	// Create the styles.css file that will be embedded
+	os.MkdirAll("guxgen/dist", 0755)
+	os.WriteFile("guxgen/dist/styles.css", []byte("body{}"), 0644)
+
+	err := generateAssetsFile("github.com/test/app", nil, "", false)
+	if err != nil {
+		t.Fatalf("generateAssetsFile: %v", err)
+	}
+
+	content, err := os.ReadFile("assets_gen.go")
+	if err != nil {
+		t.Fatalf("read assets_gen.go: %v", err)
+	}
+
+	code := string(content)
+
+	// Should NOT embed WASM files
+	if strings.Contains(code, "app.wasm") {
+		t.Error("SSR-only assets should not embed app.wasm")
+	}
+	if strings.Contains(code, "wasm_exec.js") {
+		t.Error("SSR-only assets should not embed wasm_exec.js")
+	}
+	if strings.Contains(code, "wasmBinary") {
+		t.Error("SSR-only assets should not reference wasmBinary")
+	}
+
+	// Should embed CSS
+	if !strings.Contains(code, "styles.css") {
+		t.Error("SSR-only assets should embed styles.css")
+	}
+
+	// Should use nil for WASM args
+	if !strings.Contains(code, "core.SetDefaultAssets(nil, nil, stylesCSS)") {
+		t.Error("SSR-only assets should call SetDefaultAssets(nil, nil, stylesCSS)")
+	}
+}
+
+// TestGenerateAssetsFile_WithWASM tests that hybrid apps get full assets.
+func TestGenerateAssetsFile_WithWASM(t *testing.T) {
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(origDir)
+
+	// Create the dist files
+	os.MkdirAll("guxgen/dist", 0755)
+	os.WriteFile("guxgen/dist/styles.css", []byte("body{}"), 0644)
+	os.WriteFile("guxgen/dist/app.wasm", []byte("wasm"), 0644)
+	os.WriteFile("guxgen/dist/wasm_exec.js", []byte("js"), 0644)
+
+	err := generateAssetsFile("github.com/test/app", []string{"app"}, "", true)
+	if err != nil {
+		t.Fatalf("generateAssetsFile: %v", err)
+	}
+
+	content, err := os.ReadFile("assets_gen.go")
+	if err != nil {
+		t.Fatalf("read assets_gen.go: %v", err)
+	}
+
+	code := string(content)
+
+	// Should embed all assets
+	if !strings.Contains(code, "app.wasm") {
+		t.Error("hybrid assets should embed app.wasm")
+	}
+	if !strings.Contains(code, "wasm_exec.js") {
+		t.Error("hybrid assets should embed wasm_exec.js")
+	}
+	if !strings.Contains(code, "styles.css") {
+		t.Error("hybrid assets should embed styles.css")
+	}
+	if !strings.Contains(code, "core.SetDefaultAssets(wasmBinary, wasmExecJS, stylesCSS)") {
+		t.Error("hybrid assets should call SetDefaultAssets with all three args")
+	}
+}
+
+// TestParseRoutesWithImportFollowing tests that routes in imported packages are discovered.
+func TestParseRoutesWithImportFollowing(t *testing.T) {
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(origDir)
+
+	// Create go.mod
+	os.WriteFile("go.mod", []byte("module testapp\n\ngo 1.21\n"), 0644)
+
+	// Create entry point that imports a local package
+	os.MkdirAll("cmd/server", 0755)
+	os.WriteFile("cmd/server/main.go", []byte(`package main
+
+import (
+	"testapp/internal/platform"
+)
+
+func main() {
+	platform.Setup()
+}
+`), 0644)
+
+	// Create the imported package with Hybrid routes
+	os.MkdirAll("internal/platform", 0755)
+	os.WriteFile("internal/platform/app.go", []byte(`package platform
+
+import (
+	"testapp/pages"
+	"github.com/dougbarrett/gux/core"
+)
+
+func Setup() {
+	app := core.New()
+	app.Routes().
+		Hybrid("/", pages.Home).
+		Hybrid("/about", pages.About)
+}
+`), 0644)
+
+	// Parse with import following
+	bundles, _, err := parseRoutesWithImportFollowing("cmd/server/main.go")
+	if err != nil {
+		t.Fatalf("parseRoutesWithImportFollowing: %v", err)
+	}
+
+	// Should find the routes from the imported package
+	appBundle, ok := bundles["app"]
+	if !ok {
+		t.Fatal("expected 'app' bundle")
+	}
+	if len(appBundle.Routes) != 2 {
+		t.Errorf("expected 2 routes, got %d", len(appBundle.Routes))
+	}
+}
+
+// TestParseRoutesWithImportFollowing_DirectRoutes tests that direct routes skip import following.
+func TestParseRoutesWithImportFollowing_DirectRoutes(t *testing.T) {
+	src := `package main
+
+import (
+	"myapp/pages"
+	"github.com/dougbarrett/gux/core"
+)
+
+func main() {
+	app := core.New()
+	app.Routes().Hybrid("/", pages.Home)
+}
+`
+	path := writeTestFile(t, src)
+
+	bundles, _, err := parseRoutesWithImportFollowing(path)
+	if err != nil {
+		t.Fatalf("parseRoutesWithImportFollowing: %v", err)
+	}
+
+	appBundle := bundles["app"]
+	if len(appBundle.Routes) != 1 {
+		t.Errorf("expected 1 route, got %d", len(appBundle.Routes))
+	}
+	if appBundle.Routes[0].Path != "/" {
+		t.Errorf("expected route path '/', got %q", appBundle.Routes[0].Path)
+	}
+}

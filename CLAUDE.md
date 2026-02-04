@@ -167,6 +167,8 @@ gux dev --server ./cmd/platform # Equivalent flag form
 
 **Note**: `gux build` always runs `gux gen` first, regenerating all files in `guxgen/`. Never manually edit files in `guxgen/` — they will be overwritten.
 
+**Import following**: When using a custom entry point, `gux` automatically follows local imports (within the module) to find `Hybrid()` route registrations and `CRUD()` calls in imported packages. SSR-only apps (no Hybrid routes) skip WASM compilation and only embed CSS.
+
 ### Customizing Generated Admin Pages
 
 All admin pages (layout, dashboard, settings, model CRUD pages) live in `guxgen/admin/` and are regenerated on every `gux gen` or `gux build`. **Do not edit these files directly.**

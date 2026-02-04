@@ -118,8 +118,8 @@ func generateGuxFiles(serverDir string) error {
 		return fmt.Errorf("finding app file: %w", err)
 	}
 
-	// Parse routes and bundles from app file
-	bundles, _, err := parseRoutesAndBundles(appFile)
+	// Parse routes and bundles from app file (follows imports if needed)
+	bundles, _, err := parseRoutesWithImportFollowing(appFile)
 	if err != nil {
 		return fmt.Errorf("parsing routes: %w", err)
 	}
@@ -133,14 +133,17 @@ func generateGuxFiles(serverDir string) error {
 		fmt.Println("Warning: no Hybrid routes found")
 	}
 
-	// Collect bundle names
+	// Collect bundle names (only bundles that have routes)
 	bundleNames := make([]string, 0, len(bundles))
-	for name := range bundles {
-		bundleNames = append(bundleNames, name)
+	for name, bundle := range bundles {
+		if len(bundle.Routes) > 0 {
+			bundleNames = append(bundleNames, name)
+		}
 	}
+	hasWASM := len(bundleNames) > 0
 
-	// Parse CRUD models from app file
-	crudModels, modelsImport, dtoImport, err := parseCRUDModels(appFile)
+	// Parse CRUD models from app file (follows imports if needed)
+	crudModels, modelsImport, dtoImport, err := parseCRUDModelsWithImportFollowing(appFile)
 	if err != nil {
 		return fmt.Errorf("parsing CRUD models: %w", err)
 	}
@@ -282,25 +285,29 @@ func generateGuxFiles(serverDir string) error {
 	}
 
 	// Generate WASM entry points for each bundle
-	fmt.Println("Generating WASM entry points...")
-	for name, bundle := range bundles {
-		if len(bundle.Routes) == 0 {
-			continue // Skip bundles with no routes
+	if hasWASM {
+		fmt.Println("Generating WASM entry points...")
+		for name, bundle := range bundles {
+			if len(bundle.Routes) == 0 {
+				continue // Skip bundles with no routes
+			}
+			if err := generateBundleWasmEntryPoint(name, bundle); err != nil {
+				return fmt.Errorf("generating WASM entry for bundle %s: %w", name, err)
+			}
+			fmt.Printf("  Generated entry point for bundle: %s (%d routes)\n", name, len(bundle.Routes))
 		}
-		if err := generateBundleWasmEntryPoint(name, bundle); err != nil {
-			return fmt.Errorf("generating WASM entry for bundle %s: %w", name, err)
-		}
-		fmt.Printf("  Generated entry point for bundle: %s (%d routes)\n", name, len(bundle.Routes))
-	}
 
-	// Copy wasm_exec.js (use TinyGo by default)
-	if err := copyWasmExec(true); err != nil {
-		return fmt.Errorf("copying wasm_exec.js: %w", err)
+		// Copy wasm_exec.js (use TinyGo by default)
+		if err := copyWasmExec(true); err != nil {
+			return fmt.Errorf("copying wasm_exec.js: %w", err)
+		}
+	} else {
+		fmt.Println("No Hybrid routes — skipping WASM generation")
 	}
 
 	// Generate assets_gen.go with all bundles
 	fmt.Println("Generating assets...")
-	if err := generateAssetsFile(modulePath, bundleNames, serverDir); err != nil {
+	if err := generateAssetsFile(modulePath, bundleNames, serverDir, hasWASM); err != nil {
 		return fmt.Errorf("generating assets: %w", err)
 	}
 

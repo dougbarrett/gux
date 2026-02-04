@@ -727,6 +727,8 @@ gux dev ./cmd/platform
 gux build --server ./cmd/platform
 ```
 
+**Import following**: Routes and CRUD models are automatically discovered by following local imports from the entry point. SSR-only apps (no Hybrid routes) skip WASM compilation.
+
 ### Config File (`gux.config.json`)
 
 Project settings are saved during init and can be reused:
