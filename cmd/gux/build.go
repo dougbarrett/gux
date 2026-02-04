@@ -210,16 +210,12 @@ func getModelFields(modelName string) ([]ModelFieldInfo, error) {
 		if excludedFields[name] {
 			continue
 		}
-		// Skip embedded structs and relation fields (non-primitive pointer types)
-		if strings.Contains(typ, ".") || (strings.HasPrefix(typ, "*") && !isPrimitiveType(strings.TrimPrefix(typ, "*"))) {
-			// Check if it's a simple FK pointer like *uint - those we keep
-			trimmed := strings.TrimPrefix(typ, "*")
-			if trimmed != "uint" && trimmed != "int" && trimmed != "string" {
-				continue
-			}
-		}
-		// Skip slice types (M2M relations)
+		// Skip slice types (M2M relations like []Tool)
 		if strings.HasPrefix(typ, "[]") {
+			continue
+		}
+		// Skip non-primitive types (struct relations, embedded structs)
+		if !isPrimitiveType(typ) {
 			continue
 		}
 
@@ -254,16 +250,12 @@ func getModelFieldsForImport(modelName string, importPath string) ([]ModelFieldI
 		if excludedFields[name] {
 			continue
 		}
-		// Skip embedded structs and relation fields (non-primitive pointer types)
-		if strings.Contains(typ, ".") || (strings.HasPrefix(typ, "*") && !isPrimitiveType(strings.TrimPrefix(typ, "*"))) {
-			// Check if it's a simple FK pointer like *uint - those we keep
-			trimmed := strings.TrimPrefix(typ, "*")
-			if trimmed != "uint" && trimmed != "int" && trimmed != "string" {
-				continue
-			}
-		}
-		// Skip slice types (M2M relations)
+		// Skip slice types (M2M relations like []Tool)
 		if strings.HasPrefix(typ, "[]") {
+			continue
+		}
+		// Skip non-primitive types (struct relations, embedded structs)
+		if !isPrimitiveType(typ) {
 			continue
 		}
 

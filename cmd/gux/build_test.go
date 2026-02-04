@@ -1195,6 +1195,66 @@ type App struct {
 	}
 }
 
+// TestGetModelFieldsForImport_ExcludesRelations verifies that GORM relation fields
+// (same-package struct types and slices) are excluded from generated DTOs (#77).
+func TestGetModelFieldsForImport_ExcludesRelations(t *testing.T) {
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(origDir)
+
+	os.WriteFile("go.mod", []byte("module testapp\n\ngo 1.23\n"), 0644)
+
+	os.MkdirAll("models", 0755)
+	os.WriteFile("models/agent_tool.go", []byte(`package models
+
+import "gorm.io/gorm"
+
+type Tool struct {
+	gorm.Model
+	Name string
+}
+
+type AgentTool struct {
+	gorm.Model
+	AgentID   uint
+	ToolID    uint
+	SortOrder int
+	Tool      Tool
+	Tags      []string
+}
+`), 0644)
+
+	modelFieldTypesCache = make(map[string]map[string]string)
+
+	fields, err := getModelFieldsForImport("AgentTool", "testapp/models")
+	if err != nil {
+		t.Fatalf("getModelFieldsForImport: %v", err)
+	}
+
+	fieldNames := make(map[string]bool)
+	for _, f := range fields {
+		fieldNames[f.Name] = true
+	}
+
+	// Should include scalar fields
+	for _, expected := range []string{"AgentID", "ToolID", "SortOrder"} {
+		if !fieldNames[expected] {
+			t.Errorf("expected field %q not found", expected)
+		}
+	}
+
+	// Should exclude struct relation field
+	if fieldNames["Tool"] {
+		t.Error("struct relation field 'Tool' should be excluded from DTO")
+	}
+
+	// Should exclude slice fields
+	if fieldNames["Tags"] {
+		t.Error("slice field 'Tags' should be excluded from DTO")
+	}
+}
+
 // TestToSnakeCase_Acronyms tests that toSnakeCase handles common acronyms correctly.
 func TestToSnakeCase_Acronyms(t *testing.T) {
 	tests := []struct {
