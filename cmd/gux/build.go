@@ -277,12 +277,21 @@ func getModelFieldsForImport(modelName string, importPath string) ([]ModelFieldI
 	return fields, nil
 }
 
-// toSnakeCase converts CamelCase to snake_case
+// toSnakeCase converts CamelCase to snake_case, keeping acronyms together.
+// e.g., PrimaryAgentID → primary_agent_id, DeploymentURL → deployment_url
 func toSnakeCase(s string) string {
 	var result strings.Builder
-	for i, r := range s {
+	runes := []rune(s)
+	for i, r := range runes {
 		if i > 0 && r >= 'A' && r <= 'Z' {
-			result.WriteRune('_')
+			prev := runes[i-1]
+			if prev >= 'a' && prev <= 'z' {
+				// Transition from lowercase to uppercase: "agentI" → "agent_I"
+				result.WriteRune('_')
+			} else if prev >= 'A' && prev <= 'Z' && i+1 < len(runes) && runes[i+1] >= 'a' && runes[i+1] <= 'z' {
+				// End of acronym before lowercase: "URLPath" → "URL_Path"
+				result.WriteRune('_')
+			}
 		}
 		result.WriteRune(r)
 	}
@@ -301,29 +310,24 @@ type %s struct {
 `, modelName, modelName, modelName))
 
 	for _, f := range fields {
-		// Map Go types to JSON-safe types for the DTO
+		// Map Go types to JSON-safe types for the DTO.
+		// Preserve exact numeric types and pointer types to avoid type mismatches.
 		dtoType := f.Type
 		switch f.Type {
-		case "int", "int64", "int32":
-			dtoType = "int"
-		case "uint", "uint64", "uint32":
-			dtoType = "uint"
-		case "*uint", "*int":
-			dtoType = "*uint"
-		case "*int64", "*int32":
-			dtoType = "int"
-		case "*uint64", "*uint32":
-			dtoType = "uint"
+		case "int", "int64", "int32", "uint", "uint64", "uint32":
+			dtoType = f.Type // preserve exact type
 		case "float64", "float32":
-			dtoType = "float64"
+			dtoType = f.Type
+		case "*uint", "*int", "*uint64", "*uint32", "*int64", "*int32":
+			dtoType = f.Type // preserve pointer type
 		case "*float64", "*float32":
-			dtoType = "float64"
+			dtoType = f.Type
+		case "*bool":
+			dtoType = f.Type
 		case "bool":
 			dtoType = "bool"
-		case "*bool":
-			dtoType = "bool"
 		case "*string":
-			dtoType = "string"
+			dtoType = f.Type
 		case "time.Time", "*time.Time":
 			dtoType = "string" // Times are serialized as strings
 		default:
@@ -385,56 +389,40 @@ func generateServerAPICode(modelName, pluralName, modelPkgPrefix, modelImportPat
 	var updateResultAssignments strings.Builder
 
 	for _, f := range fields {
-		// Determine if the model field is a pointer type that maps to a non-pointer DTO type
-		// (e.g., *string -> string, *float64 -> float64 in the inline DTO)
+		// Since DTO preserves exact types (including pointers), most assignments
+		// are direct pass-through. Only time.Time needs conversion (to string).
 		modelToDTO := fmt.Sprintf("item.%s", f.Name)
 		dtoToModel := fmt.Sprintf("item.%s", f.Name)
 		modelResultToDTO := fmt.Sprintf("model.%s", f.Name)
 
 		switch f.Type {
-		case "*string":
-			modelToDTO = fmt.Sprintf("func() string { if item.%s != nil { return *item.%s }; return \"\" }()", f.Name, f.Name)
-			modelResultToDTO = fmt.Sprintf("func() string { if model.%s != nil { return *model.%s }; return \"\" }()", f.Name, f.Name)
-			dtoToModel = fmt.Sprintf("func() *string { s := item.%s; if s == \"\" { return nil }; return &s }()", f.Name)
-		case "*float64", "*float32":
-			modelToDTO = fmt.Sprintf("func() float64 { if item.%s != nil { return float64(*item.%s) }; return 0 }()", f.Name, f.Name)
-			modelResultToDTO = fmt.Sprintf("func() float64 { if model.%s != nil { return float64(*model.%s) }; return 0 }()", f.Name, f.Name)
-			dtoToModel = fmt.Sprintf("func() %s { v := item.%s; if v == 0 { return nil }; p := %s(v); return &p }()", f.Type, f.Name, f.Type[1:])
-		case "*int", "*int64", "*int32":
-			modelToDTO = fmt.Sprintf("func() int { if item.%s != nil { return int(*item.%s) }; return 0 }()", f.Name, f.Name)
-			modelResultToDTO = fmt.Sprintf("func() int { if model.%s != nil { return int(*model.%s) }; return 0 }()", f.Name, f.Name)
-			dtoToModel = fmt.Sprintf("func() %s { v := item.%s; if v == 0 { return nil }; p := %s(v); return &p }()", f.Type, f.Name, f.Type[1:])
-		case "*uint", "*uint64", "*uint32":
-			modelToDTO = fmt.Sprintf("func() uint { if item.%s != nil { return uint(*item.%s) }; return 0 }()", f.Name, f.Name)
-			modelResultToDTO = fmt.Sprintf("func() uint { if model.%s != nil { return uint(*model.%s) }; return 0 }()", f.Name, f.Name)
-			dtoToModel = fmt.Sprintf("func() %s { v := item.%s; p := %s(v); return &p }()", f.Type, f.Name, f.Type[1:])
-		case "*bool":
-			modelToDTO = fmt.Sprintf("func() bool { if item.%s != nil { return *item.%s }; return false }()", f.Name, f.Name)
-			modelResultToDTO = fmt.Sprintf("func() bool { if model.%s != nil { return *model.%s }; return false }()", f.Name, f.Name)
-			dtoToModel = fmt.Sprintf("func() *bool { v := item.%s; return &v }()", f.Name)
+		case "time.Time":
+			modelToDTO = fmt.Sprintf("item.%s.Format(time.RFC3339)", f.Name)
+			modelResultToDTO = fmt.Sprintf("model.%s.Format(time.RFC3339)", f.Name)
+			dtoToModel = fmt.Sprintf("func() time.Time { t, _ := time.Parse(time.RFC3339, item.%s); return t }()", f.Name)
+		case "*time.Time":
+			modelToDTO = fmt.Sprintf("func() string { if item.%s != nil { return item.%s.Format(time.RFC3339) }; return \"\" }()", f.Name, f.Name)
+			modelResultToDTO = fmt.Sprintf("func() string { if model.%s != nil { return model.%s.Format(time.RFC3339) }; return \"\" }()", f.Name, f.Name)
+			dtoToModel = fmt.Sprintf("func() *time.Time { if item.%s == \"\" { return nil }; t, _ := time.Parse(time.RFC3339, item.%s); return &t }()", f.Name, f.Name)
 		}
+		// All other types (including *uint, *string, *bool, int64, etc.)
+		// pass through directly since DTO preserves exact types.
 
-		// For List/Get: DTO field = model field (may need pointer dereference)
+		// For List/Get: DTO field = model field
 		listFieldAssignments.WriteString(fmt.Sprintf("\t\t\t%s: %s,\n", f.Name, modelToDTO))
 		getFieldAssignments.WriteString(fmt.Sprintf("\t\t%s: %s,\n", f.Name, modelToDTO))
 		createResultAssignments.WriteString(fmt.Sprintf("\t\t%s: %s,\n", f.Name, modelResultToDTO))
 		updateResultAssignments.WriteString(fmt.Sprintf("\t\t%s: %s,\n", f.Name, modelResultToDTO))
 
-		// For Create: model field = DTO field (may need pointer wrapping)
+		// For Create: model field = DTO field
 		createModelAssignments.WriteString(fmt.Sprintf("\t\t%s: %s,\n", f.Name, dtoToModel))
 
-		// For Update: model.field = DTO.field (may need pointer wrapping)
+		// For Update: model.field = DTO.field
 		switch f.Type {
-		case "*string":
-			updateModelAssignments.WriteString(fmt.Sprintf("\tmodel.%s = func() *string { s := item.%s; if s == \"\" { return nil }; return &s }()\n", f.Name, f.Name))
-		case "*float64", "*float32":
-			updateModelAssignments.WriteString(fmt.Sprintf("\tmodel.%s = func() %s { v := item.%s; if v == 0 { return nil }; p := %s(v); return &p }()\n", f.Name, f.Type, f.Name, f.Type[1:]))
-		case "*int", "*int64", "*int32":
-			updateModelAssignments.WriteString(fmt.Sprintf("\tmodel.%s = func() %s { v := item.%s; if v == 0 { return nil }; p := %s(v); return &p }()\n", f.Name, f.Type, f.Name, f.Type[1:]))
-		case "*uint", "*uint64", "*uint32":
-			updateModelAssignments.WriteString(fmt.Sprintf("\tmodel.%s = func() %s { v := item.%s; p := %s(v); return &p }()\n", f.Name, f.Type, f.Name, f.Type[1:]))
-		case "*bool":
-			updateModelAssignments.WriteString(fmt.Sprintf("\tmodel.%s = func() *bool { v := item.%s; return &v }()\n", f.Name, f.Name))
+		case "time.Time":
+			updateModelAssignments.WriteString(fmt.Sprintf("\tmodel.%s = func() time.Time { t, _ := time.Parse(time.RFC3339, item.%s); return t }()\n", f.Name, f.Name))
+		case "*time.Time":
+			updateModelAssignments.WriteString(fmt.Sprintf("\tmodel.%s = func() *time.Time { if item.%s == \"\" { return nil }; t, _ := time.Parse(time.RFC3339, item.%s); return &t }()\n", f.Name, f.Name, f.Name))
 		default:
 			updateModelAssignments.WriteString(fmt.Sprintf("\tmodel.%s = item.%s\n", f.Name, f.Name))
 		}

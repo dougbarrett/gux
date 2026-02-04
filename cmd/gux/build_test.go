@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -742,14 +743,13 @@ func TestGenerateDTOStructCode_PointerTypes(t *testing.T) {
 	if !strings.Contains(result, "Name string") {
 		t.Errorf("expected string type for Name, got:\n%s", result)
 	}
-	// *string maps to string in inline DTOs (default case)
-	if !strings.Contains(result, "Description string") {
-		t.Errorf("expected string type for Description (*string mapped to string), got:\n%s", result)
+	// *string preserved as *string in DTOs
+	if !strings.Contains(result, "Description *string") {
+		t.Errorf("expected *string type for Description, got:\n%s", result)
 	}
-	// *float64 maps to float64 in inline DTOs (no explicit case, hits default -> string)
-	// Actually check what the actual mapping is:
-	if !strings.Contains(result, "Price") {
-		t.Errorf("expected Price field in generated DTO, got:\n%s", result)
+	// *float64 preserved as *float64 in DTOs
+	if !strings.Contains(result, "Price *float64") {
+		t.Errorf("expected *float64 type for Price, got:\n%s", result)
 	}
 	if !strings.Contains(result, "ParentID *uint") {
 		t.Errorf("expected *uint type for ParentID, got:\n%s", result)
@@ -778,24 +778,20 @@ type Widget struct {
 
 	result := generateServerAPICode("Widget", "Widgets", "models", "")
 
-	// *string should have pointer dereference in model-to-DTO
-	if !strings.Contains(result, "if item.Description != nil") {
-		t.Errorf("expected nil check for *string field Description, got:\n%s", result)
+	// Since DTO preserves exact types, pointer fields should be direct assignments
+	// *string model → *string DTO: direct pass-through
+	if !strings.Contains(result, "Description: item.Description,") {
+		t.Errorf("expected direct assignment for *string field Description, got:\n%s", result)
 	}
 
-	// *float64 should have pointer dereference in model-to-DTO
-	if !strings.Contains(result, "if item.Weight != nil") {
-		t.Errorf("expected nil check for *float64 field Weight, got:\n%s", result)
+	// *float64 model → *float64 DTO: direct pass-through
+	if !strings.Contains(result, "Weight: item.Weight,") {
+		t.Errorf("expected direct assignment for *float64 field Weight, got:\n%s", result)
 	}
 
 	// string field should be direct assignment
 	if !strings.Contains(result, "Label: item.Label,") {
 		t.Errorf("expected direct assignment for string field Label, got:\n%s", result)
-	}
-
-	// *string should have pointer wrapping in DTO-to-model (create)
-	if !strings.Contains(result, "func() *string") {
-		t.Errorf("expected *string wrapping function in create code, got:\n%s", result)
 	}
 }
 
@@ -1195,6 +1191,125 @@ type App struct {
 	for _, excluded := range []string{"ID", "CreatedAt", "UpdatedAt", "DeletedAt", "Model"} {
 		if fieldNames[excluded] {
 			t.Errorf("gorm.Model field %q should be excluded", excluded)
+		}
+	}
+}
+
+// TestToSnakeCase_Acronyms tests that toSnakeCase handles common acronyms correctly.
+func TestToSnakeCase_Acronyms(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"PrimaryAgentID", "primary_agent_id"},
+		{"DeploymentURL", "deployment_url"},
+		{"WebhookURL", "webhook_url"},
+		{"AIModel", "ai_model"},
+		{"AppID", "app_id"},
+		{"UserID", "user_id"},
+		{"HTTPSEnabled", "https_enabled"},
+		{"APIKey", "api_key"},
+		{"Name", "name"},
+		{"CreatedAt", "created_at"},
+		{"MaxTokens", "max_tokens"},
+		{"SimpleField", "simple_field"},
+		{"ID", "id"},
+		{"URL", "url"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			got := toSnakeCase(tt.input)
+			if got != tt.expected {
+				t.Errorf("toSnakeCase(%q) = %q, want %q", tt.input, got, tt.expected)
+			}
+		})
+	}
+}
+
+// TestGenerateDTOStructCode_PreservesExactTypes tests that DTO struct generation
+// preserves exact numeric and pointer types (#76).
+func TestGenerateDTOStructCode_PreservesExactTypes(t *testing.T) {
+	fields := []ModelFieldInfo{
+		{Name: "MaxTokens", Type: "int64", JSONName: "max_tokens"},
+		{Name: "Count", Type: "int32", JSONName: "count"},
+		{Name: "BigID", Type: "uint64", JSONName: "big_id"},
+		{Name: "SmallID", Type: "uint32", JSONName: "small_id"},
+		{Name: "PlannerID", Type: "*uint", JSONName: "planner_id"},
+		{Name: "Priority", Type: "*int64", JSONName: "priority"},
+		{Name: "Score", Type: "*float64", JSONName: "score"},
+		{Name: "Active", Type: "*bool", JSONName: "active"},
+		{Name: "Note", Type: "*string", JSONName: "note"},
+		{Name: "Name", Type: "string", JSONName: "name"},
+		{Name: "Weight", Type: "float64", JSONName: "weight"},
+	}
+
+	result := generateDTOStructCode("TestModel", fields)
+
+	expectations := []struct {
+		field    string
+		typeDecl string
+	}{
+		{"MaxTokens", "MaxTokens int64"},
+		{"Count", "Count int32"},
+		{"BigID", "BigID uint64"},
+		{"SmallID", "SmallID uint32"},
+		{"PlannerID", "PlannerID *uint"},
+		{"Priority", "Priority *int64"},
+		{"Score", "Score *float64"},
+		{"Active", "Active *bool"},
+		{"Note", "Note *string"},
+		{"Name", "Name string"},
+		{"Weight", "Weight float64"},
+	}
+
+	for _, e := range expectations {
+		if !strings.Contains(result, e.typeDecl) {
+			t.Errorf("expected %q in generated DTO, got:\n%s", e.typeDecl, result)
+		}
+	}
+}
+
+// TestGenerateServerAPICode_PointerPassThrough tests that server API code
+// uses direct assignment for pointer types since DTO preserves them (#76).
+func TestGenerateServerAPICode_PointerPassThrough(t *testing.T) {
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(origDir)
+
+	os.WriteFile("go.mod", []byte("module testapp\n\ngo 1.23\n"), 0644)
+	os.MkdirAll("models", 0755)
+	os.WriteFile("models/agent.go", []byte(`package models
+
+import "gorm.io/gorm"
+
+type Agent struct {
+	gorm.Model
+	Name      string
+	PlannerID *uint
+	MaxTokens int64
+	Active    *bool
+}
+`), 0644)
+
+	modelFieldTypesCache = make(map[string]map[string]string)
+
+	result := generateServerAPICode("Agent", "Agents", "models", "testapp/models")
+
+	// All types should be direct pass-through since DTO preserves exact types
+	for _, field := range []string{"PlannerID", "MaxTokens", "Active", "Name"} {
+		expected := fmt.Sprintf("%s: item.%s,", field, field)
+		if !strings.Contains(result, expected) {
+			t.Errorf("expected direct assignment %q in generated code, got:\n%s", expected, result)
+		}
+	}
+
+	// Update assignments should also be direct
+	for _, field := range []string{"PlannerID", "MaxTokens", "Active", "Name"} {
+		expected := fmt.Sprintf("model.%s = item.%s", field, field)
+		if !strings.Contains(result, expected) {
+			t.Errorf("expected direct update assignment %q, got:\n%s", expected, result)
 		}
 	}
 }
