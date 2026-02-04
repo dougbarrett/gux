@@ -2290,3 +2290,128 @@ func main() {
 		t.Errorf("missing '/' route; routes: %+v", appBundle.Routes)
 	}
 }
+
+// --- Issue 81 tests ---
+
+func TestGenerateFuncName_HyphenInPath(t *testing.T) {
+	tests := []struct {
+		method string
+		path   string
+		want   string
+	}{
+		{"GET", "/api/prebaked-tools", "GetPrebakedTools"},
+		{"POST", "/api/user-settings", "UserSettings"},
+		{"GET", "/api/my-long-path-name", "GetMyLongPathName"},
+		{"DELETE", "/api/cache-entries/:id", "DeleteCacheEntrie"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.method+" "+tt.path, func(t *testing.T) {
+			got := generateFuncName(tt.method, tt.path)
+			if got != tt.want {
+				t.Errorf("generateFuncName(%q, %q) = %q, want %q", tt.method, tt.path, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestGenerateFuncName_NoTruncatePlural(t *testing.T) {
+	tests := []struct {
+		method string
+		path   string
+		want   string
+	}{
+		// "Status" ends in 's' but should NOT be truncated since :id is not the last segment
+		{"GET", "/api/apps/:id/status", "GetAppsStatus"},
+		// "users/:id" should singularize because :id IS the last segment
+		{"GET", "/api/users/:id", "GetUser"},
+		// "posts/:id" should singularize
+		{"DELETE", "/api/posts/:id", "DeletePost"},
+		// No param at end — keep plural
+		{"GET", "/api/apps/:id/logs", "GetAppsLogs"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.method+" "+tt.path, func(t *testing.T) {
+			got := generateFuncName(tt.method, tt.path)
+			if got != tt.want {
+				t.Errorf("generateFuncName(%q, %q) = %q, want %q", tt.method, tt.path, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestGenerateEndpointFunc_NoStrayComma(t *testing.T) {
+	tests := []struct {
+		name string
+		ep   APIEndpointInfo
+	}{
+		{
+			name: "DELETE no params",
+			ep: APIEndpointInfo{
+				Method:   "DELETE",
+				Path:     "/api/logout",
+				FuncName: "Logout",
+			},
+		},
+		{
+			name: "POST no params no types",
+			ep: APIEndpointInfo{
+				Method:       "POST",
+				Path:         "/api/logout",
+				FuncName:     "Logout",
+				ResponseType: "",
+			},
+		},
+		{
+			name: "GET no params with response",
+			ep: APIEndpointInfo{
+				Method:       "GET",
+				Path:         "/api/tools",
+				FuncName:     "GetTools",
+				ResponseType: "[]string",
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			code := generateEndpointFunc(tt.ep)
+			if strings.Contains(code, "(, ") {
+				t.Errorf("generated code contains stray comma: %s", code)
+			}
+		})
+	}
+}
+
+func TestExtractMainPackageTypes_FromSourceFile(t *testing.T) {
+	dir := t.TempDir()
+
+	// Write a Go file with type definitions
+	typesFile := filepath.Join(dir, "types.go")
+	os.WriteFile(typesFile, []byte(`package main
+
+type LoginRequest struct {
+	Email    string `+"`"+`json:"email"`+"`"+`
+	Password string `+"`"+`json:"password"`+"`"+`
+}
+
+type LoginResponse struct {
+	Success bool   `+"`"+`json:"success"`+"`"+`
+	Token   string `+"`"+`json:"token"`+"`"+`
+}
+`), 0644)
+
+	typeNames := map[string]bool{
+		"LoginRequest":  true,
+		"LoginResponse": true,
+	}
+
+	result, err := extractMainPackageTypes(typesFile, typeNames)
+	if err != nil {
+		t.Fatalf("extractMainPackageTypes failed: %v", err)
+	}
+	if !strings.Contains(result, "LoginRequest") {
+		t.Error("expected LoginRequest in extracted types")
+	}
+	if !strings.Contains(result, "LoginResponse") {
+		t.Error("expected LoginResponse in extracted types")
+	}
+}

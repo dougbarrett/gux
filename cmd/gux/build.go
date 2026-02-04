@@ -164,6 +164,7 @@ type APIEndpointInfo struct {
 	ResponseType string   // Response type name (empty for DELETE)
 	Package      string   // Package where types are defined (e.g., "dto")
 	PathParams   []string // Path parameter names (e.g., ["id"])
+	SourceFile   string   // File where this endpoint was discovered
 }
 
 // isPrimitiveType checks if a type string represents a primitive Go type
@@ -1598,6 +1599,7 @@ func parseAPIEndpoints(filename string) ([]APIEndpointInfo, map[string]string, e
 		}
 
 		if endpoint.Path != "" {
+			endpoint.SourceFile = filename
 			endpoints = append(endpoints, endpoint)
 		}
 
@@ -1811,9 +1813,16 @@ func generateFuncName(method, path string) string {
 		if strings.HasPrefix(part, ":") {
 			continue
 		}
-		// Capitalize first letter
-		if len(part) > 0 {
-			nameParts = append(nameParts, strings.ToUpper(part[:1])+part[1:])
+		// Split on hyphens and capitalize each sub-part (e.g., "prebaked-tools" -> "PrebakedTools")
+		subParts := strings.Split(part, "-")
+		var combined string
+		for _, sp := range subParts {
+			if len(sp) > 0 {
+				combined += strings.ToUpper(sp[:1]) + sp[1:]
+			}
+		}
+		if combined != "" {
+			nameParts = append(nameParts, combined)
 		}
 	}
 
@@ -1839,11 +1848,11 @@ func generateFuncName(method, path string) string {
 		}
 	}
 
-	// Handle singular for endpoints with :id
-	if len(nameParts) > 0 && strings.HasSuffix(nameParts[len(nameParts)-1], "s") {
-		// Check if path has an :id parameter after this resource
-		if strings.Contains(path, "/:") {
-			// Make singular: users/:id -> User
+	// Handle singular for detail endpoints like /users/:id -> GetUser
+	// Only singularize when the path ends with a :param (i.e., it's a detail endpoint)
+	if len(nameParts) > 0 && len(parts) > 0 {
+		lastSegment := parts[len(parts)-1]
+		if strings.HasPrefix(lastSegment, ":") {
 			lastPart := nameParts[len(nameParts)-1]
 			if strings.HasSuffix(lastPart, "s") {
 				singular := lastPart[:len(lastPart)-1]
@@ -3573,11 +3582,40 @@ func generateEndpointClient(endpoints []APIEndpointInfo, dtoImports map[string]s
 		}
 	}
 	var mainTypeDefs string
-	if len(mainPkgTypes) > 0 && appFilename != "" {
-		var extractErr error
-		mainTypeDefs, extractErr = extractMainPackageTypes(appFilename, mainPkgTypes)
-		if extractErr != nil {
-			fmt.Printf("Warning: could not extract main package types: %v\n", extractErr)
+	if len(mainPkgTypes) > 0 {
+		// Collect all source files to search for type definitions
+		sourceFiles := make(map[string]bool)
+		if appFilename != "" {
+			sourceFiles[appFilename] = true
+		}
+		for _, ep := range endpoints {
+			if ep.SourceFile != "" {
+				sourceFiles[ep.SourceFile] = true
+			}
+		}
+		// Search each source file for missing type definitions
+		remaining := make(map[string]bool)
+		for k, v := range mainPkgTypes {
+			remaining[k] = v
+		}
+		for file := range sourceFiles {
+			if len(remaining) == 0 {
+				break
+			}
+			defs, extractErr := extractMainPackageTypes(file, remaining)
+			if extractErr != nil {
+				fmt.Printf("Warning: could not extract types from %s: %v\n", file, extractErr)
+				continue
+			}
+			if defs != "" {
+				mainTypeDefs += defs
+				// Remove found types from remaining
+				for typeName := range remaining {
+					if strings.Contains(defs, "type "+typeName+" struct") {
+						delete(remaining, typeName)
+					}
+				}
+			}
 		}
 	}
 
@@ -3799,10 +3837,11 @@ func generateEndpointFunc(ep APIEndpointInfo) string {
 	// Determine response handling
 	if ep.ResponseType == "" {
 		// DELETE - no response body
+		params = append(params, "callback func(error)")
 		paramStr := strings.Join(params, ", ")
 		sb.WriteString(fmt.Sprintf(`
 // %s calls %s %s
-func %s(%s, callback func(error)) {
+func %s(%s) {
 	go func() {
 		_, err := apiEndpointFetch("%s", %s, nil)
 		callback(err)
@@ -3923,10 +3962,11 @@ func generateEndpointServerFunc(ep APIEndpointInfo) string {
 	// Determine response handling
 	if ep.ResponseType == "" {
 		// DELETE - no response body
+		params = append(params, "callback func(error)")
 		paramStr := strings.Join(params, ", ")
 		sb.WriteString(fmt.Sprintf(`
 // %s calls %s %s
-func %s(%s, callback func(error)) {
+func %s(%s) {
 	_, err := endpointFetch("%s", %s, nil)
 	callback(err)
 }
