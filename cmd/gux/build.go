@@ -2113,7 +2113,7 @@ func parseRoutesAndBundles(filename string) (map[string]*BundleInfo, map[string]
 }
 
 // generateBundleWasmEntryPoint generates a WASM entry point for a specific bundle
-func generateBundleWasmEntryPoint(bundleName string, bundle *BundleInfo) error {
+func generateBundleWasmEntryPoint(bundleName string, bundle *BundleInfo, apiImport string) error {
 	wasmDir := "guxgen/wasm_" + bundleName
 	if bundleName == "app" {
 		wasmDir = "guxgen/wasm"
@@ -2210,6 +2210,11 @@ func generateBundleWasmEntryPoint(bundleName string, bundle *BundleInfo) error {
 		}
 	}
 
+	// Add api import for load tracking if needed
+	if apiImport != "" {
+		importSection.WriteString(fmt.Sprintf("\t\"%s\"\n", apiImport))
+	}
+
 	// Build route patterns for cross-bundle navigation detection
 	var bundleRoutesCode strings.Builder
 	bundleRoutesCode.WriteString("// bundleRoutePatterns contains all route patterns in this bundle\n")
@@ -2231,6 +2236,203 @@ func generateBundleWasmEntryPoint(bundleName string, bundle *BundleInfo) error {
 		}
 	}
 	bundleRoutesCode.WriteString("}\n")
+
+	// Build conditional sections based on whether async API (CRUD/endpoints) exists
+	var fetchLoaderSection string
+	var attachLinksSection string
+	var renderLinkCode string
+	var navigateBody string
+	var popstateBody string
+	var initialBootCode string
+
+	if apiImport != "" {
+		// Async API exists: use load tracking, preserve SSR DOM on initial boot
+		fetchLoaderSection = ""
+
+		attachLinksSection = `
+	attachLinks := func() {
+		links := document.Call("querySelectorAll", "a[href]")
+		for i := 0; i < links.Get("length").Int(); i++ {
+			link := links.Call("item", i)
+			href := link.Get("href").String()
+			origin := window.Get("location").Get("origin").String()
+
+			// Skip external links (marked with data-gux-external)
+			if link.Call("getAttribute", "data-gux-external").String() == "true" {
+				continue
+			}
+
+			// Only intercept internal links
+			if len(href) >= len(origin) && href[:len(origin)] == origin {
+				link.Call("addEventListener", "click", js.FuncOf(func(this js.Value, args []js.Value) any {
+					args[0].Call("preventDefault")
+					path := this.Get("pathname").String()
+					// Check if link opts out of scroll-to-top
+					if this.Call("getAttribute", "data-gux-preserve-scroll").String() == "true" {
+						scrollAfterNavigate = false
+					}
+					router.Navigate(path)
+					return nil
+				}))
+			}
+		}
+	}
+`
+
+		renderLinkCode = `
+		attachLinks()`
+
+		navigateBody = `
+		// Capture and reset scroll flag
+		shouldScroll := scrollAfterNavigate
+		scrollAfterNavigate = true
+		// Check if this path belongs to this bundle
+		if !isRouteInBundle(path) {
+			// Cross-bundle navigation - do full page redirect
+			window.Get("location").Set("href", path)
+			return
+		}
+		// Same-bundle navigation - clear component to force reload
+		currentComponent = nil
+		// Clear page-specific state before navigating to avoid stale data
+		router.ClearState()
+		api.ResetLoads()
+		window.Get("history").Call("pushState", nil, "", path)
+		loadPage()
+		if !api.HasPendingLoads() {
+			render()
+		}
+		if shouldScroll {
+			window.Call("scrollTo", 0, 0)
+		}`
+
+		popstateBody = `
+		currentComponent = nil // Force reload for history navigation
+		// Clear page-specific state for browser history navigation
+		router.ClearState()
+		api.ResetLoads()
+		path := window.Get("location").Get("pathname").String()
+		loadPage()
+		if !api.HasPendingLoads() {
+			render()
+		}
+		window.Call("scrollTo", 0, 0)`
+
+		initialBootCode = `
+	// Wire up load tracker - render after all async loads complete
+	api.OnAllLoadsComplete = func() { render() }
+	loadPage()
+	attachLinks() // Intercept links on SSR DOM without destroying it`
+
+	} else {
+		// No async API: keep current behavior with fetchLoader
+		fetchLoaderSection = `
+// fetchLoader fetches page state from loader endpoint
+func fetchLoader(path string, callback func(map[string]any)) {
+	loaderPath := "/__gux_api/pages" + path
+	if path == "/" {
+		loaderPath = "/__gux_api/pages/index"
+	}
+
+	promise := js.Global().Call("fetch", loaderPath)
+	promise.Call("then", js.FuncOf(func(this js.Value, args []js.Value) any {
+		resp := args[0]
+		if resp.Get("ok").Bool() {
+			resp.Call("text").Call("then", js.FuncOf(func(this js.Value, args []js.Value) any {
+				// Parse JSON response properly to preserve all types (arrays, objects, etc.)
+				jsonStr := args[0].String()
+				var state map[string]any
+				if err := json.Unmarshal([]byte(jsonStr), &state); err == nil {
+					callback(state)
+				} else {
+					callback(nil)
+				}
+				return nil
+			}))
+		} else {
+			callback(nil)
+		}
+		return nil
+	}))
+}
+`
+
+		attachLinksSection = ""
+
+		renderLinkCode = `
+		// Intercept link clicks for client-side navigation
+		links := document.Call("querySelectorAll", "a[href]")
+		for i := 0; i < links.Get("length").Int(); i++ {
+			link := links.Call("item", i)
+			href := link.Get("href").String()
+			origin := window.Get("location").Get("origin").String()
+
+			// Skip external links (marked with data-gux-external)
+			if link.Call("getAttribute", "data-gux-external").String() == "true" {
+				continue
+			}
+
+			// Only intercept internal links
+			if len(href) >= len(origin) && href[:len(origin)] == origin {
+				link.Call("addEventListener", "click", js.FuncOf(func(this js.Value, args []js.Value) any {
+					args[0].Call("preventDefault")
+					path := this.Get("pathname").String()
+					// Check if link opts out of scroll-to-top
+					if this.Call("getAttribute", "data-gux-preserve-scroll").String() == "true" {
+						scrollAfterNavigate = false
+					}
+					router.Navigate(path)
+					return nil
+				}))
+			}
+		}`
+
+		navigateBody = `
+		// Capture and reset scroll flag
+		shouldScroll := scrollAfterNavigate
+		scrollAfterNavigate = true
+		// Check if this path belongs to this bundle
+		if !isRouteInBundle(path) {
+			// Cross-bundle navigation - do full page redirect
+			window.Get("location").Set("href", path)
+			return
+		}
+		// Same-bundle navigation - clear component to force reload
+		currentComponent = nil
+		// Clear page-specific state before navigating to avoid stale data
+		router.ClearState()
+		window.Get("history").Call("pushState", nil, "", path)
+		fetchLoader(path, func(state map[string]any) {
+			if state != nil {
+				router.Hydrate(state)
+			}
+			loadPage()
+			render()
+			if shouldScroll {
+				window.Call("scrollTo", 0, 0)
+			}
+		})`
+
+		popstateBody = `
+		currentComponent = nil // Force reload for history navigation
+		// Clear page-specific state for browser history navigation
+		router.ClearState()
+		// Fetch fresh data for the new/previous page
+		path := window.Get("location").Get("pathname").String()
+		fetchLoader(path, func(state map[string]any) {
+			if state != nil {
+				router.Hydrate(state)
+			}
+			loadPage()
+			render()
+			window.Call("scrollTo", 0, 0)
+		})`
+
+		initialBootCode = `
+	// Initial load
+	loadPage()
+	render()`
+	}
 
 	code := fmt.Sprintf(`//go:build js && wasm
 
@@ -2297,36 +2499,7 @@ func isRouteInBundle(path string) bool {
 	}
 	return false
 }
-
-// fetchLoader fetches page state from loader endpoint
-func fetchLoader(path string, callback func(map[string]any)) {
-	loaderPath := "/__gux_api/pages" + path
-	if path == "/" {
-		loaderPath = "/__gux_api/pages/index"
-	}
-
-	promise := js.Global().Call("fetch", loaderPath)
-	promise.Call("then", js.FuncOf(func(this js.Value, args []js.Value) any {
-		resp := args[0]
-		if resp.Get("ok").Bool() {
-			resp.Call("text").Call("then", js.FuncOf(func(this js.Value, args []js.Value) any {
-				// Parse JSON response properly to preserve all types (arrays, objects, etc.)
-				jsonStr := args[0].String()
-				var state map[string]any
-				if err := json.Unmarshal([]byte(jsonStr), &state); err == nil {
-					callback(state)
-				} else {
-					callback(nil)
-				}
-				return nil
-			}))
-		} else {
-			callback(nil)
-		}
-		return nil
-	}))
-}
-
+%s
 func main() {
 	// Debug: use println which TinyGo reliably outputs to console
 	println("[Gux WASM] main() started")
@@ -2379,34 +2552,7 @@ func main() {
 				container.Call("appendChild", domVal.(js.Value))
 			}
 		}
-
-		// Intercept link clicks for client-side navigation
-		links := document.Call("querySelectorAll", "a[href]")
-		for i := 0; i < links.Get("length").Int(); i++ {
-			link := links.Call("item", i)
-			href := link.Get("href").String()
-			origin := window.Get("location").Get("origin").String()
-
-			// Skip external links (marked with data-gux-external)
-			if link.Call("getAttribute", "data-gux-external").String() == "true" {
-				continue
-			}
-
-			// Only intercept internal links
-			if len(href) >= len(origin) && href[:len(origin)] == origin {
-				link.Call("addEventListener", "click", js.FuncOf(func(this js.Value, args []js.Value) any {
-					args[0].Call("preventDefault")
-					path := this.Get("pathname").String()
-					// Check if link opts out of scroll-to-top
-					if this.Call("getAttribute", "data-gux-preserve-scroll").String() == "true" {
-						scrollAfterNavigate = false
-					}
-					router.Navigate(path)
-					return nil
-				}))
-			}
-		}
-
+%s
 		// Restore focus after re-render
 		if focusName != "" {
 			newElement := document.Call("querySelector", "[name=\""+focusName+"\"]")
@@ -2415,34 +2561,10 @@ func main() {
 			}
 		}
 	}
-
+%s
 	// Navigate fetches page data then renders
 	// For cross-bundle navigation, do a full page redirect
-	navigate := func(path string) {
-		// Capture and reset scroll flag
-		shouldScroll := scrollAfterNavigate
-		scrollAfterNavigate = true
-		// Check if this path belongs to this bundle
-		if !isRouteInBundle(path) {
-			// Cross-bundle navigation - do full page redirect
-			window.Get("location").Set("href", path)
-			return
-		}
-		// Same-bundle navigation - clear component to force reload
-		currentComponent = nil
-		// Clear page-specific state before navigating to avoid stale data
-		router.ClearState()
-		window.Get("history").Call("pushState", nil, "", path)
-		fetchLoader(path, func(state map[string]any) {
-			if state != nil {
-				router.Hydrate(state)
-			}
-			loadPage()
-			render()
-			if shouldScroll {
-				window.Call("scrollTo", 0, 0)
-			}
-		})
+	navigate := func(path string) {%s
 	}
 
 	router = core.NewRouter(render)
@@ -2462,30 +2584,13 @@ func main() {
 	}
 
 	// Handle browser back/forward
-	window.Call("addEventListener", "popstate", js.FuncOf(func(this js.Value, args []js.Value) any {
-		currentComponent = nil // Force reload for history navigation
-		// Clear page-specific state for browser history navigation
-		router.ClearState()
-		// Fetch fresh data for the new/previous page
-		path := window.Get("location").Get("pathname").String()
-		fetchLoader(path, func(state map[string]any) {
-			if state != nil {
-				router.Hydrate(state)
-			}
-			loadPage()
-			render()
-			window.Call("scrollTo", 0, 0)
-		})
+	window.Call("addEventListener", "popstate", js.FuncOf(func(this js.Value, args []js.Value) any {%s
 		return nil
 	}))
-
-	// Initial load
-	loadPage()
-	render()
-
+%s
 	select {}
 }
-`, importSection.String(), bundleRoutesCode.String(), routeCode.String())
+`, importSection.String(), bundleRoutesCode.String(), fetchLoaderSection, routeCode.String(), renderLinkCode, attachLinksSection, navigateBody, popstateBody, initialBootCode)
 
 	return os.WriteFile(wasmDir+"/main.go", []byte(code), 0644)
 }
@@ -2930,6 +3035,83 @@ func generateNestedDTOMapping(info *DTOInfo, resultVar, itemVar string, forList 
 	return sb.String()
 }
 
+// generateLoadTracker generates guxgen/api/load_tracker.go and load_tracker_server.go
+// for tracking async CRUD/endpoint loads during WASM navigation.
+func generateLoadTracker() error {
+	if err := os.MkdirAll("guxgen/api", 0755); err != nil {
+		return err
+	}
+
+	wasmCode := `//go:build js && wasm
+
+// Code generated by gux; DO NOT EDIT.
+// Load tracker for async CRUD/endpoint operations during WASM navigation.
+package api
+
+var (
+	pendingLoads       int
+	loadEpoch          int
+	// OnAllLoadsComplete is called when all pending async loads finish.
+	// Set by the WASM main entry point to trigger rendering.
+	OnAllLoadsComplete func()
+)
+
+// StartLoad increments the pending load counter and returns the current epoch.
+// Call before spawning an async load goroutine.
+func StartLoad() int {
+	pendingLoads++
+	return loadEpoch
+}
+
+// EndLoad decrements the pending load counter for the given epoch.
+// If epoch doesn't match current (navigation happened), the decrement is ignored.
+// When counter reaches 0, fires OnAllLoadsComplete.
+func EndLoad(epoch int) {
+	if epoch != loadEpoch {
+		return
+	}
+	pendingLoads--
+	if pendingLoads <= 0 {
+		pendingLoads = 0
+		if OnAllLoadsComplete != nil {
+			OnAllLoadsComplete()
+		}
+	}
+}
+
+// ResetLoads resets the pending counter and increments the epoch.
+// Call on navigation to cancel stale callbacks from previous pages.
+func ResetLoads() {
+	pendingLoads = 0
+	loadEpoch++
+}
+
+// HasPendingLoads returns true if there are outstanding async loads.
+func HasPendingLoads() bool {
+	return pendingLoads > 0
+}
+`
+
+	serverCode := `//go:build !js || !wasm
+
+// Code generated by gux; DO NOT EDIT.
+package api
+
+// Server-side no-op stubs for load tracker (only used in WASM).
+func StartLoad() int        { return 0 }
+func EndLoad(epoch int)     {}
+func ResetLoads()           {}
+func HasPendingLoads() bool { return false }
+
+var OnAllLoadsComplete func()
+`
+
+	if err := os.WriteFile("guxgen/api/load_tracker.go", []byte(wasmCode), 0644); err != nil {
+		return err
+	}
+	return os.WriteFile("guxgen/api/load_tracker_server.go", []byte(serverCode), 0644)
+}
+
 // generateAPIClient generates guxgen/api/client.go with WASM-compatible DTOs
 func generateAPIClient(modelsImport string, dtoImport string, models []CRUDModel) error {
 	if len(models) == 0 {
@@ -2997,7 +3179,9 @@ var %s = &%sAPI{baseURL: "/__gux_api/crud/%s"}
 
 // List returns all %s records using %s DTO.
 func (a *%sAPI) List(callback func([]%s.%s, error)) {
+	epoch := StartLoad()
 	go func() {
+		defer EndLoad(epoch)
 		resp, err := fetch("GET", a.baseURL, nil)
 		if err != nil {
 			callback(nil, err)
@@ -3014,7 +3198,9 @@ func (a *%sAPI) List(callback func([]%s.%s, error)) {
 
 // ListFiltered returns %s records matching the given filters using %s DTO.
 func (a *%sAPI) ListFiltered(params map[string]string, callback func([]%s.%s, error)) {
+	epoch := StartLoad()
 	go func() {
+		defer EndLoad(epoch)
 		endpoint := a.baseURL
 		if len(params) > 0 {
 			v := make([]string, 0, len(params))
@@ -3039,7 +3225,9 @@ func (a *%sAPI) ListFiltered(params map[string]string, callback func([]%s.%s, er
 
 // Get returns a single %s by ID using %s DTO.
 func (a *%sAPI) Get(id uint, callback func(*%s.%s, error)) {
+	epoch := StartLoad()
 	go func() {
+		defer EndLoad(epoch)
 		resp, err := fetch("GET", fmt.Sprintf("%%s/%%d", a.baseURL, id), nil)
 		if err != nil {
 			callback(nil, err)
@@ -3056,7 +3244,9 @@ func (a *%sAPI) Get(id uint, callback func(*%s.%s, error)) {
 
 // Create creates a new %s with the given data.
 func (a *%sAPI) Create(data map[string]interface{}, callback func(*%s.%s, error)) {
+	epoch := StartLoad()
 	go func() {
+		defer EndLoad(epoch)
 		body, _ := json.Marshal(data)
 		resp, err := fetch("POST", a.baseURL, body)
 		if err != nil {
@@ -3074,7 +3264,9 @@ func (a *%sAPI) Create(data map[string]interface{}, callback func(*%s.%s, error)
 
 // Update updates an existing %s.
 func (a *%sAPI) Update(id uint, data map[string]interface{}, callback func(*%s.%s, error)) {
+	epoch := StartLoad()
 	go func() {
+		defer EndLoad(epoch)
 		body, _ := json.Marshal(data)
 		resp, err := fetch("PUT", fmt.Sprintf("%%s/%%d", a.baseURL, id), body)
 		if err != nil {
@@ -3092,7 +3284,9 @@ func (a *%sAPI) Update(id uint, data map[string]interface{}, callback func(*%s.%
 
 // Delete deletes a %s by ID.
 func (a *%sAPI) Delete(id uint, callback func(error)) {
+	epoch := StartLoad()
 	go func() {
+		defer EndLoad(epoch)
 		_, err := fetch("DELETE", fmt.Sprintf("%%s/%%d", a.baseURL, id), nil)
 		callback(err)
 	}()
@@ -3135,7 +3329,9 @@ var %s = &%sAPI{baseURL: "/__gux_api/crud/%s"}
 
 // List returns all %s records.
 func (a *%sAPI) List(callback func([]%s, error)) {
+	epoch := StartLoad()
 	go func() {
+		defer EndLoad(epoch)
 		resp, err := fetch("GET", a.baseURL, nil)
 		if err != nil {
 			callback(nil, err)
@@ -3152,7 +3348,9 @@ func (a *%sAPI) List(callback func([]%s, error)) {
 
 // ListFiltered returns %s records matching the given filters.
 func (a *%sAPI) ListFiltered(params map[string]string, callback func([]%s, error)) {
+	epoch := StartLoad()
 	go func() {
+		defer EndLoad(epoch)
 		endpoint := a.baseURL
 		if len(params) > 0 {
 			v := make([]string, 0, len(params))
@@ -3177,7 +3375,9 @@ func (a *%sAPI) ListFiltered(params map[string]string, callback func([]%s, error
 
 // Get returns a single %s by ID.
 func (a *%sAPI) Get(id uint, callback func(*%s, error)) {
+	epoch := StartLoad()
 	go func() {
+		defer EndLoad(epoch)
 		resp, err := fetch("GET", fmt.Sprintf("%%s/%%d", a.baseURL, id), nil)
 		if err != nil {
 			callback(nil, err)
@@ -3194,7 +3394,9 @@ func (a *%sAPI) Get(id uint, callback func(*%s, error)) {
 
 // Create creates a new %s.
 func (a *%sAPI) Create(item *%s, callback func(*%s, error)) {
+	epoch := StartLoad()
 	go func() {
+		defer EndLoad(epoch)
 		body, _ := json.Marshal(item)
 		resp, err := fetch("POST", a.baseURL, body)
 		if err != nil {
@@ -3212,7 +3414,9 @@ func (a *%sAPI) Create(item *%s, callback func(*%s, error)) {
 
 // Update updates an existing %s.
 func (a *%sAPI) Update(item *%s, callback func(*%s, error)) {
+	epoch := StartLoad()
 	go func() {
+		defer EndLoad(epoch)
 		body, _ := json.Marshal(item)
 		resp, err := fetch("PUT", fmt.Sprintf("%%s/%%d", a.baseURL, item.ID), body)
 		if err != nil {
@@ -3230,7 +3434,9 @@ func (a *%sAPI) Update(item *%s, callback func(*%s, error)) {
 
 // Delete deletes a %s by ID.
 func (a *%sAPI) Delete(id uint, callback func(error)) {
+	epoch := StartLoad()
 	go func() {
+		defer EndLoad(epoch)
 		_, err := fetch("DELETE", fmt.Sprintf("%%s/%%d", a.baseURL, id), nil)
 		callback(err)
 	}()
@@ -3842,7 +4048,9 @@ func generateEndpointFunc(ep APIEndpointInfo) string {
 		sb.WriteString(fmt.Sprintf(`
 // %s calls %s %s
 func %s(%s) {
+	epoch := StartLoad()
 	go func() {
+		defer EndLoad(epoch)
 		_, err := apiEndpointFetch("%s", %s, nil)
 		callback(err)
 	}()
@@ -3864,7 +4072,9 @@ func %s(%s) {
 			sb.WriteString(fmt.Sprintf(`
 // %s calls %s %s
 func %s(%s) {
+	epoch := StartLoad()
 	go func() {
+		defer EndLoad(epoch)
 		body, err := json.Marshal(req)
 		if err != nil {
 			var zero %s
@@ -3897,7 +4107,9 @@ func %s(%s) {
 			sb.WriteString(fmt.Sprintf(`
 // %s calls %s %s
 func %s(%s) {
+	epoch := StartLoad()
 	go func() {
+		defer EndLoad(epoch)
 		resp, err := apiEndpointFetch("%s", %s, %s)
 		if err != nil {
 			var zero %s
@@ -4531,6 +4743,17 @@ func runBuildNew(tinygo bool, serverDir string) {
 		}
 	}
 
+	// Determine API import for WASM entry points
+	hasAsyncAPI := len(crudModels) > 0
+	apiImportPath := ""
+	if hasAsyncAPI {
+		if err := generateLoadTracker(); err != nil {
+			fmt.Printf("Error generating load tracker: %v\n", err)
+			os.Exit(1)
+		}
+		apiImportPath = modulePath + "/guxgen/api"
+	}
+
 	// Generate and build WASM only if there are routes
 	if hasWASM {
 		// Generate WASM entry points for each bundle
@@ -4539,7 +4762,7 @@ func runBuildNew(tinygo bool, serverDir string) {
 			if len(bundle.Routes) == 0 {
 				continue // Skip bundles with no routes
 			}
-			if err := generateBundleWasmEntryPoint(name, bundle); err != nil {
+			if err := generateBundleWasmEntryPoint(name, bundle, apiImportPath); err != nil {
 				fmt.Printf("Error generating WASM entry for bundle %s: %v\n", name, err)
 				os.Exit(1)
 			}

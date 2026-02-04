@@ -283,6 +283,16 @@ func generateGuxFiles(serverDir string) error {
 		}
 	}
 
+	// Determine if we have any async API calls (CRUD or endpoints)
+	hasAsyncAPI := len(crudModels) > 0 || len(apiEndpoints) > 0
+
+	// Generate load tracker for async CRUD/endpoint operations
+	if hasAsyncAPI {
+		if err := generateLoadTracker(); err != nil {
+			return fmt.Errorf("generating load tracker: %w", err)
+		}
+	}
+
 	// Generate WASM entry points for each bundle
 	if hasWASM {
 		fmt.Println("Generating WASM entry points...")
@@ -290,7 +300,11 @@ func generateGuxFiles(serverDir string) error {
 			if len(bundle.Routes) == 0 {
 				continue // Skip bundles with no routes
 			}
-			if err := generateBundleWasmEntryPoint(name, bundle); err != nil {
+			apiImport := ""
+			if hasAsyncAPI {
+				apiImport = modulePath + "/guxgen/api"
+			}
+			if err := generateBundleWasmEntryPoint(name, bundle, apiImport); err != nil {
 				return fmt.Errorf("generating WASM entry for bundle %s: %w", name, err)
 			}
 			fmt.Printf("  Generated entry point for bundle: %s (%d routes)\n", name, len(bundle.Routes))

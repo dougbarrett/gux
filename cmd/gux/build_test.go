@@ -2172,7 +2172,7 @@ func TestGenerateBundleWasmEntryPoint_RootRoute(t *testing.T) {
 			},
 		}
 
-		err := generateBundleWasmEntryPoint("app", bundle)
+		err := generateBundleWasmEntryPoint("app", bundle, "")
 		if err != nil {
 			t.Fatalf("generateBundleWasmEntryPoint: %v", err)
 		}
@@ -2216,7 +2216,7 @@ func TestGenerateBundleWasmEntryPoint_RootRoute(t *testing.T) {
 			},
 		}
 
-		err := generateBundleWasmEntryPoint("app", bundle)
+		err := generateBundleWasmEntryPoint("app", bundle, "")
 		if err != nil {
 			t.Fatalf("generateBundleWasmEntryPoint: %v", err)
 		}
@@ -2414,4 +2414,346 @@ type LoginResponse struct {
 	if !strings.Contains(result, "LoginResponse") {
 		t.Error("expected LoginResponse in extracted types")
 	}
+}
+
+// TestGenerateLoadTracker verifies the load tracker files are generated correctly.
+func TestGenerateLoadTracker(t *testing.T) {
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(origDir)
+
+	os.MkdirAll("guxgen/api", 0755)
+
+	err := generateLoadTracker()
+	if err != nil {
+		t.Fatalf("generateLoadTracker: %v", err)
+	}
+
+	t.Run("wasm file exists and has correct content", func(t *testing.T) {
+		data, err := os.ReadFile("guxgen/api/load_tracker.go")
+		if err != nil {
+			t.Fatalf("reading load_tracker.go: %v", err)
+		}
+		code := string(data)
+
+		checks := []struct {
+			name   string
+			needle string
+		}{
+			{"build tag", "//go:build js && wasm"},
+			{"package", "package api"},
+			{"StartLoad func", "func StartLoad() int"},
+			{"EndLoad func", "func EndLoad(epoch int)"},
+			{"ResetLoads func", "func ResetLoads()"},
+			{"HasPendingLoads func", "func HasPendingLoads() bool"},
+			{"OnAllLoadsComplete var", "OnAllLoadsComplete func()"},
+			{"epoch increment in StartLoad", "pendingLoads++"},
+			{"epoch check in EndLoad", "if epoch != loadEpoch"},
+			{"counter decrement", "pendingLoads--"},
+			{"fires callback", "OnAllLoadsComplete()"},
+		}
+		for _, c := range checks {
+			if !strings.Contains(code, c.needle) {
+				t.Errorf("%s: expected %q in load_tracker.go", c.name, c.needle)
+			}
+		}
+	})
+
+	t.Run("server file exists and has no-op stubs", func(t *testing.T) {
+		data, err := os.ReadFile("guxgen/api/load_tracker_server.go")
+		if err != nil {
+			t.Fatalf("reading load_tracker_server.go: %v", err)
+		}
+		code := string(data)
+
+		checks := []struct {
+			name   string
+			needle string
+		}{
+			{"build tag", "//go:build !js || !wasm"},
+			{"package", "package api"},
+			{"StartLoad stub", "func StartLoad() int"},
+			{"EndLoad stub", "func EndLoad(epoch int)"},
+			{"ResetLoads stub", "func ResetLoads()"},
+			{"HasPendingLoads stub", "func HasPendingLoads() bool"},
+			{"OnAllLoadsComplete var", "var OnAllLoadsComplete func()"},
+			{"returns false", "return false"},
+		}
+		for _, c := range checks {
+			if !strings.Contains(code, c.needle) {
+				t.Errorf("%s: expected %q in load_tracker_server.go", c.name, c.needle)
+			}
+		}
+	})
+}
+
+// TestGenerateAPIClient_LoadTracking verifies StartLoad/EndLoad wraps async calls.
+func TestGenerateAPIClient_LoadTracking(t *testing.T) {
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(origDir)
+
+	os.WriteFile("go.mod", []byte("module testapp\n\ngo 1.23\n"), 0644)
+	os.MkdirAll("guxgen/api", 0755)
+	os.MkdirAll("models", 0755)
+	os.WriteFile("models/item.go", []byte(`package models
+import "gorm.io/gorm"
+type Item struct {
+	gorm.Model
+	Name string
+}
+`), 0644)
+
+	modelFieldTypesCache = make(map[string]map[string]string)
+
+	models := []CRUDModel{{
+		Name:       "Item",
+		PluralName: "Items",
+		Path:       "items",
+	}}
+
+	err := generateAPIClient("testapp/models", "testapp/dto", models)
+	if err != nil {
+		t.Fatalf("generateAPIClient: %v", err)
+	}
+
+	clientData, err := os.ReadFile("guxgen/api/client.go")
+	if err != nil {
+		t.Fatalf("reading client.go: %v", err)
+	}
+	code := string(clientData)
+
+	// Verify StartLoad/EndLoad pattern appears for each CRUD method
+	startLoadCount := strings.Count(code, "epoch := StartLoad()")
+	endLoadCount := strings.Count(code, "defer EndLoad(epoch)")
+
+	if startLoadCount < 6 {
+		t.Errorf("expected at least 6 StartLoad() calls (one per CRUD method), got %d", startLoadCount)
+	}
+	if endLoadCount < 6 {
+		t.Errorf("expected at least 6 defer EndLoad(epoch) calls, got %d", endLoadCount)
+	}
+	if startLoadCount != endLoadCount {
+		t.Errorf("StartLoad count (%d) != EndLoad count (%d)", startLoadCount, endLoadCount)
+	}
+
+	// Verify StartLoad is before go func and EndLoad is inside go func
+	if !strings.Contains(code, "epoch := StartLoad()\n\tgo func() {\n\t\tdefer EndLoad(epoch)") {
+		t.Error("StartLoad/EndLoad not in expected positions relative to go func()")
+	}
+}
+
+// TestGenerateEndpointFunc_LoadTracking verifies StartLoad/EndLoad wraps endpoint async calls.
+func TestGenerateEndpointFunc_LoadTracking(t *testing.T) {
+	tests := []struct {
+		name string
+		ep   APIEndpointInfo
+	}{
+		{
+			name: "GET with response",
+			ep: APIEndpointInfo{
+				Method:       "GET",
+				Path:         "/api/items",
+				FuncName:     "GetItems",
+				ResponseType: "[]Item",
+			},
+		},
+		{
+			name: "POST with request and response",
+			ep: APIEndpointInfo{
+				Method:       "POST",
+				Path:         "/api/items",
+				FuncName:     "CreateItem",
+				RequestType:  "CreateItemRequest",
+				ResponseType: "Item",
+			},
+		},
+		{
+			name: "DELETE no response",
+			ep: APIEndpointInfo{
+				Method:   "DELETE",
+				Path:     "/api/items/:id",
+				FuncName: "DeleteItem",
+				PathParams: []string{"id"},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			code := generateEndpointFunc(tt.ep)
+
+			if !strings.Contains(code, "epoch := StartLoad()") {
+				t.Errorf("endpoint func missing StartLoad()")
+			}
+			if !strings.Contains(code, "defer EndLoad(epoch)") {
+				t.Errorf("endpoint func missing defer EndLoad(epoch)")
+			}
+			// StartLoad should be before go func
+			startIdx := strings.Index(code, "epoch := StartLoad()")
+			goFuncIdx := strings.Index(code, "go func()")
+			if startIdx > goFuncIdx {
+				t.Errorf("StartLoad() should appear before go func()")
+			}
+		})
+	}
+}
+
+// TestGenerateBundleWasmEntryPoint_WithAPIImport verifies load tracking integration in WASM main.
+func TestGenerateBundleWasmEntryPoint_WithAPIImport(t *testing.T) {
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(origDir)
+
+	bundle := &BundleInfo{
+		Name: "app",
+		Routes: []PageRoute{
+			{Path: "/", Handler: "pages.Home", IsHybrid: true, Bundle: "app"},
+			{Path: "/about", Handler: "pages.About", IsHybrid: true, Bundle: "app"},
+		},
+		Imports: []BundleImport{
+			{Path: "myapp/pages"},
+		},
+	}
+
+	err := generateBundleWasmEntryPoint("app", bundle, "myapp/guxgen/api")
+	if err != nil {
+		t.Fatalf("generateBundleWasmEntryPoint: %v", err)
+	}
+
+	content, err := os.ReadFile("guxgen/wasm/main.go")
+	if err != nil {
+		t.Fatalf("read generated file: %v", err)
+	}
+	code := string(content)
+
+	t.Run("imports api package", func(t *testing.T) {
+		if !strings.Contains(code, `"myapp/guxgen/api"`) {
+			t.Error("generated code should import api package when apiImport is provided")
+		}
+	})
+
+	t.Run("has attachLinks function", func(t *testing.T) {
+		if !strings.Contains(code, "attachLinks := func()") {
+			t.Error("generated code should have attachLinks closure when apiImport is provided")
+		}
+	})
+
+	t.Run("render calls attachLinks", func(t *testing.T) {
+		if !strings.Contains(code, "attachLinks()") {
+			t.Error("render should call attachLinks() when apiImport is provided")
+		}
+	})
+
+	t.Run("navigate uses api.ResetLoads", func(t *testing.T) {
+		if !strings.Contains(code, "api.ResetLoads()") {
+			t.Error("navigate should call api.ResetLoads() when apiImport is provided")
+		}
+	})
+
+	t.Run("navigate uses api.HasPendingLoads", func(t *testing.T) {
+		if !strings.Contains(code, "api.HasPendingLoads()") {
+			t.Error("navigate should check api.HasPendingLoads() when apiImport is provided")
+		}
+	})
+
+	t.Run("initial boot wires OnAllLoadsComplete", func(t *testing.T) {
+		if !strings.Contains(code, "api.OnAllLoadsComplete = func()") {
+			t.Error("initial boot should wire api.OnAllLoadsComplete when apiImport is provided")
+		}
+	})
+
+	t.Run("no fetchLoader function", func(t *testing.T) {
+		if strings.Contains(code, "func fetchLoader(") {
+			t.Error("generated code should NOT have fetchLoader when apiImport is provided")
+		}
+	})
+
+	t.Run("initial boot does not call render directly", func(t *testing.T) {
+		// Find the section after popstate handler - the initial boot section
+		// It should NOT have a bare render() call (only inside OnAllLoadsComplete)
+		popstateIdx := strings.Index(code, "popstate")
+		if popstateIdx < 0 {
+			t.Fatal("could not find popstate handler")
+		}
+		afterPopstate := code[popstateIdx:]
+		// Find "attachLinks()" in boot section - render() should not appear between
+		// "OnAllLoadsComplete" and "select {}"
+		bootSection := afterPopstate[strings.Index(afterPopstate, "OnAllLoadsComplete"):]
+		selectIdx := strings.Index(bootSection, "select {}")
+		bootSection = bootSection[:selectIdx]
+		// Count render() calls - should only be inside OnAllLoadsComplete callback
+		renderCalls := strings.Count(bootSection, "render()")
+		if renderCalls != 1 {
+			t.Errorf("expected exactly 1 render() call in boot section (inside OnAllLoadsComplete), got %d", renderCalls)
+		}
+	})
+}
+
+// TestGenerateBundleWasmEntryPoint_WithoutAPIImport verifies fetchLoader is kept when no API.
+func TestGenerateBundleWasmEntryPoint_WithoutAPIImport(t *testing.T) {
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(origDir)
+
+	bundle := &BundleInfo{
+		Name: "app",
+		Routes: []PageRoute{
+			{Path: "/", Handler: "pages.Home", IsHybrid: true, Bundle: "app"},
+		},
+		Imports: []BundleImport{
+			{Path: "myapp/pages"},
+		},
+	}
+
+	err := generateBundleWasmEntryPoint("app", bundle, "")
+	if err != nil {
+		t.Fatalf("generateBundleWasmEntryPoint: %v", err)
+	}
+
+	content, err := os.ReadFile("guxgen/wasm/main.go")
+	if err != nil {
+		t.Fatalf("read generated file: %v", err)
+	}
+	code := string(content)
+
+	t.Run("has fetchLoader", func(t *testing.T) {
+		if !strings.Contains(code, "func fetchLoader(") {
+			t.Error("generated code should have fetchLoader when no apiImport")
+		}
+	})
+
+	t.Run("no api import", func(t *testing.T) {
+		if strings.Contains(code, "guxgen/api") {
+			t.Error("generated code should NOT import api package when apiImport is empty")
+		}
+	})
+
+	t.Run("no api calls", func(t *testing.T) {
+		if strings.Contains(code, "api.ResetLoads") {
+			t.Error("generated code should NOT call api.ResetLoads when apiImport is empty")
+		}
+		if strings.Contains(code, "api.HasPendingLoads") {
+			t.Error("generated code should NOT call api.HasPendingLoads when apiImport is empty")
+		}
+		if strings.Contains(code, "api.OnAllLoadsComplete") {
+			t.Error("generated code should NOT reference api.OnAllLoadsComplete when apiImport is empty")
+		}
+	})
+
+	t.Run("no attachLinks function", func(t *testing.T) {
+		if strings.Contains(code, "attachLinks := func()") {
+			t.Error("generated code should NOT have attachLinks when apiImport is empty")
+		}
+	})
+
+	t.Run("navigate uses fetchLoader", func(t *testing.T) {
+		if !strings.Contains(code, "fetchLoader(path, func(") {
+			t.Error("navigate should use fetchLoader when apiImport is empty")
+		}
+	})
 }
