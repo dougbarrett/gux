@@ -1,6 +1,9 @@
 package core
 
 import (
+	"bytes"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 )
 
@@ -154,6 +157,52 @@ func TestExtractPathParams(t *testing.T) {
 				if got[k] != v {
 					t.Errorf("extractPathParams(%q, %q)[%q] = %q, want %q", tt.pattern, tt.path, k, got[k], v)
 				}
+			}
+		})
+	}
+}
+
+// TestAPI_EmptyBodyStructRequest verifies that core.API tolerates nil/empty body
+// when the request type is struct{} (#86).
+func TestAPI_EmptyBodyStructRequest(t *testing.T) {
+	app := New()
+
+	API(app, "POST", "/api/test", func(ctx *APIContext, _ struct{}) (map[string]string, error) {
+		return map[string]string{"status": "ok"}, nil
+	}).Public()
+
+	tests := []struct {
+		name string
+		body []byte
+		want int
+	}{
+		{"nil body", nil, 200},
+		{"empty body", []byte(""), 200},
+		{"empty json object", []byte("{}"), 200},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var bodyReader *bytes.Reader
+			if tt.body != nil {
+				bodyReader = bytes.NewReader(tt.body)
+			}
+			var req *http.Request
+			if bodyReader != nil {
+				req = httptest.NewRequest("POST", "/api/test", bodyReader)
+			} else {
+				req = httptest.NewRequest("POST", "/api/test", nil)
+			}
+			req.Header.Set("Content-Type", "application/json")
+			w := httptest.NewRecorder()
+			// Get the handler registered by API()
+			handler := app.customHandlers["POST /api/test"]
+			if handler == nil {
+				t.Fatal("handler not registered")
+			}
+			handler(w, req)
+			if w.Code != tt.want {
+				t.Errorf("got status %d, want %d; body: %s", w.Code, tt.want, w.Body.String())
 			}
 		})
 	}

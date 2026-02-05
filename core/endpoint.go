@@ -2,6 +2,7 @@ package core
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -298,11 +299,16 @@ func API[Req any, Res any](app *App, method string, path string, handler func(*A
 			return
 		}
 
-		// Decode request body
+		// Decode request body (skip if body is nil/empty, e.g., struct{} request type)
 		var req Req
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			api.WriteError(w, api.BadRequest("invalid request body: "+err.Error()))
-			return
+		if r.Body != nil {
+			body, _ := io.ReadAll(r.Body)
+			if len(body) > 0 {
+				if err := json.Unmarshal(body, &req); err != nil {
+					api.WriteError(w, api.BadRequest("invalid request body: "+err.Error()))
+					return
+				}
+			}
 		}
 
 		// Call handler
