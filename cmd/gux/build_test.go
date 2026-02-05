@@ -1255,6 +1255,151 @@ type AgentTool struct {
 	}
 }
 
+// TestGetModelFieldsForImport_ExcludesJSONHidden verifies that model fields
+// with json:"-" tags are excluded from generated DTOs (#89).
+func TestGetModelFieldsForImport_ExcludesJSONHidden(t *testing.T) {
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(origDir)
+
+	os.WriteFile("go.mod", []byte("module testapp\n\ngo 1.23\n"), 0644)
+
+	os.MkdirAll("models", 0755)
+	os.WriteFile("models/app.go", []byte("package models\n\nimport \"gorm.io/gorm\"\n\ntype App struct {\n\tgorm.Model\n\tName         string\n\tAnthropicKey string `gorm:\"not null\" json:\"-\"`\n\tStatus       string\n}\n"), 0644)
+
+	modelFieldTypesCache = make(map[string]map[string]string)
+
+	fields, err := getModelFieldsForImport("App", "testapp/models")
+	if err != nil {
+		t.Fatalf("getModelFieldsForImport: %v", err)
+	}
+
+	fieldNames := make(map[string]bool)
+	for _, f := range fields {
+		fieldNames[f.Name] = true
+	}
+
+	// Should include normal fields
+	for _, expected := range []string{"Name", "Status"} {
+		if !fieldNames[expected] {
+			t.Errorf("expected field %q not found", expected)
+		}
+	}
+
+	// Should exclude json:"-" field
+	if fieldNames["AnthropicKey"] {
+		t.Error("field 'AnthropicKey' with json:\"-\" should be excluded from DTO (#89)")
+	}
+}
+
+// TestExtractTypeName_MapType verifies that extractTypeName handles map types (#88).
+func TestExtractTypeName_MapType(t *testing.T) {
+	tests := []struct {
+		name     string
+		src      string
+		wantResp string
+	}{
+		{
+			name: "map[string]bool",
+			src: `package main
+import "github.com/dougbarrett/gux/core"
+func main() {
+	app := core.New()
+	core.APIGet(app, "/api/status", func(ctx *core.APIContext) (map[string]bool, error) {
+		return nil, nil
+	})
+}`,
+			wantResp: "map[string]bool",
+		},
+		{
+			name: "map[string]string",
+			src: `package main
+import "github.com/dougbarrett/gux/core"
+func main() {
+	app := core.New()
+	core.APIGet(app, "/api/config", func(ctx *core.APIContext) (map[string]string, error) {
+		return nil, nil
+	})
+}`,
+			wantResp: "map[string]string",
+		},
+		{
+			name: "map[string]int",
+			src: `package main
+import "github.com/dougbarrett/gux/core"
+func main() {
+	app := core.New()
+	core.API(app, "POST", "/api/counts", func(ctx *core.APIContext, req map[string]int) (map[string]int, error) {
+		return req, nil
+	})
+}`,
+			wantResp: "map[string]int",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			path := writeTestFile(t, tc.src)
+			endpoints, _, err := parseAPIEndpoints(path)
+			if err != nil {
+				t.Fatalf("parseAPIEndpoints: %v", err)
+			}
+			if len(endpoints) != 1 {
+				t.Fatalf("expected 1 endpoint, got %d", len(endpoints))
+			}
+			if endpoints[0].ResponseType != tc.wantResp {
+				t.Errorf("ResponseType: got %q, want %q", endpoints[0].ResponseType, tc.wantResp)
+			}
+		})
+	}
+}
+
+// TestExtractTypeName_MapType_GeneratesTypedCallback verifies that endpoints with
+// map return types generate correct client code with typed callbacks (#88).
+func TestExtractTypeName_MapType_GeneratesTypedCallback(t *testing.T) {
+	ep := APIEndpointInfo{
+		Method:       "GET",
+		Path:         "/api/apps/:id/key-status",
+		FuncName:     "GetAppsKeyStatus",
+		PathParams:   []string{"id"},
+		ResponseType: "map[string]bool",
+		Package:      "",
+	}
+	code := generateEndpointFunc(ep)
+
+	if !strings.Contains(code, "callback func(map[string]bool, error)") {
+		t.Errorf("expected typed callback with map[string]bool, got:\n%s", code)
+	}
+	if !strings.Contains(code, "var result map[string]bool") {
+		t.Errorf("expected result variable of type map[string]bool, got:\n%s", code)
+	}
+}
+
+// TestIsCustomTypeName verifies built-in and composite types are not treated as custom.
+func TestIsCustomTypeName(t *testing.T) {
+	tests := []struct {
+		name   string
+		input  string
+		custom bool
+	}{
+		{"struct type", "AppStatusResponse", true},
+		{"string", "string", false},
+		{"int", "int", false},
+		{"bool", "bool", false},
+		{"slice", "[]string", false},
+		{"map", "map[string]bool", false},
+		{"dto type", "UserDetail", true},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := isCustomTypeName(tc.input); got != tc.custom {
+				t.Errorf("isCustomTypeName(%q) = %v, want %v", tc.input, got, tc.custom)
+			}
+		})
+	}
+}
+
 // TestToSnakeCase_Acronyms tests that toSnakeCase handles common acronyms correctly.
 func TestToSnakeCase_Acronyms(t *testing.T) {
 	tests := []struct {

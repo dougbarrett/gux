@@ -751,6 +751,13 @@ func findStructInDir(modelName string, dir string) map[string]string {
 					if len(field.Names) == 0 {
 						continue
 					}
+					// Skip fields with json:"-" — they should never appear in generated DTOs
+					if field.Tag != nil {
+						tagVal := strings.Trim(field.Tag.Value, "`")
+						if strings.Contains(tagVal, `json:"-"`) {
+							continue
+						}
+					}
 					fieldName := field.Names[0].Name
 					fieldTypes[fieldName] = formatType(field.Type)
 				}
@@ -1789,8 +1796,29 @@ func extractTypeName(expr ast.Expr) (typeName, pkg string) {
 	case *ast.ArrayType:
 		elemType, elemPkg := extractTypeName(t.Elt)
 		return "[]" + elemType, elemPkg
+	case *ast.MapType:
+		keyType, _ := extractTypeName(t.Key)
+		valType, valPkg := extractTypeName(t.Value)
+		return "map[" + keyType + "]" + valType, valPkg
 	}
 	return "", ""
+}
+
+// isCustomTypeName returns true if the type name is a user-defined type (not a
+// built-in, slice, or map composite). Used to filter which types need extraction
+// from source files for embedding in generated code.
+func isCustomTypeName(name string) bool {
+	if strings.HasPrefix(name, "[]") || strings.HasPrefix(name, "map[") {
+		return false
+	}
+	builtins := map[string]bool{
+		"string": true, "bool": true, "byte": true, "rune": true,
+		"int": true, "int8": true, "int16": true, "int32": true, "int64": true,
+		"uint": true, "uint8": true, "uint16": true, "uint32": true, "uint64": true,
+		"float32": true, "float64": true, "complex64": true, "complex128": true,
+		"error": true, "any": true, "interface{}": true,
+	}
+	return !builtins[name]
 }
 
 // extractMainPackageTypes extracts struct type definitions from the main package
@@ -3876,10 +3904,10 @@ func generateEndpointClient(endpoints []APIEndpointInfo, dtoImports map[string]s
 	mainPkgTypes := make(map[string]bool)
 	for _, ep := range endpoints {
 		if ep.Package == "" || ep.Package == "main" {
-			if ep.RequestType != "" {
+			if ep.RequestType != "" && isCustomTypeName(ep.RequestType) {
 				mainPkgTypes[ep.RequestType] = true
 			}
-			if ep.ResponseType != "" {
+			if ep.ResponseType != "" && isCustomTypeName(ep.ResponseType) {
 				mainPkgTypes[ep.ResponseType] = true
 			}
 		}
