@@ -2222,6 +2222,46 @@ func main() {
 	}
 }
 
+// TestParseAPIEndpoints_CollectsModelImports verifies that imports for non-dto
+// packages (e.g., models) are collected when used in endpoint types (#90).
+func TestParseAPIEndpoints_CollectsModelImports(t *testing.T) {
+	src := `package main
+
+import (
+	"myapp/models"
+	"github.com/dougbarrett/gux/core"
+)
+
+func main() {
+	app := core.New()
+	core.APIGet(app, "/api/my/apps", func(ctx *core.APIContext) ([]models.App, error) {
+		return nil, nil
+	})
+}
+`
+	path := writeTestFile(t, src)
+	endpoints, imports, err := parseAPIEndpoints(path)
+	if err != nil {
+		t.Fatalf("parseAPIEndpoints: %v", err)
+	}
+	if len(endpoints) != 1 {
+		t.Fatalf("expected 1 endpoint, got %d", len(endpoints))
+	}
+	if endpoints[0].ResponseType != "[]App" {
+		t.Errorf("ResponseType: got %q, want %q", endpoints[0].ResponseType, "[]App")
+	}
+	if endpoints[0].Package != "models" {
+		t.Errorf("Package: got %q, want %q", endpoints[0].Package, "models")
+	}
+	// The import for "models" should be collected
+	if _, ok := imports["models"]; !ok {
+		t.Errorf("expected 'models' in imports, got: %v", imports)
+	}
+	if imports["models"] != "myapp/models" {
+		t.Errorf("expected models import path 'myapp/models', got %q", imports["models"])
+	}
+}
+
 // TestParseAPIEndpoints_NamedFuncHandler verifies that named function references
 // (not just inline function literals) have their response/request types extracted (#87).
 func TestParseAPIEndpoints_NamedFuncHandler(t *testing.T) {

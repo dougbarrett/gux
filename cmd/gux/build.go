@@ -1546,20 +1546,21 @@ func parseAPIEndpoints(filename string) ([]APIEndpointInfo, map[string]string, e
 
 	var endpoints []APIEndpointInfo
 
-	// Build a map of all import aliases to their paths for DTO-related packages.
-	// This supports multiple DTO packages (e.g., guxgen/dto and project/dto as customdto).
+	// Build a map of all import aliases to their paths for packages used by endpoints.
+	// This includes DTO packages, model packages, and any other imported packages
+	// that might be referenced in endpoint request/response types.
 	dtoImports := make(map[string]string) // alias -> import path
 	for _, imp := range node.Imports {
 		path := strings.Trim(imp.Path.Value, `"`)
-		if strings.HasSuffix(path, "/dto") || strings.Contains(path, "/dto") {
-			alias := ""
-			if imp.Name != nil {
-				alias = imp.Name.Name
-			} else {
-				// Default alias is last path segment
-				parts := strings.Split(path, "/")
-				alias = parts[len(parts)-1]
-			}
+		alias := ""
+		if imp.Name != nil {
+			alias = imp.Name.Name
+		} else {
+			// Default alias is last path segment
+			parts := strings.Split(path, "/")
+			alias = parts[len(parts)-1]
+		}
+		if alias != "" && alias != "_" && alias != "." {
 			dtoImports[alias] = path
 		}
 	}
