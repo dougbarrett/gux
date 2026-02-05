@@ -140,7 +140,7 @@ type sessionEntry struct {
 }
 
 // MemorySessionStore is an in-memory session store for development/testing.
-// For production, use Redis or database-backed stores.
+// Sessions are lost on server restart. For persistence, use DBSessionStore.
 type MemorySessionStore struct {
 	sessions map[string]*sessionEntry
 	mu       sync.RWMutex
