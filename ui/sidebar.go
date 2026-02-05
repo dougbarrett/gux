@@ -46,7 +46,7 @@ func Sidebar(props SidebarProps) core.Node {
 	// Sidebar element classes
 	sidebarClass := MergeClasses(
 		// Base: fixed on mobile, static on desktop
-		"fixed md:static inset-y-0 left-0 z-50",
+		"fixed md:sticky inset-y-0 left-0 z-50",
 		// Width transitions
 		widthClass,
 		// Mobile slide in/out
