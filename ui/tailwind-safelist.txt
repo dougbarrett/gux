@@ -230,7 +230,7 @@ stroke-current
 [stroke-width:1.5]
 
 # Sidebar Layout (responsive)
-md:static
+md:sticky
 md:translate-x-0
 md:hidden
 md:block
