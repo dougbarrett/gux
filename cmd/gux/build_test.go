@@ -2674,12 +2674,32 @@ func TestGenerateBundleWasmEntryPoint_WithAPIImport(t *testing.T) {
 
 	t.Run("initial boot renders conditionally on HasPendingLoads (#84)", func(t *testing.T) {
 		// Check that initial boot has the HasPendingLoads conditional pattern
-		if !strings.Contains(code, "api.OnAllLoadsComplete = func() { render() }\n\tloadPage()\n\tif !api.HasPendingLoads()") {
-			t.Error("boot section should wire OnAllLoadsComplete, call loadPage(), then check HasPendingLoads()")
+		if !strings.Contains(code, "!api.HasPendingLoads()") {
+			t.Error("boot section should check HasPendingLoads()")
 		}
 		// attachLinks() should be in the else branch (async loads pending)
 		if !strings.Contains(code, "attachLinks()\n\t}") {
 			t.Error("boot section should call attachLinks() in else branch for async case")
+		}
+	})
+
+	t.Run("initial boot clears hydrated flag before loadPage (#85)", func(t *testing.T) {
+		if !strings.Contains(code, "router.ClearHydrated()") {
+			t.Error("boot section should call router.ClearHydrated() so OnLoad runs on WASM")
+		}
+		// ClearHydrated must come before loadPage in the boot section
+		bootStart := strings.Index(code, "api.OnAllLoadsComplete")
+		if bootStart < 0 {
+			t.Fatal("could not find boot section")
+		}
+		bootCode := code[bootStart:]
+		clearIdx := strings.Index(bootCode, "router.ClearHydrated()")
+		loadIdx := strings.Index(bootCode, "loadPage()")
+		if clearIdx < 0 || loadIdx < 0 {
+			t.Fatal("could not find ClearHydrated or loadPage in boot section")
+		}
+		if clearIdx > loadIdx {
+			t.Error("router.ClearHydrated() must be called before loadPage()")
 		}
 	})
 

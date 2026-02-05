@@ -2320,6 +2320,9 @@ func generateBundleWasmEntryPoint(bundleName string, bundle *BundleInfo, apiImpo
 		initialBootCode = `
 	// Wire up load tracker - render after all async loads complete
 	api.OnAllLoadsComplete = func() { render() }
+	// Clear hydrated flag so OnLoad runs on WASM (populates closure vars via async API calls).
+	// State values from Hydrate() are preserved - only the flag is cleared.
+	router.ClearHydrated()
 	loadPage()
 	if !api.HasPendingLoads() {
 		// No async loads (e.g., login page) - render immediately to attach event handlers
