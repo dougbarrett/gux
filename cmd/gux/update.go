@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 )
@@ -127,6 +128,45 @@ func runUpdate(checkOnly bool) {
 	}
 
 	fmt.Printf("\nSuccessfully updated to %s!\n", latestVersion)
+
+	// Update project files if running inside a gux project
+	updateProjectFiles(latestVersion)
+}
+
+const guxModule = "github.com/dougbarrett/gux"
+
+// updateProjectFiles updates .claude/skills and go.mod in the current directory
+func updateProjectFiles(version string) {
+	// Update .claude/skills if present
+	skillPath := filepath.Join(".claude", "skills", "gux-framework.md")
+	if _, err := os.Stat(skillPath); err == nil {
+		skillContent, err := templates.ReadFile("templates/claude/skills/gux-framework.md")
+		if err == nil {
+			if err := os.WriteFile(skillPath, skillContent, 0644); err == nil {
+				fmt.Printf("  Updated %s\n", skillPath)
+			}
+		}
+	}
+
+	// Update go.mod gux dependency if present
+	goModData, err := os.ReadFile("go.mod")
+	if err != nil {
+		return
+	}
+	if !strings.Contains(string(goModData), guxModule) {
+		return
+	}
+
+	fmt.Printf("  Updating go.mod dependency to %s...\n", version)
+	cmd := exec.Command("go", "get", guxModule+"@"+version)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		fmt.Printf("  Warning: could not update go.mod: %v\n", err)
+		fmt.Printf("  Run manually: go get %s@%s\n", guxModule, version)
+		return
+	}
+	fmt.Printf("  Updated go.mod dependency to %s\n", version)
 }
 
 // isUpToDate compares current and latest versions
