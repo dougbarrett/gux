@@ -4127,6 +4127,27 @@ func endpointFetch(method, path string, body []byte) ([]byte, error) {
 	return os.WriteFile("guxgen/api/endpoints_server_gen.go", []byte(serverCode), 0644)
 }
 
+// qualifyType prefixes a type name with a package qualifier, correctly handling
+// slice and map prefixes. E.g., ("[]App", "models") → "[]models.App".
+func qualifyType(typeName, pkg string) string {
+	if pkg == "" || pkg == "main" {
+		return typeName
+	}
+	if strings.HasPrefix(typeName, "[]") {
+		return "[]" + pkg + "." + strings.TrimPrefix(typeName, "[]")
+	}
+	if strings.HasPrefix(typeName, "map[") {
+		// map[K]V — qualify V only if V is a simple identifier
+		bracketEnd := strings.Index(typeName, "]")
+		if bracketEnd != -1 {
+			key := typeName[4:bracketEnd]
+			val := typeName[bracketEnd+1:]
+			return "map[" + key + "]" + pkg + "." + val
+		}
+	}
+	return pkg + "." + typeName
+}
+
 // generateEndpointFunc generates a single endpoint client function
 func generateEndpointFunc(ep APIEndpointInfo) string {
 	var sb strings.Builder
@@ -4143,10 +4164,7 @@ func generateEndpointFunc(ep APIEndpointInfo) string {
 
 	// Add request body parameter if needed
 	if ep.RequestType != "" {
-		reqType := ep.RequestType
-		if ep.Package != "" && ep.Package != "main" {
-			reqType = ep.Package + "." + ep.RequestType
-		}
+		reqType := qualifyType(ep.RequestType, ep.Package)
 		params = append(params, "req "+reqType)
 	}
 
@@ -4183,10 +4201,7 @@ func %s(%s) {
 `, ep.FuncName, ep.Method, ep.Path, ep.FuncName, paramStr, ep.Method, urlExpr))
 	} else {
 		// Has response body
-		respType := ep.ResponseType
-		if ep.Package != "" && ep.Package != "main" {
-			respType = ep.Package + "." + ep.ResponseType
-		}
+		respType := qualifyType(ep.ResponseType, ep.Package)
 
 		// Add callback parameter
 		params = append(params, fmt.Sprintf("callback func(%s, error)", respType))
@@ -4274,10 +4289,7 @@ func generateEndpointServerFunc(ep APIEndpointInfo) string {
 
 	// Add request body parameter if needed
 	if ep.RequestType != "" {
-		reqType := ep.RequestType
-		if ep.Package != "" && ep.Package != "main" {
-			reqType = ep.Package + "." + ep.RequestType
-		}
+		reqType := qualifyType(ep.RequestType, ep.Package)
 		params = append(params, "req "+reqType)
 	}
 
@@ -4310,10 +4322,7 @@ func %s(%s) {
 `, ep.FuncName, ep.Method, ep.Path, ep.FuncName, paramStr, ep.Method, urlExpr))
 	} else {
 		// Has response body
-		respType := ep.ResponseType
-		if ep.Package != "" && ep.Package != "main" {
-			respType = ep.Package + "." + ep.ResponseType
-		}
+		respType := qualifyType(ep.ResponseType, ep.Package)
 
 		// Add callback parameter
 		params = append(params, fmt.Sprintf("callback func(%s, error)", respType))

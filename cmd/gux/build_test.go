@@ -2373,6 +2373,67 @@ func TestGenerateEndpointFunc_NamedFuncHandler(t *testing.T) {
 	}
 }
 
+// TestQualifyType verifies package qualification handles slice and map prefixes (#90).
+func TestQualifyType(t *testing.T) {
+	tests := []struct {
+		typeName string
+		pkg      string
+		want     string
+	}{
+		{"App", "models", "models.App"},
+		{"[]App", "models", "[]models.App"},
+		{"[]string", "", "[]string"},
+		{"map[string]App", "models", "map[string]models.App"},
+		{"UserDetail", "dto", "dto.UserDetail"},
+		{"[]UserDetail", "dto", "[]dto.UserDetail"},
+		{"AppStatusResponse", "", "AppStatusResponse"},
+		{"AppStatusResponse", "main", "AppStatusResponse"},
+		{"map[string]bool", "", "map[string]bool"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.typeName+"_"+tc.pkg, func(t *testing.T) {
+			got := qualifyType(tc.typeName, tc.pkg)
+			if got != tc.want {
+				t.Errorf("qualifyType(%q, %q) = %q, want %q", tc.typeName, tc.pkg, got, tc.want)
+			}
+		})
+	}
+}
+
+// TestGenerateEndpointFunc_SliceOfPackageType verifies that endpoints returning
+// []package.Type generate valid Go syntax (#90).
+func TestGenerateEndpointFunc_SliceOfPackageType(t *testing.T) {
+	ep := APIEndpointInfo{
+		Method:       "GET",
+		Path:         "/api/my/apps",
+		FuncName:     "GetMyApps",
+		ResponseType: "[]App",
+		Package:      "models",
+	}
+
+	code := generateEndpointFunc(ep)
+
+	// Must produce []models.App, NOT models.[]App
+	if strings.Contains(code, "models.[]App") {
+		t.Errorf("generated invalid syntax models.[]App:\n%s", code)
+	}
+	if !strings.Contains(code, "[]models.App") {
+		t.Errorf("expected []models.App in callback, got:\n%s", code)
+	}
+	if !strings.Contains(code, "var result []models.App") {
+		t.Errorf("expected var result []models.App, got:\n%s", code)
+	}
+
+	// Also verify server func
+	serverCode := generateEndpointServerFunc(ep)
+	if strings.Contains(serverCode, "models.[]App") {
+		t.Errorf("server func has invalid syntax models.[]App:\n%s", serverCode)
+	}
+	if !strings.Contains(serverCode, "[]models.App") {
+		t.Errorf("server func expected []models.App, got:\n%s", serverCode)
+	}
+}
+
 // TestParseRoutesAndBundles_RootRouteInRouteGroup verifies that Hybrid("/", ...) inside a
 // RouteGroup produces the group prefix, not an empty string (#80).
 func TestParseRoutesAndBundles_RootRouteInRouteGroup(t *testing.T) {
