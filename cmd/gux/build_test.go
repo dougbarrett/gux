@@ -2077,6 +2077,157 @@ func main() {
 	}
 }
 
+// TestParseAPIEndpoints_NamedFuncHandler verifies that named function references
+// (not just inline function literals) have their response/request types extracted (#87).
+func TestParseAPIEndpoints_NamedFuncHandler(t *testing.T) {
+	tests := []struct {
+		name         string
+		src          string
+		wantMethod   string
+		wantPath     string
+		wantReqType  string
+		wantRespType string
+	}{
+		{
+			name: "APIGet with named function handler",
+			src: `package main
+
+import "github.com/dougbarrett/gux/core"
+
+type AppStatusResponse struct {
+	Status string
+}
+
+func handleAppStatus(ctx *core.APIContext) (AppStatusResponse, error) {
+	return AppStatusResponse{}, nil
+}
+
+func main() {
+	app := core.New()
+	core.APIGet(app, "/api/apps/:id/status", handleAppStatus).Public()
+}`,
+			wantMethod:   "GET",
+			wantPath:     "/api/apps/:id/status",
+			wantRespType: "AppStatusResponse",
+		},
+		{
+			name: "APIGet with inline function literal (regression)",
+			src: `package main
+
+import "github.com/dougbarrett/gux/core"
+
+type AppStatusResponse struct {
+	Status string
+}
+
+func main() {
+	app := core.New()
+	core.APIGet(app, "/api/apps/:id/status", func(ctx *core.APIContext) (AppStatusResponse, error) {
+		return AppStatusResponse{}, nil
+	}).Public()
+}`,
+			wantMethod:   "GET",
+			wantPath:     "/api/apps/:id/status",
+			wantRespType: "AppStatusResponse",
+		},
+		{
+			name: "API POST with named function handler",
+			src: `package main
+
+import "github.com/dougbarrett/gux/core"
+
+type LoginRequest struct {
+	Email string
+}
+type LoginResponse struct {
+	Token string
+}
+
+func handleLogin(ctx *core.APIContext, req LoginRequest) (LoginResponse, error) {
+	return LoginResponse{}, nil
+}
+
+func main() {
+	app := core.New()
+	core.API(app, "POST", "/api/login", handleLogin)
+}`,
+			wantMethod:   "POST",
+			wantPath:     "/api/login",
+			wantReqType:  "LoginRequest",
+			wantRespType: "LoginResponse",
+		},
+		{
+			name: "APIGet with dto package response (existing behavior)",
+			src: `package main
+
+import (
+	"myapp/dto"
+	"github.com/dougbarrett/gux/core"
+)
+
+func main() {
+	app := core.New()
+	core.APIGet(app, "/api/users/:id", func(ctx *core.APIContext) (dto.UserDetail, error) {
+		return dto.UserDetail{}, nil
+	})
+}`,
+			wantMethod:   "GET",
+			wantPath:     "/api/users/:id",
+			wantRespType: "UserDetail",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			path := writeTestFile(t, tc.src)
+			endpoints, _, err := parseAPIEndpoints(path)
+			if err != nil {
+				t.Fatalf("parseAPIEndpoints: %v", err)
+			}
+			if len(endpoints) != 1 {
+				t.Fatalf("expected 1 endpoint, got %d", len(endpoints))
+			}
+			ep := endpoints[0]
+			if ep.Method != tc.wantMethod {
+				t.Errorf("Method: got %q, want %q", ep.Method, tc.wantMethod)
+			}
+			if ep.Path != tc.wantPath {
+				t.Errorf("Path: got %q, want %q", ep.Path, tc.wantPath)
+			}
+			if ep.RequestType != tc.wantReqType {
+				t.Errorf("RequestType: got %q, want %q", ep.RequestType, tc.wantReqType)
+			}
+			if ep.ResponseType != tc.wantRespType {
+				t.Errorf("ResponseType: got %q, want %q", ep.ResponseType, tc.wantRespType)
+			}
+		})
+	}
+}
+
+// TestGenerateEndpointFunc_NamedFuncHandler verifies that endpoints parsed from named
+// function handlers generate correct client code with typed callbacks (#87).
+func TestGenerateEndpointFunc_NamedFuncHandler(t *testing.T) {
+	ep := APIEndpointInfo{
+		Method:       "GET",
+		Path:         "/api/apps/:id/status",
+		FuncName:     "GetAppsStatus",
+		PathParams:   []string{"id"},
+		ResponseType: "AppStatusResponse",
+		Package:      "",
+	}
+	code := generateEndpointFunc(ep)
+
+	if !strings.Contains(code, "callback func(AppStatusResponse, error)") {
+		t.Errorf("expected typed callback with AppStatusResponse, got:\n%s", code)
+	}
+	if !strings.Contains(code, "var result AppStatusResponse") {
+		t.Errorf("expected response unmarshal into AppStatusResponse, got:\n%s", code)
+	}
+	if !strings.Contains(code, "json.Unmarshal(resp, &result)") {
+		t.Errorf("expected json.Unmarshal call, got:\n%s", code)
+	}
+}
+
 // TestParseRoutesAndBundles_RootRouteInRouteGroup verifies that Hybrid("/", ...) inside a
 // RouteGroup produces the group prefix, not an empty string (#80).
 func TestParseRoutesAndBundles_RootRouteInRouteGroup(t *testing.T) {

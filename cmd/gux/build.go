@@ -1582,17 +1582,17 @@ func parseAPIEndpoints(filename string) ([]APIEndpointInfo, map[string]string, e
 		case "API":
 			// core.API(app, "POST", "/api/login", handler)
 			if len(call.Args) >= 4 {
-				endpoint = parseAPICall(call.Args)
+				endpoint = parseAPICall(call.Args, node)
 			}
 		case "APIGet":
 			// core.APIGet(app, "/api/users/:id", handler)
 			if len(call.Args) >= 3 {
-				endpoint = parseAPIGetCall(call.Args)
+				endpoint = parseAPIGetCall(call.Args, node)
 			}
 		case "APIDelete":
 			// core.APIDelete(app, "/api/users/:id", handler)
 			if len(call.Args) >= 3 {
-				endpoint = parseAPIDeleteCall(call.Args)
+				endpoint = parseAPIDeleteCall(call.Args, node)
 			}
 		default:
 			return true
@@ -1610,7 +1610,7 @@ func parseAPIEndpoints(filename string) ([]APIEndpointInfo, map[string]string, e
 }
 
 // parseAPICall parses core.API(app, "POST", "/api/login", handler) call
-func parseAPICall(args []ast.Expr) APIEndpointInfo {
+func parseAPICall(args []ast.Expr, file *ast.File) APIEndpointInfo {
 	var ep APIEndpointInfo
 
 	// arg[1] = method string
@@ -1626,17 +1626,24 @@ func parseAPICall(args []ast.Expr) APIEndpointInfo {
 	}
 
 	// arg[3] = handler function - extract request/response types from signature
+	var funcType *ast.FuncType
 	if funcLit, ok := args[3].(*ast.FuncLit); ok {
+		funcType = funcLit.Type
+	} else if file != nil {
+		funcType = resolveFuncType(args[3], file)
+	}
+
+	if funcType != nil {
 		// Handler: func(ctx *core.APIContext, req LoginRequest) (LoginResponse, error)
-		if funcLit.Type.Params != nil && len(funcLit.Type.Params.List) >= 2 {
+		if funcType.Params != nil && len(funcType.Params.List) >= 2 {
 			// Second param is the request type
-			reqParam := funcLit.Type.Params.List[1]
+			reqParam := funcType.Params.List[1]
 			ep.RequestType, ep.Package = extractTypeName(reqParam.Type)
 		}
-		if funcLit.Type.Results != nil && len(funcLit.Type.Results.List) >= 1 {
+		if funcType.Results != nil && len(funcType.Results.List) >= 1 {
 			// First result is the response type
 			var respPkg string
-			ep.ResponseType, respPkg = extractTypeName(funcLit.Type.Results.List[0].Type)
+			ep.ResponseType, respPkg = extractTypeName(funcType.Results.List[0].Type)
 			// Use response package if request package is empty (e.g., struct{} input)
 			if ep.Package == "" && respPkg != "" {
 				ep.Package = respPkg
@@ -1648,7 +1655,7 @@ func parseAPICall(args []ast.Expr) APIEndpointInfo {
 }
 
 // parseAPIGetCall parses core.APIGet(app, "/api/users/:id", handler) call
-func parseAPIGetCall(args []ast.Expr) APIEndpointInfo {
+func parseAPIGetCall(args []ast.Expr, file *ast.File) APIEndpointInfo {
 	var ep APIEndpointInfo
 	ep.Method = "GET"
 
@@ -1660,10 +1667,17 @@ func parseAPIGetCall(args []ast.Expr) APIEndpointInfo {
 	}
 
 	// arg[2] = handler function - extract response type from signature
+	var funcType *ast.FuncType
 	if funcLit, ok := args[2].(*ast.FuncLit); ok {
+		funcType = funcLit.Type
+	} else if file != nil {
+		funcType = resolveFuncType(args[2], file)
+	}
+
+	if funcType != nil {
 		// Handler: func(ctx *core.APIContext) (dto.UserDetail, error)
-		if funcLit.Type.Results != nil && len(funcLit.Type.Results.List) >= 1 {
-			ep.ResponseType, ep.Package = extractTypeName(funcLit.Type.Results.List[0].Type)
+		if funcType.Results != nil && len(funcType.Results.List) >= 1 {
+			ep.ResponseType, ep.Package = extractTypeName(funcType.Results.List[0].Type)
 		}
 	}
 
@@ -1671,7 +1685,7 @@ func parseAPIGetCall(args []ast.Expr) APIEndpointInfo {
 }
 
 // parseAPIDeleteCall parses core.APIDelete(app, "/api/users/:id", handler) call
-func parseAPIDeleteCall(args []ast.Expr) APIEndpointInfo {
+func parseAPIDeleteCall(args []ast.Expr, file *ast.File) APIEndpointInfo {
 	var ep APIEndpointInfo
 	ep.Method = "DELETE"
 
@@ -1684,6 +1698,80 @@ func parseAPIDeleteCall(args []ast.Expr) APIEndpointInfo {
 
 	// DELETE has no request body and typically no response body
 	return ep
+}
+
+// resolveFuncType resolves a function's type from a named reference (Ident or SelectorExpr)
+// by looking up the function declaration in the AST. Returns the *ast.FuncType or nil if not found.
+func resolveFuncType(expr ast.Expr, file *ast.File) *ast.FuncType {
+	switch ref := expr.(type) {
+	case *ast.Ident:
+		// Named function reference: look up FuncDecl in the file
+		for _, decl := range file.Decls {
+			funcDecl, ok := decl.(*ast.FuncDecl)
+			if !ok {
+				continue
+			}
+			if funcDecl.Name.Name == ref.Name && funcDecl.Recv == nil {
+				return funcDecl.Type
+			}
+		}
+	case *ast.SelectorExpr:
+		// Method value expression (e.g., h.getStatus): look up method on the receiver type
+		if ident, ok := ref.X.(*ast.Ident); ok {
+			// Find the variable's type, then find the method on that type
+			var receiverTypeName string
+
+			// Search for variable declaration to find its type
+			ast.Inspect(file, func(n ast.Node) bool {
+				if receiverTypeName != "" {
+					return false
+				}
+				switch stmt := n.(type) {
+				case *ast.AssignStmt:
+					for i, lhs := range stmt.Lhs {
+						if id, ok := lhs.(*ast.Ident); ok && id.Name == ident.Name {
+							if i < len(stmt.Rhs) {
+								// Check for &Type{} or Type{} pattern
+								rhs := stmt.Rhs[i]
+								if unary, ok := rhs.(*ast.UnaryExpr); ok {
+									rhs = unary.X
+								}
+								if comp, ok := rhs.(*ast.CompositeLit); ok {
+									if typeIdent, ok := comp.Type.(*ast.Ident); ok {
+										receiverTypeName = typeIdent.Name
+									}
+								}
+							}
+						}
+					}
+				}
+				return true
+			})
+
+			if receiverTypeName != "" {
+				// Find the method declaration
+				for _, decl := range file.Decls {
+					funcDecl, ok := decl.(*ast.FuncDecl)
+					if !ok || funcDecl.Recv == nil || funcDecl.Name.Name != ref.Sel.Name {
+						continue
+					}
+					// Check receiver type matches
+					for _, recv := range funcDecl.Recv.List {
+						recvType := recv.Type
+						if star, ok := recvType.(*ast.StarExpr); ok {
+							recvType = star.X
+						}
+						if recvIdent, ok := recvType.(*ast.Ident); ok {
+							if recvIdent.Name == receiverTypeName {
+								return funcDecl.Type
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	return nil
 }
 
 // extractTypeName extracts the type name from an AST expression
