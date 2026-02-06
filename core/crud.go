@@ -655,8 +655,9 @@ func (a *App) convertSingleToDTO(model interface{}, dtoType reflect.Type) interf
 				dtoFieldType = dtoFieldType.Elem()
 			}
 
-			// First check if types are directly assignable (handles time.Time, etc.)
-			if modelField.Type().AssignableTo(dtoField.Type) {
+			// First check if types match directly (handles time.Time, etc.)
+			// Use == instead of AssignableTo for TinyGo WASM compatibility
+			if modelField.Type() == dtoField.Type {
 				dtoVal.Field(i).Set(modelField)
 			} else if srcVal.Kind() == reflect.Struct && dtoFieldType.Kind() == reflect.Struct {
 				// Handle struct-to-struct conversion (including pointer DTO fields)

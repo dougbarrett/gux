@@ -563,15 +563,21 @@ func (a *App) Handler() http.Handler {
 				if SSRSessionSetter != nil && sessionID != "" {
 					SSRSessionSetter(sessionID, cookieName)
 				}
+				if SSRCookieSetter != nil {
+					SSRCookieSetter(r.Cookies())
+				}
 
 				router := NewRouterWithAuth(a.db, params, user, r, w, a.authConfig)
 				router.sessionID = sessionID
 				component := route.Handler(router)
 				component()
 
-				// Clear session context after rendering
+				// Clear session/cookie context after rendering
 				if SSRSessionClearer != nil {
 					SSRSessionClearer()
+				}
+				if SSRCookieClearer != nil {
+					SSRCookieClearer()
 				}
 
 				// Include user in state for hydration
@@ -662,6 +668,9 @@ func (a *App) Handler() http.Handler {
 				if SSRSessionSetter != nil && sessionID != "" {
 					SSRSessionSetter(sessionID, cookieName)
 				}
+				if SSRCookieSetter != nil {
+					SSRCookieSetter(r.Cookies())
+				}
 
 				// Create router with auth context
 				router := NewRouterWithAuth(a.db, params, user, r, w, a.authConfig)
@@ -669,9 +678,12 @@ func (a *App) Handler() http.Handler {
 				component := route.Handler(router)
 				html := component().Render(HTML()).HTML()
 
-				// Clear session context after rendering
+				// Clear session/cookie context after rendering
 				if SSRSessionClearer != nil {
 					SSRSessionClearer()
+				}
+				if SSRCookieClearer != nil {
+					SSRCookieClearer()
 				}
 
 				w.Header().Set("Content-Type", "text/html")
@@ -830,6 +842,7 @@ type Router struct {
 	state          map[string]any
 	rerender       func()
 	navigate       func(path string)
+	redirect       func(path string)
 	db             interface{}          // Database connection (server-side only)
 	hydrated       bool                 // True if state was hydrated from server
 	routeParams    map[string]string    // Route parameters (e.g., :id -> "123")
@@ -869,6 +882,16 @@ var SSRSessionSetter func(sessionID, cookieName string)
 // SSRSessionClearer is a function that clears the session context after SSR rendering.
 // Set this to your generated api.ClearEndpointSession function.
 var SSRSessionClearer func()
+
+// SSRCookieSetter is a function that forwards all cookies from the incoming request
+// to SSR API calls. This enables endpoints that depend on non-session cookies
+// (e.g., org selection, preferences) to work correctly during server-side rendering.
+// Set this to your generated api.SetEndpointCookies function.
+var SSRCookieSetter func(cookies []*http.Cookie)
+
+// SSRCookieClearer is a function that clears forwarded cookies after SSR rendering.
+// Set this to your generated api.ClearEndpointCookies function.
+var SSRCookieClearer func()
 
 // SuppressRender temporarily suppresses re-renders during the callback.
 // Used by the DOM renderer for input events to avoid re-render on every keystroke.
@@ -971,6 +994,12 @@ func (r *Router) DB() interface{} {
 // SetNavigate sets the navigation callback (called by WASM runtime).
 func (r *Router) SetNavigate(fn func(path string)) {
 	r.navigate = fn
+}
+
+// SetRedirect sets the redirect callback (called by WASM runtime).
+// This is used for full-page navigation (window.location.assign).
+func (r *Router) SetRedirect(fn func(path string)) {
+	r.redirect = fn
 }
 
 // Navigate programmatically navigates to a path.
@@ -1269,8 +1298,16 @@ func (r *Router) Logout() error {
 	return nil
 }
 
-// Redirect performs an HTTP redirect. Only works server-side.
+// Redirect performs a full-page navigation.
+// In WASM: uses window.location.assign() for a full page load (cross-bundle safe).
+// On server: performs an HTTP 302 redirect.
+// Use this instead of Navigate() when crossing WASM bundle boundaries
+// or when you need a guaranteed full page load (e.g., after login/logout).
 func (r *Router) Redirect(path string) {
+	if r.redirect != nil {
+		r.redirect(path)
+		return
+	}
 	if r.response != nil && r.request != nil {
 		http.Redirect(r.response, r.request, path, http.StatusFound)
 	}

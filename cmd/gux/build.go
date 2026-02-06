@@ -2406,7 +2406,7 @@ func generateBundleWasmEntryPoint(bundleName string, bundle *BundleInfo, apiImpo
 		// Check if this path belongs to this bundle
 		if !isRouteInBundle(path) {
 			// Cross-bundle navigation - do full page redirect
-			window.Get("location").Set("href", path)
+			window.Get("location").Call("assign", path)
 			return
 		}
 		// Same-bundle navigation - clear component to force reload
@@ -2520,7 +2520,7 @@ func fetchLoader(path string, callback func(map[string]any)) {
 		// Check if this path belongs to this bundle
 		if !isRouteInBundle(path) {
 			// Cross-bundle navigation - do full page redirect
-			window.Get("location").Set("href", path)
+			window.Get("location").Call("assign", path)
 			return
 		}
 		// Same-bundle navigation - clear component to force reload
@@ -2695,6 +2695,9 @@ func main() {
 
 	router = core.NewRouter(render)
 	router.SetNavigate(navigate)
+	router.SetRedirect(func(path string) {
+		window.Get("location").Call("assign", path)
+	})
 	println("[Gux WASM] Calling SetDebugRouter")
 	core.SetDebugRouter(router) // Enable state debugging
 	println("[Gux WASM] SetDebugRouter completed")
@@ -4047,6 +4050,11 @@ var endpointSessionID = ""
 // endpointSessionCookieName is the name of the session cookie.
 var endpointSessionCookieName = "__gux_session"
 
+// endpointCookies stores all cookies from the incoming request for SSR propagation.
+// When set, these cookies are forwarded to API calls during server-side rendering,
+// enabling endpoints that depend on non-session cookies (e.g., org selection).
+var endpointCookies []*http.Cookie
+
 // InitEndpoints sets the base URL for server-side API calls.
 // Call this in your main() before starting the server.
 // If not called, defaults to http://localhost:$PORT or http://localhost:8080.
@@ -4067,6 +4075,17 @@ func SetEndpointSession(sessionID, cookieName string) {
 // ClearEndpointSession clears the session after page rendering is complete.
 func ClearEndpointSession() {
 	endpointSessionID = ""
+}
+
+// SetEndpointCookies stores all cookies from the incoming request for SSR propagation.
+// This enables API endpoints that depend on non-session cookies to work during SSR.
+func SetEndpointCookies(cookies []*http.Cookie) {
+	endpointCookies = cookies
+}
+
+// ClearEndpointCookies clears the stored cookies after SSR rendering.
+func ClearEndpointCookies() {
+	endpointCookies = nil
 }
 
 // getEndpointBaseURL returns the base URL for API calls.
@@ -4098,8 +4117,13 @@ func endpointFetch(method, path string, body []byte) ([]byte, error) {
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	// Pass session cookie if available (for SSR auth propagation)
-	if endpointSessionID != "" {
+	// Forward all cookies if available (for SSR with non-session cookies)
+	if len(endpointCookies) > 0 {
+		for _, c := range endpointCookies {
+			req.AddCookie(c)
+		}
+	} else if endpointSessionID != "" {
+		// Fallback: pass session cookie only (backwards compatible)
 		req.AddCookie(&http.Cookie{
 			Name:  endpointSessionCookieName,
 			Value: endpointSessionID,
