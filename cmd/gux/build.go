@@ -4712,7 +4712,10 @@ func buildBinary(serverDir string) error {
 		buildTarget = "./" + serverDir
 	}
 	cmd := exec.Command("go", "build", "-o", "bin/app", buildTarget)
-	cmd.Env = append(os.Environ(), "CGO_ENABLED=0")
+	// Respect CGO_ENABLED if set by the user; default to disabled for smaller binaries
+	if os.Getenv("CGO_ENABLED") == "" {
+		cmd.Env = append(os.Environ(), "CGO_ENABLED=0")
+	}
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
