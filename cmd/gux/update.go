@@ -102,6 +102,10 @@ func runUpdate(checkOnly bool) {
 	// Compare versions
 	if isUpToDate(currentVersion, latestVersion) {
 		fmt.Println("\nYou're already on the latest version!")
+		// Still update project files (skills, go.mod) in case they're outdated
+		if !checkOnly {
+			updateProjectFiles(latestVersion)
+		}
 		return
 	}
 
