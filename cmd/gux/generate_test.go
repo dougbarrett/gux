@@ -173,3 +173,188 @@ func TestRegenerateDockerfile_AppNameFromDirectory(t *testing.T) {
 		t.Error("Dockerfile does not contain app name from directory")
 	}
 }
+
+func TestGetExportedTypeNames_FindsTypes(t *testing.T) {
+	tmpDir, cleanup := setupGenerateTestDir(t, "myapp")
+	defer cleanup()
+
+	// Create dto/ package with several types
+	os.MkdirAll(filepath.Join(tmpDir, "dto"), 0755)
+	os.WriteFile(filepath.Join(tmpDir, "dto", "user.go"), []byte(`package dto
+
+type UserList struct {
+	ID    uint   `+"`"+`json:"id"`+"`"+`
+	Email string `+"`"+`json:"email"`+"`"+`
+}
+
+type UserDetail struct {
+	ID    uint   `+"`"+`json:"id"`+"`"+`
+	Email string `+"`"+`json:"email"`+"`"+`
+}
+`), 0644)
+	os.WriteFile(filepath.Join(tmpDir, "dto", "auth.go"), []byte(`package dto
+
+type LoginRequest struct {
+	Email    string
+	Password string
+}
+
+type LogoutResponse struct {
+	Success bool
+}
+`), 0644)
+
+	types := getExportedTypeNames("dto")
+	if types == nil {
+		t.Fatal("getExportedTypeNames returned nil")
+	}
+
+	expected := []string{"UserList", "UserDetail", "LoginRequest", "LogoutResponse"}
+	for _, name := range expected {
+		if !types[name] {
+			t.Errorf("expected type %q not found", name)
+		}
+	}
+
+	// Should not include unexported types
+	if types["unexported"] {
+		t.Error("should not include unexported types")
+	}
+}
+
+func TestGetExportedTypeNames_EmptyDir(t *testing.T) {
+	tmpDir, cleanup := setupGenerateTestDir(t, "myapp")
+	defer cleanup()
+
+	// dto/ does not exist
+	types := getExportedTypeNames(filepath.Join(tmpDir, "nonexistent"))
+	if types != nil {
+		t.Errorf("expected nil for nonexistent dir, got %v", types)
+	}
+}
+
+func TestGetExportedTypeNames_MultipleFiles(t *testing.T) {
+	_, cleanup := setupGenerateTestDir(t, "myapp")
+	defer cleanup()
+
+	os.MkdirAll("dto", 0755)
+	os.WriteFile("dto/a.go", []byte("package dto\n\ntype Alpha struct{}\n"), 0644)
+	os.WriteFile("dto/b.go", []byte("package dto\n\ntype Beta struct{}\n"), 0644)
+
+	types := getExportedTypeNames("dto")
+	if !types["Alpha"] || !types["Beta"] {
+		t.Errorf("expected both Alpha and Beta, got %v", types)
+	}
+}
+
+func TestGenerateAuthDTOWithAliases_AllAliased(t *testing.T) {
+	_, cleanup := setupGenerateTestDir(t, "myapp")
+	defer cleanup()
+
+	os.MkdirAll("guxgen/dto", 0755)
+
+	err := generateAuthDTOWithAliases("myapp", []string{"LoginRequest", "LoginResponse", "LogoutResponse", "Breadcrumb"})
+	if err != nil {
+		t.Fatalf("generateAuthDTOWithAliases: %v", err)
+	}
+
+	content, err := os.ReadFile("guxgen/dto/auth.go")
+	if err != nil {
+		t.Fatalf("read auth.go: %v", err)
+	}
+
+	s := string(content)
+
+	// Should have type aliases for all four
+	for _, typeName := range []string{"LoginRequest", "LoginResponse", "LogoutResponse", "Breadcrumb"} {
+		expected := "type " + typeName + " = manualdto." + typeName
+		if !strings.Contains(s, expected) {
+			t.Errorf("expected alias %q, not found in:\n%s", expected, s)
+		}
+	}
+
+	// Should have import
+	if !strings.Contains(s, `import manualdto "myapp/dto"`) {
+		t.Errorf("expected import of myapp/dto, got:\n%s", s)
+	}
+
+	// Should NOT have fresh struct definitions
+	if strings.Contains(s, "struct {") {
+		t.Errorf("should not have fresh struct definitions when all are aliased, got:\n%s", s)
+	}
+}
+
+func TestGenerateAuthDTOWithAliases_PartialAlias(t *testing.T) {
+	_, cleanup := setupGenerateTestDir(t, "myapp")
+	defer cleanup()
+
+	os.MkdirAll("guxgen/dto", 0755)
+
+	// Only LogoutResponse exists in dto/
+	err := generateAuthDTOWithAliases("myapp", []string{"LogoutResponse"})
+	if err != nil {
+		t.Fatalf("generateAuthDTOWithAliases: %v", err)
+	}
+
+	content, err := os.ReadFile("guxgen/dto/auth.go")
+	if err != nil {
+		t.Fatalf("read auth.go: %v", err)
+	}
+
+	s := string(content)
+
+	// LogoutResponse should be aliased
+	if !strings.Contains(s, "type LogoutResponse = manualdto.LogoutResponse") {
+		t.Errorf("expected LogoutResponse alias, got:\n%s", s)
+	}
+
+	// LoginRequest should be a fresh struct (not aliased)
+	if strings.Contains(s, "type LoginRequest = ") {
+		t.Errorf("LoginRequest should NOT be aliased, got:\n%s", s)
+	}
+	if !strings.Contains(s, "type LoginRequest struct") {
+		t.Errorf("expected fresh LoginRequest struct, got:\n%s", s)
+	}
+
+	// Breadcrumb should be a fresh struct (not aliased)
+	if !strings.Contains(s, "type Breadcrumb struct") {
+		t.Errorf("expected fresh Breadcrumb struct, got:\n%s", s)
+	}
+}
+
+func TestTypeAlias_ManualDTOInDifferentFile(t *testing.T) {
+	_, cleanup := setupModelGenTestDir(t)
+	defer cleanup()
+
+	// Create manual DTO in a differently named file (not dto/user.go)
+	os.MkdirAll("dto", 0755)
+	os.WriteFile("dto/accounts.go", []byte("package dto\n\ntype UserList struct{}\ntype UserDetail struct{}\n"), 0644)
+
+	model := &ModelDefinition{
+		Name:   "User",
+		Preset: "auth",
+		Sections: map[string][]ModelField{
+			"Account": {
+				{Name: "Email", Type: "string", Table: true},
+			},
+		},
+	}
+
+	err := GenerateModelFilesImpl(model, nil, "myapp", false, nil, nil, nil)
+	if err != nil {
+		t.Fatalf("GenerateModelFilesImpl: %v", err)
+	}
+
+	content, err := os.ReadFile("guxgen/dto/user_gen.go")
+	if err != nil {
+		t.Fatalf("read DTO type alias file: %v", err)
+	}
+
+	s := string(content)
+	if !strings.Contains(s, "type UserList = manualdto.UserList") {
+		t.Errorf("expected UserList type alias even though DTO is in dto/accounts.go, got:\n%s", s)
+	}
+	if !strings.Contains(s, "type UserDetail = manualdto.UserDetail") {
+		t.Errorf("expected UserDetail type alias, got:\n%s", s)
+	}
+}
