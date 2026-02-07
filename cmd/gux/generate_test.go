@@ -358,3 +358,83 @@ func TestTypeAlias_ManualDTOInDifferentFile(t *testing.T) {
 		t.Errorf("expected UserDetail type alias, got:\n%s", s)
 	}
 }
+
+func TestGenerateScaffoldDTOAliases_BuiltInUser(t *testing.T) {
+	_, cleanup := setupGenerateTestDir(t, "myapp")
+	defer cleanup()
+
+	os.MkdirAll("dto", 0755)
+	os.MkdirAll("guxgen/dto", 0755)
+	os.WriteFile("dto/user.go", []byte("package dto\n\ntype UserList struct{}\ntype UserDetail struct{}\n"), 0644)
+
+	dtoTypes := getExportedTypeNames("dto")
+
+	err := generateScaffoldDTOAliases("myapp", dtoTypes)
+	if err != nil {
+		t.Fatalf("generateScaffoldDTOAliases: %v", err)
+	}
+
+	content, err := os.ReadFile("guxgen/dto/user_gen.go")
+	if err != nil {
+		t.Fatalf("read user_gen.go: %v", err)
+	}
+
+	s := string(content)
+	if !strings.Contains(s, "type UserList = manualdto.UserList") {
+		t.Errorf("expected UserList alias, got:\n%s", s)
+	}
+	if !strings.Contains(s, "type UserDetail = manualdto.UserDetail") {
+		t.Errorf("expected UserDetail alias, got:\n%s", s)
+	}
+	if !strings.Contains(s, `import manualdto "myapp/dto"`) {
+		t.Errorf("expected import, got:\n%s", s)
+	}
+}
+
+func TestGenerateScaffoldDTOAliases_SkipsIfAlreadyExists(t *testing.T) {
+	_, cleanup := setupGenerateTestDir(t, "myapp")
+	defer cleanup()
+
+	os.MkdirAll("dto", 0755)
+	os.MkdirAll("guxgen/dto", 0755)
+	os.WriteFile("dto/user.go", []byte("package dto\n\ntype UserList struct{}\ntype UserDetail struct{}\n"), 0644)
+
+	// Pre-existing file (e.g., from GenerateModelFilesImpl)
+	existing := "// existing content\npackage dto\n"
+	os.WriteFile("guxgen/dto/user_gen.go", []byte(existing), 0644)
+
+	dtoTypes := getExportedTypeNames("dto")
+
+	err := generateScaffoldDTOAliases("myapp", dtoTypes)
+	if err != nil {
+		t.Fatalf("generateScaffoldDTOAliases: %v", err)
+	}
+
+	// Should NOT overwrite existing file
+	content, _ := os.ReadFile("guxgen/dto/user_gen.go")
+	if string(content) != existing {
+		t.Errorf("should not overwrite existing file, got:\n%s", string(content))
+	}
+}
+
+func TestGenerateScaffoldDTOAliases_NoUserDTOs(t *testing.T) {
+	_, cleanup := setupGenerateTestDir(t, "myapp")
+	defer cleanup()
+
+	os.MkdirAll("dto", 0755)
+	os.MkdirAll("guxgen/dto", 0755)
+	// dto/ has types but NOT UserList/UserDetail
+	os.WriteFile("dto/product.go", []byte("package dto\n\ntype ProductList struct{}\n"), 0644)
+
+	dtoTypes := getExportedTypeNames("dto")
+
+	err := generateScaffoldDTOAliases("myapp", dtoTypes)
+	if err != nil {
+		t.Fatalf("generateScaffoldDTOAliases: %v", err)
+	}
+
+	// Should NOT create user_gen.go
+	if _, err := os.Stat("guxgen/dto/user_gen.go"); err == nil {
+		t.Error("should not create user_gen.go when UserList/UserDetail don't exist in dto/")
+	}
+}
