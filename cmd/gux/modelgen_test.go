@@ -1907,3 +1907,99 @@ func TestFormFieldCode_RequiredBoolParam(t *testing.T) {
 		})
 	}
 }
+
+// TestGenerateDTOFile_ListDTOHasDisplayMethod verifies that generated List DTOs
+// include a Display() method, fixing #105 where FK dropdowns call Display()
+// on List DTOs which previously lacked it.
+func TestGenerateDTOFile_ListDTOHasDisplayMethod(t *testing.T) {
+	tests := []struct {
+		name           string
+		displayField   string
+		displayFields  []string
+		displayFormat  string
+		isPointer      bool
+		tableFields    []TemplateField
+		wantMethod     string
+		wantField      string // extra field added to struct
+	}{
+		{
+			name:         "simple display field",
+			displayField: "Name",
+			displayFields: []string{"Name"},
+			tableFields: []TemplateField{
+				{Name: "Name", JSONName: "name", DTOType: "string"},
+			},
+			wantMethod: "func (d ClientList) Display() string {\n\treturn d.Name\n}",
+		},
+		{
+			name:          "composite display",
+			displayField:  "FirstName",
+			displayFields: []string{"FirstName", "LastName"},
+			displayFormat: "{{FirstName}} {{LastName}}",
+			tableFields: []TemplateField{
+				{Name: "FirstName", JSONName: "first_name", DTOType: "string"},
+				{Name: "LastName", JSONName: "last_name", DTOType: "string"},
+			},
+			wantMethod: `func (d ClientList) Display() string {`,
+		},
+		{
+			name:          "missing display field added to struct",
+			displayField:  "Name",
+			displayFields: []string{"Name"},
+			tableFields:   []TemplateField{
+				{Name: "Email", JSONName: "email", DTOType: "string"},
+			},
+			wantField:  `Name string`,
+			wantMethod: "func (d ClientList) Display() string {\n\treturn d.Name\n}",
+		},
+		{
+			name:          "pointer display field",
+			displayField:  "Name",
+			displayFields: []string{"Name"},
+			isPointer:     true,
+			tableFields: []TemplateField{
+				{Name: "Name", JSONName: "name", DTOType: "*string"},
+			},
+			wantMethod: "if d.Name != nil { return *d.Name }",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			dtoPath := filepath.Join(tmpDir, "client_gen.go")
+
+			data := &ModelTemplateData{
+				Name:                  "Client",
+				NameLower:             "client",
+				DisplayField:          tt.displayField,
+				DisplayFields:         tt.displayFields,
+				DisplayFormat:         tt.displayFormat,
+				DisplayFieldIsPointer: tt.isPointer,
+				TableFields:           tt.tableFields,
+				AllFields: append(tt.tableFields, TemplateField{
+					Name: "Name", JSONName: "name", DTOType: "string",
+				}),
+			}
+
+			err := generateDTOFile(dtoPath, data)
+			if err != nil {
+				t.Fatalf("generateDTOFile error: %v", err)
+			}
+
+			content, err := os.ReadFile(dtoPath)
+			if err != nil {
+				t.Fatalf("read file error: %v", err)
+			}
+			output := string(content)
+
+			if !strings.Contains(output, tt.wantMethod) {
+				t.Errorf("expected Display() method containing %q\nGot:\n%s", tt.wantMethod, output)
+			}
+
+			if tt.wantField != "" && !strings.Contains(output, tt.wantField) {
+				t.Errorf("expected struct to contain field %q\nGot:\n%s", tt.wantField, output)
+			}
+		})
+	}
+}

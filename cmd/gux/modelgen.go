@@ -1823,7 +1823,9 @@ type ModelTemplateData struct {
 	HasSelectRelations   bool   // True if any relation uses a select dropdown (*uint or input:"select")
 	HasExternalRelations bool   // True if any relations are to models not in gux.config.json
 	DisplayField          string
-	DisplayFieldIsPointer bool   // True if the display field type is a pointer (e.g., *string)
+	DisplayFields         []string // Extracted display field names (for composite display)
+	DisplayFormat         string   // Template format (e.g., "{{FirstName}} {{LastName}}")
+	DisplayFieldIsPointer bool     // True if the display field type is a pointer (e.g., *string)
 	AdminEnabled      bool   // From config.Admin - use ui components instead of inline styles
 	FieldCount        int    // Number of fields for layout decisions
 	FormLayout        string // "stacked" (default) or "grid" for two-column layout
@@ -2170,6 +2172,22 @@ func prepareModelTemplateData(model *ModelDefinition, modulePath string, display
 		DisplayField:      detectDisplayField(model),
 		FormLayout:        formLayout,
 		IsAuthModel:       model.Preset == "auth",
+	}
+
+	// Populate composite display fields
+	rawDisplay := model.Display
+	if rawDisplay == "" {
+		rawDisplay = detectDisplayField(model)
+	}
+	if isDisplayTemplate(rawDisplay) {
+		data.DisplayFormat = rawDisplay
+		data.DisplayFields = extractDisplayFields(rawDisplay)
+		// For single-field contexts (like detail page header), use the first field
+		if len(data.DisplayFields) > 0 {
+			data.DisplayField = data.DisplayFields[0]
+		}
+	} else if rawDisplay != "" {
+		data.DisplayFields = []string{rawDisplay}
 	}
 
 	// Add auth-specific fields if using auth preset
@@ -2956,6 +2974,9 @@ func generateDTOFile(path string, data *ModelTemplateData) error {
 	buf.WriteString(fmt.Sprintf("// %sList is the DTO for %s list responses.\n", data.Name, data.NameLower))
 	buf.WriteString(fmt.Sprintf("type %sList struct {\n", data.Name))
 	buf.WriteString(fmt.Sprintf("\tID uint `json:\"id\" gux:\"%s.ID\"`\n", data.Name))
+
+	// Track which fields are included in the List DTO (for display field check)
+	listFieldNames := map[string]bool{"ID": true}
 	for _, field := range data.TableFields {
 		// For relations, use the preload name as the DTO field name
 		dtoFieldName := field.Name
@@ -2968,6 +2989,7 @@ func generateDTOFile(path string, data *ModelTemplateData) error {
 		}
 		tag += "`"
 		buf.WriteString(fmt.Sprintf("\t%s %s %s\n", dtoFieldName, field.DTOType, tag))
+		listFieldNames[field.Name] = true
 	}
 	// Add auth-specific fields to DTO (exclude PasswordHash)
 	if data.IsAuthModel {
@@ -2975,10 +2997,98 @@ func generateDTOFile(path string, data *ModelTemplateData) error {
 			if authField.Name != "PasswordHash" {
 				buf.WriteString(fmt.Sprintf("\t%s %s `json:\"%s\" gux:\"%s.%s\"`\n",
 					authField.Name, authField.Type, ToSnakeCase(authField.Name), data.Name, authField.Name))
+				listFieldNames[authField.Name] = true
+			}
+		}
+	}
+	// Ensure display fields are present in List DTO (needed for Display() method)
+	for _, df := range data.DisplayFields {
+		if listFieldNames[df] {
+			continue
+		}
+		// Find the field in AllFields and add it
+		for _, af := range data.AllFields {
+			if af.Name == df {
+				dtoType := af.DTOType
+				if dtoType == "" {
+					dtoType = "string"
+				}
+				buf.WriteString(fmt.Sprintf("\t%s %s `json:\"%s\" gux:\"%s.%s\"`\n",
+					df, dtoType, af.JSONName, data.Name, df))
+				listFieldNames[df] = true
+				break
 			}
 		}
 	}
 	buf.WriteString("}\n\n")
+
+	// Generate Display() method on List DTO
+	needsStrings := false
+	displayFields := data.DisplayFields
+	if len(displayFields) == 0 && data.DisplayField != "" {
+		displayFields = []string{data.DisplayField}
+	}
+	if len(displayFields) > 0 {
+		if len(displayFields) == 1 {
+			df := displayFields[0]
+			// Check if the display field is a pointer type
+			if data.DisplayFieldIsPointer {
+				buf.WriteString(fmt.Sprintf("func (d %sList) Display() string {\n", data.Name))
+				buf.WriteString(fmt.Sprintf("\tif d.%s != nil { return *d.%s }\n", df, df))
+				buf.WriteString("\treturn \"\"\n")
+				buf.WriteString("}\n\n")
+			} else {
+				buf.WriteString(fmt.Sprintf("func (d %sList) Display() string {\n", data.Name))
+				buf.WriteString(fmt.Sprintf("\treturn d.%s\n", df))
+				buf.WriteString("}\n\n")
+			}
+		} else if data.DisplayFormat != "" {
+			// Composite display from template format
+			needsStrings = true
+			buf.WriteString(fmt.Sprintf("func (d %sList) Display() string {\n", data.Name))
+			format := data.DisplayFormat
+			var parts []string
+			remaining := format
+			for {
+				start := strings.Index(remaining, "{{")
+				if start == -1 {
+					if remaining != "" {
+						parts = append(parts, fmt.Sprintf("%q", remaining))
+					}
+					break
+				}
+				if start > 0 {
+					parts = append(parts, fmt.Sprintf("%q", remaining[:start]))
+				}
+				end := strings.Index(remaining[start:], "}}")
+				if end == -1 {
+					break
+				}
+				field := strings.TrimSpace(remaining[start+2 : start+end])
+				parts = append(parts, "d."+field)
+				remaining = remaining[start+end+2:]
+			}
+			buf.WriteString(fmt.Sprintf("\treturn strings.TrimSpace(%s)\n", strings.Join(parts, " + ")))
+			buf.WriteString("}\n\n")
+		} else {
+			// Multiple fields, no template - join with space
+			buf.WriteString(fmt.Sprintf("func (d %sList) Display() string {\n", data.Name))
+			var fieldRefs []string
+			for _, df := range displayFields {
+				fieldRefs = append(fieldRefs, "d."+df)
+			}
+			buf.WriteString(fmt.Sprintf("\treturn %s\n", strings.Join(fieldRefs, ` + " " + `)))
+			buf.WriteString("}\n\n")
+		}
+	}
+
+	// Add strings import if needed for Display() method
+	if needsStrings {
+		content := buf.String()
+		content = strings.Replace(content, "import (\n\t\"time\"\n", "import (\n\t\"strings\"\n\t\"time\"\n", 1)
+		buf.Reset()
+		buf.WriteString(content)
+	}
 
 	// Write Detail DTO
 	buf.WriteString(fmt.Sprintf("// %sDetail is the DTO for single %s responses.\n", data.Name, data.NameLower))
