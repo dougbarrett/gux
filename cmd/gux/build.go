@@ -2383,7 +2383,7 @@ func generateBundleWasmEntryPoint(bundleName string, bundle *BundleInfo, apiImpo
 			if len(href) >= len(origin) && href[:len(origin)] == origin {
 				link.Call("addEventListener", "click", js.FuncOf(func(this js.Value, args []js.Value) any {
 					args[0].Call("preventDefault")
-					path := this.Get("pathname").String()
+					path := this.Get("pathname").String() + this.Get("search").String()
 					// Check if link opts out of scroll-to-top
 					if this.Call("getAttribute", "data-gux-preserve-scroll").String() == "true" {
 						scrollAfterNavigate = false
@@ -2502,7 +2502,7 @@ func fetchLoader(path string, callback func(map[string]any)) {
 			if len(href) >= len(origin) && href[:len(origin)] == origin {
 				link.Call("addEventListener", "click", js.FuncOf(func(this js.Value, args []js.Value) any {
 					args[0].Call("preventDefault")
-					path := this.Get("pathname").String()
+					path := this.Get("pathname").String() + this.Get("search").String()
 					// Check if link opts out of scroll-to-top
 					if this.Call("getAttribute", "data-gux-preserve-scroll").String() == "true" {
 						scrollAfterNavigate = false
@@ -2544,7 +2544,7 @@ func fetchLoader(path string, callback func(map[string]any)) {
 		// Clear page-specific state for browser history navigation
 		router.ClearState()
 		// Fetch fresh data for the new/previous page
-		path := window.Get("location").Get("pathname").String()
+		path := window.Get("location").Get("pathname").String() + window.Get("location").Get("search").String()
 		fetchLoader(path, func(state map[string]any) {
 			if state != nil {
 				router.Hydrate(state)
@@ -2610,6 +2610,10 @@ func extractRouteParam(path, prefix, suffix string) string {
 // isRouteInBundle checks if a path matches any route pattern in this bundle.
 // Returns true if the path should be handled by this bundle's router.
 func isRouteInBundle(path string) bool {
+	// Strip query string for route matching
+	if idx := strings.Index(path, "?"); idx != -1 {
+		path = path[:idx]
+	}
 	for _, pattern := range bundleRoutePatterns {
 		if pattern.exact != "" {
 			// Exact match
@@ -2645,12 +2649,14 @@ func main() {
 	// loadPage creates the page component for the current path
 	// Called on navigation and initial load, NOT on state-triggered re-renders
 	loadPage := func() {
-		path := js.Global().Get("location").Get("pathname").String()
+		fullPath := js.Global().Get("location").Get("pathname").String() + js.Global().Get("location").Get("search").String()
 		// Only reload component if path changed (handles state-triggered re-renders)
-		if currentComponent != nil && path == currentPath {
+		if currentComponent != nil && fullPath == currentPath {
 			return
 		}
-		currentPath = path
+		currentPath = fullPath
+		// Use pathname only for route matching (query params don't affect component selection)
+		path := js.Global().Get("location").Get("pathname").String()
 %s
 		currentComponent = component
 	}

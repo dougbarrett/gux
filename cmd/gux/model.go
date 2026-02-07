@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -49,22 +50,24 @@ type ModelField struct {
 	Accept     string         `json:"accept,omitempty"`     // Allowed MIME patterns (e.g., "image/*") for file fields
 	MaxSize    string         `json:"maxSize,omitempty"`    // Max file size (e.g., "5MB") for file fields
 	Directory  string         `json:"directory,omitempty"`  // Upload subdirectory (e.g., "avatars") for file fields
+	Format     string         `json:"format,omitempty"`     // Display format: "currency", "percent", "number"
 	Section    string         `json:"-"`                    // Form section (set during parsing)
 }
 
 // ModelDefinition represents a complete model configuration
 type ModelDefinition struct {
-	Name        string                  `json:"-"`                      // Model name (from map key)
-	Preset      string                  `json:"preset,omitempty"`       // Preset: "auth" for authentication models
-	Display     string                  `json:"display,omitempty"`      // Display field name (for Brief DTOs and relation labels)
-	Sections    map[string][]ModelField `json:"sections"`               // Fields grouped by section
-	Preloads    []string                `json:"preloads,omitempty"`     // Relations to preload
-	Public      bool                    `json:"public,omitempty"`       // CRUD is public (no auth)
-	Roles       []string                `json:"roles,omitempty"`        // Required roles for CRUD
-	FormLayout  string                  `json:"formLayout,omitempty"`   // Form layout: "stacked" (default) or "grid"
-	Parent      string                  `json:"parent,omitempty"`       // Parent model name for inline management (e.g., "Order")
-	ParentField string                  `json:"parentField,omitempty"`  // FK field to parent (e.g., "OrderID")
-	Sidebar     *bool                   `json:"sidebar,omitempty"`      // Show in sidebar (defaults to true, set false to hide)
+	Name         string                  `json:"-"`                      // Model name (from map key)
+	Preset       string                  `json:"preset,omitempty"`       // Preset: "auth" for authentication models
+	Display      string                  `json:"display,omitempty"`      // Display field name (for Brief DTOs and relation labels)
+	Sections     map[string][]ModelField `json:"sections"`               // Fields grouped by section
+	SectionOrder []string                `json:"-"`                      // Section key order (parsed separately to preserve JSON order)
+	Preloads     []string                `json:"preloads,omitempty"`     // Relations to preload
+	Public       bool                    `json:"public,omitempty"`       // CRUD is public (no auth)
+	Roles        []string                `json:"roles,omitempty"`        // Required roles for CRUD
+	FormLayout   string                  `json:"formLayout,omitempty"`   // Form layout: "stacked" (default) or "grid"
+	Parent       string                  `json:"parent,omitempty"`       // Parent model name for inline management (e.g., "Order")
+	ParentField  string                  `json:"parentField,omitempty"`  // FK field to parent (e.g., "OrderID")
+	Sidebar      *bool                   `json:"sidebar,omitempty"`      // Show in sidebar (defaults to true, set false to hide)
 }
 
 // OptionSet defines a reusable set of select options
@@ -90,13 +93,112 @@ func LoadModelsConfig(dir string) (*ModelsConfig, error) {
 		return nil, err
 	}
 
-	// Set model names from map keys
+	// Parse section order from JSON (maps don't preserve insertion order)
+	sectionOrders := parseSectionOrders(data)
+
+	// Set model names from map keys and apply section order
 	for name, model := range config.Models {
 		model.Name = name
+		if order, ok := sectionOrders[name]; ok {
+			model.SectionOrder = order
+		} else {
+			// Fallback: use map key order (non-deterministic but better than nothing)
+			for sectionName := range model.Sections {
+				model.SectionOrder = append(model.SectionOrder, sectionName)
+			}
+		}
 		config.Models[name] = model
 	}
 
 	return &config, nil
+}
+
+// parseSectionOrders extracts section key ordering from raw JSON for each model.
+// This preserves the JSON declaration order that json.Unmarshal into maps loses.
+func parseSectionOrders(data []byte) map[string][]string {
+	result := make(map[string][]string)
+
+	// Parse top-level to find "models" key
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return result
+	}
+	modelsRaw, ok := raw["models"]
+	if !ok {
+		return result
+	}
+
+	// Parse models object to get each model's raw JSON
+	var modelsMap map[string]json.RawMessage
+	if err := json.Unmarshal(modelsRaw, &modelsMap); err != nil {
+		return result
+	}
+
+	for modelName, modelRaw := range modelsMap {
+		// Parse each model to find "sections" key
+		var modelMap map[string]json.RawMessage
+		if err := json.Unmarshal(modelRaw, &modelMap); err != nil {
+			continue
+		}
+		sectionsRaw, ok := modelMap["sections"]
+		if !ok {
+			continue
+		}
+
+		// Use json.Decoder to extract section keys in order
+		order := extractObjectKeyOrder(sectionsRaw)
+		if len(order) > 0 {
+			result[modelName] = order
+		}
+	}
+
+	return result
+}
+
+// extractObjectKeyOrder returns the keys of a JSON object in their declaration order.
+func extractObjectKeyOrder(data json.RawMessage) []string {
+	dec := json.NewDecoder(bytes.NewReader(data))
+	// Read opening brace
+	t, err := dec.Token()
+	if err != nil {
+		return nil
+	}
+	if delim, ok := t.(json.Delim); !ok || delim != '{' {
+		return nil
+	}
+
+	var keys []string
+	depth := 0
+	for dec.More() {
+		t, err := dec.Token()
+		if err != nil {
+			break
+		}
+		if depth == 0 {
+			// At top level, tokens alternate between keys and values
+			if key, ok := t.(string); ok {
+				keys = append(keys, key)
+				// Skip the value (which may be a nested object/array)
+				// We need to consume the entire value
+				var skip json.RawMessage
+				if err := dec.Decode(&skip); err != nil {
+					break
+				}
+			}
+		} else {
+			// Track nested depth
+			if delim, ok := t.(json.Delim); ok {
+				switch delim {
+				case '{', '[':
+					depth++
+				case '}', ']':
+					depth--
+				}
+			}
+		}
+	}
+
+	return keys
 }
 
 // SaveModelsConfig saves model definitions to gux.config.json
@@ -134,11 +236,95 @@ func SaveModelsConfig(dir string, modelsConfig *ModelsConfig) error {
 	return os.WriteFile(configPath, data, 0644)
 }
 
+// MarshalJSON implements custom JSON marshaling to preserve section order.
+func (m ModelDefinition) MarshalJSON() ([]byte, error) {
+	// Build an ordered map-like structure using json.RawMessage
+	var buf bytes.Buffer
+	buf.WriteByte('{')
+	first := true
+
+	writeField := func(key string, val any) error {
+		if !first {
+			buf.WriteByte(',')
+		}
+		first = false
+		keyJSON, _ := json.Marshal(key)
+		buf.Write(keyJSON)
+		buf.WriteByte(':')
+		valJSON, err := json.Marshal(val)
+		if err != nil {
+			return err
+		}
+		buf.Write(valJSON)
+		return nil
+	}
+
+	if m.Preset != "" {
+		writeField("preset", m.Preset)
+	}
+	if m.Display != "" {
+		writeField("display", m.Display)
+	}
+	if m.Parent != "" {
+		writeField("parent", m.Parent)
+	}
+	if m.ParentField != "" {
+		writeField("parentField", m.ParentField)
+	}
+	if m.Sidebar != nil {
+		writeField("sidebar", *m.Sidebar)
+	}
+	if m.Public {
+		writeField("public", m.Public)
+	}
+	if len(m.Roles) > 0 {
+		writeField("roles", m.Roles)
+	}
+	if m.FormLayout != "" {
+		writeField("formLayout", m.FormLayout)
+	}
+	if len(m.Preloads) > 0 {
+		writeField("preloads", m.Preloads)
+	}
+
+	// Write sections in order
+	if len(m.Sections) > 0 {
+		if !first {
+			buf.WriteByte(',')
+		}
+		first = false
+		buf.WriteString(`"sections":{`)
+		sectionFirst := true
+		for _, sectionName := range m.orderedSectionNames() {
+			fields, ok := m.Sections[sectionName]
+			if !ok {
+				continue
+			}
+			if !sectionFirst {
+				buf.WriteByte(',')
+			}
+			sectionFirst = false
+			keyJSON, _ := json.Marshal(sectionName)
+			buf.Write(keyJSON)
+			buf.WriteByte(':')
+			fieldsJSON, err := json.Marshal(fields)
+			if err != nil {
+				return nil, err
+			}
+			buf.Write(fieldsJSON)
+		}
+		buf.WriteByte('}')
+	}
+
+	buf.WriteByte('}')
+	return buf.Bytes(), nil
+}
+
 // GetAllFields returns all fields from all sections in order
 func (m *ModelDefinition) GetAllFields() []ModelField {
 	var fields []ModelField
-	for sectionName, sectionFields := range m.Sections {
-		for _, field := range sectionFields {
+	for _, sectionName := range m.orderedSectionNames() {
+		for _, field := range m.Sections[sectionName] {
 			field.Section = sectionName
 			fields = append(fields, field)
 		}
@@ -146,11 +332,24 @@ func (m *ModelDefinition) GetAllFields() []ModelField {
 	return fields
 }
 
+// orderedSectionNames returns section names in their configured order.
+// Uses SectionOrder if available, otherwise falls back to map iteration order.
+func (m *ModelDefinition) orderedSectionNames() []string {
+	if len(m.SectionOrder) > 0 {
+		return m.SectionOrder
+	}
+	var names []string
+	for name := range m.Sections {
+		names = append(names, name)
+	}
+	return names
+}
+
 // GetTableFields returns fields marked for table display, sorted by priority
 func (m *ModelDefinition) GetTableFields() []ModelField {
 	var tableFields []ModelField
-	for sectionName, sectionFields := range m.Sections {
-		for _, field := range sectionFields {
+	for _, sectionName := range m.orderedSectionNames() {
+		for _, field := range m.Sections[sectionName] {
 			if field.Table {
 				field.Section = sectionName
 				tableFields = append(tableFields, field)

@@ -340,7 +340,7 @@ func {{$.Name}}Cell{{.Name}}(item dto.{{$.Name}}List) core.Node {
 {{- if .IsRelation}}
 	text := "-"
 	if item.{{.DTOFieldName}} != nil {
-		text = item.{{.DTOFieldName}}.{{.RelationDisplayField}}
+		text = item.{{.DTOFieldName}}.Display()
 	}
 	return tableCell{{$.Name}}(text)
 {{- else if .IsBool}}
@@ -448,6 +448,14 @@ func {{$.Name}}Cell{{.Name}}(item dto.{{$.Name}}List) core.Node {
 		),
 	)
 {{- end}}
+{{- else if .Format}}
+	{{- if eq .Format "currency"}}
+	return tableCell{{$.Name}}({{if .IsPointer}}formatCurrencyPtr(item.{{.DTOFieldName}}){{else}}formatCurrency(item.{{.DTOFieldName}}){{end}})
+	{{- else if eq .Format "percent"}}
+	return tableCell{{$.Name}}({{if .IsPointer}}formatPercentPtr(item.{{.DTOFieldName}}){{else}}formatPercent(item.{{.DTOFieldName}}){{end}})
+	{{- else if eq .Format "number"}}
+	return tableCell{{$.Name}}({{if .IsPointer}}formatNumberPtr(item.{{.DTOFieldName}}){{else}}formatNumber(item.{{.DTOFieldName}}){{end}})
+	{{- end}}
 {{- else}}
 	return tableCell{{$.Name}}({{if eq .Type "int" "uint" "float64"}}fmt.Sprintf("%v", item.{{.DTOFieldName}}){{else if .IsPointer}}func() string { if item.{{.DTOFieldName}} != nil { return fmt.Sprintf("%v", *item.{{.DTOFieldName}}) }; return "" }(){{else}}item.{{.DTOFieldName}}{{end}})
 {{- end}}
@@ -581,8 +589,12 @@ func {{.Name}}New(r *core.Router) func() core.Node {
 			}
 {{end}}
 			data := map[string]any{
-{{range .AllFields}}				"{{.JSONName}}": {{.DataValue}},
-{{end}}			}
+{{range .AllFields}}{{if not .IsTime}}				"{{.JSONName}}": {{.DataValue}},
+{{end}}{{end}}			}
+{{range .AllFields}}{{if .IsTime}}			if {{.StateVar}}.Get() != "" {
+				data["{{.JSONName}}"] = {{.DataValue}}
+			}
+{{end}}{{end}}
 {{- if .ParentField}}
 			// Override parent FK if pre-filled from query param
 			if parentFKFromQuery != "" {
@@ -608,7 +620,6 @@ func {{.Name}}New(r *core.Router) func() core.Node {
 					if {{.Name}}AfterSave != nil {
 						{{.Name}}AfterSave(HookContext{Router: r}, result.ID, false)
 					}
-					successState.Set("{{.NameDisplay}} created successfully!")
 {{- if .ParentField}}
 					// Navigate back to parent detail if FK was pre-filled
 					if parentFKFromQuery != "" {
@@ -718,8 +729,7 @@ func {{.Name}}New(r *core.Router) func() core.Node {
 	}
 }
 
-func {{.NameLower}}FormField(label, inputType, name, value string, onChange func(string), onEnter ...func()) core.Node {
-{{- if .AdminEnabled}}
+func {{.NameLower}}FormField(label, inputType, name, value string, required bool, onChange func(string), onEnter ...func()) core.Node {
 	attrs := core.Attrs{
 		Type:     inputType,
 		Name:     name,
@@ -730,30 +740,16 @@ func {{.NameLower}}FormField(label, inputType, name, value string, onChange func
 	if len(onEnter) > 0 {
 		attrs.OnEnter = onEnter[0]
 	}
-	return core.Div(core.Class("mb-4"),
-		core.Label(core.Class("block text-gray-700 dark:text-gray-300 text-sm font-medium mb-2"),
-			core.Text(label),
-		),
-		core.Input(attrs),
-	)
-{{- else}}
-	attrs := core.Attrs{
-		Type:     inputType,
-		Name:     name,
-		Value:    value,
-		Class:    "w-full px-4 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:border-blue-500",
-		OnChange: onChange,
-	}
-	if len(onEnter) > 0 {
-		attrs.OnEnter = onEnter[0]
+	labelChildren := []core.Node{core.Text(label)}
+	if required {
+		labelChildren = append(labelChildren, core.Span(core.Class("text-red-500 ml-1"), core.Text("*")))
 	}
 	return core.Div(core.Class("mb-4"),
 		core.Label(core.Class("block text-gray-700 dark:text-gray-300 text-sm font-medium mb-2"),
-			core.Text(label),
+			labelChildren...,
 		),
 		core.Input(attrs),
 	)
-{{- end}}
 }
 `,
 
@@ -1032,7 +1028,7 @@ func {{.Name}}Detail(r *core.Router) func() core.Node {
 											core.Td(core.Class("px-6 py-4 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300"), core.Text(fmt.Sprintf("%d", child.ID))),
 {{- range .TableFields}}
 {{- if .IsRelation}}
-											core.Td(core.Class("px-6 py-4 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300"), core.Text(func() string { if child.{{.DTOFieldName}} != nil { return child.{{.DTOFieldName}}.{{.RelationDisplayField}} }; return "" }())),
+											core.Td(core.Class("px-6 py-4 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300"), core.Text(func() string { if child.{{.DTOFieldName}} != nil { return child.{{.DTOFieldName}}.Display() }; return "" }())),
 {{- else}}
 											core.Td(core.Class("px-6 py-4 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300"), core.Text(fmt.Sprintf("%v", child.{{.Name}}))),
 {{- end}}
@@ -1284,8 +1280,12 @@ func {{.Name}}Edit(r *core.Router) func() core.Node {
 			}
 {{end}}
 			data := map[string]any{
-{{range .AllFields}}				"{{.JSONName}}": {{.DataValue}},
-{{end}}			}
+{{range .AllFields}}{{if not .IsTime}}				"{{.JSONName}}": {{.DataValue}},
+{{end}}{{end}}			}
+{{range .AllFields}}{{if .IsTime}}			if {{.StateVar}}.Get() != "" {
+				data["{{.JSONName}}"] = {{.DataValue}}
+			}
+{{end}}{{end}}
 
 			// Call BeforeSave hook if set
 			if {{.Name}}BeforeSave != nil {
@@ -1303,7 +1303,6 @@ func {{.Name}}Edit(r *core.Router) func() core.Node {
 					if {{.Name}}AfterSave != nil {
 						{{.Name}}AfterSave(HookContext{Router: r}, result.ID, true)
 					}
-					successState.Set("{{.NameDisplay}} updated successfully!")
 					r.Navigate(fmt.Sprintf("/admin/{{.RoutePlural}}/%d", displayItem.ID))
 				}
 			})
@@ -1391,8 +1390,12 @@ func {{.Name}}Edit(r *core.Router) func() core.Node {
 			}
 {{end}}
 			data := map[string]any{
-{{range .AllFields}}				"{{.JSONName}}": {{.DataValue}},
-{{end}}			}
+{{range .AllFields}}{{if not .IsTime}}				"{{.JSONName}}": {{.DataValue}},
+{{end}}{{end}}			}
+{{range .AllFields}}{{if .IsTime}}			if {{.StateVar}}.Get() != "" {
+				data["{{.JSONName}}"] = {{.DataValue}}
+			}
+{{end}}{{end}}
 
 			// Call BeforeSave hook if set
 			if {{.Name}}BeforeSave != nil {
@@ -1410,7 +1413,6 @@ func {{.Name}}Edit(r *core.Router) func() core.Node {
 					if {{.Name}}AfterSave != nil {
 						{{.Name}}AfterSave(HookContext{Router: r}, result.ID, true)
 					}
-					successState.Set("{{.NameDisplay}} updated successfully!")
 					r.Navigate(fmt.Sprintf("/admin/{{.RoutePlural}}/%d", displayItem.ID))
 				}
 			})
@@ -1517,6 +1519,8 @@ type AfterSaveHook func(ctx HookContext, id uint, isEdit bool)
 package admin
 
 import (
+	"fmt"
+	"math"
 	"strconv"
 	"time"
 )
@@ -1540,21 +1544,33 @@ func parseUintPtr(s string) *uint {
 	return &u
 }
 
-// parseTime converts a date string (YYYY-MM-DD) to time.Time, returning zero time for empty strings
+// parseTime converts a date string (YYYY-MM-DD or RFC3339) to time.Time, returning zero time for empty strings
 func parseTime(s string) time.Time {
 	if s == "" {
 		return time.Time{}
 	}
-	t, _ := time.Parse("2006-01-02", s)
+	t, err := time.Parse("2006-01-02", s)
+	if err != nil {
+		t, err = time.Parse(time.RFC3339, s)
+		if err != nil {
+			return time.Time{}
+		}
+	}
 	return t
 }
 
-// parseTimePtr converts a date string (YYYY-MM-DD) to *time.Time, returning nil for empty strings
+// parseTimePtr converts a date string (YYYY-MM-DD or RFC3339) to *time.Time, returning nil for empty strings
 func parseTimePtr(s string) *time.Time {
 	if s == "" {
 		return nil
 	}
-	t, _ := time.Parse("2006-01-02", s)
+	t, err := time.Parse("2006-01-02", s)
+	if err != nil {
+		t, err = time.Parse(time.RFC3339, s)
+		if err != nil {
+			return nil
+		}
+	}
 	return &t
 }
 
@@ -1582,6 +1598,93 @@ func parseStringPtr(s string) *string {
 		return nil
 	}
 	return &s
+}
+
+// formatCurrency formats a float64 as a currency string (e.g., "$1,234.56")
+func formatCurrency(v float64) string {
+	negative := v < 0
+	if negative {
+		v = -v
+	}
+	v = math.Round(v*100) / 100
+	whole := int64(v)
+	frac := int64(math.Round((v - float64(whole)) * 100))
+	s := formatWithCommas(whole)
+	prefix := "$"
+	if negative {
+		prefix = "-$"
+	}
+	return fmt.Sprintf("%s%s.%02d", prefix, s, frac)
+}
+
+// formatPercent formats a float64 as a percentage string (e.g., "12.5%")
+func formatPercent(v float64) string {
+	return fmt.Sprintf("%.1f%%", v)
+}
+
+// formatNumber formats a float64 with commas (e.g., "1,234" or "1,234.56")
+func formatNumber(v float64) string {
+	if v == float64(int64(v)) {
+		return formatWithCommas(int64(v))
+	}
+	negative := v < 0
+	if negative {
+		v = -v
+	}
+	whole := int64(v)
+	frac := v - float64(whole)
+	fracStr := strconv.FormatFloat(frac, 'f', -1, 64)
+	if len(fracStr) > 1 {
+		fracStr = fracStr[1:] // Remove leading "0"
+	}
+	result := formatWithCommas(whole) + fracStr
+	if negative {
+		return "-" + result
+	}
+	return result
+}
+
+// formatWithCommas adds comma separators to an integer
+func formatWithCommas(n int64) string {
+	if n < 0 {
+		return "-" + formatWithCommas(-n)
+	}
+	s := strconv.FormatInt(n, 10)
+	if len(s) <= 3 {
+		return s
+	}
+	var result []byte
+	for i, ch := range s {
+		if i > 0 && (len(s)-i)%3 == 0 {
+			result = append(result, ',')
+		}
+		result = append(result, byte(ch))
+	}
+	return string(result)
+}
+
+// formatCurrencyPtr formats a *float64 as currency, returning "-" for nil
+func formatCurrencyPtr(v *float64) string {
+	if v == nil {
+		return "-"
+	}
+	return formatCurrency(*v)
+}
+
+// formatPercentPtr formats a *float64 as percentage, returning "-" for nil
+func formatPercentPtr(v *float64) string {
+	if v == nil {
+		return "-"
+	}
+	return formatPercent(*v)
+}
+
+// formatNumberPtr formats a *float64 with commas, returning "-" for nil
+func formatNumberPtr(v *float64) string {
+	if v == nil {
+		return "-"
+	}
+	return formatNumber(*v)
 }
 `,
 
@@ -1677,6 +1780,8 @@ type TemplateField struct {
 	FileMaxSize          int64  // MaxSize in bytes (parsed at gen time)
 	FileDir              string // Upload directory from config
 	FormOnly             bool   // True for virtual fields that only appear in forms (e.g., password)
+	Required             bool   // True if the field is required
+	Format               string // Display format: "currency", "percent", "number"
 	Badge                *BadgeConfig
 }
 
@@ -2075,8 +2180,9 @@ func prepareModelTemplateData(model *ModelDefinition, modulePath string, display
 		}
 	}
 
-	// Process sections and fields
-	for sectionName, fields := range model.Sections {
+	// Process sections and fields (in declared order)
+	for _, sectionName := range model.orderedSectionNames() {
+		fields := model.Sections[sectionName]
 		var sectionFields []TemplateField
 
 		for _, field := range fields {
@@ -2208,6 +2314,8 @@ func convertToTemplateField(field *ModelField, modelName string, displayFields m
 		DTOFieldName: field.Name, // Default to Name, overwritten for relations
 		JSONName:     ToSnakeCase(field.Name),
 		Label:        getLabel(*field),
+		Required:     field.Required,
+		Format:       field.Format,
 		IsRelation:   field.Relation != "",
 		IsBool:       field.Type == "bool",
 		IsTime:       field.Type == "time.Time" || field.Type == "*time.Time",
@@ -2473,12 +2581,17 @@ func generateFormFieldCode(field *ModelField, tf TemplateField, modelNameLower s
 		if tf.FileDir != "" {
 			uploadURL = fmt.Sprintf(`"/__gux_api/upload?dir=%s"`, tf.FileDir)
 		}
+		requiredLabelSuffix := ""
+		if tf.Required {
+			requiredLabelSuffix = `
+		core.Span(core.Class("text-red-500 ml-1"), core.Text("*")),`
+		}
 		fileUploadCode := fmt.Sprintf(`core.Div(core.Class("%s"),
 	core.Label(core.Class("block text-gray-700 dark:text-gray-300 text-sm font-medium mb-2"),
-		core.Text("%s"),
+		core.Text("%s"),%s
 	),
 	ui.FileUpload(ui.FileUploadProps{
-		UploadURL: %s,`, wrapperClass, tf.Label, uploadURL)
+		UploadURL: %s,`, wrapperClass, tf.Label, requiredLabelSuffix, uploadURL)
 		if tf.FileAccept != "" {
 			fileUploadCode += fmt.Sprintf(`
 		Accept: []string{"%s"},`, tf.FileAccept)
@@ -2511,9 +2624,14 @@ func generateFormFieldCode(field *ModelField, tf TemplateField, modelNameLower s
 		if tf.FileDir != "" {
 			uploadURL = fmt.Sprintf(`"/__gux_api/upload?dir=%s"`, tf.FileDir)
 		}
+		requiredLabelSuffix := ""
+		if tf.Required {
+			requiredLabelSuffix = `
+		core.Span(core.Class("text-red-500 ml-1"), core.Text("*")),`
+		}
 		multiFileCode := fmt.Sprintf(`core.Div(core.Class("%s"),
 	core.Label(core.Class("block text-gray-700 dark:text-gray-300 text-sm font-medium mb-2"),
-		core.Text("%s"),
+		core.Text("%s"),%s
 	),
 	func() core.Node {
 		var keys []string
@@ -2526,7 +2644,7 @@ func generateFormFieldCode(field *ModelField, tf TemplateField, modelNameLower s
 		}
 		return ui.MultiFileUpload(ui.MultiFileUploadProps{
 			Values: urls,
-			UploadURL: %s,`, wrapperClass, tf.Label, tf.StateVar, tf.StateVar, uploadURL)
+			UploadURL: %s,`, wrapperClass, tf.Label, requiredLabelSuffix, tf.StateVar, tf.StateVar, uploadURL)
 		if tf.FileAccept != "" {
 			multiFileCode += fmt.Sprintf(`
 			Accept: []string{"%s"},`, tf.FileAccept)
@@ -2561,9 +2679,13 @@ func generateFormFieldCode(field *ModelField, tf TemplateField, modelNameLower s
 		buf.WriteString(indent + multiFileCode)
 
 	case field.Input == "textarea":
+		requiredIndicator := ""
+		if tf.Required {
+			requiredIndicator = fmt.Sprintf("\n%s		core.Span(core.Class(\"text-red-500 ml-1\"), core.Text(\"*\")),", indent)
+		}
 		buf.WriteString(fmt.Sprintf(`%score.Div(core.Class("%s"),
 %s	core.Label(core.Class("block text-gray-700 dark:text-gray-300 text-sm font-medium mb-2"),
-%s		core.Text("%s"),
+%s		core.Text("%s"),%s
 %s	),
 %s	core.Textarea(core.Attrs{
 %s		Name:     "%s",
@@ -2572,13 +2694,17 @@ func generateFormFieldCode(field *ModelField, tf TemplateField, modelNameLower s
 %s		OnChange: func(v string) { %s.Set(v) },
 %s	}),
 %s),
-`, indent, wrapperClass, indent, indent, tf.Label, indent, indent, indent, tf.StateName, indent, tf.StateVar, indent, indent, tf.StateVar, indent, indent))
+`, indent, wrapperClass, indent, indent, tf.Label, requiredIndicator, indent, indent, indent, tf.StateName, indent, tf.StateVar, indent, indent, tf.StateVar, indent, indent))
 
 	case field.Input == "select" || ((field.Type == "*uint" || field.Type == "uint") && field.Relation != ""):
 		// Select dropdown
+		requiredIndicator := ""
+		if tf.Required {
+			requiredIndicator = fmt.Sprintf("\n%s		core.Span(core.Class(\"text-red-500 ml-1\"), core.Text(\"*\")),", indent)
+		}
 		buf.WriteString(fmt.Sprintf(`%score.Div(core.Class("%s"),
 %s	core.Label(core.Class("block text-gray-700 dark:text-gray-300 text-sm font-medium mb-2"),
-%s		core.Text("%s"),
+%s		core.Text("%s"),%s
 %s	),
 %s	core.Select(
 %s		core.Attrs{
@@ -2586,7 +2712,7 @@ func generateFormFieldCode(field *ModelField, tf TemplateField, modelNameLower s
 %s			Class: "w-full px-4 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:border-blue-500",
 %s			OnChange: func(v string) { %s.Set(v) },
 %s		},
-`, indent, wrapperClass, indent, indent, tf.Label, indent, indent, indent, indent, tf.StateName, indent, indent, tf.StateVar, indent))
+`, indent, wrapperClass, indent, indent, tf.Label, requiredIndicator, indent, indent, indent, indent, tf.StateName, indent, indent, tf.StateVar, indent))
 
 		if field.Relation != "" {
 			// Dynamic options from relation - generate inline by building slice
@@ -2599,11 +2725,11 @@ func generateFormFieldCode(field *ModelField, tf TemplateField, modelNameLower s
 %s				if idStr == %s.Get() {
 %s					attrs.Extra = map[string]string{"selected": "selected"}
 %s				}
-%s				opts = append(opts, core.Option(attrs, core.Text(item.%s)))
+%s				opts = append(opts, core.Option(attrs, core.Text(item.Display())))
 %s			}
 %s			return opts
 %s		}()...,
-`, indent, indent, tf.Label, indent, varName, indent, indent, indent, tf.StateVar, indent, indent, indent, tf.RelationDisplayField, indent, indent, indent))
+`, indent, indent, tf.Label, indent, varName, indent, indent, indent, tf.StateVar, indent, indent, indent, indent, indent, indent))
 		} else {
 			// Static options
 			for _, opt := range field.Options {
@@ -2653,8 +2779,8 @@ func generateFormFieldCode(field *ModelField, tf TemplateField, modelNameLower s
 			inputType = "password"
 		}
 
-		buf.WriteString(fmt.Sprintf(`%s%sFormField("%s", "%s", "%s", %s.Get(), func(v string) { %s.Set(v) }, save),
-`, indent, modelNameLower, tf.Label, inputType, tf.StateName, tf.StateVar, tf.StateVar))
+		buf.WriteString(fmt.Sprintf(`%s%sFormField("%s", "%s", "%s", %s.Get(), %t, func(v string) { %s.Set(v) }, save),
+`, indent, modelNameLower, tf.Label, inputType, tf.StateName, tf.StateVar, tf.Required, tf.StateVar))
 	}
 
 	return buf.String()
@@ -2742,19 +2868,15 @@ func generateDetailFieldCode(field *ModelField, tf TemplateField, modelNameLower
 		return indent + multiFileDetailCode
 
 	case field.Relation != "" && !IsSliceType(field.Type):
-		// FK relation - show related display field with nil check
+		// FK relation - show related display using Display() method
 		preloadName := strings.TrimSuffix(field.Name, "ID")
-		displayField := tf.RelationDisplayField
-		if displayField == "" {
-			displayField = "Name" // Fallback
-		}
 		return fmt.Sprintf(`%s%sDetailRow("%s", func() string {
 %s	if displayItem.%s != nil {
-%s		return displayItem.%s.%s
+%s		return displayItem.%s.Display()
 %s	}
 %s	return "-"
 %s}()),
-`, indent, modelNameLower, tf.Label, indent, preloadName, indent, preloadName, displayField, indent, indent, indent)
+`, indent, modelNameLower, tf.Label, indent, preloadName, indent, preloadName, indent, indent, indent)
 
 	case field.Type == "bool":
 		return fmt.Sprintf(`%s%sDetailRow("%s", func() string {
@@ -2778,10 +2900,36 @@ func generateDetailFieldCode(field *ModelField, tf TemplateField, modelNameLower
 `, indent, modelNameLower, tf.Label, tf.DTOFieldName, tf.DTOFieldName)
 
 	case field.Type == "*float64":
+		if tf.Format != "" {
+			switch tf.Format {
+			case "currency":
+				return fmt.Sprintf(`%s%sDetailRow("%s", formatCurrencyPtr(displayItem.%s)),
+`, indent, modelNameLower, tf.Label, tf.DTOFieldName)
+			case "percent":
+				return fmt.Sprintf(`%s%sDetailRow("%s", formatPercentPtr(displayItem.%s)),
+`, indent, modelNameLower, tf.Label, tf.DTOFieldName)
+			case "number":
+				return fmt.Sprintf(`%s%sDetailRow("%s", formatNumberPtr(displayItem.%s)),
+`, indent, modelNameLower, tf.Label, tf.DTOFieldName)
+			}
+		}
 		return fmt.Sprintf(`%s%sDetailRow("%s", func() string { if displayItem.%s != nil { return fmt.Sprintf("%%v", *displayItem.%s) }; return "-" }()),
 `, indent, modelNameLower, tf.Label, tf.DTOFieldName, tf.DTOFieldName)
 
 	default:
+		if tf.Format != "" {
+			switch tf.Format {
+			case "currency":
+				return fmt.Sprintf(`%s%sDetailRow("%s", formatCurrency(displayItem.%s)),
+`, indent, modelNameLower, tf.Label, tf.DTOFieldName)
+			case "percent":
+				return fmt.Sprintf(`%s%sDetailRow("%s", formatPercent(displayItem.%s)),
+`, indent, modelNameLower, tf.Label, tf.DTOFieldName)
+			case "number":
+				return fmt.Sprintf(`%s%sDetailRow("%s", formatNumber(displayItem.%s)),
+`, indent, modelNameLower, tf.Label, tf.DTOFieldName)
+			}
+		}
 		if field.Type == "int" || field.Type == "uint" || field.Type == "float64" {
 			return fmt.Sprintf(`%s%sDetailRow("%s", fmt.Sprintf("%%v", displayItem.%s)),
 `, indent, modelNameLower, tf.Label, tf.DTOFieldName)
@@ -2870,8 +3018,45 @@ func generateDTOFile(path string, data *ModelTemplateData) error {
 
 // BriefDTOInfo holds information needed to generate a Brief DTO
 type BriefDTOInfo struct {
-	Model        string
-	DisplayField string
+	Model         string
+	DisplayField  string   // Single display field (backwards compat)
+	DisplayFields []string // Multiple display fields (from template like "{{FirstName}} {{LastName}}")
+	DisplayFormat string   // Template format string (e.g., "{{FirstName}} {{LastName}}")
+}
+
+// extractDisplayFields returns field names from a display template like "{{FirstName}} {{LastName}}"
+// For simple field names like "Name", returns ["Name"].
+func extractDisplayFields(display string) []string {
+	if display == "" {
+		return nil
+	}
+	// Check if it's a template string (contains {{ }})
+	if !strings.Contains(display, "{{") {
+		return []string{display}
+	}
+	var fields []string
+	remaining := display
+	for {
+		start := strings.Index(remaining, "{{")
+		if start == -1 {
+			break
+		}
+		end := strings.Index(remaining[start:], "}}")
+		if end == -1 {
+			break
+		}
+		field := strings.TrimSpace(remaining[start+2 : start+end])
+		if field != "" {
+			fields = append(fields, field)
+		}
+		remaining = remaining[start+end+2:]
+	}
+	return fields
+}
+
+// isDisplayTemplate returns true if the display string is a template (contains {{ }})
+func isDisplayTemplate(display string) bool {
+	return strings.Contains(display, "{{")
 }
 
 // GenerateSharedBriefsFile generates guxgen/dto/briefs_gen.go with all Brief DTOs
@@ -2902,6 +3087,7 @@ func GenerateSharedBriefsFile(briefs map[string]BriefDTOInfo) error {
 	sort.Strings(models)
 
 	generated := 0
+	needsStrings := false
 	for _, model := range models {
 		briefTypeName := model + "Brief"
 		if existingTypes[briefTypeName] {
@@ -2909,17 +3095,81 @@ func GenerateSharedBriefsFile(briefs map[string]BriefDTOInfo) error {
 		}
 
 		info := briefs[model]
-		displayField := info.DisplayField
-		if displayField == "" {
-			displayField = "Name"
+		displayFields := info.DisplayFields
+		if len(displayFields) == 0 {
+			// Backwards compat: single display field
+			df := info.DisplayField
+			if df == "" {
+				df = "Name"
+			}
+			displayFields = []string{df}
 		}
 
 		buf.WriteString(fmt.Sprintf("// %sBrief is a simplified %s DTO for embedding.\n", model, strings.ToLower(model)))
 		buf.WriteString(fmt.Sprintf("type %sBrief struct {\n", model))
 		buf.WriteString(fmt.Sprintf("\tID   uint   `json:\"id\" gux:\"%s.ID\"`\n", model))
-		buf.WriteString(fmt.Sprintf("\t%s string `json:\"%s\" gux:\"%s.%s\"`\n", displayField, ToSnakeCase(displayField), model, displayField))
+		for _, df := range displayFields {
+			buf.WriteString(fmt.Sprintf("\t%s string `json:\"%s\" gux:\"%s.%s\"`\n", df, ToSnakeCase(df), model, df))
+		}
 		buf.WriteString("}\n\n")
+
+		// Generate Display() method
+		if len(displayFields) == 1 {
+			buf.WriteString(fmt.Sprintf("func (b %sBrief) Display() string {\n", model))
+			buf.WriteString(fmt.Sprintf("\treturn b.%s\n", displayFields[0]))
+			buf.WriteString("}\n\n")
+		} else if info.DisplayFormat != "" {
+			// Build Display() from template format
+			needsStrings = true
+			buf.WriteString(fmt.Sprintf("func (b %sBrief) Display() string {\n", model))
+			// Convert template to Go string concatenation
+			// e.g., "{{FirstName}} {{LastName}} - {{Organization}}"
+			// becomes: strings.TrimSpace(b.FirstName + " " + b.LastName + " - " + b.Organization)
+			format := info.DisplayFormat
+			var parts []string
+			remaining := format
+			for {
+				start := strings.Index(remaining, "{{")
+				if start == -1 {
+					if remaining != "" {
+						parts = append(parts, fmt.Sprintf("%q", remaining))
+					}
+					break
+				}
+				if start > 0 {
+					parts = append(parts, fmt.Sprintf("%q", remaining[:start]))
+				}
+				end := strings.Index(remaining[start:], "}}")
+				if end == -1 {
+					break
+				}
+				field := strings.TrimSpace(remaining[start+2 : start+end])
+				parts = append(parts, "b."+field)
+				remaining = remaining[start+end+2:]
+			}
+			buf.WriteString(fmt.Sprintf("\treturn strings.TrimSpace(%s)\n", strings.Join(parts, " + ")))
+			buf.WriteString("}\n\n")
+		} else {
+			// Multiple fields but no format template - join with space
+			buf.WriteString(fmt.Sprintf("func (b %sBrief) Display() string {\n", model))
+			var fieldRefs []string
+			for _, df := range displayFields {
+				fieldRefs = append(fieldRefs, "b."+df)
+			}
+			buf.WriteString(fmt.Sprintf("\treturn %s\n", strings.Join(fieldRefs, ` + " " + `)))
+			buf.WriteString("}\n\n")
+		}
+
 		generated++
+	}
+
+	// Add strings import if needed
+	if needsStrings {
+		// Insert import after package line
+		content := buf.String()
+		content = strings.Replace(content, "package dto\n\n", "package dto\n\nimport \"strings\"\n\n", 1)
+		buf.Reset()
+		buf.WriteString(content)
 	}
 
 	if generated == 0 {

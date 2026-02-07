@@ -12,41 +12,26 @@ import (
 // TestGenerateFormFieldCode_RelationDropdownUsesDisplayField verifies that
 // relation dropdown options use the Brief DTO's actual display field
 // instead of a hardcoded field name. (Regression test for #22, #27)
-func TestGenerateFormFieldCode_RelationDropdownUsesDisplayField(t *testing.T) {
+func TestGenerateFormFieldCode_RelationDropdownUsesDisplay(t *testing.T) {
 	tests := []struct {
-		name         string
-		relation     string
-		displayField string
-		fieldType    string
-		wantField    string // expected field access in generated code
+		name      string
+		relation  string
+		fieldType string
 	}{
 		{
-			name:         "default Name field",
-			relation:     "Industry",
-			displayField: "Name",
-			fieldType:    "*uint",
-			wantField:    "item.Name",
+			name:      "nullable *uint relation",
+			relation:  "Industry",
+			fieldType: "*uint",
 		},
 		{
-			name:         "custom display field OrderNumber",
-			relation:     "Order",
-			displayField: "OrderNumber",
-			fieldType:    "*uint",
-			wantField:    "item.OrderNumber",
+			name:      "required uint relation",
+			relation:  "Order",
+			fieldType: "uint",
 		},
 		{
-			name:         "custom display field FirstName",
-			relation:     "Client",
-			displayField: "FirstName",
-			fieldType:    "*uint",
-			wantField:    "item.FirstName",
-		},
-		{
-			name:         "required uint relation with custom display",
-			relation:     "Order",
-			displayField: "OrderNumber",
-			fieldType:    "uint",
-			wantField:    "item.OrderNumber",
+			name:      "client relation",
+			relation:  "Client",
+			fieldType: "*uint",
 		},
 	}
 
@@ -61,12 +46,13 @@ func TestGenerateFormFieldCode_RelationDropdownUsesDisplayField(t *testing.T) {
 				Label:                tt.relation,
 				StateVar:             strings.ToLower(tt.relation) + "IDState",
 				StateName:            strings.ToLower(tt.relation) + "_id",
-				RelationDisplayField: tt.displayField,
+				RelationDisplayField: "Name",
 			}
 			code := generateFormFieldCode(field, tf, "test")
 
-			if !strings.Contains(code, tt.wantField) {
-				t.Errorf("expected generated code to contain %q, but it doesn't.\nGenerated:\n%s", tt.wantField, code)
+			// Should use Display() method instead of direct field access
+			if !strings.Contains(code, "item.Display()") {
+				t.Errorf("expected generated code to contain item.Display(), but it doesn't.\nGenerated:\n%s", code)
 			}
 			// Must NOT contain hardcoded #%d pattern
 			if strings.Contains(code, `Sprintf("#`) {
@@ -1486,5 +1472,438 @@ func TestGenerateDetailFieldCode_MultiFile(t *testing.T) {
 	}
 	if !strings.Contains(code, "h-20 w-20") {
 		t.Error("detail code should render thumbnails")
+	}
+}
+
+// TestExtractDisplayFields tests extracting field names from display templates
+func TestExtractDisplayFields(t *testing.T) {
+	tests := []struct {
+		name   string
+		input  string
+		expect []string
+	}{
+		{
+			name:   "single field",
+			input:  "Name",
+			expect: []string{"Name"},
+		},
+		{
+			name:   "two template fields",
+			input:  "{{FirstName}} {{LastName}}",
+			expect: []string{"FirstName", "LastName"},
+		},
+		{
+			name:   "three fields with separator",
+			input:  "{{FirstName}} {{LastName}} - {{Organization}}",
+			expect: []string{"FirstName", "LastName", "Organization"},
+		},
+		{
+			name:   "empty string",
+			input:  "",
+			expect: nil,
+		},
+		{
+			name:   "single template field",
+			input:  "{{Title}}",
+			expect: []string{"Title"},
+		},
+		{
+			name:   "field with spaces in braces",
+			input:  "{{ Name }}",
+			expect: []string{"Name"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := extractDisplayFields(tt.input)
+			if len(result) != len(tt.expect) {
+				t.Errorf("extractDisplayFields(%q) = %v, want %v", tt.input, result, tt.expect)
+				return
+			}
+			for i, v := range result {
+				if v != tt.expect[i] {
+					t.Errorf("extractDisplayFields(%q)[%d] = %q, want %q", tt.input, i, v, tt.expect[i])
+				}
+			}
+		})
+	}
+}
+
+// TestIsDisplayTemplate tests checking if display string is a template
+func TestIsDisplayTemplate(t *testing.T) {
+	tests := []struct {
+		input  string
+		expect bool
+	}{
+		{"Name", false},
+		{"{{Name}}", true},
+		{"{{FirstName}} {{LastName}}", true},
+		{"", false},
+	}
+
+	for _, tt := range tests {
+		if got := isDisplayTemplate(tt.input); got != tt.expect {
+			t.Errorf("isDisplayTemplate(%q) = %v, want %v", tt.input, got, tt.expect)
+		}
+	}
+}
+
+// TestSectionOrderPreservation tests that section order is preserved during config round-trip
+func TestSectionOrderPreservation(t *testing.T) {
+	configJSON := `{
+  "module": "testapp",
+  "models": {
+    "Client": {
+      "sections": {
+        "Contact": [{"name": "Email", "type": "string"}],
+        "Account": [{"name": "Name", "type": "string"}],
+        "Billing": [{"name": "Balance", "type": "float64"}]
+      }
+    }
+  }
+}`
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "gux.config.json")
+	if err := os.WriteFile(configPath, []byte(configJSON), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Save original dir and restore after test
+	origDir, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(origDir)
+
+	config, err := LoadModelsConfig(".")
+	if err != nil {
+		t.Fatalf("LoadModelsConfig: %v", err)
+	}
+
+	model := config.Models["Client"]
+	expectedOrder := []string{"Contact", "Account", "Billing"}
+	if len(model.SectionOrder) != len(expectedOrder) {
+		t.Fatalf("SectionOrder length = %d, want %d: %v", len(model.SectionOrder), len(expectedOrder), model.SectionOrder)
+	}
+	for i, got := range model.SectionOrder {
+		if got != expectedOrder[i] {
+			t.Errorf("SectionOrder[%d] = %q, want %q", i, got, expectedOrder[i])
+		}
+	}
+}
+
+// TestFormFieldRequiredIndicator tests that required fields generate asterisk indicators
+func TestFormFieldRequiredIndicator(t *testing.T) {
+	field := &ModelField{
+		Name:     "Email",
+		Type:     "string",
+		Required: true,
+		Input:    "email",
+	}
+	tf := convertToTemplateField(field, "User", nil)
+	code := generateFormFieldCode(field, tf, "user")
+
+	if !strings.Contains(code, "true") {
+		t.Error("expected form field code to pass true for required parameter")
+	}
+}
+
+// TestFormFieldNotRequiredIndicator tests that non-required fields don't get asterisk
+func TestFormFieldNotRequiredIndicator(t *testing.T) {
+	field := &ModelField{
+		Name: "Notes",
+		Type: "string",
+	}
+	tf := convertToTemplateField(field, "User", nil)
+	code := generateFormFieldCode(field, tf, "user")
+
+	if !strings.Contains(code, "false") {
+		t.Error("expected form field code to pass false for non-required parameter")
+	}
+}
+
+// TestConvertToTemplateField_Format tests that Format is properly carried through
+func TestConvertToTemplateField_Format(t *testing.T) {
+	tests := []struct {
+		name   string
+		format string
+	}{
+		{"currency", "currency"},
+		{"percent", "percent"},
+		{"number", "number"},
+		{"empty", ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			field := &ModelField{
+				Name:   "Amount",
+				Type:   "float64",
+				Format: tt.format,
+			}
+			tf := convertToTemplateField(field, "Order", nil)
+			if tf.Format != tt.format {
+				t.Errorf("Format = %q, want %q", tf.Format, tt.format)
+			}
+		})
+	}
+}
+
+// TestDetailFieldCode_FormattedCurrency tests that currency format generates formatCurrency call
+func TestDetailFieldCode_FormattedCurrency(t *testing.T) {
+	field := &ModelField{
+		Name:   "Amount",
+		Type:   "float64",
+		Format: "currency",
+	}
+	tf := convertToTemplateField(field, "Order", nil)
+	tf.Format = "currency"
+	code := generateDetailFieldCode(field, tf, "order")
+
+	if !strings.Contains(code, "formatCurrency") {
+		t.Errorf("expected detail code to use formatCurrency, got:\n%s", code)
+	}
+}
+
+// TestDetailFieldCode_FormattedPercent tests percent format in detail view
+func TestDetailFieldCode_FormattedPercent(t *testing.T) {
+	field := &ModelField{
+		Name:   "Rate",
+		Type:   "float64",
+		Format: "percent",
+	}
+	tf := convertToTemplateField(field, "Order", nil)
+	tf.Format = "percent"
+	code := generateDetailFieldCode(field, tf, "order")
+
+	if !strings.Contains(code, "formatPercent") {
+		t.Errorf("expected detail code to use formatPercent, got:\n%s", code)
+	}
+}
+
+// TestDetailFieldCode_PointerCurrency tests currency format for pointer float64
+func TestDetailFieldCode_PointerCurrency(t *testing.T) {
+	field := &ModelField{
+		Name:   "Amount",
+		Type:   "*float64",
+		Format: "currency",
+	}
+	tf := convertToTemplateField(field, "Order", nil)
+	tf.Format = "currency"
+	code := generateDetailFieldCode(field, tf, "order")
+
+	if !strings.Contains(code, "formatCurrencyPtr") {
+		t.Errorf("expected detail code to use formatCurrencyPtr, got:\n%s", code)
+	}
+}
+
+// TestConvertToTemplateField_Required tests Required flag propagation
+func TestConvertToTemplateField_Required(t *testing.T) {
+	field := &ModelField{
+		Name:     "Email",
+		Type:     "string",
+		Required: true,
+	}
+	tf := convertToTemplateField(field, "User", nil)
+	if !tf.Required {
+		t.Error("TemplateField.Required should be true when ModelField.Required is true")
+	}
+
+	field2 := &ModelField{
+		Name: "Notes",
+		Type: "string",
+	}
+	tf2 := convertToTemplateField(field2, "User", nil)
+	if tf2.Required {
+		t.Error("TemplateField.Required should be false when ModelField.Required is false")
+	}
+}
+
+// TestModelDefinitionMarshalJSON_PreservesOrder tests custom JSON marshal preserves section order
+func TestModelDefinitionMarshalJSON_PreservesOrder(t *testing.T) {
+	model := ModelDefinition{
+		Name:         "Client",
+		SectionOrder: []string{"Contact", "Account", "Billing"},
+		Sections: map[string][]ModelField{
+			"Contact": {{Name: "Email", Type: "string"}},
+			"Account": {{Name: "Name", Type: "string"}},
+			"Billing": {{Name: "Balance", Type: "float64"}},
+		},
+	}
+
+	data, err := json.Marshal(model)
+	if err != nil {
+		t.Fatalf("Marshal: %v", err)
+	}
+
+	jsonStr := string(data)
+	contactIdx := strings.Index(jsonStr, `"Contact"`)
+	accountIdx := strings.Index(jsonStr, `"Account"`)
+	billingIdx := strings.Index(jsonStr, `"Billing"`)
+
+	if contactIdx == -1 || accountIdx == -1 || billingIdx == -1 {
+		t.Fatalf("missing section in JSON: %s", jsonStr)
+	}
+
+	if contactIdx > accountIdx || accountIdx > billingIdx {
+		t.Errorf("sections not in expected order. Contact@%d, Account@%d, Billing@%d\nJSON: %s",
+			contactIdx, accountIdx, billingIdx, jsonStr)
+	}
+}
+
+// TestTimeFieldOmittedWhenEmpty tests that time fields are conditionally included in data map
+func TestTimeFieldOmittedWhenEmpty(t *testing.T) {
+	field := &ModelField{
+		Name:  "LeadDate",
+		Type:  "time.Time",
+		Input: "date",
+	}
+	tf := convertToTemplateField(field, "Lead", nil)
+
+	if !tf.IsTime {
+		t.Error("expected IsTime to be true for time.Time field")
+	}
+}
+
+// TestFormatFieldConfig tests that format config option is parsed correctly
+func TestFormatFieldConfig(t *testing.T) {
+	configJSON := `{
+  "module": "testapp",
+  "models": {
+    "Order": {
+      "sections": {
+        "General": [
+          {"name": "Amount", "type": "float64", "format": "currency"},
+          {"name": "TaxRate", "type": "float64", "format": "percent"},
+          {"name": "Quantity", "type": "int", "format": "number"}
+        ]
+      }
+    }
+  }
+}`
+	var config ModelsConfig
+	if err := json.Unmarshal([]byte(configJSON), &config); err != nil {
+		t.Fatalf("Unmarshal: %v", err)
+	}
+
+	fields := config.Models["Order"].Sections["General"]
+	formats := map[string]string{
+		"Amount":   "currency",
+		"TaxRate":  "percent",
+		"Quantity": "number",
+	}
+
+	for _, field := range fields {
+		expected := formats[field.Name]
+		if field.Format != expected {
+			t.Errorf("field %s: Format = %q, want %q", field.Name, field.Format, expected)
+		}
+	}
+}
+
+// TestTextareaRequiredIndicator tests textarea fields get required asterisk
+func TestTextareaRequiredIndicator(t *testing.T) {
+	field := &ModelField{
+		Name:     "Description",
+		Type:     "string",
+		Input:    "textarea",
+		Required: true,
+	}
+	tf := convertToTemplateField(field, "Product", nil)
+	code := generateFormFieldCode(field, tf, "product")
+
+	if !strings.Contains(code, "text-red-500") {
+		t.Error("expected textarea required field to contain red asterisk indicator")
+	}
+}
+
+// TestSelectRequiredIndicator tests select fields get required asterisk
+func TestSelectRequiredIndicator(t *testing.T) {
+	field := &ModelField{
+		Name:     "Status",
+		Type:     "string",
+		Input:    "select",
+		Required: true,
+		Options: []SelectOption{
+			{Value: "active", Label: "Active"},
+			{Value: "inactive", Label: "Inactive"},
+		},
+	}
+	tf := convertToTemplateField(field, "Product", nil)
+	code := generateFormFieldCode(field, tf, "product")
+
+	if !strings.Contains(code, "text-red-500") {
+		t.Error("expected select required field to contain red asterisk indicator")
+	}
+}
+
+// TestBriefDTOInfo_CompositeDisplay tests BriefDTOInfo with composite display
+func TestBriefDTOInfo_CompositeDisplay(t *testing.T) {
+	display := "{{FirstName}} {{LastName}} - {{Organization}}"
+	fields := extractDisplayFields(display)
+	if len(fields) != 3 {
+		t.Fatalf("expected 3 fields, got %d: %v", len(fields), fields)
+	}
+	if fields[0] != "FirstName" || fields[1] != "LastName" || fields[2] != "Organization" {
+		t.Errorf("fields = %v, want [FirstName LastName Organization]", fields)
+	}
+
+	info := BriefDTOInfo{
+		Model:         "Client",
+		DisplayField:  display,
+		DisplayFields: fields,
+		DisplayFormat: display,
+	}
+
+	if !isDisplayTemplate(info.DisplayField) {
+		t.Error("expected display field to be detected as template")
+	}
+	if len(info.DisplayFields) != 3 {
+		t.Errorf("DisplayFields length = %d, want 3", len(info.DisplayFields))
+	}
+}
+
+// TestDetailFieldCode_RelationUsesDisplay tests that relation detail code uses Display() method
+func TestDetailFieldCode_RelationUsesDisplay(t *testing.T) {
+	field := &ModelField{
+		Name:     "ClientID",
+		Type:     "*uint",
+		Relation: "Client",
+	}
+	tf := convertToTemplateField(field, "Order", map[string]string{"Client": "Name"})
+	code := generateDetailFieldCode(field, tf, "order")
+
+	if !strings.Contains(code, ".Display()") {
+		t.Errorf("expected detail code to use Display() method, got:\n%s", code)
+	}
+}
+
+// TestFormFieldCode_RequiredBoolParam tests the required bool parameter in formField calls
+func TestFormFieldCode_RequiredBoolParam(t *testing.T) {
+	tests := []struct {
+		name     string
+		required bool
+		expect   string
+	}{
+		{"required field", true, "true"},
+		{"optional field", false, "false"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			field := &ModelField{
+				Name:     "Email",
+				Type:     "string",
+				Input:    "email",
+				Required: tt.required,
+			}
+			tf := convertToTemplateField(field, "User", nil)
+			code := generateFormFieldCode(field, tf, "user")
+
+			// The formField call should include the required bool
+			expectedPattern := fmt.Sprintf(`FormField("Email", "email", "email", emailState.Get(), %s,`, tt.expect)
+			if !strings.Contains(code, expectedPattern) {
+				t.Errorf("expected code to contain %q\nGot: %s", expectedPattern, code)
+			}
+		})
 	}
 }

@@ -76,10 +76,18 @@ func generateGuxFiles(serverDir string) error {
 				for _, field := range fields {
 					if field.Relation != "" {
 						if _, exists := briefDTOs[field.Relation]; !exists {
-							briefDTOs[field.Relation] = BriefDTOInfo{
+							display := displayFields[field.Relation]
+							info := BriefDTOInfo{
 								Model:        field.Relation,
-								DisplayField: displayFields[field.Relation],
+								DisplayField: display,
 							}
+							if isDisplayTemplate(display) {
+								info.DisplayFields = extractDisplayFields(display)
+								info.DisplayFormat = display
+							} else {
+								info.DisplayFields = extractDisplayFields(display)
+							}
+							briefDTOs[field.Relation] = info
 						}
 					}
 				}
