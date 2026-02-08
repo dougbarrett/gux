@@ -739,3 +739,167 @@ func TestPopulateFileInfoFields(t *testing.T) {
 		})
 	}
 }
+
+// TestConvertSingleToDTO_PreloadFallback verifies that when a gux tag points
+// to a FK field (*uint) but the DTO expects a struct, convertSingleToDTO falls
+// back to the preloaded association field from the preload tag (#108).
+func TestConvertSingleToDTO_PreloadFallback(t *testing.T) {
+	// Simulates: model has DistributionGroupID *uint + DistributionGroup (struct)
+	// DTO has DistributionGroup *BriefDTO with gux tag pointing to FK field
+	type DistributionGroup struct {
+		ID   uint
+		Name string
+	}
+
+	type Volunteer struct {
+		ID                  uint
+		Name                string
+		DistributionGroupID *uint
+		DistributionGroup   DistributionGroup
+	}
+
+	type DistributionGroupBrief struct {
+		ID   uint   `json:"id" gux:"DistributionGroup.ID"`
+		Name string `json:"name" gux:"DistributionGroup.Name"`
+	}
+
+	type VolunteerListDTO struct {
+		ID                uint                    `json:"id" gux:"Volunteer.ID"`
+		Name              string                  `json:"name" gux:"Volunteer.Name"`
+		DistributionGroup *DistributionGroupBrief `json:"distribution_group_id" gux:"Volunteer.DistributionGroupID" preload:"DistributionGroup"`
+	}
+
+	app := &App{}
+	groupID := uint(6)
+	model := Volunteer{
+		ID:                  1,
+		Name:                "Alice",
+		DistributionGroupID: &groupID,
+		DistributionGroup: DistributionGroup{
+			ID:   6,
+			Name: "Brave",
+		},
+	}
+
+	dtoType := reflect.TypeOf(VolunteerListDTO{})
+	result := app.convertSingleToDTO(model, dtoType)
+
+	dto, ok := result.(VolunteerListDTO)
+	if !ok {
+		t.Fatalf("expected VolunteerListDTO, got %T", result)
+	}
+
+	if dto.ID != 1 {
+		t.Errorf("ID = %d, want 1", dto.ID)
+	}
+	if dto.Name != "Alice" {
+		t.Errorf("Name = %q, want \"Alice\"", dto.Name)
+	}
+	if dto.DistributionGroup == nil {
+		t.Fatal("DistributionGroup should not be nil")
+	}
+	if dto.DistributionGroup.ID != 6 {
+		t.Errorf("DistributionGroup.ID = %d, want 6", dto.DistributionGroup.ID)
+	}
+	if dto.DistributionGroup.Name != "Brave" {
+		t.Errorf("DistributionGroup.Name = %q, want \"Brave\"", dto.DistributionGroup.Name)
+	}
+}
+
+// TestConvertSingleToDTO_PreloadFallback_NilFK verifies the preload fallback
+// works correctly when the FK field is nil but the association is populated.
+func TestConvertSingleToDTO_PreloadFallback_NilFK(t *testing.T) {
+	type Group struct {
+		ID   uint
+		Name string
+	}
+
+	type Item struct {
+		ID      uint
+		GroupID *uint
+		Group   Group
+	}
+
+	type GroupBrief struct {
+		ID   uint   `json:"id" gux:"Group.ID"`
+		Name string `json:"name" gux:"Group.Name"`
+	}
+
+	type ItemDTO struct {
+		ID    uint        `json:"id" gux:"Item.ID"`
+		Group *GroupBrief `json:"group_id" gux:"Item.GroupID" preload:"Group"`
+	}
+
+	app := &App{}
+
+	// FK is nil but Group is zero-value struct (ID=0)
+	model := Item{
+		ID:      1,
+		GroupID: nil,
+		Group:   Group{}, // zero value - not preloaded
+	}
+
+	dtoType := reflect.TypeOf(ItemDTO{})
+	result := app.convertSingleToDTO(model, dtoType)
+
+	dto, ok := result.(ItemDTO)
+	if !ok {
+		t.Fatalf("expected ItemDTO, got %T", result)
+	}
+
+	// With zero-value Group, the nested mapping still runs but produces zero values
+	if dto.Group == nil {
+		t.Fatal("Group should not be nil (falls back to association field)")
+	}
+	if dto.Group.ID != 0 {
+		t.Errorf("Group.ID = %d, want 0 (zero value)", dto.Group.ID)
+	}
+}
+
+// TestConvertSingleToDTO_DirectStructMatch verifies that when the gux tag
+// points to a struct field directly (no FK mismatch), no fallback is needed.
+func TestConvertSingleToDTO_DirectStructMatch(t *testing.T) {
+	type Address struct {
+		ID   uint
+		City string
+	}
+
+	type Person struct {
+		ID      uint
+		Address Address
+	}
+
+	type AddressBrief struct {
+		ID   uint   `json:"id" gux:"Address.ID"`
+		City string `json:"city" gux:"Address.City"`
+	}
+
+	type PersonDTO struct {
+		ID      uint          `json:"id" gux:"Person.ID"`
+		Address *AddressBrief `json:"address" gux:"Person.Address"`
+	}
+
+	app := &App{}
+	model := Person{
+		ID: 1,
+		Address: Address{
+			ID:   10,
+			City: "Portland",
+		},
+	}
+
+	dtoType := reflect.TypeOf(PersonDTO{})
+	result := app.convertSingleToDTO(model, dtoType)
+
+	dto, ok := result.(PersonDTO)
+	if !ok {
+		t.Fatalf("expected PersonDTO, got %T", result)
+	}
+
+	if dto.Address == nil {
+		t.Fatal("Address should not be nil")
+	}
+	if dto.Address.City != "Portland" {
+		t.Errorf("Address.City = %q, want \"Portland\"", dto.Address.City)
+	}
+}

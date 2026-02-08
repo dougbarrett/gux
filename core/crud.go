@@ -641,6 +641,30 @@ func (a *App) convertSingleToDTO(model interface{}, dtoType reflect.Type) interf
 
 		modelField := modelVal.FieldByName(modelFieldName)
 
+		// If the gux tag points to a FK field (e.g. *uint) but the DTO expects
+		// a struct/slice (e.g. *DistributionGroupBrief), fall back to the
+		// preloaded association field so GORM-populated relations are mapped.
+		if modelField.IsValid() {
+			if preloadTag := dtoField.Tag.Get("preload"); preloadTag != "" {
+				dtoFieldKind := dtoField.Type
+				if dtoFieldKind.Kind() == reflect.Ptr {
+					dtoFieldKind = dtoFieldKind.Elem()
+				}
+				modelFieldType := modelField.Type()
+				if modelFieldType.Kind() == reflect.Ptr {
+					modelFieldType = modelFieldType.Elem()
+				}
+				needsFallback := (dtoFieldKind.Kind() == reflect.Struct || dtoFieldKind.Kind() == reflect.Slice) &&
+					modelFieldType.Kind() != reflect.Struct && modelFieldType.Kind() != reflect.Slice
+				if needsFallback {
+					if assocField := modelVal.FieldByName(preloadTag); assocField.IsValid() {
+						modelField = assocField
+						modelFieldName = preloadTag
+					}
+				}
+			}
+		}
+
 		if modelField.IsValid() {
 			// Handle pointer fields - dereference if model field is pointer
 			srcVal := modelField
