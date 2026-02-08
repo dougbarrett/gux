@@ -1872,6 +1872,43 @@ func extractMainPackageTypes(filename string, typeNames map[string]bool) (string
 	return sb.String(), nil
 }
 
+// scanExistingAPITypes scans non-generated .go files in the given directory for
+// struct type definitions. Returns a set of type names that already exist, so
+// the code generator can skip emitting them and avoid redeclaration errors.
+func scanExistingAPITypes(dir string) map[string]bool {
+	types := make(map[string]bool)
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return types
+	}
+	for _, entry := range entries {
+		name := entry.Name()
+		// Skip generated files — those will be overwritten anyway
+		if entry.IsDir() || !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_gen.go") {
+			continue
+		}
+		fset := token.NewFileSet()
+		node, parseErr := parser.ParseFile(fset, filepath.Join(dir, name), nil, 0)
+		if parseErr != nil {
+			continue
+		}
+		for _, decl := range node.Decls {
+			genDecl, ok := decl.(*ast.GenDecl)
+			if !ok || genDecl.Tok != token.TYPE {
+				continue
+			}
+			for _, spec := range genDecl.Specs {
+				typeSpec, ok := spec.(*ast.TypeSpec)
+				if !ok {
+					continue
+				}
+				types[typeSpec.Name.Name] = true
+			}
+		}
+	}
+	return types
+}
+
 // extractPathParams extracts path parameter names from a path pattern
 // e.g., "/api/users/:id/posts/:postId" -> ["id", "postId"]
 // formatDTOImport builds an import statement with alias if needed.
@@ -3932,18 +3969,44 @@ func generateEndpointClient(endpoints []APIEndpointInfo, dtoImports map[string]s
 			}
 		}
 	}
+
+	// Scan existing non-generated files in guxgen/api/ for type definitions
+	// to avoid redeclaration errors with manually-defined types.
+	existingAPITypes := scanExistingAPITypes("guxgen/api")
+	for typeName := range existingAPITypes {
+		delete(mainPkgTypes, typeName)
+	}
+
 	var mainTypeDefs string
 	if len(mainPkgTypes) > 0 {
-		// Collect all source files to search for type definitions
+		// Collect all source files to search for type definitions.
+		// Include all .go files in the same directories as endpoint source files
+		// so that types defined in separate files (e.g., types.go) are found.
 		sourceFiles := make(map[string]bool)
+		sourceDirs := make(map[string]bool)
 		if appFilename != "" {
 			sourceFiles[appFilename] = true
+			sourceDirs[filepath.Dir(appFilename)] = true
 		}
 		for _, ep := range endpoints {
 			if ep.SourceFile != "" {
 				sourceFiles[ep.SourceFile] = true
+				sourceDirs[filepath.Dir(ep.SourceFile)] = true
 			}
 		}
+		// Add all .go files from source directories
+		for dir := range sourceDirs {
+			entries, dirErr := os.ReadDir(dir)
+			if dirErr != nil {
+				continue
+			}
+			for _, entry := range entries {
+				if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".go") {
+					sourceFiles[filepath.Join(dir, entry.Name())] = true
+				}
+			}
+		}
+
 		// Search each source file for missing type definitions
 		remaining := make(map[string]bool)
 		for k, v := range mainPkgTypes {

@@ -3085,6 +3085,163 @@ type LoginResponse struct {
 	}
 }
 
+func TestScanExistingAPITypes_SkipsGenFiles(t *testing.T) {
+	dir := t.TempDir()
+
+	// Write a non-generated file with a type
+	os.WriteFile(filepath.Join(dir, "types_custom.go"), []byte(`package api
+
+type ResetBuildResponse struct {
+	Success bool   `+"`"+`json:"success"`+"`"+`
+}
+
+type UpdateOrgRequest struct {
+	Name string `+"`"+`json:"name"`+"`"+`
+}
+`), 0644)
+
+	// Write a generated file with types (should be skipped)
+	os.WriteFile(filepath.Join(dir, "endpoints_gen.go"), []byte(`package api
+
+type LoginRequest struct {
+	Email string `+"`"+`json:"email"`+"`"+`
+}
+`), 0644)
+
+	types := scanExistingAPITypes(dir)
+
+	if !types["ResetBuildResponse"] {
+		t.Error("expected ResetBuildResponse from types_custom.go")
+	}
+	if !types["UpdateOrgRequest"] {
+		t.Error("expected UpdateOrgRequest from types_custom.go")
+	}
+	if types["LoginRequest"] {
+		t.Error("should not include LoginRequest from _gen.go file")
+	}
+}
+
+func TestScanExistingAPITypes_EmptyDir(t *testing.T) {
+	dir := t.TempDir()
+	types := scanExistingAPITypes(dir)
+	if len(types) != 0 {
+		t.Errorf("expected empty map for empty dir, got %v", types)
+	}
+}
+
+func TestScanExistingAPITypes_NonexistentDir(t *testing.T) {
+	types := scanExistingAPITypes("/nonexistent/path/to/dir")
+	if len(types) != 0 {
+		t.Errorf("expected empty map for nonexistent dir, got %v", types)
+	}
+}
+
+func TestGenerateEndpointClient_DeduplicatesTypes(t *testing.T) {
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(origDir)
+
+	os.MkdirAll("guxgen/api", 0755)
+
+	// Write a types_custom.go with a type that an endpoint also uses
+	os.WriteFile("guxgen/api/types_custom.go", []byte(`package api
+
+type ResetBuildResponse struct {
+	Success bool   `+"`"+`json:"success"`+"`"+`
+	Message string `+"`"+`json:"message"`+"`"+`
+}
+`), 0644)
+
+	// Write an app file with the endpoint registration and a type definition
+	appFile := filepath.Join(dir, "app.go")
+	os.WriteFile(appFile, []byte(`package main
+
+type ResetBuildResponse struct {
+	Success bool   `+"`"+`json:"success"`+"`"+`
+	Message string `+"`"+`json:"message"`+"`"+`
+}
+`), 0644)
+
+	endpoints := []APIEndpointInfo{
+		{
+			Method:       "POST",
+			Path:         "/api/reset-build",
+			FuncName:     "ResetBuild",
+			ResponseType: "ResetBuildResponse",
+			Package:      "",
+			SourceFile:   appFile,
+		},
+	}
+
+	err := generateEndpointClient(endpoints, nil, nil, appFile)
+	if err != nil {
+		t.Fatalf("generateEndpointClient: %v", err)
+	}
+
+	// Read the generated file — should NOT contain ResetBuildResponse type
+	content, _ := os.ReadFile("guxgen/api/endpoints_gen.go")
+	if strings.Contains(string(content), "type ResetBuildResponse struct") {
+		t.Error("generated file should not redeclare ResetBuildResponse (exists in types_custom.go)")
+	}
+
+	// But should still contain the function that uses the type
+	if !strings.Contains(string(content), "func ResetBuild") {
+		t.Error("generated file should contain the endpoint function")
+	}
+}
+
+func TestGenerateEndpointClient_FindsTypesInSiblingFiles(t *testing.T) {
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(origDir)
+
+	os.MkdirAll("guxgen/api", 0755)
+
+	// Write the app file with the endpoint but NOT the type
+	appFile := filepath.Join(dir, "app.go")
+	os.WriteFile(appFile, []byte(`package main
+
+import "github.com/dougbarrett/gux/core"
+
+func setup() {
+	// endpoint uses UpdateOrgRequest defined in types.go
+}
+`), 0644)
+
+	// Write a sibling file with the type definition
+	os.WriteFile(filepath.Join(dir, "types.go"), []byte(`package main
+
+type UpdateOrgRequest struct {
+	Name    string `+"`"+`json:"name"`+"`"+`
+	Purpose string `+"`"+`json:"purpose"`+"`"+`
+}
+`), 0644)
+
+	endpoints := []APIEndpointInfo{
+		{
+			Method:      "PUT",
+			Path:        "/api/org/purpose",
+			FuncName:    "MyOrgsPurpose",
+			RequestType: "UpdateOrgRequest",
+			Package:     "",
+			SourceFile:  appFile,
+		},
+	}
+
+	err := generateEndpointClient(endpoints, nil, nil, appFile)
+	if err != nil {
+		t.Fatalf("generateEndpointClient: %v", err)
+	}
+
+	// Read the generated file — should contain the type from the sibling file
+	content, _ := os.ReadFile("guxgen/api/endpoints_gen.go")
+	if !strings.Contains(string(content), "type UpdateOrgRequest struct") {
+		t.Error("generated file should contain UpdateOrgRequest extracted from sibling types.go")
+	}
+}
+
 // TestGenerateLoadTracker verifies the load tracker files are generated correctly.
 func TestGenerateLoadTracker(t *testing.T) {
 	dir := t.TempDir()
