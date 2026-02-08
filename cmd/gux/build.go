@@ -4464,14 +4464,32 @@ func generateDistEmbedFile(bundles []string, hasWASM bool) error {
 	var embedCode strings.Builder
 
 	if hasWASM {
-		embedCode.WriteString(`//go:embed app.wasm
+		// Check if the default "app" bundle exists (has routes)
+		hasDefaultBundle := false
+		for _, b := range bundles {
+			if b == "app" {
+				hasDefaultBundle = true
+				break
+			}
+		}
+
+		if hasDefaultBundle {
+			embedCode.WriteString(`//go:embed app.wasm
 var WasmBinary []byte
 
-//go:embed wasm_exec.js
+`)
+		} else {
+			// No default bundle — declare var without embedding so code compiles
+			embedCode.WriteString(`var WasmBinary []byte
+
+`)
+		}
+
+		embedCode.WriteString(`//go:embed wasm_exec.js
 var WasmExecJS []byte
 
 `)
-		// Additional bundles
+		// Additional named bundles
 		for _, bundle := range bundles {
 			if bundle != "app" {
 				embedCode.WriteString(fmt.Sprintf(`//go:embed %s.wasm
@@ -4504,11 +4522,8 @@ func generateAssetsInitFile(modulePath string, bundles []string, serverDir strin
 	stylesHash := computeFileHash("guxgen/dist/styles.css")
 	wasmHashes := make(map[string]string)
 	if hasWASM {
-		wasmHashes["app"] = computeFileHash("guxgen/dist/app.wasm")
 		for _, bundle := range bundles {
-			if bundle != "app" {
-				wasmHashes[bundle] = computeFileHash(fmt.Sprintf("guxgen/dist/%s.wasm", bundle))
-			}
+			wasmHashes[bundle] = computeFileHash(fmt.Sprintf("guxgen/dist/%s.wasm", bundle))
 		}
 	}
 
@@ -4524,7 +4539,21 @@ func generateAssetsInitFile(modulePath string, bundles []string, serverDir strin
 	var initCode strings.Builder
 	initCode.WriteString("func init() {\n")
 	if hasWASM {
-		initCode.WriteString("\tcore.SetDefaultAssets(dist.WasmBinary, dist.WasmExecJS, dist.StylesCSS)\n")
+		// Check if the default "app" bundle has routes
+		hasDefaultBundle := false
+		for _, b := range bundles {
+			if b == "app" {
+				hasDefaultBundle = true
+				break
+			}
+		}
+
+		if hasDefaultBundle {
+			initCode.WriteString("\tcore.SetDefaultAssets(dist.WasmBinary, dist.WasmExecJS, dist.StylesCSS)\n")
+		} else {
+			// No default bundle — pass nil for WASM binary but still provide wasm_exec.js and CSS
+			initCode.WriteString("\tcore.SetDefaultAssets(nil, dist.WasmExecJS, dist.StylesCSS)\n")
+		}
 		for _, bundle := range bundles {
 			if bundle != "app" {
 				initCode.WriteString(fmt.Sprintf("\tcore.SetDefaultBundle(%q, dist.Wasm%s)\n", bundle, strings.Title(bundle)))

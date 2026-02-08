@@ -2162,6 +2162,139 @@ func TestGenerateAssetsFile_CustomServerDir(t *testing.T) {
 	}
 }
 
+// TestGenerateAssetsFile_NamedBundlesOnly tests that when all routes use named bundles
+// (no default "app" bundle), embed_gen.go omits the //go:embed app.wasm directive
+// and assets_gen.go passes nil for the WASM binary (#109).
+func TestGenerateAssetsFile_NamedBundlesOnly(t *testing.T) {
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(origDir)
+
+	// Create dist files — only admin.wasm, no app.wasm
+	os.MkdirAll("guxgen/dist", 0755)
+	os.WriteFile("guxgen/dist/styles.css", []byte("body{}"), 0644)
+	os.WriteFile("guxgen/dist/admin.wasm", []byte("wasm-admin"), 0644)
+	os.WriteFile("guxgen/dist/wasm_exec.js", []byte("js"), 0644)
+
+	// Only "admin" bundle, no "app"
+	err := generateAssetsFile("github.com/test/app", []string{"admin"}, "", true)
+	if err != nil {
+		t.Fatalf("generateAssetsFile: %v", err)
+	}
+
+	// Check embed_gen.go
+	embedContent, err := os.ReadFile("guxgen/dist/embed_gen.go")
+	if err != nil {
+		t.Fatalf("read embed_gen.go: %v", err)
+	}
+	embedCode := string(embedContent)
+
+	// Should NOT have //go:embed app.wasm
+	if strings.Contains(embedCode, "//go:embed app.wasm") {
+		t.Error("embed_gen.go should not have //go:embed app.wasm when no default bundle exists")
+	}
+
+	// Should still declare var WasmBinary (without embed directive)
+	if !strings.Contains(embedCode, "var WasmBinary []byte") {
+		t.Error("embed_gen.go should declare var WasmBinary even without default bundle")
+	}
+
+	// Should have wasm_exec.js (needed for named bundles)
+	if !strings.Contains(embedCode, "wasm_exec.js") {
+		t.Error("embed_gen.go should reference wasm_exec.js")
+	}
+
+	// Should have admin.wasm
+	if !strings.Contains(embedCode, "//go:embed admin.wasm") {
+		t.Error("embed_gen.go should reference admin.wasm")
+	}
+
+	// Should have styles.css
+	if !strings.Contains(embedCode, "styles.css") {
+		t.Error("embed_gen.go should reference styles.css")
+	}
+
+	// Check assets_gen.go
+	initContent, err := os.ReadFile("assets_gen.go")
+	if err != nil {
+		t.Fatalf("read assets_gen.go: %v", err)
+	}
+	initCode := string(initContent)
+
+	// Should pass nil for WASM binary (no default bundle)
+	if !strings.Contains(initCode, "core.SetDefaultAssets(nil, dist.WasmExecJS, dist.StylesCSS)") {
+		t.Errorf("init should call SetDefaultAssets(nil, dist.WasmExecJS, dist.StylesCSS), got:\n%s", initCode)
+	}
+
+	// Should NOT reference dist.WasmBinary in SetDefaultAssets
+	if strings.Contains(initCode, "SetDefaultAssets(dist.WasmBinary") {
+		t.Error("init should not pass dist.WasmBinary when no default bundle exists")
+	}
+
+	// Should register the named bundle
+	if !strings.Contains(initCode, `core.SetDefaultBundle("admin"`) {
+		t.Error("init should register the admin bundle")
+	}
+
+	// Should NOT have hash for "app" bundle
+	if strings.Contains(initCode, `"app"`) {
+		t.Error("init should not have hash for non-existent app bundle")
+	}
+}
+
+// TestGenerateAssetsFile_MixedBundles tests that when both default and named bundles
+// exist, the default app.wasm is still embedded correctly.
+func TestGenerateAssetsFile_MixedBundles(t *testing.T) {
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(origDir)
+
+	os.MkdirAll("guxgen/dist", 0755)
+	os.WriteFile("guxgen/dist/styles.css", []byte("body{}"), 0644)
+	os.WriteFile("guxgen/dist/app.wasm", []byte("wasm-app"), 0644)
+	os.WriteFile("guxgen/dist/admin.wasm", []byte("wasm-admin"), 0644)
+	os.WriteFile("guxgen/dist/wasm_exec.js", []byte("js"), 0644)
+
+	err := generateAssetsFile("github.com/test/app", []string{"app", "admin"}, "", true)
+	if err != nil {
+		t.Fatalf("generateAssetsFile: %v", err)
+	}
+
+	// Check embed_gen.go
+	embedContent, err := os.ReadFile("guxgen/dist/embed_gen.go")
+	if err != nil {
+		t.Fatalf("read embed_gen.go: %v", err)
+	}
+	embedCode := string(embedContent)
+
+	// Should have both app.wasm and admin.wasm
+	if !strings.Contains(embedCode, "//go:embed app.wasm") {
+		t.Error("embed_gen.go should reference app.wasm when default bundle exists")
+	}
+	if !strings.Contains(embedCode, "//go:embed admin.wasm") {
+		t.Error("embed_gen.go should reference admin.wasm")
+	}
+
+	// Check assets_gen.go
+	initContent, err := os.ReadFile("assets_gen.go")
+	if err != nil {
+		t.Fatalf("read assets_gen.go: %v", err)
+	}
+	initCode := string(initContent)
+
+	// Should use dist.WasmBinary (default bundle exists)
+	if !strings.Contains(initCode, "core.SetDefaultAssets(dist.WasmBinary, dist.WasmExecJS, dist.StylesCSS)") {
+		t.Errorf("init should call SetDefaultAssets with dist.WasmBinary, got:\n%s", initCode)
+	}
+
+	// Should register the admin bundle
+	if !strings.Contains(initCode, `core.SetDefaultBundle("admin"`) {
+		t.Error("init should register the admin bundle")
+	}
+}
+
 // TestParseRoutesWithImportFollowing tests that routes in imported packages are discovered.
 func TestParseRoutesWithImportFollowing(t *testing.T) {
 	dir := t.TempDir()
