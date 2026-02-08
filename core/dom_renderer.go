@@ -190,19 +190,13 @@ func (r *DOMRenderer) RenderElement(tag string, attrs Attrs, children []Node) Re
 			} else {
 				value = target.Get("value").String()
 			}
-			// Debug: log the change event
-			js.Global().Get("console").Call("log", "[Gux OnChange] value:", value, "element:", target.Get("name").String())
-			// Suppress re-renders during change events.
-			// This allows button clicks to work - the state is updated but
-			// the DOM isn't replaced, so the click event completes normally.
-			// The re-render will happen after the click handler's side effects
-			// (like navigation or showing success messages).
+			// Defer re-renders during change events so that if a text input's
+			// blur fires change right before a button click, the DOM isn't
+			// replaced mid-click. The deferred re-render runs after the
+			// change handler returns via SetInChangeEvent(false).
 			SetInChangeEvent(true)
-			js.Global().Get("console").Call("log", "[Gux OnChange] BEFORE callback")
 			attrs.OnChange(value)
-			js.Global().Get("console").Call("log", "[Gux OnChange] AFTER callback")
 			SetInChangeEvent(false)
-			js.Global().Get("console").Call("log", "[Gux OnChange] callback completed for:", value)
 			return nil
 		})
 		// Listen to "change" event - fires on blur for text inputs, immediately for selects

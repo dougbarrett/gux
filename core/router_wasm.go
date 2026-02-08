@@ -10,9 +10,10 @@ import (
 )
 
 var (
-	rerenderScheduled = false
-	scheduledRouter   *Router
-	inChangeEvent     = false // When true, ScheduleRerender is suppressed
+	rerenderScheduled      = false
+	scheduledRouter        *Router
+	inChangeEvent          = false   // When true, ScheduleRerender is deferred
+	changeEventSuppressed  *Router   // Router that was suppressed during change event
 )
 
 // debugRouter holds reference to the current router for debugging
@@ -96,10 +97,17 @@ func clearTimer(h *TimerHandle) {
 }
 
 // SetInChangeEvent sets the change event flag.
-// When true, ScheduleRerender calls are ignored to prevent
-// re-renders from interrupting click events.
+// When true, ScheduleRerender calls are deferred to prevent
+// re-renders from interrupting click events. When the flag is
+// cleared, any suppressed re-render is scheduled.
 func SetInChangeEvent(v bool) {
 	inChangeEvent = v
+	if !v && changeEventSuppressed != nil {
+		// Change event finished — schedule the deferred re-render
+		r := changeEventSuppressed
+		changeEventSuppressed = nil
+		ScheduleRerender(r)
+	}
 }
 
 // ScheduleRerender schedules a re-render after the current event loop completes.
@@ -111,8 +119,10 @@ func SetInChangeEvent(v bool) {
 // button click is being processed. The state is still updated, so when the
 // click handler runs, it reads the correct values.
 func ScheduleRerender(r *Router) {
-	// Suppress re-renders during change events to allow button clicks to work
+	// Defer re-renders during change events to allow button clicks to work.
+	// The deferred re-render is scheduled when SetInChangeEvent(false) is called.
 	if inChangeEvent {
+		changeEventSuppressed = r
 		return
 	}
 

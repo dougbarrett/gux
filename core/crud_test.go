@@ -903,3 +903,117 @@ func TestConvertSingleToDTO_DirectStructMatch(t *testing.T) {
 		t.Errorf("Address.City = %q, want \"Portland\"", dto.Address.City)
 	}
 }
+
+// TestStateSet_TriggersRerender verifies that State.Set() calls ScheduleRerender
+// which on the server side fires the rerender callback immediately (#110).
+func TestStateSet_TriggersRerender(t *testing.T) {
+	r := &Router{
+		state: make(map[string]any),
+	}
+
+	renderCount := 0
+	r.rerender = func() {
+		renderCount++
+	}
+
+	s := r.StateString("filter", "")
+
+	// Initial state
+	if s.Get() != "" {
+		t.Errorf("initial value should be empty, got %q", s.Get())
+	}
+	if renderCount != 0 {
+		t.Errorf("no render should have happened yet, got %d", renderCount)
+	}
+
+	// Set triggers rerender
+	s.Set("2025")
+	if s.Get() != "2025" {
+		t.Errorf("expected \"2025\", got %q", s.Get())
+	}
+	if renderCount != 1 {
+		t.Errorf("expected 1 rerender after Set(), got %d", renderCount)
+	}
+
+	// Second Set triggers another rerender
+	s.Set("2024")
+	if renderCount != 2 {
+		t.Errorf("expected 2 rerenders after second Set(), got %d", renderCount)
+	}
+}
+
+// TestStateSet_SuppressRender verifies that suppressRender prevents rerender.
+func TestStateSet_SuppressRender(t *testing.T) {
+	r := &Router{
+		state: make(map[string]any),
+	}
+
+	renderCount := 0
+	r.rerender = func() {
+		renderCount++
+	}
+
+	s := r.StateString("input", "")
+
+	r.suppressRender = true
+	s.Set("typing...")
+	if renderCount != 0 {
+		t.Errorf("expected 0 rerenders with suppressRender=true, got %d", renderCount)
+	}
+
+	// State still updated even though render was suppressed
+	if s.Get() != "typing..." {
+		t.Errorf("expected state to be updated, got %q", s.Get())
+	}
+
+	// After unsuppressing, next Set triggers render
+	r.suppressRender = false
+	s.Set("done")
+	if renderCount != 1 {
+		t.Errorf("expected 1 rerender after suppressRender=false, got %d", renderCount)
+	}
+}
+
+// TestStateBool_TriggersRerender verifies that StateBool.Set() also triggers rerender.
+func TestStateBool_TriggersRerender(t *testing.T) {
+	r := &Router{
+		state: make(map[string]any),
+	}
+
+	renderCount := 0
+	r.rerender = func() {
+		renderCount++
+	}
+
+	s := r.StateBool("open", false)
+
+	s.Set(true)
+	if !s.Get() {
+		t.Error("expected true after Set(true)")
+	}
+	if renderCount != 1 {
+		t.Errorf("expected 1 rerender, got %d", renderCount)
+	}
+}
+
+// TestStateInt_TriggersRerender verifies that StateInt.Set() triggers rerender.
+func TestStateInt_TriggersRerender(t *testing.T) {
+	r := &Router{
+		state: make(map[string]any),
+	}
+
+	renderCount := 0
+	r.rerender = func() {
+		renderCount++
+	}
+
+	s := r.StateInt("count", 0)
+
+	s.Set(42)
+	if s.Get() != 42 {
+		t.Errorf("expected 42, got %d", s.Get())
+	}
+	if renderCount != 1 {
+		t.Errorf("expected 1 rerender, got %d", renderCount)
+	}
+}
