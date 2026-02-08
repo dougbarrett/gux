@@ -3763,6 +3763,9 @@ type %s struct {
 		stubCode.WriteString(generateServerAPICode(m.Name, m.PluralName, pkg, m.ModelImportPath))
 	}
 
+	// Check if generated code uses the time package (e.g. time.Time / *time.Time field conversions)
+	hasTimeFields := strings.Contains(stubCode.String(), "time.RFC3339")
+
 	// Check if any CRUD models have external models, core models, or external DTOs
 	hasExternalModels := false
 	hasCoreModels := false
@@ -3791,6 +3794,13 @@ type %s struct {
 	serverImports := fmt.Sprintf(`"gorm.io/gorm"
 
 	"%s"`, modelsImport)
+
+	// Add time import if any model has time.Time or *time.Time fields
+	if hasTimeFields {
+		serverImports = `"time"
+
+	` + serverImports
+	}
 
 	// Add external models import if needed
 	if hasExternalModels {

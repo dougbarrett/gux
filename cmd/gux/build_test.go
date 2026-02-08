@@ -1519,6 +1519,145 @@ type Agent struct {
 	}
 }
 
+// TestGenerateServerAPICode_TimeFields verifies that generated server API code
+// contains time.RFC3339 conversions for time.Time and *time.Time fields.
+func TestGenerateServerAPICode_TimeFields(t *testing.T) {
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(origDir)
+
+	os.WriteFile("go.mod", []byte("module testapp\n\ngo 1.23\n"), 0644)
+	os.MkdirAll("models", 0755)
+	os.WriteFile("models/app.go", []byte(`package models
+
+import (
+	"time"
+	"gorm.io/gorm"
+)
+
+type App struct {
+	gorm.Model
+	Name         string
+	LastBilledAt *time.Time
+}
+`), 0644)
+
+	modelFieldTypesCache = make(map[string]map[string]string)
+
+	result := generateServerAPICode("App", "Apps", "models", "testapp/models")
+
+	// *time.Time fields should generate nil-safe time.RFC3339 formatting
+	if !strings.Contains(result, "time.RFC3339") {
+		t.Errorf("expected time.RFC3339 in generated code for *time.Time field, got:\n%s", result)
+	}
+	if !strings.Contains(result, "time.Parse") {
+		t.Errorf("expected time.Parse in generated code for *time.Time field, got:\n%s", result)
+	}
+	// Should generate nil-safe wrapper for pointer time
+	if !strings.Contains(result, "if item.LastBilledAt != nil") {
+		t.Errorf("expected nil check for *time.Time field, got:\n%s", result)
+	}
+}
+
+// TestGenerateAPIClient_TimeImport verifies that client_server.go includes
+// the "time" import when a model has time.Time or *time.Time fields (#107).
+func TestGenerateAPIClient_TimeImport(t *testing.T) {
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(origDir)
+
+	os.WriteFile("go.mod", []byte("module testapp\n\ngo 1.23\n"), 0644)
+	os.MkdirAll("guxgen/api", 0755)
+	os.MkdirAll("models", 0755)
+	os.WriteFile("models/app.go", []byte(`package models
+
+import (
+	"time"
+	"gorm.io/gorm"
+)
+
+type App struct {
+	gorm.Model
+	Name         string
+	LastBilledAt *time.Time
+}
+`), 0644)
+
+	modelFieldTypesCache = make(map[string]map[string]string)
+
+	models := []CRUDModel{{
+		Name:       "App",
+		PluralName: "Apps",
+		Path:       "apps",
+	}}
+
+	err := generateAPIClient("testapp/guxgen/models", "testapp/guxgen/dto", models)
+	if err != nil {
+		t.Fatalf("generateAPIClient: %v", err)
+	}
+
+	serverData, err := os.ReadFile("guxgen/api/client_server.go")
+	if err != nil {
+		t.Fatalf("reading client_server.go: %v", err)
+	}
+
+	content := string(serverData)
+
+	// Should contain "time" import
+	if !strings.Contains(content, `"time"`) {
+		t.Errorf("expected \"time\" import in client_server.go for model with *time.Time field, got:\n%s", content)
+	}
+}
+
+// TestGenerateAPIClient_NoTimeImportWithoutTimeFields verifies that client_server.go
+// does NOT include the "time" import when no model has time fields.
+func TestGenerateAPIClient_NoTimeImportWithoutTimeFields(t *testing.T) {
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(origDir)
+
+	os.WriteFile("go.mod", []byte("module testapp\n\ngo 1.23\n"), 0644)
+	os.MkdirAll("guxgen/api", 0755)
+	os.MkdirAll("models", 0755)
+	os.WriteFile("models/item.go", []byte(`package models
+
+import "gorm.io/gorm"
+
+type Item struct {
+	gorm.Model
+	Name string
+}
+`), 0644)
+
+	modelFieldTypesCache = make(map[string]map[string]string)
+
+	models := []CRUDModel{{
+		Name:       "Item",
+		PluralName: "Items",
+		Path:       "items",
+	}}
+
+	err := generateAPIClient("testapp/guxgen/models", "testapp/guxgen/dto", models)
+	if err != nil {
+		t.Fatalf("generateAPIClient: %v", err)
+	}
+
+	serverData, err := os.ReadFile("guxgen/api/client_server.go")
+	if err != nil {
+		t.Fatalf("reading client_server.go: %v", err)
+	}
+
+	content := string(serverData)
+
+	// Should NOT contain "time" import when no time fields
+	if strings.Contains(content, `"time"`) {
+		t.Errorf("unexpected \"time\" import in client_server.go for model without time fields, got:\n%s", content)
+	}
+}
+
 // TestGenerateAPIClient_NoGenerics verifies that generated client code does not
 // contain generic functions like Post[T] which panic in TinyGo WASM (#78).
 func TestGenerateAPIClient_NoGenerics(t *testing.T) {
