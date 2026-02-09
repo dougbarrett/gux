@@ -159,9 +159,14 @@ func {{.NamePlural}}(r *core.Router) func() core.Node {
 	})
 
 	return func() core.Node {
-		// Store in state for hydration
-		itemsJSON, _ := json.Marshal(items)
-		itemsState := r.StateString("items", string(itemsJSON))
+		// Sync closure data to state for hydration and client-side navigation.
+		// UseState ignores the initial value when the key already exists, so we
+		// must use SetQuiet to push loaded data into existing state (#113).
+		itemsState := r.StateString("items", "null")
+		if items != nil {
+			itemsJSON, _ := json.Marshal(items)
+			itemsState.SetQuiet(string(itemsJSON))
+		}
 
 		// Parse from state
 		var displayItems []dto.{{.Name}}List
@@ -805,20 +810,22 @@ func {{.Name}}Detail(r *core.Router) func() core.Node {
 	})
 
 	return func() core.Node {
-		// Store in state for hydration
-		var itemData dto.{{.Name}}Detail
+		// Sync closure data to state for hydration and client-side navigation (#113).
+		itemState := r.StateString("item", "{}")
 		if item != nil {
-			itemData = *item
+			itemJSON, _ := json.Marshal(*item)
+			itemState.SetQuiet(string(itemJSON))
 		}
-		itemJSON, _ := json.Marshal(itemData)
-		itemState := r.StateString("item", string(itemJSON))
 
 		var displayItem dto.{{.Name}}Detail
 		json.Unmarshal([]byte(itemState.Get()), &displayItem)
 
 {{- range .Children}}
-		child{{.NamePlural}}JSON, _ := json.Marshal(child{{.NamePlural}})
-		child{{.NamePlural}}State := r.StateString("child_{{.RoutePlural}}", string(child{{.NamePlural}}JSON))
+		child{{.NamePlural}}State := r.StateString("child_{{.RoutePlural}}", "null")
+		if child{{.NamePlural}} != nil {
+			child{{.NamePlural}}JSON, _ := json.Marshal(child{{.NamePlural}})
+			child{{.NamePlural}}State.SetQuiet(string(child{{.NamePlural}}JSON))
+		}
 		var display{{.NamePlural}} []dto.{{.Name}}List
 		json.Unmarshal([]byte(child{{.NamePlural}}State.Get()), &display{{.NamePlural}})
 {{- end}}
@@ -1211,21 +1218,23 @@ func {{.Name}}Edit(r *core.Router) func() core.Node {
 	})
 
 	return func() core.Node {
-		// Store in state for hydration
-		var itemData dto.{{.Name}}Detail
+		// Sync closure data to state for hydration and client-side navigation (#113).
+		itemState := r.StateString("item", "{}")
 		if item != nil {
-			itemData = *item
+			itemJSON, _ := json.Marshal(*item)
+			itemState.SetQuiet(string(itemJSON))
 		}
-		itemJSON, _ := json.Marshal(itemData)
-		itemState := r.StateString("item", string(itemJSON))
 
 		var displayItem dto.{{.Name}}Detail
 		json.Unmarshal([]byte(itemState.Get()), &displayItem)
 
 {{- range .Relations}}
 		// {{.Label}} state
-		{{.VarName}}JSON, _ := json.Marshal({{.VarName}})
-		{{.VarName}}State := r.StateString("{{.VarName}}", string({{.VarName}}JSON))
+		{{.VarName}}State := r.StateString("{{.VarName}}", "null")
+		if {{.VarName}} != nil {
+			{{.VarName}}JSON, _ := json.Marshal({{.VarName}})
+			{{.VarName}}State.SetQuiet(string({{.VarName}}JSON))
+		}
 		var {{.VarName}}Options []{{if .IsExternal}}extdto{{else}}dto{{end}}.{{.Model}}List
 		json.Unmarshal([]byte({{.VarName}}State.Get()), &{{.VarName}}Options)
 {{- end}}

@@ -2003,3 +2003,91 @@ func TestGenerateDTOFile_ListDTOHasDisplayMethod(t *testing.T) {
 		})
 	}
 }
+
+// TestListTemplate_UsesSetQuiet verifies the list page template uses SetQuiet
+// to sync closure data to state instead of relying on UseState's initial parameter,
+// which silently discards data when the key already exists (#113).
+func TestListTemplate_UsesSetQuiet(t *testing.T) {
+	tmpl := ModelGenTemplates.AdminList
+
+	t.Run("uses SetQuiet for items state", func(t *testing.T) {
+		if !strings.Contains(tmpl, "itemsState.SetQuiet(") {
+			t.Error("list template must use itemsState.SetQuiet() to push loaded data into state")
+		}
+	})
+
+	t.Run("guards SetQuiet with nil check", func(t *testing.T) {
+		if !strings.Contains(tmpl, "if items != nil") {
+			t.Error("list template must guard SetQuiet with nil check to preserve hydrated state")
+		}
+	})
+
+	t.Run("does not use Marshal result as initial value", func(t *testing.T) {
+		// The old broken pattern: r.StateString("items", string(itemsJSON))
+		if strings.Contains(tmpl, `StateString("items", string(itemsJSON))`) {
+			t.Error("list template must NOT pass marshaled data as StateString initial value — use SetQuiet instead (#113)")
+		}
+	})
+}
+
+// TestDetailTemplate_UsesSetQuiet verifies the detail page template uses SetQuiet
+// for both the main item and child entities (#113).
+func TestDetailTemplate_UsesSetQuiet(t *testing.T) {
+	tmpl := ModelGenTemplates.AdminDetail
+
+	t.Run("uses SetQuiet for item state", func(t *testing.T) {
+		if !strings.Contains(tmpl, "itemState.SetQuiet(") {
+			t.Error("detail template must use itemState.SetQuiet() to push loaded data into state")
+		}
+	})
+
+	t.Run("guards item SetQuiet with nil check", func(t *testing.T) {
+		if !strings.Contains(tmpl, "if item != nil") {
+			t.Error("detail template must guard SetQuiet with nil check")
+		}
+	})
+
+	t.Run("does not use Marshal result as initial value for item", func(t *testing.T) {
+		if strings.Contains(tmpl, `StateString("item", string(itemJSON))`) {
+			t.Error("detail template must NOT pass marshaled data as StateString initial value (#113)")
+		}
+	})
+
+	t.Run("uses SetQuiet for child entity state", func(t *testing.T) {
+		// Child template uses: child{{.NamePlural}}State.SetQuiet(...)
+		if !strings.Contains(tmpl, "State.SetQuiet(") {
+			t.Error("detail template must use SetQuiet for child entity state")
+		}
+	})
+}
+
+// TestEditTemplate_UsesSetQuiet verifies the edit page template uses SetQuiet
+// for both the main item and relation dropdown options (#113).
+func TestEditTemplate_UsesSetQuiet(t *testing.T) {
+	tmpl := ModelGenTemplates.AdminEdit
+
+	t.Run("uses SetQuiet for item state", func(t *testing.T) {
+		if !strings.Contains(tmpl, "itemState.SetQuiet(") {
+			t.Error("edit template must use itemState.SetQuiet() to push loaded data into state")
+		}
+	})
+
+	t.Run("guards item SetQuiet with nil check", func(t *testing.T) {
+		if !strings.Contains(tmpl, "if item != nil") {
+			t.Error("edit template must guard SetQuiet with nil check")
+		}
+	})
+
+	t.Run("does not use Marshal result as initial value for item", func(t *testing.T) {
+		if strings.Contains(tmpl, `StateString("item", string(itemJSON))`) {
+			t.Error("edit template must NOT pass marshaled data as StateString initial value (#113)")
+		}
+	})
+
+	t.Run("uses SetQuiet for relation state", func(t *testing.T) {
+		// Relations use: {{.VarName}}State.SetQuiet(...)
+		if !strings.Contains(tmpl, "State.SetQuiet(") {
+			t.Error("edit template must use SetQuiet for relation option state")
+		}
+	})
+}
