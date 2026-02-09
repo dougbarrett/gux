@@ -2453,9 +2453,9 @@ func generateBundleWasmEntryPoint(bundleName string, bundle *BundleInfo, apiImpo
 		api.ResetLoads()
 		window.Get("history").Call("pushState", nil, "", path)
 		loadPage()
-		if !api.HasPendingLoads() {
-			render()
-		}
+		// Always render immediately to attach event handlers.
+		// If async loads are pending, OnAllLoadsComplete will re-render with data.
+		render()
 		if shouldScroll {
 			window.Call("scrollTo", 0, 0)
 		}`
@@ -2466,9 +2466,9 @@ func generateBundleWasmEntryPoint(bundleName string, bundle *BundleInfo, apiImpo
 		router.ClearState()
 		api.ResetLoads()
 		loadPage()
-		if !api.HasPendingLoads() {
-			render()
-		}
+		// Always render immediately to attach event handlers.
+		// If async loads are pending, OnAllLoadsComplete will re-render with data.
+		render()
 		window.Call("scrollTo", 0, 0)`
 
 		initialBootCode = `
@@ -2478,14 +2478,10 @@ func generateBundleWasmEntryPoint(bundleName string, bundle *BundleInfo, apiImpo
 	// State values from Hydrate() are preserved - only the flag is cleared.
 	router.ClearHydrated()
 	loadPage()
-	if !api.HasPendingLoads() {
-		// No async loads (e.g., login page) - render immediately to attach event handlers
-		render()
-	} else {
-		// Async loads pending - preserve SSR DOM, just intercept links for now
-		// render() will be called by OnAllLoadsComplete when data arrives
-		attachLinks()
-	}`
+	// Always render immediately to attach event handlers (onClick, onChange, etc.).
+	// Components handle missing data gracefully (empty slices, zero values).
+	// When async loads complete, OnAllLoadsComplete fires render() again with real data.
+	render()`
 
 	} else {
 		// No async API: keep current behavior with fetchLoader

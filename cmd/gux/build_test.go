@@ -3480,12 +3480,6 @@ func TestGenerateBundleWasmEntryPoint_WithAPIImport(t *testing.T) {
 		}
 	})
 
-	t.Run("navigate uses api.HasPendingLoads", func(t *testing.T) {
-		if !strings.Contains(code, "api.HasPendingLoads()") {
-			t.Error("navigate should check api.HasPendingLoads() when apiImport is provided")
-		}
-	})
-
 	t.Run("initial boot wires OnAllLoadsComplete", func(t *testing.T) {
 		if !strings.Contains(code, "api.OnAllLoadsComplete = func()") {
 			t.Error("initial boot should wire api.OnAllLoadsComplete when apiImport is provided")
@@ -3498,14 +3492,72 @@ func TestGenerateBundleWasmEntryPoint_WithAPIImport(t *testing.T) {
 		}
 	})
 
-	t.Run("initial boot renders conditionally on HasPendingLoads (#84)", func(t *testing.T) {
-		// Check that initial boot has the HasPendingLoads conditional pattern
-		if !strings.Contains(code, "!api.HasPendingLoads()") {
-			t.Error("boot section should check HasPendingLoads()")
+	t.Run("initial boot always renders immediately (#112)", func(t *testing.T) {
+		// Boot must always call render() to attach event handlers immediately.
+		// There should be no HasPendingLoads conditional gating render().
+		bootStart := strings.Index(code, "api.OnAllLoadsComplete")
+		if bootStart < 0 {
+			t.Fatal("could not find boot section")
 		}
-		// attachLinks() should be in the else branch (async loads pending)
-		if !strings.Contains(code, "attachLinks()\n\t}") {
-			t.Error("boot section should call attachLinks() in else branch for async case")
+		bootCode := code[bootStart:]
+		// Find loadPage() first, then look for render() AFTER it
+		loadIdx := strings.Index(bootCode, "loadPage()")
+		if loadIdx < 0 {
+			t.Fatal("could not find loadPage in boot section")
+		}
+		afterLoad := bootCode[loadIdx:]
+		renderIdx := strings.Index(afterLoad, "render()")
+		if renderIdx < 0 {
+			t.Fatal("could not find render() after loadPage() in boot section")
+		}
+		// Must NOT have conditional render based on HasPendingLoads between loadPage and render
+		betweenSection := afterLoad[:renderIdx]
+		if strings.Contains(betweenSection, "!api.HasPendingLoads()") {
+			t.Error("boot should NOT conditionally gate render() on HasPendingLoads — always render to attach handlers (#112)")
+		}
+	})
+
+	t.Run("navigate always renders immediately (#112)", func(t *testing.T) {
+		// Navigate must always call render() after loadPage() without
+		// gating on HasPendingLoads, to avoid hydration gap.
+		navStart := strings.Index(code, "pushState")
+		if navStart < 0 {
+			t.Fatal("could not find navigate section")
+		}
+		navCode := code[navStart:]
+		loadIdx := strings.Index(navCode, "loadPage()")
+		renderIdx := strings.Index(navCode, "render()")
+		if loadIdx < 0 || renderIdx < 0 {
+			t.Fatal("could not find loadPage or render in navigate section")
+		}
+		if renderIdx < loadIdx {
+			t.Error("render() must come after loadPage() in navigate")
+		}
+		navSection := navCode[:renderIdx+len("render()")]
+		if strings.Contains(navSection, "!api.HasPendingLoads()") {
+			t.Error("navigate should NOT conditionally gate render() on HasPendingLoads (#112)")
+		}
+	})
+
+	t.Run("popstate always renders immediately (#112)", func(t *testing.T) {
+		// Popstate must always call render() after loadPage() without
+		// gating on HasPendingLoads.
+		popIdx := strings.Index(code, "popstate")
+		if popIdx < 0 {
+			t.Fatal("could not find popstate handler")
+		}
+		popCode := code[popIdx:]
+		loadIdx := strings.Index(popCode, "loadPage()")
+		renderIdx := strings.Index(popCode, "render()")
+		if loadIdx < 0 || renderIdx < 0 {
+			t.Fatal("could not find loadPage or render in popstate section")
+		}
+		if renderIdx < loadIdx {
+			t.Error("render() must come after loadPage() in popstate")
+		}
+		popSection := popCode[:renderIdx+len("render()")]
+		if strings.Contains(popSection, "!api.HasPendingLoads()") {
+			t.Error("popstate should NOT conditionally gate render() on HasPendingLoads (#112)")
 		}
 	})
 
