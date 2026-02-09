@@ -20,7 +20,7 @@ func runClaude() {
 	fmt.Println("helping you develop your Gux application.")
 }
 
-// installClaudeSkill installs the gux-framework.md skill file
+// installClaudeSkill installs all skill files from the embedded templates directory
 func installClaudeSkill(targetDir string) {
 	// Create .claude/skills directory
 	skillsDir := filepath.Join(targetDir, ".claude", "skills")
@@ -29,22 +29,31 @@ func installClaudeSkill(targetDir string) {
 		os.Exit(1)
 	}
 
-	// Read embedded skill file
-	skillContent, err := templates.ReadFile("templates/claude/skills/gux-framework.md")
+	// Read all skill files from embedded templates
+	entries, err := templates.ReadDir("templates/claude/skills")
 	if err != nil {
-		fmt.Printf("Error reading skill template: %v\n", err)
-		os.Exit(1)
-	}
-
-	// Write skill file
-	skillPath := filepath.Join(skillsDir, "gux-framework.md")
-	if err := os.WriteFile(skillPath, skillContent, 0644); err != nil {
-		fmt.Printf("Error writing skill file: %v\n", err)
+		fmt.Printf("Error reading skill templates: %v\n", err)
 		os.Exit(1)
 	}
 
 	fmt.Println("Claude Code integration installed:")
-	fmt.Printf("  created %s\n", skillPath)
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		content, err := templates.ReadFile("templates/claude/skills/" + entry.Name())
+		if err != nil {
+			fmt.Printf("Error reading skill template %s: %v\n", entry.Name(), err)
+			os.Exit(1)
+		}
+
+		skillPath := filepath.Join(skillsDir, entry.Name())
+		if err := os.WriteFile(skillPath, content, 0644); err != nil {
+			fmt.Printf("Error writing skill file %s: %v\n", entry.Name(), err)
+			os.Exit(1)
+		}
+		fmt.Printf("  created %s\n", skillPath)
+	}
 }
 
 // handleClaudeMD creates or updates CLAUDE.md in the target directory
