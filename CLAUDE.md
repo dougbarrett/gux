@@ -67,7 +67,19 @@ app.CRUD(models.Product{},
     core.WithPublic(), // Anyone can access
     core.WithListDTO(dto.ProductList{}),
 )
+
+// Multi-tenant scoping — filters ALL CRUD queries by org_id
+app.CRUD(models.App{},
+    core.WithScope(func(ctx *core.APIContext) interface{} {
+        orgID := getOrgIDFromUser(ctx.User())
+        return func(db *gorm.DB) *gorm.DB {
+            return db.Where("org_id = ?", orgID)
+        }
+    }),
+)
 ```
+
+**WithScope** applies a GORM scope to every CRUD operation (list, get, update, delete) for multi-tenant data isolation. The scope function receives an `APIContext` with the authenticated user and request. Records outside the scope return 404 (not 403), preventing enumeration.
 
 **Typed API Endpoints** (`endpoint.go`):
 

@@ -1017,3 +1017,174 @@ func TestStateInt_TriggersRerender(t *testing.T) {
 		t.Errorf("expected 1 rerender, got %d", renderCount)
 	}
 }
+
+// TestWithScope verifies the WithScope option sets the Scope field on CRUDModel.
+func TestWithScope(t *testing.T) {
+	scopeFunc := func(ctx *APIContext) interface{} {
+		return "mock-scope"
+	}
+
+	model := CRUDModel{}
+	opt := WithScope(scopeFunc)
+	opt(&model)
+
+	if model.Scope == nil {
+		t.Fatal("Scope should not be nil after WithScope")
+	}
+
+	// Verify the scope function is callable and returns expected value
+	ctx := &APIContext{}
+	result := model.Scope(ctx)
+	if result != "mock-scope" {
+		t.Errorf("Scope returned %v, want \"mock-scope\"", result)
+	}
+}
+
+// TestWithScope_NilScope verifies that not setting a scope leaves it nil.
+func TestWithScope_NilScope(t *testing.T) {
+	model := CRUDModel{}
+	if model.Scope != nil {
+		t.Error("Scope should be nil by default")
+	}
+}
+
+// TestCrudAPIContext verifies that crudAPIContext creates a proper APIContext.
+func TestCrudAPIContext(t *testing.T) {
+	app := &App{}
+
+	req := httptest.NewRequest("GET", "/test", nil)
+	ctx := app.crudAPIContext(req)
+
+	if ctx == nil {
+		t.Fatal("crudAPIContext returned nil")
+	}
+	if ctx.Request != req {
+		t.Error("APIContext.Request should match the input request")
+	}
+	if ctx.app != app {
+		t.Error("APIContext.app should match the input app")
+	}
+	// No auth configured, so user should be nil
+	if ctx.user != nil {
+		t.Error("user should be nil when auth is not configured")
+	}
+}
+
+// TestApplyCRUDScope_NilScope verifies that applyCRUDScope is a no-op when no scope is set.
+func TestApplyCRUDScope_NilScope(t *testing.T) {
+	app := &App{}
+	model := CRUDModel{} // No scope
+
+	req := httptest.NewRequest("GET", "/test", nil)
+	original := reflect.ValueOf("original-db")
+	result := app.applyCRUDScope(original, req, model)
+
+	if result.Interface() != original.Interface() {
+		t.Error("applyCRUDScope should return original dbVal when no scope is set")
+	}
+}
+
+// TestApplyCRUDScope_WithScope verifies that applyCRUDScope calls Scopes() on the db.
+func TestApplyCRUDScope_WithScope(t *testing.T) {
+	app := &App{}
+
+	scopeCalled := false
+	model := CRUDModel{
+		Scope: func(ctx *APIContext) interface{} {
+			scopeCalled = true
+			return "scope-fn"
+		},
+	}
+
+	// Use a mock that has a Scopes method
+	mockDB := &mockGormDB{scopesCalled: false}
+	req := httptest.NewRequest("GET", "/test", nil)
+
+	result := app.applyCRUDScope(reflect.ValueOf(mockDB), req, model)
+
+	if !scopeCalled {
+		t.Error("Scope function should have been called")
+	}
+	if !mockDB.scopesCalled {
+		t.Error("Scopes() method should have been called on the DB")
+	}
+	// Result should be the return value of Scopes()
+	if result.Interface() != mockDB {
+		t.Error("applyCRUDScope should return the result of Scopes()")
+	}
+}
+
+// TestApplyCRUDScope_ScopeReturnsNil verifies no-op when scope function returns nil.
+func TestApplyCRUDScope_ScopeReturnsNil(t *testing.T) {
+	app := &App{}
+
+	model := CRUDModel{
+		Scope: func(ctx *APIContext) interface{} {
+			return nil // Explicitly return nil
+		},
+	}
+
+	mockDB := &mockGormDB{}
+	req := httptest.NewRequest("GET", "/test", nil)
+
+	result := app.applyCRUDScope(reflect.ValueOf(mockDB), req, model)
+
+	if mockDB.scopesCalled {
+		t.Error("Scopes() should not be called when scope returns nil")
+	}
+	if result.Interface() != mockDB {
+		t.Error("applyCRUDScope should return original dbVal when scope returns nil")
+	}
+}
+
+// TestHandleList_NoDB_WithScope verifies handleList returns 500 with scope but no DB.
+func TestHandleList_NoDB_WithScope(t *testing.T) {
+	app := &App{} // no DB configured
+
+	model := CRUDModel{
+		Name:      "Test",
+		ModelType: reflect.TypeOf(struct{ ID uint }{}),
+		SliceType: reflect.SliceOf(reflect.TypeOf(struct{ ID uint }{})),
+		Scope: func(ctx *APIContext) interface{} {
+			return "scope"
+		},
+	}
+
+	req := httptest.NewRequest("GET", "/test", nil)
+	w := httptest.NewRecorder()
+
+	app.handleList(w, req, model)
+
+	// Should return 500 because no DB, not panic
+	if w.Code != http.StatusInternalServerError {
+		t.Errorf("expected 500 with no DB, got %d", w.Code)
+	}
+}
+
+// mockGormDB simulates a GORM *gorm.DB with Scopes() method for testing.
+type mockGormDB struct {
+	scopesCalled bool
+	scopeArg     interface{}
+}
+
+func (m *mockGormDB) Scopes(scope interface{}) *mockGormDB {
+	m.scopesCalled = true
+	m.scopeArg = scope
+	return m
+}
+
+func (m *mockGormDB) Where(query interface{}, args ...interface{}) *mockGormDB {
+	return m
+}
+
+func (m *mockGormDB) Find(dest interface{}, conds ...interface{}) *mockGormDB {
+	return m
+}
+
+func (m *mockGormDB) First(dest interface{}, conds ...interface{}) *mockGormDB {
+	return m
+}
+
+func (m *mockGormDB) Error() error {
+	return nil
+}

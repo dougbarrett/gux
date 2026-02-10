@@ -295,7 +295,19 @@ app.CRUD(models.User{},
         return user, nil
     }),
 )
+
+// Multi-tenant scoping — filters ALL CRUD queries by org_id
+app.CRUD(models.App{},
+    core.WithScope(func(ctx *core.APIContext) interface{} {
+        orgID := getOrgIDFromUser(ctx.User())
+        return func(db *gorm.DB) *gorm.DB {
+            return db.Where("org_id = ?", orgID)
+        }
+    }),
+)
 ```
+
+**WithScope** applies a GORM scope to every CRUD operation (list, get, update, delete). The scope function receives an `APIContext` with the authenticated user and request data. Records outside the scope return 404 (not 403), preventing enumeration. Composable with `WithRoles`, `WithDTO`, etc.
 
 ### Typed API Endpoints
 

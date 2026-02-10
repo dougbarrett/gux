@@ -57,6 +57,13 @@ type CreateHook func(data map[string]interface{}) (interface{}, error)
 // The hook receives the existing model and decoded JSON, returns the model to save.
 type UpdateHook func(existing interface{}, data map[string]interface{}) (interface{}, error)
 
+// ScopeFunc returns a GORM scope that is applied to all CRUD queries.
+// The scope receives an APIContext for accessing the authenticated user,
+// request data, and database. It returns a GORM-compatible scope function
+// (func(*gorm.DB) *gorm.DB) that adds WHERE clauses or other conditions.
+// Use this for multi-tenant filtering (e.g., WHERE org_id = ?).
+type ScopeFunc func(ctx *APIContext) interface{}
+
 // BeforeUploadHook is called before a file is written to storage.
 // Receives file metadata and can reject the upload by returning an error.
 type BeforeUploadHook func(meta UploadMeta) error
@@ -97,6 +104,7 @@ type CRUDModel struct {
 	OnAfterUpload      AfterUploadHook      // Optional hook called after file upload
 	OnBeforeFileDelete BeforeFileDeleteHook // Optional hook called before file deletion
 	DisableAutoCleanup bool                 // If true, don't automatically delete files on record delete/update
+	Scope              ScopeFunc            // Optional scope for query filtering (e.g., multi-tenant org_id)
 }
 
 // WithListDTO sets a DTO type for list responses.
@@ -216,6 +224,62 @@ func WithNoAutoCleanup() CRUDOption {
 	return func(m *CRUDModel) {
 		m.DisableAutoCleanup = true
 	}
+}
+
+// WithScope sets a scoping function that is applied to all CRUD queries
+// (list, get, update, delete). Use this for multi-tenant data isolation.
+// The scope function receives an APIContext and returns a GORM scope
+// (func(*gorm.DB) *gorm.DB) that adds WHERE clauses.
+//
+// Example:
+//
+//	app.CRUD(models.App{},
+//	    core.WithScope(func(ctx *core.APIContext) interface{} {
+//	        orgID := getOrgID(ctx)
+//	        return func(db *gorm.DB) *gorm.DB {
+//	            return db.Where("org_id = ?", orgID)
+//	        }
+//	    }),
+//	)
+func WithScope(scope ScopeFunc) CRUDOption {
+	return func(m *CRUDModel) {
+		m.Scope = scope
+	}
+}
+
+// crudAPIContext creates an APIContext for use in CRUD scope functions.
+func (a *App) crudAPIContext(r *http.Request) *APIContext {
+	return &APIContext{
+		Request: r,
+		app:     a,
+		user:    a.getUserFromRequest(r),
+	}
+}
+
+// applyCRUDScope applies the model's scope function to a GORM db value using
+// GORM's Scopes() method. The scope function returns a func(*gorm.DB) *gorm.DB
+// which is passed to db.Scopes().
+func (a *App) applyCRUDScope(dbVal reflect.Value, r *http.Request, model CRUDModel) reflect.Value {
+	if model.Scope == nil {
+		return dbVal
+	}
+
+	ctx := a.crudAPIContext(r)
+	scope := model.Scope(ctx)
+	if scope == nil {
+		return dbVal
+	}
+
+	scopesMethod := dbVal.MethodByName("Scopes")
+	if !scopesMethod.IsValid() {
+		return dbVal
+	}
+
+	ret := scopesMethod.Call([]reflect.Value{reflect.ValueOf(scope)})
+	if len(ret) > 0 {
+		return ret[0]
+	}
+	return dbVal
 }
 
 // DB interface for database operations (compatible with GORM)
@@ -471,6 +535,9 @@ func (a *App) handleList(w http.ResponseWriter, r *http.Request, model CRUDModel
 	// Start with the db value
 	dbVal := reflect.ValueOf(a.db)
 
+	// Apply scope for multi-tenant filtering
+	dbVal = a.applyCRUDScope(dbVal, r, model)
+
 	// Apply preloads for list queries
 	for _, preload := range model.ListPreloads {
 		preloadMethod := dbVal.MethodByName("Preload")
@@ -538,6 +605,9 @@ func (a *App) handleGet(w http.ResponseWriter, r *http.Request, model CRUDModel,
 
 	// Start with the db value
 	dbVal := reflect.ValueOf(a.db)
+
+	// Apply scope for multi-tenant filtering
+	dbVal = a.applyCRUDScope(dbVal, r, model)
 
 	// Apply preloads for detail queries
 	for _, preload := range model.DetailPreloads {
@@ -882,10 +952,13 @@ func (a *App) handleUpdate(w http.ResponseWriter, r *http.Request, model CRUDMod
 	var oldMultiFileKeys map[string][]string // old multi-file keys for cleanup
 	dbVal := reflect.ValueOf(a.db)
 
+	// Apply scope for multi-tenant filtering
+	scopedDbVal := a.applyCRUDScope(dbVal, r, model)
+
 	if model.OnUpdate != nil {
-		// Fetch existing model first
+		// Fetch existing model first (use scoped query)
 		existing := reflect.New(model.ModelType).Interface()
-		firstMethod := dbVal.MethodByName("First")
+		firstMethod := scopedDbVal.MethodByName("First")
 		if firstMethod.IsValid() {
 			ret := firstMethod.Call([]reflect.Value{reflect.ValueOf(existing), reflect.ValueOf(id)})
 			if len(ret) > 0 {
@@ -930,7 +1003,7 @@ func (a *App) handleUpdate(w http.ResponseWriter, r *http.Request, model CRUDMod
 		// Default behavior: fetch existing record first, then merge JSON fields.
 		// This preserves CreatedAt and other fields not included in the request.
 		item = reflect.New(model.ModelType).Interface()
-		firstMethod := dbVal.MethodByName("First")
+		firstMethod := scopedDbVal.MethodByName("First")
 		if firstMethod.IsValid() {
 			ret := firstMethod.Call([]reflect.Value{reflect.ValueOf(item), reflect.ValueOf(id)})
 			if len(ret) > 0 {
@@ -1055,12 +1128,19 @@ func (a *App) handleDelete(w http.ResponseWriter, r *http.Request, model CRUDMod
 
 	dbVal := reflect.ValueOf(a.db)
 
-	// If model has file fields, fetch the record first to read file keys
+	// Apply scope for multi-tenant filtering
+	scopedDbVal := a.applyCRUDScope(dbVal, r, model)
+
+	// When a scope is configured, always fetch the record first to verify
+	// it belongs to the scoped tenant. Without a scope, only fetch when
+	// file fields need cleanup. This returns 404 (not 403) for records
+	// outside the scope, preventing enumeration.
 	var fileKeys map[string]string
 	var multiFileKeys map[string][]string
-	if len(model.FileFields) > 0 || len(model.MultiFileFields) > 0 {
+	needsFetch := model.Scope != nil || len(model.FileFields) > 0 || len(model.MultiFileFields) > 0
+	if needsFetch {
 		item := reflect.New(model.ModelType).Interface()
-		firstMethod := dbVal.MethodByName("First")
+		firstMethod := scopedDbVal.MethodByName("First")
 		if firstMethod.IsValid() {
 			ret := firstMethod.Call([]reflect.Value{reflect.ValueOf(item), reflect.ValueOf(id)})
 			if len(ret) > 0 {
@@ -1090,8 +1170,8 @@ func (a *App) handleDelete(w http.ResponseWriter, r *http.Request, model CRUDMod
 		idField.SetUint(uint64(id))
 	}
 
-	// Call db.Delete(item)
-	deleteMethod := dbVal.MethodByName("Delete")
+	// Call db.Delete(item) — use scoped db to apply tenant filtering
+	deleteMethod := scopedDbVal.MethodByName("Delete")
 	if !deleteMethod.IsValid() {
 		http.Error(w, "Database does not support Delete", http.StatusInternalServerError)
 		return
