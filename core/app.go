@@ -42,6 +42,7 @@ type App struct {
 	apiEndpoints   []APIEndpoint                // Registered typed API endpoints
 	auditMigrated  bool                         // Whether audit_entries table has been auto-migrated
 	storage        Storage                      // File storage backend (nil = disabled)
+	server         *http.Server                 // Underlying server (set by Run)
 	// Cache busting hashes
 	stylesHash     string            // Hash for styles.css
 	wasmHashes     map[string]string // Hash for each WASM bundle
@@ -831,10 +832,19 @@ func (a *App) Handler() http.Handler {
 	return handler
 }
 
-// Run starts the HTTP server on the given address.
+// Run starts the HTTP server on the given address with graceful shutdown.
+// On SIGTERM or SIGINT, it stops accepting new connections and waits up to
+// 30 seconds for in-flight requests to complete before returning.
 func (a *App) Run(addr string) error {
 	fmt.Printf("http://localhost%s\n", addr)
-	return http.ListenAndServe(addr, a.Handler())
+	return a.listenAndServe(addr)
+}
+
+// Server returns the underlying *http.Server after Run has been called.
+// Returns nil if Run has not been called yet. Use this for custom shutdown
+// logic (e.g., stopping background workers before draining connections).
+func (a *App) Server() *http.Server {
+	return a.server
 }
 
 // Router provides page context and state management.
