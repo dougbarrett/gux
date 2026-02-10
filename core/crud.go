@@ -247,6 +247,42 @@ func WithScope(scope ScopeFunc) CRUDOption {
 	}
 }
 
+// checkGormError extracts the error from a GORM operation result.
+// Handles both GORM v1 (Error() method) and v2 (Error struct field).
+// Returns the error if present, nil otherwise.
+func checkGormError(result reflect.Value) error {
+	if !result.IsValid() {
+		return nil
+	}
+
+	// GORM v2: Error is a public struct field on *gorm.DB
+	val := result
+	if val.Kind() == reflect.Ptr {
+		val = val.Elem()
+	}
+	if val.Kind() == reflect.Struct {
+		errField := val.FieldByName("Error")
+		if errField.IsValid() && !errField.IsNil() {
+			if err, ok := errField.Interface().(error); ok {
+				return err
+			}
+		}
+	}
+
+	// GORM v1 fallback: Error() method
+	errMethod := result.MethodByName("Error")
+	if errMethod.IsValid() {
+		errVal := errMethod.Call(nil)
+		if len(errVal) > 0 && !errVal[0].IsNil() {
+			if err, ok := errVal[0].Interface().(error); ok {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
 // crudAPIContext creates an APIContext for use in CRUD scope functions.
 func (a *App) crudAPIContext(r *http.Request) *APIContext {
 	return &APIContext{
@@ -561,14 +597,9 @@ func (a *App) handleList(w http.ResponseWriter, r *http.Request, model CRUDModel
 
 	ret := findMethod.Call([]reflect.Value{reflect.ValueOf(results)})
 	if len(ret) > 0 {
-		// Check for error (GORM returns *gorm.DB, check Error field)
-		errField := ret[0].MethodByName("Error")
-		if errField.IsValid() {
-			errVal := errField.Call(nil)
-			if len(errVal) > 0 && !errVal[0].IsNil() {
-				http.Error(w, "Database error", http.StatusInternalServerError)
-				return
-			}
+		if err := checkGormError(ret[0]); err != nil {
+			http.Error(w, "Database error", http.StatusInternalServerError)
+			return
 		}
 	}
 
@@ -629,13 +660,9 @@ func (a *App) handleGet(w http.ResponseWriter, r *http.Request, model CRUDModel,
 
 	ret := firstMethod.Call([]reflect.Value{reflect.ValueOf(result), reflect.ValueOf(id)})
 	if len(ret) > 0 {
-		errField := ret[0].MethodByName("Error")
-		if errField.IsValid() {
-			errVal := errField.Call(nil)
-			if len(errVal) > 0 && !errVal[0].IsNil() {
-				http.Error(w, "Not found", http.StatusNotFound)
-				return
-			}
+		if err := checkGormError(ret[0]); err != nil {
+			http.Error(w, "Not found", http.StatusNotFound)
+			return
 		}
 	}
 
@@ -889,26 +916,16 @@ func (a *App) handleCreate(w http.ResponseWriter, r *http.Request, model CRUDMod
 
 	ret := createMethod.Call([]reflect.Value{reflect.ValueOf(item)})
 	if len(ret) > 0 {
-		errField := ret[0].MethodByName("Error")
-		if errField.IsValid() {
-			errVal := errField.Call(nil)
-			if len(errVal) > 0 && !errVal[0].IsNil() {
-				// Rollback: delete any uploaded files on create failure
-				if len(model.FileFields) > 0 {
-					fileKeys := getFileFieldValues(item, model.FileFields)
-					for _, key := range fileKeys {
-						a.deleteFileIfExists(model, key)
-					}
+		if err := checkGormError(ret[0]); err != nil {
+			// Rollback: delete any uploaded files on create failure
+			if len(model.FileFields) > 0 {
+				fileKeys := getFileFieldValues(item, model.FileFields)
+				for _, key := range fileKeys {
+					a.deleteFileIfExists(model, key)
 				}
-				// Get actual error message
-				errInterface := errVal[0].Interface()
-				if err, ok := errInterface.(error); ok {
-					http.Error(w, "Create failed: "+err.Error(), http.StatusInternalServerError)
-				} else {
-					http.Error(w, "Create failed", http.StatusInternalServerError)
-				}
-				return
 			}
+			http.Error(w, "Create failed: "+err.Error(), http.StatusInternalServerError)
+			return
 		}
 	}
 
@@ -962,13 +979,9 @@ func (a *App) handleUpdate(w http.ResponseWriter, r *http.Request, model CRUDMod
 		if firstMethod.IsValid() {
 			ret := firstMethod.Call([]reflect.Value{reflect.ValueOf(existing), reflect.ValueOf(id)})
 			if len(ret) > 0 {
-				errField := ret[0].MethodByName("Error")
-				if errField.IsValid() {
-					errVal := errField.Call(nil)
-					if len(errVal) > 0 && !errVal[0].IsNil() {
-						http.Error(w, "Not found", http.StatusNotFound)
-						return
-					}
+				if err := checkGormError(ret[0]); err != nil {
+					http.Error(w, "Not found", http.StatusNotFound)
+					return
 				}
 			}
 		}
@@ -1007,13 +1020,9 @@ func (a *App) handleUpdate(w http.ResponseWriter, r *http.Request, model CRUDMod
 		if firstMethod.IsValid() {
 			ret := firstMethod.Call([]reflect.Value{reflect.ValueOf(item), reflect.ValueOf(id)})
 			if len(ret) > 0 {
-				errField := ret[0].MethodByName("Error")
-				if errField.IsValid() {
-					errVal := errField.Call(nil)
-					if len(errVal) > 0 && !errVal[0].IsNil() {
-						http.Error(w, "Not found", http.StatusNotFound)
-						return
-					}
+				if err := checkGormError(ret[0]); err != nil {
+					http.Error(w, "Not found", http.StatusNotFound)
+					return
 				}
 			}
 		}
@@ -1048,13 +1057,9 @@ func (a *App) handleUpdate(w http.ResponseWriter, r *http.Request, model CRUDMod
 
 	ret := saveMethod.Call([]reflect.Value{reflect.ValueOf(item)})
 	if len(ret) > 0 {
-		errField := ret[0].MethodByName("Error")
-		if errField.IsValid() {
-			errVal := errField.Call(nil)
-			if len(errVal) > 0 && !errVal[0].IsNil() {
-				http.Error(w, "Update failed", http.StatusInternalServerError)
-				return
-			}
+		if err := checkGormError(ret[0]); err != nil {
+			http.Error(w, "Update failed", http.StatusInternalServerError)
+			return
 		}
 	}
 
@@ -1144,13 +1149,9 @@ func (a *App) handleDelete(w http.ResponseWriter, r *http.Request, model CRUDMod
 		if firstMethod.IsValid() {
 			ret := firstMethod.Call([]reflect.Value{reflect.ValueOf(item), reflect.ValueOf(id)})
 			if len(ret) > 0 {
-				errField := ret[0].MethodByName("Error")
-				if errField.IsValid() {
-					errVal := errField.Call(nil)
-					if len(errVal) > 0 && !errVal[0].IsNil() {
-						http.Error(w, "Not found", http.StatusNotFound)
-						return
-					}
+				if err := checkGormError(ret[0]); err != nil {
+					http.Error(w, "Not found", http.StatusNotFound)
+					return
 				}
 			}
 			if len(model.FileFields) > 0 {
@@ -1170,8 +1171,10 @@ func (a *App) handleDelete(w http.ResponseWriter, r *http.Request, model CRUDMod
 		idField.SetUint(uint64(id))
 	}
 
-	// Call db.Delete(item) — use scoped db to apply tenant filtering
-	deleteMethod := scopedDbVal.MethodByName("Delete")
+	// Call db.Delete(item) — use unscoped db since ownership was already verified
+	// by the scoped First() call above. Using scoped db here would leak WHERE
+	// clauses into GORM's AfterDelete hooks on different tables.
+	deleteMethod := dbVal.MethodByName("Delete")
 	if !deleteMethod.IsValid() {
 		http.Error(w, "Database does not support Delete", http.StatusInternalServerError)
 		return
@@ -1179,13 +1182,9 @@ func (a *App) handleDelete(w http.ResponseWriter, r *http.Request, model CRUDMod
 
 	ret := deleteMethod.Call([]reflect.Value{reflect.ValueOf(item)})
 	if len(ret) > 0 {
-		errField := ret[0].MethodByName("Error")
-		if errField.IsValid() {
-			errVal := errField.Call(nil)
-			if len(errVal) > 0 && !errVal[0].IsNil() {
-				http.Error(w, "Delete failed", http.StatusInternalServerError)
-				return
-			}
+		if err := checkGormError(ret[0]); err != nil {
+			http.Error(w, "Delete failed", http.StatusInternalServerError)
+			return
 		}
 	}
 

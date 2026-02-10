@@ -1188,3 +1188,97 @@ func (m *mockGormDB) First(dest interface{}, conds ...interface{}) *mockGormDB {
 func (m *mockGormDB) Error() error {
 	return nil
 }
+
+// --- checkGormError tests ---
+
+// gormV2Like simulates GORM v2 where Error is a struct field
+type gormV2Like struct {
+	Error error
+}
+
+// gormV1Like simulates GORM v1 where Error() is a method
+type gormV1Like struct {
+	err error
+}
+
+func (g *gormV1Like) Error() error {
+	return g.err
+}
+
+func TestCheckGormError_V2StructField_WithError(t *testing.T) {
+	testErr := errors.New("record not found")
+	v2 := &gormV2Like{Error: testErr}
+	got := checkGormError(reflect.ValueOf(v2))
+	if got != testErr {
+		t.Errorf("checkGormError(v2 with error) = %v, want %v", got, testErr)
+	}
+}
+
+func TestCheckGormError_V2StructField_NilError(t *testing.T) {
+	v2 := &gormV2Like{Error: nil}
+	got := checkGormError(reflect.ValueOf(v2))
+	if got != nil {
+		t.Errorf("checkGormError(v2 nil error) = %v, want nil", got)
+	}
+}
+
+func TestCheckGormError_V1Method_WithError(t *testing.T) {
+	testErr := errors.New("delete failed")
+	v1 := &gormV1Like{err: testErr}
+	got := checkGormError(reflect.ValueOf(v1))
+	if got != testErr {
+		t.Errorf("checkGormError(v1 with error) = %v, want %v", got, testErr)
+	}
+}
+
+func TestCheckGormError_V1Method_NilError(t *testing.T) {
+	v1 := &gormV1Like{err: nil}
+	got := checkGormError(reflect.ValueOf(v1))
+	if got != nil {
+		t.Errorf("checkGormError(v1 nil error) = %v, want nil", got)
+	}
+}
+
+func TestCheckGormError_InvalidValue(t *testing.T) {
+	got := checkGormError(reflect.Value{})
+	if got != nil {
+		t.Errorf("checkGormError(invalid) = %v, want nil", got)
+	}
+}
+
+func TestCheckGormError_NonStructNonMethod(t *testing.T) {
+	// Pass a plain string — no Error field or method
+	got := checkGormError(reflect.ValueOf("hello"))
+	if got != nil {
+		t.Errorf("checkGormError(string) = %v, want nil", got)
+	}
+}
+
+// TestHandleDelete_UsesUnscopedDB verifies that the delete handler uses the
+// unscoped db for the actual Delete call (not the scoped db which would leak
+// WHERE clauses into GORM AfterDelete hooks).
+func TestHandleDelete_UsesUnscopedDB(t *testing.T) {
+	// This is a code inspection test — verify the fix is in place by checking
+	// that the delete comment mentions "unscoped" and the code uses dbVal
+	// We verify this by searching the source for the expected pattern
+	src, err := os.ReadFile("crud.go")
+	if err != nil {
+		t.Fatal("could not read crud.go:", err)
+	}
+	content := string(src)
+
+	// The delete should use unscoped db, not scoped
+	if !strings.Contains(content, "use unscoped db since ownership was already verified") {
+		t.Error("handleDelete should contain comment about using unscoped db")
+	}
+
+	// Should NOT have the old pattern of scopedDbVal.MethodByName("Delete")
+	if strings.Contains(content, `scopedDbVal.MethodByName("Delete")`) {
+		t.Error("handleDelete should use dbVal.MethodByName(\"Delete\"), not scopedDbVal")
+	}
+
+	// Should have the new pattern
+	if !strings.Contains(content, `dbVal.MethodByName("Delete")`) {
+		t.Error("handleDelete should contain dbVal.MethodByName(\"Delete\")")
+	}
+}
