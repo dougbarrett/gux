@@ -2281,14 +2281,15 @@ func generateBundleWasmEntryPoint(bundleName string, bundle *BundleInfo, apiImpo
 	imports := bundle.Imports
 
 	// Build the router/page matching code
-	// Note: 'path' is already declared in loadPage(), so we just use it here
+	// 'path' is only declared when needed (multi-route bundles use it for switch/if matching)
 	var routeCode strings.Builder
 	if len(routes) == 1 && !strings.Contains(routes[0].Path, ":") {
 		// Single non-parameterized route - simple case
 		routeCode.WriteString(fmt.Sprintf("\t\tcomponent := %s(router)\n", routes[0].Handler))
 	} else {
 		// Multiple routes or parameterized routes - need pattern matching
-		// Note: 'path' is already declared in loadPage()
+		routeCode.WriteString("\t\t// Use pathname only for route matching (query params don't affect component selection)\n")
+		routeCode.WriteString("\t\tpath := js.Global().Get(\"location\").Get(\"pathname\").String()\n")
 		routeCode.WriteString("\t\tvar component func() core.Node\n")
 
 		// Separate exact routes from parameterized routes
@@ -2688,8 +2689,6 @@ func main() {
 			return
 		}
 		currentPath = fullPath
-		// Use pathname only for route matching (query params don't affect component selection)
-		path := js.Global().Get("location").Get("pathname").String()
 %s
 		currentComponent = component
 	}

@@ -3671,3 +3671,125 @@ func TestGenerateBundleWasmEntryPoint_WithoutAPIImport(t *testing.T) {
 		}
 	})
 }
+
+// TestGenerateBundleWasmEntryPoint_SingleRoute verifies that single-route bundles
+// don't declare an unused 'path' variable (#117).
+func TestGenerateBundleWasmEntryPoint_SingleRoute(t *testing.T) {
+	t.Run("single route omits path variable", func(t *testing.T) {
+		dir := t.TempDir()
+		origDir, _ := os.Getwd()
+		os.Chdir(dir)
+		defer os.Chdir(origDir)
+
+		bundle := &BundleInfo{
+			Name: "public",
+			Routes: []PageRoute{
+				{Path: "/", Handler: "pages.Home", IsHybrid: true, Bundle: "public"},
+			},
+			Imports: []BundleImport{
+				{Path: "myapp/pages"},
+			},
+		}
+
+		err := generateBundleWasmEntryPoint("public", bundle, "")
+		if err != nil {
+			t.Fatalf("generateBundleWasmEntryPoint: %v", err)
+		}
+
+		content, err := os.ReadFile("guxgen/wasm_public/main.go")
+		if err != nil {
+			t.Fatalf("read generated file: %v", err)
+		}
+
+		code := string(content)
+
+		// Single-route bundle should NOT declare 'path' (it's unused without a switch)
+		if strings.Contains(code, "path := js.Global()") {
+			t.Error("single-route bundle should not declare 'path' variable — causes unused variable compile error")
+		}
+
+		// Should directly assign the component
+		if !strings.Contains(code, "component := pages.Home(router)") {
+			t.Error("single-route bundle should directly assign component")
+		}
+
+		// Should NOT have a switch statement
+		if strings.Contains(code, "switch path {") {
+			t.Error("single-route bundle should not have switch statement")
+		}
+	})
+
+	t.Run("multi-route declares path variable", func(t *testing.T) {
+		dir := t.TempDir()
+		origDir, _ := os.Getwd()
+		os.Chdir(dir)
+		defer os.Chdir(origDir)
+
+		bundle := &BundleInfo{
+			Name: "app",
+			Routes: []PageRoute{
+				{Path: "/", Handler: "pages.Home", IsHybrid: true, Bundle: "app"},
+				{Path: "/about", Handler: "pages.About", IsHybrid: true, Bundle: "app"},
+			},
+			Imports: []BundleImport{
+				{Path: "myapp/pages"},
+			},
+		}
+
+		err := generateBundleWasmEntryPoint("app", bundle, "")
+		if err != nil {
+			t.Fatalf("generateBundleWasmEntryPoint: %v", err)
+		}
+
+		content, err := os.ReadFile("guxgen/wasm/main.go")
+		if err != nil {
+			t.Fatalf("read generated file: %v", err)
+		}
+
+		code := string(content)
+
+		// Multi-route bundle SHOULD declare 'path' for the switch statement
+		if !strings.Contains(code, "path := js.Global()") {
+			t.Error("multi-route bundle should declare 'path' variable for route matching")
+		}
+
+		// Should have a switch statement
+		if !strings.Contains(code, "switch path {") {
+			t.Error("multi-route bundle should have switch statement")
+		}
+	})
+
+	t.Run("single parameterized route declares path variable", func(t *testing.T) {
+		dir := t.TempDir()
+		origDir, _ := os.Getwd()
+		os.Chdir(dir)
+		defer os.Chdir(origDir)
+
+		bundle := &BundleInfo{
+			Name: "detail",
+			Routes: []PageRoute{
+				{Path: "/items/:id", Handler: "pages.ItemDetail", IsHybrid: true, Bundle: "detail"},
+			},
+			Imports: []BundleImport{
+				{Path: "myapp/pages"},
+			},
+		}
+
+		err := generateBundleWasmEntryPoint("detail", bundle, "")
+		if err != nil {
+			t.Fatalf("generateBundleWasmEntryPoint: %v", err)
+		}
+
+		content, err := os.ReadFile("guxgen/wasm_detail/main.go")
+		if err != nil {
+			t.Fatalf("read generated file: %v", err)
+		}
+
+		code := string(content)
+
+		// Single parameterized route still needs 'path' for param extraction
+		if !strings.Contains(code, "path := js.Global()") {
+			t.Error("single parameterized route should declare 'path' for param extraction")
+		}
+	})
+}
