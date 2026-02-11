@@ -294,6 +294,12 @@ func generateGuxFiles(serverDir string) error {
 		}
 	}
 
+	// Generate JavaScript API client for Alpine.js mode
+	fmt.Println("Generating JavaScript API client...")
+	if err := generateAPIJS(apiEndpoints, crudModels); err != nil {
+		return fmt.Errorf("generating API JS: %w", err)
+	}
+
 	// Determine if we have any async API calls (CRUD or endpoints)
 	hasAsyncAPI := len(crudModels) > 0 || len(apiEndpoints) > 0
 

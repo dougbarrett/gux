@@ -59,6 +59,12 @@ type InputProps struct {
 	// When set, Value and OnChange are automatically handled.
 	// Usage: Bind: r.StateString("email", "")
 	Bind StringState
+
+	// Alpine.js props (used when in Alpine mode)
+	XModel    string // x-model expression (e.g., "email")
+	XOnChange string // x-on:change expression
+	XOnInput  string // x-on:input expression
+	XOnEnter  string // x-on:keydown.enter expression
 }
 
 // Input creates a styled text input component.
@@ -119,6 +125,24 @@ func Input(props InputProps) core.Node {
 		Class:    class,
 		OnChange: onChange,
 		OnEnter:  props.OnEnter,
+	}
+
+	// Alpine.js directives
+	if props.XModel != "" {
+		attrs.XModel = props.XModel
+	}
+	xOn := make(map[string]string)
+	if props.XOnChange != "" {
+		xOn["change"] = props.XOnChange
+	}
+	if props.XOnInput != "" {
+		xOn["input"] = props.XOnInput
+	}
+	if props.XOnEnter != "" {
+		xOn["keydown.enter"] = props.XOnEnter
+	}
+	if len(xOn) > 0 {
+		attrs.XOn = xOn
 	}
 
 	// Build extra attributes

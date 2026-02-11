@@ -76,6 +76,22 @@ type Attrs struct {
 	// instances, removing global event listeners, etc.
 	OnUnmount func()
 
+	// Alpine.js directives
+	XData       string            // x-data="{open: false}"
+	XShow       string            // x-show="open"
+	XModel      string            // x-model="email"
+	XInit       string            // x-init="..."
+	XRef        string            // x-ref="inputEl"
+	XText       string            // x-text="count"
+	XCloak      bool              // x-cloak (boolean attr, no value)
+	XTransition string            // x-transition or x-transition.duration.500ms
+	XOn         map[string]string // "click" → "open = true", "submit.prevent" → "handle()"
+	XBind       map[string]string // "class" → "{ active: isActive }", "disabled" → "loading"
+	XIf         string            // x-if (wraps in <template>)
+	XFor        string            // x-for="item in items" (wraps in <template>)
+	XEffect     string            // x-effect="..."
+	XHTML       string            // x-html="rawContent"
+
 	// Additional attributes not covered above
 	Extra map[string]string
 }

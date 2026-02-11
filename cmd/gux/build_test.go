@@ -2013,16 +2013,17 @@ func TestFindMainAppFile(t *testing.T) {
 	})
 }
 
-// TestGenerateAssetsFile_NoWASM tests that SSR-only apps get CSS-only assets.
+// TestGenerateAssetsFile_NoWASM tests that non-WASM apps get Alpine mode assets.
 func TestGenerateAssetsFile_NoWASM(t *testing.T) {
 	dir := t.TempDir()
 	origDir, _ := os.Getwd()
 	os.Chdir(dir)
 	defer os.Chdir(origDir)
 
-	// Create the styles.css file that will be embedded
+	// Create the asset files that will be embedded
 	os.MkdirAll("guxgen/dist", 0755)
 	os.WriteFile("guxgen/dist/styles.css", []byte("body{}"), 0644)
+	os.WriteFile("guxgen/dist/api.js", []byte("const API = {};"), 0644)
 
 	err := generateAssetsFile("github.com/test/app", nil, "", false)
 	if err != nil {
@@ -2037,13 +2038,16 @@ func TestGenerateAssetsFile_NoWASM(t *testing.T) {
 	embedCode := string(embedContent)
 
 	if strings.Contains(embedCode, "app.wasm") {
-		t.Error("SSR-only embed should not reference app.wasm")
+		t.Error("Alpine mode embed should not reference app.wasm")
 	}
 	if strings.Contains(embedCode, "wasm_exec.js") {
-		t.Error("SSR-only embed should not reference wasm_exec.js")
+		t.Error("Alpine mode embed should not reference wasm_exec.js")
 	}
 	if !strings.Contains(embedCode, "styles.css") {
-		t.Error("SSR-only embed should reference styles.css")
+		t.Error("Alpine mode embed should reference styles.css")
+	}
+	if !strings.Contains(embedCode, "api.js") {
+		t.Error("Alpine mode embed should reference api.js")
 	}
 
 	// Check assets_gen.go (init file)
@@ -2054,13 +2058,13 @@ func TestGenerateAssetsFile_NoWASM(t *testing.T) {
 	initCode := string(initContent)
 
 	if !strings.Contains(initCode, "dist.StylesCSS") {
-		t.Error("SSR-only init should reference dist.StylesCSS")
+		t.Error("Alpine mode init should reference dist.StylesCSS")
 	}
-	if !strings.Contains(initCode, "core.SetDefaultAssets(nil, nil, dist.StylesCSS)") {
-		t.Error("SSR-only init should call SetDefaultAssets(nil, nil, dist.StylesCSS)")
+	if !strings.Contains(initCode, "core.SetAlpineAssets(dist.APIJS, dist.StylesCSS)") {
+		t.Error("Alpine mode init should call SetAlpineAssets(dist.APIJS, dist.StylesCSS)")
 	}
 	if strings.Contains(initCode, "WasmBinary") {
-		t.Error("SSR-only init should not reference WasmBinary")
+		t.Error("Alpine mode init should not reference WasmBinary")
 	}
 }
 

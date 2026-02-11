@@ -107,6 +107,9 @@ func (s *State[T]) Set(val T) {
 	}
 }
 
+// Key returns the state key name. Useful for Alpine.js x-model binding.
+func (s *State[T]) Key() string { return s.key }
+
 // SetQuiet updates the state WITHOUT triggering a re-render.
 // Use this for input field updates where you want to track the value
 // but don't need to re-render the UI on every keystroke.
@@ -326,6 +329,20 @@ func (r *Router) HasAnyRole(roles ...string) bool {
 		return false
 	}
 	return r.user.HasAnyRole(roles...)
+}
+
+// XDataJSON returns all state key-value pairs as a JSON string suitable for
+// the page root x-data attribute. This enables Alpine.js to manage the same
+// state that was initialized via StateString/StateInt/StateBool.
+func (r *Router) XDataJSON() string {
+	if len(r.state) == 0 {
+		return "{}"
+	}
+	data, err := json.Marshal(r.state)
+	if err != nil {
+		return "{}"
+	}
+	return string(data)
 }
 
 // HasAllRoles checks if the current user has all of the specified roles.

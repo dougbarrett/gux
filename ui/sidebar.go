@@ -9,6 +9,10 @@ type SidebarProps struct {
 	OnCloseMobile func()      // Callback when clicking overlay or close button
 	Class         string      // Additional classes
 	Children      []core.Node // SidebarHeader, SidebarNav, SidebarFooter
+
+	// Alpine.js props
+	XMobileShow    string // x-show expression for mobile overlay
+	XOnCloseMobile string // x-on:click expression for mobile close
 }
 
 // Sidebar creates a responsive sidebar navigation container.
@@ -62,7 +66,18 @@ func Sidebar(props SidebarProps) core.Node {
 	children := []core.Node{}
 
 	// Mobile overlay (hidden on desktop)
-	if props.OnCloseMobile != nil {
+	if props.XMobileShow != "" {
+		// Alpine-controlled mobile overlay
+		overlayAttrs := core.Attrs{
+			Class:       "fixed inset-0 bg-black/50 z-40 md:hidden",
+			XShow:       props.XMobileShow,
+			XTransition: "true",
+		}
+		if props.XOnCloseMobile != "" {
+			overlayAttrs.XOn = map[string]string{"click": props.XOnCloseMobile}
+		}
+		children = append(children, core.Div(overlayAttrs))
+	} else if props.OnCloseMobile != nil {
 		overlayClass := MergeClasses(
 			"fixed inset-0 bg-black/50 z-40 md:hidden",
 			ConditionalClass(!props.MobileOpen, "hidden"),

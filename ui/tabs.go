@@ -73,6 +73,10 @@ type TabProps struct {
 	Disabled bool        // Disabled state
 	Class    string      // Additional classes
 	Children []core.Node // Tab label content
+
+	// Alpine.js props
+	XActive   string // x-bind:class expression for active state
+	XOnSelect string // x-on:click expression for tab selection
 }
 
 // Tab class constants
@@ -135,11 +139,21 @@ func Tab(props TabProps) core.Node {
 		extra["aria-disabled"] = "true"
 	}
 
-	return core.Button(core.Attrs{
+	attrs := core.Attrs{
 		Class:   class,
 		OnClick: props.OnSelect,
 		Extra:   extra,
-	}, props.Children...)
+	}
+
+	// Alpine.js directives
+	if props.XOnSelect != "" {
+		attrs.XOn = map[string]string{"click": props.XOnSelect}
+	}
+	if props.XActive != "" {
+		attrs.XBind = map[string]string{"class": props.XActive}
+	}
+
+	return core.Button(attrs, props.Children...)
 }
 
 // TabPanelProps configures a TabPanel component.
@@ -147,6 +161,9 @@ type TabPanelProps struct {
 	Active   bool        // Whether this panel is visible
 	Class    string      // Additional classes
 	Children []core.Node // Panel content
+
+	// Alpine.js props
+	XShow string // x-show expression for panel visibility
 }
 
 // TabPanel creates a tab content panel.
@@ -167,11 +184,19 @@ func TabPanel(props TabPanelProps) core.Node {
 		props.Class,
 	)
 
-	return core.Div(core.Attrs{
+	attrs := core.Attrs{
 		Class: class,
 		Extra: map[string]string{
 			"role":     "tabpanel",
 			"tabindex": "0",
 		},
-	}, props.Children...)
+	}
+
+	// Alpine.js directives
+	if props.XShow != "" {
+		attrs.XShow = props.XShow
+		attrs.XCloak = true
+	}
+
+	return core.Div(attrs, props.Children...)
 }

@@ -31,6 +31,10 @@ type ButtonProps struct {
 	Type     string        // Button type: "button", "submit", "reset" (default: "button")
 	OnClick  func()        // Click handler (WASM only)
 	Children []core.Node   // Button content
+
+	// Alpine.js props (used when in Alpine mode)
+	XOnClick  string // x-on:click expression (e.g., "login()")
+	XDisabled string // x-bind:disabled expression (e.g., "loading")
 }
 
 // buttonVariantClasses maps variants to their Tailwind classes.
@@ -97,11 +101,20 @@ func Button(props ButtonProps) core.Node {
 		OnClick: props.OnClick,
 	}
 
+	// Alpine.js directives
+	if props.XOnClick != "" {
+		attrs.XOn = map[string]string{"click": props.XOnClick}
+	}
+	if props.XDisabled != "" {
+		attrs.XBind = map[string]string{"disabled": props.XDisabled}
+	}
+
 	// Add disabled attribute when disabled
 	if props.Disabled {
-		attrs.Extra = map[string]string{
-			"disabled": "disabled",
+		if attrs.Extra == nil {
+			attrs.Extra = make(map[string]string)
 		}
+		attrs.Extra["disabled"] = "disabled"
 	}
 
 	return core.El("button", attrs, props.Children...)

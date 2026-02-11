@@ -37,6 +37,10 @@ type SelectProps struct {
 	// When set, Value and OnChange are automatically handled.
 	// Usage: Bind: r.StateString("country", "")
 	Bind StringState
+
+	// Alpine.js props (used when in Alpine mode)
+	XModel    string // x-model expression (e.g., "country")
+	XOnChange string // x-on:change expression
 }
 
 // Select creates a styled dropdown select component.
@@ -99,6 +103,14 @@ func Select(props SelectProps) core.Node {
 		Name:     props.Name,
 		Class:    class,
 		OnChange: onChange,
+	}
+
+	// Alpine.js directives
+	if props.XModel != "" {
+		attrs.XModel = props.XModel
+	}
+	if props.XOnChange != "" {
+		attrs.XOn = map[string]string{"change": props.XOnChange}
 	}
 
 	// Build extra attributes

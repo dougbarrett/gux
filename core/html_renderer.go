@@ -79,6 +79,31 @@ func (r *HTMLRenderer) RenderElement(tag string, attrs Attrs, children []Node) R
 		writeAttr(k, v)
 	}
 
+	// Alpine.js directives
+	writeAttr("x-data", attrs.XData)
+	writeAttr("x-show", attrs.XShow)
+	writeAttr("x-model", attrs.XModel)
+	writeAttr("x-init", attrs.XInit)
+	writeAttr("x-ref", attrs.XRef)
+	writeAttr("x-text", attrs.XText)
+	writeAttr("x-effect", attrs.XEffect)
+	writeAttr("x-html", attrs.XHTML)
+	if attrs.XCloak {
+		b.WriteString(" x-cloak")
+	}
+	if attrs.XTransition != "" {
+		if attrs.XTransition == "true" {
+			b.WriteString(" x-transition")
+		} else {
+			writeAttr("x-transition", attrs.XTransition)
+		}
+	}
+	for event, expr := range attrs.XOn {
+		writeAttr("x-on:"+event, expr)
+	}
+	for prop, expr := range attrs.XBind {
+		writeAttr("x-bind:"+prop, expr)
+	}
 	// Self-closing tags
 	selfClosing := map[string]bool{
 		"area": true, "base": true, "br": true, "col": true,
@@ -89,25 +114,33 @@ func (r *HTMLRenderer) RenderElement(tag string, attrs Attrs, children []Node) R
 
 	if selfClosing[tag] {
 		b.WriteString(" />")
-		return &htmlResult{html: b.String()}
-	}
+	} else {
+		b.WriteString(">")
 
-	b.WriteString(">")
-
-	// Render children
-	for _, child := range children {
-		if child == nil {
-			continue
+		// Render children
+		for _, child := range children {
+			if child == nil {
+				continue
+			}
+			result := child.Render(r)
+			b.WriteString(result.HTML())
 		}
-		result := child.Render(r)
-		b.WriteString(result.HTML())
+
+		b.WriteString("</")
+		b.WriteString(tag)
+		b.WriteString(">")
 	}
 
-	b.WriteString("</")
-	b.WriteString(tag)
-	b.WriteString(">")
+	// Wrap in <template> for x-if or x-for
+	result := b.String()
+	if attrs.XIf != "" {
+		result = fmt.Sprintf(`<template x-if="%s">%s</template>`, html.EscapeString(attrs.XIf), result)
+	}
+	if attrs.XFor != "" {
+		result = fmt.Sprintf(`<template x-for="%s">%s</template>`, html.EscapeString(attrs.XFor), result)
+	}
 
-	return &htmlResult{html: b.String()}
+	return &htmlResult{html: result}
 }
 
 func (r *HTMLRenderer) RenderFragment(children []Node) RenderResult {

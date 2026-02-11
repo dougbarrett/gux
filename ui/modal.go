@@ -30,6 +30,10 @@ type ModalProps struct {
 	Size     ModalSize   // Width size (default: md)
 	Class    string      // Additional classes for modal container
 	Children []core.Node // Modal content
+
+	// Alpine.js props
+	XShow    string // x-show expression (e.g., "modalOpen")
+	XOnClose string // x-on:click expression for close button (e.g., "modalOpen = false")
 }
 
 // Modal creates an accessible modal dialog.
@@ -98,7 +102,7 @@ func Modal(props ModalProps) core.Node {
 	var content []core.Node
 
 	// Header with title and close button (when either Title or OnClose provided)
-	if props.Title != "" || props.OnClose != nil {
+	if props.Title != "" || props.OnClose != nil || props.XOnClose != "" {
 		headerChildren := []core.Node{}
 
 		if props.Title != "" {
@@ -113,13 +117,18 @@ func Modal(props ModalProps) core.Node {
 			headerChildren = append(headerChildren, core.Div(core.Attrs{}))
 		}
 
-		if props.OnClose != nil {
+		if props.OnClose != nil || props.XOnClose != "" {
+			closeAttrs := core.Attrs{
+				Class: "text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-2xl leading-none cursor-pointer",
+				Extra: map[string]string{"aria-label": "Close"},
+			}
+			if props.XOnClose != "" {
+				closeAttrs.XOn = map[string]string{"click": props.XOnClose}
+			} else {
+				closeAttrs.OnClick = props.OnClose
+			}
 			headerChildren = append(headerChildren,
-				core.Button(core.Attrs{
-					Class:   "text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-2xl leading-none cursor-pointer",
-					OnClick: props.OnClose,
-					Extra:   map[string]string{"aria-label": "Close"},
-				}, core.Text("×")),
+				core.Button(closeAttrs, core.Text("×")),
 			)
 		}
 
@@ -132,10 +141,22 @@ func Modal(props ModalProps) core.Node {
 	// Children
 	content = append(content, props.Children...)
 
-	return core.Div(core.Attrs{
+	overlayAttrs := core.Attrs{
 		Class:   overlayClass,
 		OnClick: props.OnClose, // Clicking backdrop closes
-	},
+	}
+
+	// Alpine.js directives on overlay
+	if props.XShow != "" {
+		overlayAttrs.XShow = props.XShow
+		overlayAttrs.XCloak = true
+		overlayAttrs.XTransition = "true"
+	}
+	if props.XOnClose != "" {
+		overlayAttrs.XOn = map[string]string{"click": props.XOnClose}
+	}
+
+	return core.Div(overlayAttrs,
 		core.Div(modalAttrs, content...),
 	)
 }

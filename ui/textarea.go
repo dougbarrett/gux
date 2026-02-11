@@ -39,6 +39,11 @@ type TextareaProps struct {
 	Required    bool           // Required indicator
 	Error       string         // Error message (adds aria-invalid)
 	OnChange    func(string)   // Value change handler (WASM only)
+
+	// Alpine.js props
+	XModel    string // x-model expression
+	XOnChange string // x-on:change expression
+	XOnInput  string // x-on:input expression
 }
 
 // Textarea creates a styled multi-line text input component.
@@ -85,6 +90,21 @@ func Textarea(props TextareaProps) core.Node {
 		Name:     props.Name,
 		Class:    class,
 		OnChange: props.OnChange,
+	}
+
+	// Alpine.js directives
+	if props.XModel != "" {
+		attrs.XModel = props.XModel
+	}
+	xOn := make(map[string]string)
+	if props.XOnChange != "" {
+		xOn["change"] = props.XOnChange
+	}
+	if props.XOnInput != "" {
+		xOn["input"] = props.XOnInput
+	}
+	if len(xOn) > 0 {
+		attrs.XOn = xOn
 	}
 
 	// Build extra attributes

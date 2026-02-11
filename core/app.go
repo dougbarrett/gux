@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"os"
 	"strings"
+
+	"github.com/a-h/templ"
 )
 
 // Route represents a registered route.
@@ -40,6 +42,8 @@ type App struct {
 	auditMigrated  bool                         // Whether audit_entries table has been auto-migrated
 	storage        Storage                      // File storage backend (nil = disabled)
 	server         *http.Server                 // Underlying server (set by Run)
+	alpineMode     bool                         // Alpine.js mode (SSR + Alpine, no WASM)
+	apiJS          []byte                       // Generated API.js for Alpine mode
 	// Cache busting hashes
 	stylesHash     string            // Hash for styles.css
 	wasmHashes     map[string]string // Hash for each WASM bundle
@@ -52,6 +56,18 @@ var defaultWasmExecJS []byte
 var defaultStylesCSS []byte
 var defaultStylesHash string
 var defaultWasmHashes = make(map[string]string)
+
+// Alpine mode assets (set by generated code)
+var defaultAlpineMode bool
+var defaultAPIJS []byte
+
+// SetAlpineAssets sets the Alpine.js mode assets (api.js + styles.css).
+// Called by generated assets_gen.go in init() for Alpine mode apps.
+func SetAlpineAssets(apiJS, stylesCSS []byte) {
+	defaultAlpineMode = true
+	defaultAPIJS = apiJS
+	defaultStylesCSS = stylesCSS
+}
 
 // matchRoute checks if a URL path matches a route pattern and extracts parameters.
 // Pattern "/users/:id" matches path "/users/123" and returns {"id": "123"}.
@@ -128,6 +144,8 @@ func New() *App {
 		stylesCSS:   defaultStylesCSS,
 		stylesHash:  defaultStylesHash,
 		wasmHashes:  hashes,
+		alpineMode:  defaultAlpineMode,
+		apiJS:       defaultAPIJS,
 		csrfConfig:  DefaultCSRFConfig(), // CSRF enabled by default
 	}
 }
@@ -238,6 +256,14 @@ func (a *App) SetAssets(wasmBinary, wasmExecJS []byte) {
 // SetTitle sets the page title.
 func (a *App) SetTitle(title string) {
 	a.title = title
+}
+
+// UseAlpine enables Alpine.js mode (SSR + Alpine.js, no WASM).
+// When enabled, Hybrid routes render via templ shell + Alpine.js
+// instead of SSR + WASM hydration.
+func (a *App) UseAlpine() *App {
+	a.alpineMode = true
+	return a
 }
 
 // DarkMode enables dark mode for the application.
@@ -495,6 +521,14 @@ func (a *App) Handler() http.Handler {
 		})
 	}
 
+	// Serve api.js for Alpine mode
+	if len(a.apiJS) > 0 {
+		mux.HandleFunc("/api.js", func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/javascript")
+			w.Write(a.apiJS)
+		})
+	}
+
 	// Register page loader endpoints (for client-side navigation)
 	// We need custom matching for parameterized routes
 	mux.HandleFunc(a.apiPrefix+"/pages/", func(w http.ResponseWriter, r *http.Request) {
@@ -674,24 +708,30 @@ func (a *App) Handler() http.Handler {
 				router := NewRouterWithAuth(a.db, params, user, r, w, a.authConfig)
 				router.sessionID = sessionID
 				component := route.Handler(router)
-				html := component().Render(HTML()).HTML()
 
-				// Clear session/cookie context after rendering
-				if SSRSessionClearer != nil {
-					SSRSessionClearer()
+				// Get or generate CSRF token
+				csrfToken := ""
+				if a.csrfConfig.Enabled {
+					csrfToken = getCSRFFromCookie(r)
+					if csrfToken == "" {
+						var err error
+						csrfToken, err = generateCSRFToken()
+						if err == nil {
+							setCSRFCookie(w, csrfToken, a.csrfConfig)
+						}
+					}
 				}
-				if SSRCookieClearer != nil {
-					SSRCookieClearer()
+
+				// Build dark mode class
+				htmlClass := ""
+				if a.darkMode {
+					htmlClass = "dark"
 				}
 
-				w.Header().Set("Content-Type", "text/html")
-
-				// Determine which WASM to use
-				wasmPath := "/app.wasm"
-				hasWasm := len(a.wasmBinary) > 0
-				if route.Bundle != "" {
-					wasmPath = "/" + route.Bundle + ".wasm"
-					_, hasWasm = a.wasmBundles[route.Bundle]
+				// Build cache-busted asset URLs
+				stylesURL := "/styles.css"
+				if a.stylesHash != "" {
+					stylesURL = fmt.Sprintf("/styles.css?v=%s", a.stylesHash)
 				}
 
 				// Check if hot reload is enabled (gux dev --watch)
@@ -728,18 +768,54 @@ func (a *App) Handler() http.Handler {
     </script>`
 				}
 
-				// Get or generate CSRF token
-				csrfToken := ""
-				if a.csrfConfig.Enabled {
-					// Reuse existing cookie token to avoid meta/cookie desync
-					csrfToken = getCSRFFromCookie(r)
-					if csrfToken == "" {
-						var err error
-						csrfToken, err = generateCSRFToken()
-						if err == nil {
-							setCSRFCookie(w, csrfToken, a.csrfConfig)
-						}
+				// Alpine.js mode: stream HTML via templ shell
+				if a.alpineMode && route.Hybrid {
+					nodeTree := component()
+
+					// Clear session/cookie context after rendering
+					if SSRSessionClearer != nil {
+						SSRSessionClearer()
 					}
+					if SSRCookieClearer != nil {
+						SSRCookieClearer()
+					}
+
+					w.Header().Set("Content-Type", "text/html")
+
+					// Build xData from router state (Alpine manages the state)
+					xData := router.XDataJSON()
+
+					// Render using templ shell with streaming
+					content := AsComponent(nodeTree)
+					if hotReloadScript != "" {
+						shell := PageShellWithScripts(a.title, csrfToken, stylesURL, xData, htmlClass, hotReloadScript)
+						shell.Render(templ.WithChildren(r.Context(), content), w)
+					} else {
+						shell := PageShell(a.title, csrfToken, stylesURL, xData, htmlClass)
+						shell.Render(templ.WithChildren(r.Context(), content), w)
+					}
+					return
+				}
+
+				// Legacy WASM mode
+				renderedHTML := component().Render(HTML()).HTML()
+
+				// Clear session/cookie context after rendering
+				if SSRSessionClearer != nil {
+					SSRSessionClearer()
+				}
+				if SSRCookieClearer != nil {
+					SSRCookieClearer()
+				}
+
+				w.Header().Set("Content-Type", "text/html")
+
+				// Determine which WASM to use
+				wasmPath := "/app.wasm"
+				hasWasm := len(a.wasmBinary) > 0
+				if route.Bundle != "" {
+					wasmPath = "/" + route.Bundle + ".wasm"
+					_, hasWasm = a.wasmBundles[route.Bundle]
 				}
 
 				// Build CSRF meta tag
@@ -748,16 +824,10 @@ func (a *App) Handler() http.Handler {
 					csrfMeta = fmt.Sprintf(`<meta name="%s" content="%s">`, CSRFMetaName, csrfToken)
 				}
 
-				// Build dark mode class
-				htmlClass := ""
-				if a.darkMode {
-					htmlClass = ` class="dark"`
-				}
-
-				// Build cache-busted asset URLs
-				stylesURL := "/styles.css"
-				if a.stylesHash != "" {
-					stylesURL = fmt.Sprintf("/styles.css?v=%s", a.stylesHash)
+				// Build legacy dark mode class attribute
+				htmlClassAttr := ""
+				if htmlClass != "" {
+					htmlClassAttr = fmt.Sprintf(` class="%s"`, htmlClass)
 				}
 
 				wasmURL := wasmPath
@@ -797,7 +867,7 @@ func (a *App) Handler() http.Handler {
             .then(result => go.run(result.instance));
     </script>%s
 </body>
-</html>`, htmlClass, a.title, csrfMeta, stylesURL, html, stateJSON, wasmURL, hotReloadScript)
+</html>`, htmlClassAttr, a.title, csrfMeta, stylesURL, renderedHTML, stateJSON, wasmURL, hotReloadScript)
 				} else {
 					// SSR only, no WASM
 					fmt.Fprintf(w, `<!DOCTYPE html>
@@ -812,7 +882,7 @@ func (a *App) Handler() http.Handler {
 <body>
     <div id="app">%s</div>%s
 </body>
-</html>`, htmlClass, a.title, csrfMeta, stylesURL, html, hotReloadScript)
+</html>`, htmlClassAttr, a.title, csrfMeta, stylesURL, renderedHTML, hotReloadScript)
 				}
 				return
 			}

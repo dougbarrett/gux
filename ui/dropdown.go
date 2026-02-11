@@ -27,6 +27,10 @@ type DropdownProps struct {
 	Position DropdownPosition // Menu position (default: DropdownBottomLeft)
 	Class    string           // Additional wrapper classes
 	Children []core.Node      // DropdownTrigger and DropdownMenu
+
+	// Alpine.js props
+	XShow    string // x-show expression for menu visibility
+	XOnClose string // x-on:click expression for backdrop close
 }
 
 // Dropdown creates a dropdown container with relative positioning.
@@ -62,7 +66,19 @@ func Dropdown(props DropdownProps) core.Node {
 	var children []core.Node
 
 	// Invisible backdrop for outside click detection when open
-	if props.Open && props.OnClose != nil {
+	if props.XShow != "" {
+		// Alpine-controlled backdrop
+		backdropAttrs := core.Attrs{
+			Class:       "fixed inset-0 z-40",
+			XShow:       props.XShow,
+			XCloak:      true,
+			XTransition: "true",
+		}
+		if props.XOnClose != "" {
+			backdropAttrs.XOn = map[string]string{"click": props.XOnClose}
+		}
+		children = append(children, core.Div(backdropAttrs))
+	} else if props.Open && props.OnClose != nil {
 		children = append(children,
 			core.Div(core.Attrs{
 				Class:   "fixed inset-0 z-40",
@@ -162,6 +178,9 @@ type DropdownItemProps struct {
 	Destructive bool        // Red styling for delete actions
 	Class       string      // Additional classes
 	Children    []core.Node // Item content
+
+	// Alpine.js props
+	XOnClick string // x-on:click expression
 }
 
 // DropdownItem renders a menu item button with role="menuitem".
@@ -215,6 +234,9 @@ func DropdownItem(props DropdownItemProps) core.Node {
 	// Only attach click handler if not disabled
 	if !props.Disabled {
 		attrs.OnClick = props.OnClick
+		if props.XOnClick != "" {
+			attrs.XOn = map[string]string{"click": props.XOnClick}
+		}
 	}
 
 	return core.Button(attrs, props.Children...)

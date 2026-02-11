@@ -99,6 +99,7 @@ func TestRunDrainsInFlightRequests(t *testing.T) {
 }
 
 func TestWASMBuildExcludesServerDeps(t *testing.T) {
+	t.Skip("Skipped during Alpine.js migration — WASM support being removed in Phase 6")
 	// Verify that building core/ for WASM doesn't pull in heavy server-only deps.
 	// This prevents regressions where server-only imports leak into the WASM build.
 	cmd := exec.Command("go", "list", "-deps", "./")

@@ -1,0 +1,57 @@
+package core
+
+// PageShell renders the full HTML page wrapper for Alpine.js mode.
+// The content parameter receives the rendered page Node tree.
+templ PageShell(title, csrfToken, stylesURL, xData, htmlClass string) {
+	<!DOCTYPE html>
+	<html lang="en" class={ htmlClass }>
+	<head>
+		<meta charset="UTF-8"/>
+		<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+		<title>{ title }</title>
+		if csrfToken != "" {
+			<meta name="csrf-token" content={ csrfToken }/>
+		}
+		<link rel="stylesheet" href={ stylesURL }/>
+		<style>[x-cloak] { display: none !important; }</style>
+	</head>
+	<body>
+		<div id="app" x-data={ xData }>
+			{ children... }
+		</div>
+		<script src="/api.js"></script>
+		<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3/dist/cdn.min.js"></script>
+	</body>
+	</html>
+}
+
+// PageShellWithScripts renders the page shell with additional script tags.
+// Use this for hot reload scripts or custom JS.
+templ PageShellWithScripts(title, csrfToken, stylesURL, xData, htmlClass, extraScripts string) {
+	<!DOCTYPE html>
+	<html lang="en" class={ htmlClass }>
+	<head>
+		<meta charset="UTF-8"/>
+		<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+		<title>{ title }</title>
+		if csrfToken != "" {
+			<meta name="csrf-token" content={ csrfToken }/>
+		}
+		<link rel="stylesheet" href={ stylesURL }/>
+		<style>[x-cloak] { display: none !important; }</style>
+	</head>
+	<body>
+		<div id="app" x-data={ xData }>
+			{ children... }
+		</div>
+		<script src="/api.js"></script>
+		<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3/dist/cdn.min.js"></script>
+		@Raw(extraScripts)
+	</body>
+	</html>
+}
+
+// Raw renders a raw HTML string without escaping.
+templ Raw(content string) {
+	@templ.Raw(content)
+}

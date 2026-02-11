@@ -1,6 +1,10 @@
 package ui
 
-import "github.com/dougbarrett/gux/core"
+import (
+	"strconv"
+
+	"github.com/dougbarrett/gux/core"
+)
 
 // ColumnDef defines a column in a DataTable.
 type ColumnDef[T any] struct {
@@ -18,6 +22,9 @@ type DataTableProps[T any] struct {
 	Striped    bool           // Alternate row background
 	Hoverable  bool           // Row hover effect
 	Class      string         // Additional classes
+
+	// Alpine.js props
+	XOnRowClick string // x-on:click expression for row clicks (receives row index via $el.dataset.idx)
 }
 
 // DataTable renders a typed data table using generic column definitions.
@@ -73,11 +80,21 @@ func DataTable[T any](props DataTableProps[T]) core.Node {
 			}
 		}
 
-		rows = append(rows, Tr(TrProps{
-			Class:    rowClass,
-			OnClick:  onClick,
-			Children: cells,
-		}))
+		// Alpine.js row click
+		if props.XOnRowClick != "" {
+			rowAttrs := core.Attrs{
+				Class: MergeClasses(rowClass),
+				Data:  map[string]string{"idx": strconv.Itoa(i)},
+				XOn:   map[string]string{"click": props.XOnRowClick},
+			}
+			rows = append(rows, core.Tr(rowAttrs, cells...))
+		} else {
+			rows = append(rows, Tr(TrProps{
+				Class:    rowClass,
+				OnClick:  onClick,
+				Children: cells,
+			}))
+		}
 	}
 
 	return Table(TableProps{
