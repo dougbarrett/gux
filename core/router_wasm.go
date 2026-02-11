@@ -10,12 +10,12 @@ import (
 )
 
 var (
-	rerenderScheduled      = false
-	scheduledRouter        *Router
-	inChangeEvent          = false   // When true, ScheduleRerender is deferred
-	changeEventSuppressed  *Router   // Router that was suppressed during change event
-	inPointerDown          = false   // When true, re-renders are deferred until mouseup/touchend
-	pointerDownSuppressed  *Router   // Router that was suppressed during pointer-down window
+	rerenderScheduled     = false
+	scheduledRouter       *Router
+	inChangeEvent         = false  // When true, ScheduleRerender is deferred
+	changeEventSuppressed *Router // Router that was suppressed during change event
+	inPointerDown         = false  // When true, re-renders are deferred until mouseup/touchend
+	pointerDownSuppressed *Router // Router that was suppressed during pointer-down window
 )
 
 // debugRouter holds reference to the current router for debugging
@@ -194,4 +194,39 @@ func ScheduleRerender(r *Router) {
 		}
 		return nil
 	}), 0)
+}
+
+// Path returns the current request path.
+// In WASM, reads from route params or window.location.pathname.
+func (r *Router) Path() string {
+	if path, ok := r.routeParams["__path"]; ok {
+		return path
+	}
+	return js.Global().Get("location").Get("pathname").String()
+}
+
+// Query returns a URL query parameter value by name.
+// In WASM, reads from window.location.search.
+func (r *Router) Query(name string) string {
+	return wasmQuery(name)
+}
+
+// Login is server-side only. In WASM, returns an error.
+func (r *Router) Login(user *SessionUser) error {
+	return fmt.Errorf("Login() is server-side only")
+}
+
+// Logout is server-side only. In WASM, returns an error.
+func (r *Router) Logout() error {
+	return fmt.Errorf("Logout() is server-side only")
+}
+
+// Redirect performs a full-page navigation.
+// In WASM, uses the redirect callback or window.location.assign().
+func (r *Router) Redirect(path string) {
+	if r.redirect != nil {
+		r.redirect(path)
+		return
+	}
+	js.Global().Get("location").Call("assign", path)
 }

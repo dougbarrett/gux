@@ -2,6 +2,8 @@ package core
 
 import (
 	"net/http"
+	"os/exec"
+	"strings"
 	"syscall"
 	"testing"
 	"time"
@@ -93,6 +95,34 @@ func TestRunDrainsInFlightRequests(t *testing.T) {
 		}
 	case <-time.After(5 * time.Second):
 		t.Fatal("Run did not return within 5 seconds")
+	}
+}
+
+func TestWASMBuildExcludesServerDeps(t *testing.T) {
+	// Verify that building core/ for WASM doesn't pull in heavy server-only deps.
+	// This prevents regressions where server-only imports leak into the WASM build.
+	cmd := exec.Command("go", "list", "-deps", "./")
+	cmd.Env = append(cmd.Environ(), "GOOS=js", "GOARCH=wasm")
+	out, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("go list -deps failed: %v", err)
+	}
+
+	deps := strings.Split(string(out), "\n")
+	depSet := make(map[string]bool, len(deps))
+	for _, d := range deps {
+		depSet[strings.TrimSpace(d)] = true
+	}
+
+	forbidden := []string{
+		"net/http",
+		"github.com/go-analyze/charts",
+		"github.com/gabriel-vasile/mimetype",
+	}
+	for _, pkg := range forbidden {
+		if depSet[pkg] {
+			t.Errorf("WASM build should not depend on %q", pkg)
+		}
 	}
 }
 
